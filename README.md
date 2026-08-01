@@ -29,6 +29,12 @@ go test ./...
 go run ./tools/cmd/himind-repo-check
 ```
 
+将仓库中的全部扩展注册到本机 Agent 工作台：
+
+```powershell
+go run ./tools/cmd/himind-agent-workspace-sync -commit (git rev-parse HEAD)
+```
+
 插件构建产物、`.hmpkg`、`.hmskill`、`checksums.sha256` 和 Agent 草稿状态不进入 Git。构建产物由 Agent 生成并作为不可变审核制品提交。
 
 ## 发布规则
