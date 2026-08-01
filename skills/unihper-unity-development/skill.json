@@ -1,0 +1,30 @@
+{
+    "id":  "com.mrbaoquan.skill.unihper-unity-development",
+    "name":  "UNIHper Unity 开发助手",
+    "author":  "马宝全",
+    "categories":  [
+                       "software-engineering"
+                   ],
+    "version":  "1.0.0",
+    "scope":  "organization",
+    "description":  "面向基于 UNIHper 框架的 Unity 项目开发，指导场景脚本、UGUI、UI Toolkit、资源、配置及相关管理器的设计、实现、检查与排错；当用户提到 UNIHper、SceneScriptBase、UIBase、UIToolkitBase、ResourceManager、UConfig 或 Managements 门面时使用。",
+    "min_agent_version":  "0.3.1",
+    "supported_clients":  [
+                              "codex",
+                              "github-copilot",
+                              "workbuddy"
+                          ],
+    "capabilities":  [
+
+                     ],
+    "plugin_dependencies":  [
+
+                            ],
+    "risk_summary":  "可能按用户要求修改目标 Unity 工程内的 C#、JSON、UXML、USS、asmdef 与资源配置；禁止访问项目外路径、凭据和生成缓存，涉及迁移、删除、发布或提交时必须先确认范围。",
+    "contents":  [
+                     "SKILL.md",
+                     "agents/openai.yaml",
+                     "skill.json"
+                 ],
+    "release_notes":  "补全初始版本的功能分类和更新说明。"
+}

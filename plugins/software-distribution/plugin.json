@@ -1,0 +1,61 @@
+{
+  "id": "com.himind.software-distribution",
+  "name": "软件分发对接",
+  "author": "马宝全",
+  "categories": ["software-engineering", "collaboration-delivery", "testing-quality"],
+  "description": "为 AI 提供项目识别、软件制品摘要校验和 Dashboard 公共更新解析能力；发布凭据由 Agent 内置 broker 隔离。",
+  "release_notes": "统一源码仓库结构并复用公共 JSON-RPC SDK，保持现有能力与协议兼容。",
+  "version": "1.0.1",
+  "entry": "bin/software-distribution.exe",
+  "runtime": "process-jsonrpc-stdio",
+  "platforms": ["windows-x64"],
+  "min_agent_version": "0.3.0",
+  "governance": "optional",
+  "capabilities": [
+    {
+      "id": "software.distribution.project.inspect",
+      "description": "识别 WPF 或 Unity 项目并返回分发接入建议，不修改工程",
+      "input_schema": {
+        "type": "object",
+        "properties": {"workspace_root":{"type":"string"},"project_path":{"type":"string"},"product_id":{"type":"string"}},
+        "required": ["workspace_root", "project_path", "product_id"],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "software.distribution.artifact.inspect",
+      "description": "在工作区内检查发布制品并计算大小与 SHA-256",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root":{"type":"string"},"artifact_path":{"type":"string"},"product_id":{"type":"string"},"version":{"type":"string"},
+          "channel":{"type":"string"},"platform":{"type":"string"},"architecture":{"type":"string"},
+          "package_type":{"type":"string","enum":["directory-zip","apk","unity-addressables","content"]}
+        },
+        "required": ["workspace_root","artifact_path","product_id","version","platform","architecture","package_type"],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "software.distribution.release.resolve",
+      "description": "使用 Agent 配置的可信 Dashboard 地址检查指定产品更新，不接收凭据或任意 URL",
+      "input_schema": {
+        "type": "object",
+        "properties": {"product_id":{"type":"string"},"current_version":{"type":"string"},"channel":{"type":"string"},"platform":{"type":"string"},"architecture":{"type":"string"}},
+        "required": ["product_id","current_version","platform","architecture"],
+        "additionalProperties": false
+      },
+      "risk_level": "network"
+    }
+  ],
+  "permissions": ["filesystem.workspace.read", "network.dashboard.public"],
+  "contributes": {
+    "commands": [
+      {"id":"software.distribution.project.inspect","title":"检查软件分发接入"},
+      {"id":"software.distribution.artifact.inspect","title":"检查软件分发制品"},
+      {"id":"software.distribution.release.resolve","title":"验证软件更新发布"}
+    ]
+  }
+}

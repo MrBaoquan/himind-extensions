@@ -1,0 +1,44 @@
+---
+name: develop-himind-plugins
+description: 自动设计、创建、实现、测试、校验、打包和受控提交 HiMind Agent 插件。用户要求开发插件、创建 Capability、生成 plugin.json、构建 JSON-RPC/stdio 插件、生成 .hmpkg、在空白目录开发、提交审核或排查插件工程问题时使用。展示名称和用户文案使用中文，稳定 ID、目录名、二进制名和 Capability ID 使用 ASCII。
+---
+
+# 插件开发助手
+
+通过 HiMind Agent 提供的 Capability 完成插件全流程。不要假设当前项目包含 HiMind 源码、`AGENTS.md`、ADR、`docs/`、`agent-plugins/` 或任何脚手架；这些内容不存在时也必须正常工作。
+
+## 工作边界
+
+1. 将 `workspace_root` 只作为用户授权的开发目录和路径边界，不把它当成开发规范来源。用户说“当前目录”时使用客户端实际提供的工作目录，不向父目录搜索 HiMind 源码。
+2. 用户未给出目标目录时，先确认一个明确的工作区；不得猜测 Agent 安装目录、Dashboard 地址或凭据位置。
+3. 插件承担确定性文件、进程和专业格式处理；纯操作知识与编排规则使用独立技能。
+4. 用户可见名称、描述、命令标题和错误提示使用中文；`id`、目录名、Go 模块名、入口文件和 Capability ID 使用小写 ASCII。
+5. 只在 `workspace_root` 内写文件。不得读取或传递 Token、Cookie、私钥和 Agent credential，不得直接修改 Distribution 数据库。
+6. 先调用 `extension.authoring.identity` 获取当前 Agent 已授权工作台账号，将返回的 `user_name` 写入 `plugin.json.author`。不得猜测、缓存或硬编码作者。未授权时停止创建并提示用户先完成账号授权。
+7. 每个新版本必须在 `plugin.json.release_notes` 中填写中文更新说明，并从功能分类 ID `software-engineering`、`visual-design`、`video-post`、`3d-animation`、`content-production`、`audio-sound`、`data-automation`、`docs-knowledge`、`testing-quality`、`collaboration-delivery`、`system-device` 中选择至少一个 `categories` 分类。分类描述能力领域，不填写岗位名称、权限或客户端名称。
+8. Agent 不执行 Git clone、pull、commit、push 或凭据管理。开发者可自行用 Git 管理源码；本技能只处理当前 `workspace_root` 中的工作副本和不可变候选包。
+
+## 自动开发流程
+
+1. 调用 `extension.authoring.identity` 获取 `user_name`，再调用 `extension.environment.preflight` 并传入 `kind: plugin`，确认受管开发插件和 Go 工具链可用。存在阻塞项时停止写入并返回明确修复项。
+2. 根据需求确定插件 ASCII 名称、中文展示名、用途说明、模板、Capability、输入 Schema、风险等级、最小权限、功能分类和本版本更新说明。需要独立窗口或桌面快捷方式时使用 `ui-tool`；只向 AI 提供只读工具时使用 `readonly-tool`；长任务使用 `job-worker`。
+3. 调用 `extension.plugin.scaffold`，传入绝对 `workspace_root`、工作区内的 `output_dir`、`name`、`display_name`、`description`、身份返回的 `author`、`categories`、`release_notes` 和 `template`。脚手架必须生成可在空白目录独立构建的工程。
+4. 在生成工程内实现功能与测试。使用 JSON-RPC 2.0 stdin/stdout；业务日志只写 stderr 并脱敏。不得接受任意 Shell、任意 URL、明文凭据或越出工作区的路径。
+5. 调用 `extension.plugin.validate` 校验工程，再调用 `extension.plugin.build` 执行 `go test ./...` 并构建 Manifest 声明的入口。修复失败后重复校验和构建，直到通过或出现需要用户决策的阻塞。
+6. 调用 `extension.plugin.package` 生成工作区内的 `.hmpkg`，随后再次调用 `extension.plugin.validate` 校验制品。
+7. 调用 `extension.plugin.candidate.save`，传入已校验 `.hmpkg` 的 `package_path` 保存候选包，再用返回的稳定 ID 和版本调用 `extension.plugin.candidate.test`。记录候选包路径、SHA-256、测试结果和失败原因。
+8. 只有用户明确要求“提交审核”时，才调用 `extension.plugin.submission.submit`。该能力会显示包含中文名称、版本和 SHA-256 的本机确认窗口；用户取消时不得重试或绕过。
+9. 提交后调用 `extension.plugin.submission.status` 返回审核状态和意见。管理员审核、签名、发布、撤回和同版本替换不属于本技能权限。
+
+## 协作修订
+
+1. 其他同事接手已上架插件时，先调用 `extension.plugin.submission.status` 定位产品、当前版本、提交 ID 和自己的协作角色。作者与贡献者都可以准备、构建和提交新版本。
+2. 开发者自行取得并管理源码工作副本。基于已发布版本修改时提升语义版本，更新 `release_notes`，重新完成校验、构建和打包。
+3. 保存候选时除 `package_path` 外传入 `revision_of_version` 和 `parent_submission_id`，使 Dashboard 能把新提交挂到同一产品和父版本。不得创建同版本替换包。
+
+## 完成标准
+
+- 工程不依赖创建它的仓库，可以从空白目录独立测试和构建。
+- Manifest、代码测试、入口构建、目录校验、包校验和候选测试全部通过。
+- 已发布内容发生变化时提升语义版本，不覆盖原版本；`release_notes` 准确概括新增、改进、修复和兼容性变化。
+- 输出中文摘要，列出插件名称、稳定 ID、版本、版本更新说明、Capability、文件路径、测试结果、制品 SHA-256、提审状态及仍需管理员处理的动作。

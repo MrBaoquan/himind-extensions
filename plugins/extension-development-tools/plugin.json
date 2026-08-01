@@ -1,0 +1,123 @@
+{
+  "id": "com.himind.extension-development-tools",
+  "name": "AI 扩展开发工具",
+  "author": "马宝全",
+  "categories": ["software-engineering"],
+  "description": "为 AI 助手提供不依赖业务项目上下文的插件与技能脚手架、校验、构建和打包能力。",
+  "release_notes": "迁移到统一扩展仓库并更新共享工具链引用，保持现有插件与 Skill 开发能力兼容。",
+  "version": "1.1.1",
+  "entry": "extension-development-tools.exe",
+  "runtime": "process-jsonrpc-stdio",
+  "platforms": ["windows-x64"],
+  "min_agent_version": "0.3.0",
+  "governance": "managed",
+  "capabilities": [
+    {
+      "id": "extension.environment.preflight",
+      "description": "检查扩展开发工具链和本机 Agent 依赖",
+      "input_schema": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["plugin", "skill"]}}, "additionalProperties": false},
+      "risk_level": "read_only"
+    },
+    {
+      "id": "extension.plugin.scaffold",
+      "description": "在用户指定工作区创建可独立构建的 HiMind 插件工程",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {"type": "string"},
+          "output_dir": {"type": "string"},
+          "name": {"type": "string"},
+          "display_name": {"type": "string"},
+          "description": {"type": "string"},
+          "author": {"type": "string"},
+          "categories": {"type": "array", "items": {"type": "string"}},
+          "release_notes": {"type": "string"},
+          "template": {"type": "string", "enum": ["readonly-tool", "job-worker", "ui-tool"]}
+        },
+        "required": ["workspace_root", "output_dir", "name", "display_name", "description", "author", "categories", "release_notes"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "extension.plugin.validate",
+      "description": "校验 HiMind 插件工程或 .hmpkg 制品",
+      "input_schema": {
+        "type": "object",
+        "properties": {"workspace_root": {"type": "string"}, "path": {"type": "string"}},
+        "required": ["workspace_root", "path"],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "extension.plugin.build",
+      "description": "在工作区内运行插件测试并构建入口文件",
+      "input_schema": {
+        "type": "object",
+        "properties": {"workspace_root": {"type": "string"}, "path": {"type": "string"}},
+        "required": ["workspace_root", "path"],
+        "additionalProperties": false
+      },
+      "risk_level": "process"
+    },
+    {
+      "id": "extension.plugin.package",
+      "description": "校验并打包 HiMind .hmpkg 制品",
+      "input_schema": {
+        "type": "object",
+        "properties": {"workspace_root": {"type": "string"}, "path": {"type": "string"}, "output": {"type": "string"}},
+        "required": ["workspace_root", "path", "output"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "extension.skill.scaffold",
+      "description": "在用户指定工作区创建可独立使用的 HiMind Skill 工程",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {"type": "string"},
+          "output_dir": {"type": "string"},
+          "slug": {"type": "string"},
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "version": {"type": "string"},
+          "min_agent_version": {"type": "string"},
+          "description": {"type": "string"},
+          "author": {"type": "string"},
+          "categories": {"type": "array", "items": {"type": "string"}},
+          "release_notes": {"type": "string"},
+          "supported_clients": {"type": "array", "items": {"type": "string"}}
+        },
+        "required": ["workspace_root", "output_dir", "slug", "name", "description", "author", "categories", "release_notes"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "extension.skill.validate",
+      "description": "校验 HiMind Skill 工程或 .hmskill 制品",
+      "input_schema": {
+        "type": "object",
+        "properties": {"workspace_root": {"type": "string"}, "path": {"type": "string"}},
+        "required": ["workspace_root", "path"],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "extension.skill.package",
+      "description": "校验并打包 HiMind .hmskill 制品",
+      "input_schema": {
+        "type": "object",
+        "properties": {"workspace_root": {"type": "string"}, "path": {"type": "string"}, "output": {"type": "string"}},
+        "required": ["workspace_root", "path", "output"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    }
+  ],
+  "permissions": ["filesystem.workspace.read", "filesystem.workspace.write", "process.go"]
+}

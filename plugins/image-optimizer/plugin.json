@@ -1,0 +1,38 @@
+{
+  "id": "com.himind.image-optimizer",
+  "name": "图片压缩与缩放",
+  "author": "马宝全",
+  "categories": ["visual-design", "content-production"],
+  "description": "压缩 JPEG 与 PNG 图片，并按最大边长等比例缩放，始终输出新文件。",
+  "release_notes": "补充作者、功能分类与版本更新说明，纳入统一扩展源码仓库。",
+  "version": "1.0.2",
+  "entry": "image-optimizer.exe",
+  "runtime": "process-jsonrpc-stdio",
+  "platforms": ["windows-x64"],
+  "min_agent_version": "0.2.0",
+  "governance": "optional",
+  "capabilities": [
+    {
+      "id": "image.optimize",
+      "description": "压缩 JPEG/PNG 图片并可按最大边长等比例缩放，始终写入新文件",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "input_path": { "type": "string" },
+          "output_path": { "type": "string" },
+          "quality": { "type": "integer", "minimum": 40, "maximum": 95 },
+          "max_dimension": { "type": "integer", "minimum": 320, "maximum": 8192 }
+        },
+        "required": ["input_path", "output_path"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    }
+  ],
+  "permissions": ["fs.read.user_selected", "fs.write.user_selected"],
+  "contributes": {
+    "commands": [
+      { "id": "image.optimize", "title": "压缩图片" }
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "com.himind.skill.git-svn-commit-summary",
+  "name": "Git/SVN 提交摘要",
+  "author": "马宝全",
+  "categories": ["collaboration-delivery"],
+  "version": "1.1.0",
+  "scope": "organization",
+  "description": "根据 Git 或 SVN 的真实差异生成提交摘要，并且只执行用户明确确认的提交。",
+  "release_notes": "统一 Git 与 SVN 的差异审查、提交摘要和受控提交工作流，并补充 WorkBuddy 支持。",
+  "min_agent_version": "0.2.0",
+  "supported_clients": [
+    "codex",
+    "github-copilot",
+    "workbuddy"
+  ],
+  "capabilities": [],
+  "plugin_dependencies": [],
+  "risk_summary": "read_only_by_default; commit_requires_explicit_confirmation",
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml"
+  ]
+}

@@ -1,0 +1,23 @@
+# Build outputs
+bin/
+dist/
+out/
+*.exe
+*.pdb
+*.hmpkg
+*.hmskill
+checksums.sha256
+
+# Local state
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+.himind-candidate-*
+
+# Credentials and environment files
+.env
+.env.*
+!.env.example

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/MrBaoquan/himind-extensions.git",
+  "default_branch": "main",
+  "extensions": [
+    {"type": "plugin", "id": "com.himind.document-inspector", "path": "plugins/document-inspector"},
+    {"type": "plugin", "id": "com.himind.extension-development-tools", "path": "plugins/extension-development-tools"},
+    {"type": "plugin", "id": "com.himind.image-optimizer", "path": "plugins/image-optimizer"},
+    {"type": "plugin", "id": "com.himind.software-distribution", "path": "plugins/software-distribution"},
+    {"type": "skill", "id": "com.himind.skill.develop-himind-plugins", "path": "skills/develop-himind-plugins"},
+    {"type": "skill", "id": "com.himind.skill.develop-himind-skills", "path": "skills/develop-himind-skills"},
+    {"type": "skill", "id": "com.himind.skill.git-svn-commit-summary", "path": "skills/git-svn-commit-summary"},
+    {"type": "skill", "id": "com.himind.skill.image-delivery-preflight", "path": "skills/image-delivery-preflight"},
+    {"type": "skill", "id": "com.himind.skill.software-distribution", "path": "skills/software-distribution"},
+    {"type": "skill", "id": "com.mrbaoquan.skill.unihper-unity-development", "path": "skills/unihper-unity-development"}
+  ]
+}

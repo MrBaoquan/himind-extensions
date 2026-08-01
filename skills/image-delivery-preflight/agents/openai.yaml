@@ -1,0 +1,4 @@
+interface:
+  display_name: "图片交付预检"
+  short_description: "在图片优化或交付前检查环境、插件依赖、输入范围与交付约束"
+  default_prompt: "使用 $image-delivery-preflight 检查图片优化与交付是否已准备就绪。"

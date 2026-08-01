@@ -1,0 +1,36 @@
+{
+  "id": "com.himind.document-inspector",
+  "name": "项目文档解析",
+  "author": "马宝全",
+  "categories": ["docs-knowledge", "data-automation"],
+  "description": "解析 DOCX、TXT 与 Markdown 文档，提取文本、字数和基础元数据。",
+  "release_notes": "补充作者、功能分类与版本更新说明，纳入统一扩展源码仓库。",
+  "version": "1.0.1",
+  "entry": "document-inspector.exe",
+  "runtime": "process-jsonrpc-stdio",
+  "platforms": ["windows-x64"],
+  "min_agent_version": "0.2.0",
+  "governance": "optional",
+  "capabilities": [
+    {
+      "id": "document.inspect",
+      "description": "解析 DOCX、TXT 或 Markdown 文档的文本、字数和基础元数据",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "max_chars": { "type": "integer", "minimum": 100, "maximum": 200000 }
+        },
+        "required": ["path"],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    }
+  ],
+  "permissions": ["fs.read.user_selected"],
+  "contributes": {
+    "commands": [
+      { "id": "document.inspect", "title": "解析项目文档" }
+    ]
+  }
+}

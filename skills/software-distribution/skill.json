@@ -1,0 +1,23 @@
+{
+  "id": "com.himind.skill.software-distribution",
+  "name": "软件分发对接",
+  "author": "马宝全",
+  "categories": ["software-engineering", "collaboration-delivery", "testing-quality"],
+  "version": "1.0.0",
+  "scope": "organization",
+  "description": "为 WPF、Unity Windows 或 Unity Android 项目接入 Dashboard 软件分发，完成制品检查、受控发布和真实更新验证。",
+  "release_notes": "建立软件分发项目检查、制品校验、受控发布和真实更新验证的完整工作流。",
+  "min_agent_version": "0.3.0",
+  "supported_clients": ["codex", "github-copilot", "workbuddy"],
+  "capabilities": [
+    {"id":"software.distribution.project.inspect","required":true,"min_version":"1.0.0","provider":"com.himind.software-distribution"},
+    {"id":"software.distribution.artifact.inspect","required":true,"min_version":"1.0.0","provider":"com.himind.software-distribution"},
+    {"id":"software.distribution.release.publish","required":true,"min_version":"1.0.0","provider":"builtin"},
+    {"id":"software.distribution.release.resolve","required":true,"min_version":"1.0.0","provider":"com.himind.software-distribution"}
+  ],
+  "plugin_dependencies": [
+    {"plugin_id":"com.himind.software-distribution","required":true,"min_version":"1.0.0"}
+  ],
+  "risk_summary": "read_only_by_default; publish_requires_user_confirmation_and_agent_oauth_scope",
+  "contents": ["skill.json", "SKILL.md", "agents/openai.yaml"]
+}

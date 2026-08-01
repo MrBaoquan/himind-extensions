@@ -1,0 +1,4 @@
+interface:
+  display_name: "软件分发对接"
+  short_description: "检查项目和制品，经确认发布到 Dashboard 并验证更新链路"
+  default_prompt: "使用 $software-distribution 为当前应用接入 Dashboard 软件分发；先检查项目与制品，展示发布摘要并等待确认，再发布和验证。"

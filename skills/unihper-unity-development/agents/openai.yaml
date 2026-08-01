@@ -1,0 +1,4 @@
+interface:
+  display_name: "UNIHper Unity 开发助手"
+  short_description: "按 UNIHper 约定实现和排查 Unity 场景、UI、资源与配置"
+  default_prompt: "使用 $unihper-unity-development 分析目标 Unity 工程的实际 UNIHper 版本与配置，并按框架生命周期完成实现、检查和验证。"
