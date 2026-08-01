@@ -28,7 +28,7 @@
     {
       "plugin_id": "com.himind.extension-development-tools",
       "required": true,
-      "min_version": "1.1.1"
+      "min_version": "1.1.0"
     }
   ],
   "risk_summary": "local_write; submission_requires_confirmation; publication_requires_admin_review",
