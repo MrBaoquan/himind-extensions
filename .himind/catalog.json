@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "source_id": "",
+  "generation": "bootstrap",
+  "plugins": [],
+  "skills": [],
+  "feature_packs": [
+    {
+      "id": "com.himind.feature.extension-authoring",
+      "name": "扩展创作",
+      "plugin_ids": [
+        "com.himind.extension-development-tools"
+      ],
+      "skill_ids": [
+        "com.himind.skill.develop-himind-plugins",
+        "com.himind.skill.develop-himind-skills"
+      ]
+    }
+  ]
+}

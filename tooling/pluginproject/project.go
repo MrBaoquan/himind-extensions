@@ -49,6 +49,7 @@ type Capability struct {
 	Description string         `json:"description"`
 	InputSchema map[string]any `json:"input_schema"`
 	RiskLevel   string         `json:"risk_level"`
+	Availability string        `json:"availability"`
 }
 
 type Contributions struct {
@@ -140,7 +141,7 @@ func Create(config Config) (Result, error) {
 func buildManifest(name, displayName, description, author string, categories []string, releaseNotes, template string) Manifest {
 	id := "com.himind." + strings.ReplaceAll(name, "_", "-")
 	capabilityID := strings.ReplaceAll(name, "-", ".") + ".run"
-	capability := Capability{ID: capabilityID, Description: "请用中文说明该插件能力的用途、输入和输出。", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"value": map[string]any{"type": "string"}}, "additionalProperties": false}, RiskLevel: "read_only"}
+	capability := Capability{ID: capabilityID, Description: "请用中文说明该插件能力的用途、输入和输出。", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"value": map[string]any{"type": "string"}}, "additionalProperties": false}, RiskLevel: "read_only", Availability: "local"}
 	if template == "job-worker" {
 		capability.Description = "请用中文说明该长任务能力的用途、进度和结果。"
 		capability.RiskLevel = "local_write"

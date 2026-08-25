@@ -137,8 +137,34 @@ func replaceFile(temporary, target string) error {
 }
 
 func defaultRegistry() string {
+	if value := strings.TrimSpace(os.Getenv("HIMIND_EXTENSION_PROJECTS_FILE")); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(os.Getenv("HIMIND_AGENT_HOME")); value != "" {
+		return filepath.Join(value, "extension-projects.json")
+	}
+	base := ""
 	if value := os.Getenv("LOCALAPPDATA"); value != "" {
-		return filepath.Join(value, "HiMindAgent", "extension-projects.json")
+		base = filepath.Join(value, "HiMindAgent")
+	}
+	if base != "" {
+		profile := strings.TrimSpace(os.Getenv("HIMIND_AGENT_PROFILE"))
+		if profile != "" && profile != "production" && profile != "default" && safeProfileName(profile) {
+			return filepath.Join(base, "profiles", profile, "extension-projects.json")
+		}
+		return filepath.Join(base, "extension-projects.json")
 	}
 	return "extension-projects.json"
+}
+
+func safeProfileName(value string) bool {
+	if len(value) == 0 || len(value) > 48 {
+		return false
+	}
+	for _, char := range value {
+		if !(char >= 'a' && char <= 'z') && !(char >= 'A' && char <= 'Z') && !(char >= '0' && char <= '9') && char != '.' && char != '_' && char != '-' {
+			return false
+		}
+	}
+	return true
 }

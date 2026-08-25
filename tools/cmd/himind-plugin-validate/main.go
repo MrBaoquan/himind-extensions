@@ -38,6 +38,7 @@ type capability struct {
 	Description string          `json:"description"`
 	InputSchema json.RawMessage `json:"input_schema"`
 	RiskLevel   string          `json:"risk_level"`
+	Availability string         `json:"availability"`
 }
 
 type contributions struct {
@@ -64,6 +65,7 @@ var (
 	governances    = map[string]bool{"required": true, "managed": true, "optional": true, "blocked": true}
 	runtimes       = map[string]bool{"process-jsonrpc-stdio": true}
 	riskLevels     = map[string]bool{"read_only": true, "local_write": true, "process": true, "network": true, "system": true, "builtin_policy": true}
+	availability   = map[string]bool{"local": true, "network_service": true, "control_plane": true}
 )
 
 func Main() {
@@ -253,6 +255,9 @@ func ParseManifest(data []byte) (manifest, error) {
 		capabilityIDs[capability.ID] = true
 		if !riskLevels[capability.RiskLevel] {
 			return item, fmt.Errorf("unsupported risk_level for %s: %s", capability.ID, capability.RiskLevel)
+		}
+		if capability.Availability != "" && !availability[capability.Availability] {
+			return item, fmt.Errorf("unsupported availability for %s: %s", capability.ID, capability.Availability)
 		}
 		if len(capability.InputSchema) == 0 || !json.Valid(capability.InputSchema) {
 			return item, fmt.Errorf("input_schema must be valid JSON for %s", capability.ID)

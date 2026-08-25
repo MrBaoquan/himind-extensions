@@ -3,18 +3,19 @@
   "name": "软件分发对接",
   "author": "马宝全",
   "categories": ["software-engineering", "collaboration-delivery", "testing-quality"],
-  "description": "为 AI 提供项目识别、软件制品摘要校验和 Dashboard 公共更新解析能力；发布凭据由 Agent 内置 broker 隔离。",
-  "release_notes": "统一源码仓库结构并复用公共 JSON-RPC SDK，保持现有能力与协议兼容。",
-  "version": "1.0.1",
+  "description": "为 AI 提供项目接入诊断、软件制品结构与摘要校验；连接组织分发服务后可继续验证更新。",
+  "release_notes": "增强 WPF 与客户端接入识别、ZIP/APK 结构门禁和已签名 resolve Manifest 校验。",
+  "version": "1.1.0",
   "entry": "bin/software-distribution.exe",
   "runtime": "process-jsonrpc-stdio",
   "platforms": ["windows-x64"],
-  "min_agent_version": "0.3.0",
+  "min_agent_version": "0.3.33",
   "governance": "optional",
   "capabilities": [
     {
       "id": "software.distribution.project.inspect",
       "description": "识别 WPF 或 Unity 项目并返回分发接入建议，不修改工程",
+      "availability": "local",
       "input_schema": {
         "type": "object",
         "properties": {"workspace_root":{"type":"string"},"project_path":{"type":"string"},"product_id":{"type":"string"}},
@@ -26,6 +27,7 @@
     {
       "id": "software.distribution.artifact.inspect",
       "description": "在工作区内检查发布制品并计算大小与 SHA-256",
+      "availability": "local",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -40,7 +42,8 @@
     },
     {
       "id": "software.distribution.release.resolve",
-      "description": "使用 Agent 配置的可信 Dashboard 地址检查指定产品更新，不接收凭据或任意 URL",
+      "description": "使用 Agent 配置的可信组织分发服务检查指定产品更新，不接收凭据或任意 URL",
+      "availability": "control_plane",
       "input_schema": {
         "type": "object",
         "properties": {"product_id":{"type":"string"},"current_version":{"type":"string"},"channel":{"type":"string"},"platform":{"type":"string"},"architecture":{"type":"string"}},

@@ -1,0 +1,116 @@
+name: Repair extension catalog
+
+on:
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: Extension kind
+        required: true
+        type: choice
+        options:
+          - plugin
+          - skill
+      path:
+        description: Repository path at the release commit
+        required: true
+        type: string
+      tag:
+        description: Existing immutable GitHub Release tag
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: himind-extension-release
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.22.x
+          cache: false
+      - name: Validate repository
+        shell: pwsh
+        run: |
+          go test ./...
+          go run ./tools/cmd/himind-repo-check
+      - name: Resolve immutable release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $kind = '${{ inputs.kind }}'
+          $sourcePath = '${{ inputs.path }}'.Replace('\', '/').Trim('/')
+          $tag = '${{ inputs.tag }}'
+          if ($sourcePath -notmatch '^(plugins|skills)/[A-Za-z0-9._/-]+$' -or $sourcePath.Contains('..')) { throw 'Extension path is invalid.' }
+          if (($kind -eq 'plugin' -and -not $sourcePath.StartsWith('plugins/')) -or ($kind -eq 'skill' -and -not $sourcePath.StartsWith('skills/'))) { throw 'Extension path does not match its kind.' }
+          if ($tag -notmatch '^[A-Za-z0-9._+-]+$') { throw 'Release tag is invalid.' }
+
+          $release = gh release view $tag --repo '${{ github.repository }}' --json targetCommitish,publishedAt | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'The immutable GitHub Release was not found.' }
+          $target = [string]$release.targetCommitish
+          if ([string]::IsNullOrWhiteSpace($target)) { throw 'The release does not identify its source commit.' }
+          git cat-file -e "$target^{commit}" 2>$null
+          if ($LASTEXITCODE -ne 0) { throw 'The release source commit is not available in repository history.' }
+
+          $manifestName = if ($kind -eq 'plugin') { 'plugin.json' } else { 'skill.json' }
+          $manifestSpec = "${target}:$sourcePath/$manifestName"
+          $manifestText = git show $manifestSpec
+          if ($LASTEXITCODE -ne 0) { throw "The release source commit does not contain $sourcePath/$manifestName." }
+          $sourceRoot = Join-Path $env:RUNNER_TEMP 'himind-release-source'
+          New-Item -ItemType Directory -Force -Path $sourceRoot | Out-Null
+          $manifestFile = Join-Path $sourceRoot $manifestName
+          [IO.File]::WriteAllText($manifestFile, (($manifestText -join "`n") + "`n"), [Text.UTF8Encoding]::new($false))
+          $manifest = Get-Content -LiteralPath $manifestFile -Raw -Encoding UTF8 | ConvertFrom-Json
+          $safeId = ([string]$manifest.id) -replace '[^A-Za-z0-9._-]', '-'
+          $expectedTag = "$kind-$safeId-v$($manifest.version)"
+          if ($tag -ne $expectedTag) { throw "Release tag does not match the source manifest. Expected $expectedTag." }
+
+          $downloadRoot = Join-Path $env:RUNNER_TEMP 'himind-release-assets'
+          New-Item -ItemType Directory -Force -Path $downloadRoot | Out-Null
+          gh release download $tag --repo '${{ github.repository }}' --dir $downloadRoot --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to download the immutable release assets.' }
+          $extension = if ($kind -eq 'plugin') { '.hmpkg' } else { '.hmskill' }
+          $artifact = Join-Path $downloadRoot "$safeId-$($manifest.version)$extension"
+          $signature = "$artifact.signature.json"
+          if (-not (Test-Path -LiteralPath $artifact -PathType Leaf)) { throw "Expected release artifact was not found: $artifact" }
+          if (-not (Test-Path -LiteralPath $signature -PathType Leaf)) { throw "Expected signature metadata was not found: $signature" }
+
+          "source_root=$sourceRoot" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "artifact_path=$artifact" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "signature_path=$signature" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "published_at=$($release.publishedAt)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "target_commit=$target" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+      - name: Repair public catalog
+        shell: pwsh
+        run: |
+          go run ./tools/cmd/himind-catalog-upsert `
+            -kind '${{ inputs.kind }}' `
+            -source '${{ steps.release.outputs.source_root }}' `
+            -artifact '${{ steps.release.outputs.artifact_path }}' `
+            -signature '${{ steps.release.outputs.signature_path }}' `
+            -repository '${{ github.repository }}' `
+            -tag '${{ inputs.tag }}' `
+            -generation '${{ steps.release.outputs.target_commit }}-${{ inputs.tag }}' `
+            -published-at '${{ steps.release.outputs.published_at }}' `
+            -catalog '.himind/catalog.json'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .himind/catalog.json
+          git diff --cached --quiet -- .himind/catalog.json
+          if ($LASTEXITCODE -eq 0) {
+            Write-Output 'Catalog already contains this immutable release.'
+            exit 0
+          }
+          git commit -m 'catalog: repair ${{ inputs.tag }}'
+          git push origin HEAD:main

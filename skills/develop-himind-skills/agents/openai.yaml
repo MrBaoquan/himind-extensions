@@ -1,4 +1,4 @@
 interface:
   display_name: "技能开发助手"
   short_description: "自动创建、跨客户端测试并受控提交 HiMind 技能"
-  default_prompt: "使用 $develop-himind-skills 在指定工作区自动创建、校验、打包并测试一个 HiMind 技能。"
+  default_prompt: "使用 $develop-himind-skills 在当前 HiMind AI 项目中创建、校验、打包并测试技能；仅在我明确要求时提交审核。"

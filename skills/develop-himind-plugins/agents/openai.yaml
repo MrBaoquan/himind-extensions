@@ -1,4 +1,4 @@
 interface:
   display_name: "插件开发助手"
   short_description: "自动开发、测试、打包并受控提交 HiMind 插件"
-  default_prompt: "使用 $develop-himind-plugins 在指定工作区自动开发、测试、打包并准备提交一个 HiMind 插件。"
+  default_prompt: "使用 $develop-himind-plugins 在当前 HiMind AI 项目中开发、测试并打包插件；仅在我明确要求时提交审核。"

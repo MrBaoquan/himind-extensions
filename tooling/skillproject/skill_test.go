@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -25,9 +26,8 @@ func TestCreateAndPackageSkillInBlankDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(manifest.SupportedClients) != 3 ||
-		manifest.SupportedClients[1] != "github-copilot" ||
-		manifest.SupportedClients[2] != "workbuddy" {
+	expectedClients := []string{"himind-ai", "codex", "github-copilot", "workbuddy"}
+	if !slices.Equal(manifest.SupportedClients, expectedClients) {
 		t.Fatalf("unexpected clients: %#v", manifest.SupportedClients)
 	}
 	if _, err := os.Stat(filepath.Join(root, "agents", "openai.yaml")); err != nil {

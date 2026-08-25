@@ -78,7 +78,7 @@ func Create(config CreateConfig) (string, error) {
 		config.MinAgentVersion = "0.3.0"
 	}
 	if len(config.Clients) == 0 {
-		config.Clients = []string{"codex", "github-copilot", "workbuddy"}
+		config.Clients = []string{"himind-ai", "codex", "github-copilot", "workbuddy"}
 	}
 	if strings.TrimSpace(config.Author) == "" {
 		return "", errors.New("author is required; use the current Agent authorized user")

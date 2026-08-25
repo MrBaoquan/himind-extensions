@@ -4,8 +4,8 @@
   "author": "马宝全",
   "categories": ["software-engineering"],
   "description": "为 AI 助手提供不依赖业务项目上下文的插件与技能脚手架、校验、构建和打包能力。",
-  "release_notes": "迁移到统一扩展仓库并更新共享工具链引用，保持现有插件与 Skill 开发能力兼容。",
-  "version": "1.1.1",
+  "release_notes": "显式声明全部创作能力为本地能力，并由 Agent 将 AI 调用绑定到当前扩展工作区。",
+  "version": "1.2.0",
   "entry": "extension-development-tools.exe",
   "runtime": "process-jsonrpc-stdio",
   "platforms": ["windows-x64"],
@@ -16,7 +16,8 @@
       "id": "extension.environment.preflight",
       "description": "检查扩展开发工具链和本机 Agent 依赖",
       "input_schema": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["plugin", "skill"]}}, "additionalProperties": false},
-      "risk_level": "read_only"
+      "risk_level": "read_only",
+      "availability": "local"
     },
     {
       "id": "extension.plugin.scaffold",
@@ -37,7 +38,8 @@
         "required": ["workspace_root", "output_dir", "name", "display_name", "description", "author", "categories", "release_notes"],
         "additionalProperties": false
       },
-      "risk_level": "local_write"
+      "risk_level": "local_write",
+      "availability": "local"
     },
     {
       "id": "extension.plugin.validate",
@@ -48,7 +50,8 @@
         "required": ["workspace_root", "path"],
         "additionalProperties": false
       },
-      "risk_level": "read_only"
+      "risk_level": "read_only",
+      "availability": "local"
     },
     {
       "id": "extension.plugin.build",
@@ -59,7 +62,8 @@
         "required": ["workspace_root", "path"],
         "additionalProperties": false
       },
-      "risk_level": "process"
+      "risk_level": "process",
+      "availability": "local"
     },
     {
       "id": "extension.plugin.package",
@@ -70,7 +74,8 @@
         "required": ["workspace_root", "path", "output"],
         "additionalProperties": false
       },
-      "risk_level": "local_write"
+      "risk_level": "local_write",
+      "availability": "local"
     },
     {
       "id": "extension.skill.scaffold",
@@ -94,7 +99,8 @@
         "required": ["workspace_root", "output_dir", "slug", "name", "description", "author", "categories", "release_notes"],
         "additionalProperties": false
       },
-      "risk_level": "local_write"
+      "risk_level": "local_write",
+      "availability": "local"
     },
     {
       "id": "extension.skill.validate",
@@ -105,7 +111,8 @@
         "required": ["workspace_root", "path"],
         "additionalProperties": false
       },
-      "risk_level": "read_only"
+      "risk_level": "read_only",
+      "availability": "local"
     },
     {
       "id": "extension.skill.package",
@@ -116,7 +123,8 @@
         "required": ["workspace_root", "path", "output"],
         "additionalProperties": false
       },
-      "risk_level": "local_write"
+      "risk_level": "local_write",
+      "availability": "local"
     }
   ],
   "permissions": ["filesystem.workspace.read", "filesystem.workspace.write", "process.go"]
