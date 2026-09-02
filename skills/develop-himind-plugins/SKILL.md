@@ -17,16 +17,17 @@ description: 自动设计、创建、实现、测试、校验、打包和受控�
 6. 调用 `extension.authoring.identity` 获取当前 Agent 的本地或 Dashboard 作者资料，将返回的 `user_name` 写入 `plugin.json.author`。独立模式使用本地作者资料，不因未连接 Dashboard 停止本地创作。
 7. 每个新版本必须在 `plugin.json.release_notes` 中填写中文更新说明，并从功能分类 ID `software-engineering`、`visual-design`、`video-post`、`3d-animation`、`content-production`、`audio-sound`、`data-automation`、`docs-knowledge`、`testing-quality`、`collaboration-delivery`、`system-device` 中选择至少一个 `categories` 分类。分类描述能力领域，不填写岗位名称、权限或客户端名称。
 8. Agent 不执行 Git clone、pull、commit、push 或凭据管理。开发者可自行用 Git 管理源码；本技能只处理当前 `workspace_root` 中的工作副本和不可变候选包。
+9. `plugin.json` 必须显式声明插件依赖。只在确有运行时依赖时填写 `plugin_dependencies`；不得把本技能、技能开发助手或 AI 扩展开发工具声明为业务插件运行时依赖。
 
 ## 自动开发流程
 
 1. 调用 `extension.workspace.current` 确认当前目录及项目身份，再调用 `extension.authoring.identity` 获取 `user_name`，最后调用 `extension.environment.preflight` 并传入 `kind: plugin`。存在阻塞项时停止写入并返回明确修复项。
-2. 根据需求确定插件 ASCII 名称、中文展示名、用途说明、模板、Capability、输入 Schema、风险等级、最小权限、功能分类和本版本更新说明。需要独立窗口或桌面快捷方式时使用 `ui-tool`；只向 AI 提供只读工具时使用 `readonly-tool`；长任务使用 `job-worker`。
+2. 根据需求确定插件 ASCII 名称、中文展示名、用途说明、模板、Capability、输入 Schema、风险等级、最小权限、功能分类、必需/可选插件依赖和本版本更新说明。需要独立窗口或桌面快捷方式时使用 `ui-tool`；只向 AI 提供只读工具时使用 `readonly-tool`；长任务使用 `job-worker`。
 3. 调用 `extension.plugin.scaffold`，传入绝对 `workspace_root`、工作区内的 `output_dir`、`name`、`display_name`、`description`、身份返回的 `author`、`categories`、`release_notes` 和 `template`。脚手架必须生成可在空白目录独立构建的工程。
 4. 在生成工程内实现功能与测试。使用 JSON-RPC 2.0 stdin/stdout；业务日志只写 stderr 并脱敏。不得接受任意 Shell、任意 URL、明文凭据或越出工作区的路径。
 5. 调用 `extension.plugin.validate` 校验工程，再调用 `extension.plugin.build` 执行 `go test ./...` 并构建 Manifest 声明的入口。修复失败后重复校验和构建，直到通过或出现需要用户决策的阻塞。
 6. 调用 `extension.plugin.package` 生成工作区内的 `.hmpkg`，随后再次调用 `extension.plugin.validate` 校验制品。
-7. 调用 `extension.plugin.candidate.save`，传入已校验 `.hmpkg` 的 `package_path` 保存候选包，再用返回的稳定 ID 和版本调用 `extension.plugin.candidate.test`。记录候选包路径、SHA-256、测试结果和失败原因。
+7. 调用 `extension.plugin.candidate.save`，传入已校验 `.hmpkg` 的 `package_path` 保存候选包，再调用 `extension.test` 并传入 `kind: plugin`、稳定 ID 和版本。统一测试必须完成 Manifest、依赖、包、开发注册和运行时 Registry 门禁；记录候选包路径、SHA-256、结构化测试结果和失败原因。
 8. 本地完成后向用户返回候选包、SHA-256 和测试结果。只有 Connected 模式下用户明确要求“提交审核”时，才调用 `extension.plugin.submission.submit`；独立模式保留候选，不提示连接 Dashboard。
 9. 提交成功后才调用 `extension.plugin.submission.status` 返回审核状态和意见。管理员审核、签名、发布、撤回和同版本替换不属于本技能权限。
 
@@ -39,6 +40,6 @@ description: 自动设计、创建、实现、测试、校验、打包和受控�
 ## 完成标准
 
 - 工程不依赖创建它的仓库，可以从空白目录独立测试和构建。
-- Manifest、代码测试、入口构建、目录校验、包校验和候选测试全部通过。
+- Manifest、依赖解析、代码测试、入口构建、目录校验、包校验和统一候选测试全部通过；禁用三件套后，候选插件仍能作为独立运行时能力进入 Agent Capability Registry。
 - 已发布内容发生变化时提升语义版本，不覆盖原版本；`release_notes` 准确概括新增、改进、修复和兼容性变化。
 - 输出中文摘要，列出插件名称、稳定 ID、版本、版本更新说明、Capability、文件路径、测试结果和制品 SHA-256。仅在已执行提审时补充审核状态。

@@ -3,17 +3,12 @@
   "name": "技能开发助手",
   "author": "马宝全",
   "categories": ["software-engineering"],
-  "version": "1.5.0",
+  "version": "1.7.0",
   "scope": "organization",
   "description": "使用中文规范创建、校验、跨客户端测试、打包并受控提交 HiMind 技能。",
-  "release_notes": "接入 HiMind AI 当前项目上下文和候选 Skill Store，补全本地必需能力与 Connected 可选治理能力声明。",
-  "min_agent_version": "0.3.1",
-  "supported_clients": [
-    "himind-ai",
-    "codex",
-    "github-copilot",
-    "workbuddy"
-  ],
+  "release_notes": "要求 Skill 显式声明 Capability 与插件依赖，并通过统一 extension.test 完成 readiness、Skill Store 和客户端候选测试。",
+  "min_agent_version": "0.3.37",
+  "supported_clients": ["agent-skills"],
   "capabilities": [
     {"id": "extension.authoring.identity", "required": true, "min_version": "1.0.0", "provider": "agent"},
     {"id": "extension.workspace.current", "required": true, "min_version": "1.0.0", "provider": "agent"},
@@ -22,7 +17,7 @@
     {"id": "extension.skill.validate", "required": true, "min_version": "1.1.0", "provider": "com.himind.extension-development-tools"},
     {"id": "extension.skill.package", "required": true, "min_version": "1.1.0", "provider": "com.himind.extension-development-tools"},
     {"id": "extension.skill.candidate.save", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.skill.candidate.test", "required": true, "min_version": "1.0.0", "provider": "agent"},
+    {"id": "extension.test", "required": true, "min_version": "1.0.0", "provider": "agent"},
     {"id": "extension.skill.submission.submit", "required": false, "min_version": "1.0.0", "provider": "agent"},
     {"id": "extension.skill.submission.status", "required": false, "min_version": "1.0.0", "provider": "agent"}
   ],

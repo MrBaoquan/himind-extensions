@@ -1,6 +1,6 @@
 ---
 name: develop-himind-skills
-description: 自动设计、创建、编辑、校验、跨客户端测试、打包和受控提交 HiMind 技能。用户要求制作技能、编写 SKILL.md、生成 skill.json、配置 Codex、GitHub Copilot 或 WorkBuddy 全局发现、创建 .hmskill、在空白目录开发、执行 Agent 候选测试、提交组织审核或排查技能创作问题时使用。展示名称和说明使用中文，frontmatter name、稳定 ID 和目录名使用 ASCII。
+description: 自动设计、创建、编辑、校验、跨客户端测试、打包和受控提交 HiMind 技能。用户要求制作技能、编写 SKILL.md、生成 skill.json、配置 Agent Skills 客户端全局发现、创建 .hmskill、在空白目录开发、执行 Agent 候选测试、提交组织审核或排查技能创作问题时使用。展示名称和说明使用中文，frontmatter name、稳定 ID 和目录名使用 ASCII。
 ---
 
 # 技能开发助手
@@ -17,16 +17,17 @@ description: 自动设计、创建、编辑、校验、跨客户端测试、打�
 6. 调用 `extension.authoring.identity` 获取当前 Agent 的本地或 Dashboard 作者资料，将返回的 `user_name` 写入 `skill.json.author`。独立模式使用本地作者资料，不因未连接 Dashboard 停止本地创作。
 7. 每个新版本必须在 `skill.json.release_notes` 中填写中文更新说明，并从功能分类 ID `software-engineering`、`visual-design`、`video-post`、`3d-animation`、`content-production`、`audio-sound`、`data-automation`、`docs-knowledge`、`testing-quality`、`collaboration-delivery`、`system-device` 中选择至少一个 `categories` 分类。分类描述能力领域，不填写岗位名称、权限或客户端名称。
 8. Agent 不执行 Git clone、pull、commit、push 或凭据管理。开发者可自行用 Git 管理源码；本技能只处理当前 `workspace_root` 中的工作副本和不可变候选包。
+9. `skill.json` 必须声明工作流引用的 Capability 和插件依赖。优先依赖稳定 Capability ID；只有必须绑定具体实现或资源时才增加 `plugin_dependencies`。不得把本技能、插件开发助手或 AI 扩展开发工具声明为业务 Skill 运行时依赖。
 
 ## 自动开发流程
 
 1. 调用 `extension.workspace.current` 确认当前目录及项目身份，再调用 `extension.authoring.identity` 获取 `user_name`，最后调用 `extension.environment.preflight` 并传入 `kind: skill`。Skill 脚手架、校验、打包和候选测试均可在独立模式完成。
 2. 根据用户场景确定触发语、必要输入、工作步骤、输出格式、风险门禁、支持客户端、Capability 和插件依赖。
-3. 调用 `extension.skill.scaffold`，传入绝对 `workspace_root`、工作区内的 `output_dir`、ASCII `slug`、稳定 `id`、中文 `name`、版本、中文说明、身份返回的 `author`、`categories`、`release_notes` 和 `supported_clients`。默认同时支持 `himind-ai`、`codex`、`github-copilot` 与 `workbuddy`。
-4. 编辑生成的 `SKILL.md`、`skill.json` 和 `agents/openai.yaml`。frontmatter 只包含 `name` 与 `description`；`description` 同时写明用途和触发场景。把 `agents/openai.yaml` 加入 `contents`，保持中文展示名、简短说明和默认提示与正文一致。
+3. 调用 `extension.skill.scaffold`，传入绝对 `workspace_root`、工作区内的 `output_dir`、ASCII `slug`、稳定 `id`、中文 `name`、版本、中文说明、身份返回的 `author`、`categories`、`release_notes` 和 `supported_clients`。通用技能默认声明 `supported_clients: ["agent-skills"]`；只有明确依赖某个客户端私有行为时才改成具体客户端 ID。
+4. 编辑生成的 `SKILL.md`、`skill.json` 和 `agents/openai.yaml`。frontmatter 只包含 `name` 与 `description`；`description` 同时写明用途和触发场景。把 `agents/openai.yaml` 加入 `contents`，保持中文展示名、简短说明和默认提示与正文一致。Skill 正文引用的每项 MCP Capability 都必须出现在 `capabilities`；必需/可选与最低版本必须和正文降级策略一致。
 5. 调用 `extension.skill.validate` 校验工程，再调用 `extension.skill.package` 生成工作区内的 `.hmskill`，随后再次调用 `extension.skill.validate` 校验制品。
-6. 调用 `extension.skill.candidate.save`，仅传入已校验 `.hmskill` 的 `package_path`。Agent 必须原样保存候选制品和 SHA-256，不再根据结构化字段重新生成包。再用返回的稳定 ID 和版本调用 `extension.skill.candidate.test`。
-7. 候选测试必须覆盖 Manifest 声明的全部客户端：HiMind AI 将候选安装为 Agent Skill Store 当前版本并在下次会话加载；Codex、GitHub Copilot 与 WorkBuddy 分别同步到各自全局目录。记录实际结果，不把项目级 `.agents/skills` 当作安装结果。
+6. 调用 `extension.skill.candidate.save`，仅传入已校验 `.hmskill` 的 `package_path`。Agent 必须原样保存候选制品和 SHA-256，不再根据结构化字段重新生成包。再调用 `extension.test` 并传入 `kind: skill`、稳定 ID 和版本，统一完成依赖 readiness、Skill Store 安装和客户端渲染测试。
+7. `agent-skills` 是可移植能力声明，不是一个虚拟安装目录。候选测试会将它展开为 HiMind AI 和本机实际检测到的 Codex、GitHub Copilot、WorkBuddy、Qoder、ZCode、Cursor、Windsurf、Cline、Gemini CLI、OpenCode、Kiro、Qwen Code、Kimi Code 等适配器，并分别写入客户端原生用户级目录。记录实际完成的目标；未安装的客户端不作为失败，也不把项目级 `.agents/skills` 当作全局安装结果。
 8. 提醒用户分别在声明的客户端完成真实对话测试。独立模式到此结束并保留本地候选；只有 Connected 模式下用户确认测试通过并明确要求“提交审核”时，才调用 `extension.skill.submission.submit`。
 9. 提交成功后才调用 `extension.skill.submission.status` 返回审核状态和意见。管理员审核、签名、发布、撤回和同版本替换不属于本技能权限。
 
@@ -39,6 +40,6 @@ description: 自动设计、创建、编辑、校验、跨客户端测试、打�
 ## 完成标准
 
 - 工程不依赖创建它的仓库，在没有上下文文档的空白目录也能校验和打包。
-- Skill Creator 规则、工程校验、包校验、依赖预检以及 Codex、GitHub Copilot、WorkBuddy 渲染测试全部通过。
+- Skill Creator 规则、工程校验、包校验、Capability/插件依赖 readiness 和统一候选测试全部通过；HiMind AI 以及本机检测到的 Agent Skills 客户端均完成原生目录渲染测试。禁用三件套后，已注册 Skill 仍能由目标 AI 工具使用。
 - 已发布内容发生变化时提升语义版本，不覆盖原版本；`release_notes` 准确概括新增、改进、修复和兼容性变化。
 - 输出中文摘要，列出技能名称、稳定 ID、版本、版本更新说明、支持客户端、依赖、文件路径、测试结果和制品 SHA-256。仅在已执行提审时补充审核状态。

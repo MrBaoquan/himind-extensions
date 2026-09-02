@@ -3,11 +3,11 @@
   "name": "插件开发助手",
   "author": "马宝全",
   "categories": ["software-engineering"],
-  "version": "1.5.0",
+  "version": "1.6.0",
   "scope": "organization",
   "description": "使用中文规范设计、构建、校验、调试并打包 HiMind Agent 插件。",
-  "release_notes": "接入 HiMind AI 当前项目上下文和候选 Skill Store，补全本地必需能力与 Connected 可选治理能力声明。",
-  "min_agent_version": "0.3.1",
+  "release_notes": "要求插件显式声明运行时依赖，并通过统一 extension.test 完成依赖、制品和 Registry 候选测试闭环。",
+  "min_agent_version": "0.3.37",
   "supported_clients": [
     "himind-ai",
     "codex",
@@ -23,7 +23,7 @@
     {"id": "extension.plugin.build", "required": true, "min_version": "1.1.0", "provider": "com.himind.extension-development-tools"},
     {"id": "extension.plugin.package", "required": true, "min_version": "1.1.0", "provider": "com.himind.extension-development-tools"},
     {"id": "extension.plugin.candidate.save", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.plugin.candidate.test", "required": true, "min_version": "1.0.0", "provider": "agent"},
+    {"id": "extension.test", "required": true, "min_version": "1.0.0", "provider": "agent"},
     {"id": "extension.plugin.submission.submit", "required": false, "min_version": "1.0.0", "provider": "agent"},
     {"id": "extension.plugin.submission.status", "required": false, "min_version": "1.0.0", "provider": "agent"}
   ],
