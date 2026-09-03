@@ -4,8 +4,8 @@
   "author": "马宝全",
   "categories": ["software-engineering"],
   "description": "为 AI 助手提供不依赖业务项目上下文的插件与技能脚手架、校验、构建和打包能力。",
-  "release_notes": "显式声明全部创作能力为本地能力，并由 Agent 将 AI 调用绑定到当前扩展工作区。",
-  "version": "1.2.0",
+  "release_notes": "统一扩展工具链风险契约，固定 Go 测试与构建按本地操作执行，并返回结构化 blockers/state/next_steps。",
+  "version": "1.3.1",
   "entry": "extension-development-tools.exe",
   "runtime": "process-jsonrpc-stdio",
   "platforms": ["windows-x64"],
@@ -62,7 +62,7 @@
         "required": ["workspace_root", "path"],
         "additionalProperties": false
       },
-      "risk_level": "process",
+      "risk_level": "local_action",
       "availability": "local"
     },
     {

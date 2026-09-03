@@ -382,20 +382,37 @@ func workspacePath(workspaceRoot, target string) (string, string, error) {
 	if workspaceRoot == "" || target == "" {
 		return "", "", errors.New("workspace_root 和目标路径不能为空")
 	}
-	root, err := filepath.Abs(workspaceRoot)
+	lexicalRoot, err := filepath.Abs(workspaceRoot)
 	if err != nil {
 		return "", "", err
 	}
+	if !isDirectory(lexicalRoot) {
+		return "", "", errors.New("workspace_root 必须是可访问的本机目录")
+	}
 	if !filepath.IsAbs(target) {
-		target = filepath.Join(root, target)
+		target = filepath.Join(lexicalRoot, target)
 	}
 	target, err = filepath.Abs(target)
 	if err != nil {
 		return "", "", err
 	}
-	relative, err := filepath.Rel(root, target)
+	// Reject lexical escapes before resolving the target. This keeps the
+	// diagnostic deterministic even when an out-of-root path does not exist.
+	relative, err := filepath.Rel(lexicalRoot, target)
 	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(os.PathSeparator)) || filepath.IsAbs(relative) {
-		return "", "", errors.New("目标路径必须位于 workspace_root 内")
+		return "", "", errors.New("目标路径必须位于显式指定的 workspace_root 内")
+	}
+	root, err := filepath.EvalSymlinks(lexicalRoot)
+	if err != nil {
+		return "", "", errors.New("workspace_root 目录不存在或不可访问")
+	}
+	target, err = filepath.EvalSymlinks(target)
+	if err != nil {
+		return "", "", errors.New("目标路径不存在或不可访问")
+	}
+	relative, err = filepath.Rel(root, target)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(os.PathSeparator)) || filepath.IsAbs(relative) {
+		return "", "", errors.New("目标路径必须位于显式指定的 workspace_root 内")
 	}
 	return root, target, nil
 }

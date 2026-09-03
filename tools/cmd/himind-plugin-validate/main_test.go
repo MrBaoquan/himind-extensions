@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -31,6 +32,64 @@ func TestParseManifestAcceptsCurrentPluginShape(t *testing.T) {
 	}
 	if len(item.Platforms) != 1 || item.Platforms[0] != "windows-x64" {
 		t.Fatalf("unexpected default platforms: %#v", item.Platforms)
+	}
+}
+
+func TestParseManifestAcceptsCanonicalRiskLevels(t *testing.T) {
+	for _, riskLevel := range []string{
+		"read_only",
+		"local_action",
+		"local_write",
+		"network_write",
+		"admin_action",
+		"R1",
+		"R2",
+		"R3",
+		"R4",
+	} {
+		t.Run(riskLevel, func(t *testing.T) {
+			data := []byte(strings.ReplaceAll(`{
+				"id":"com.himind.example.tool",
+				"name":"Example Tool",
+				"author":"Test User",
+				"categories":["software-engineering"],
+				"description":"Example plugin.",
+				"release_notes":"Initial release.",
+				"version":"1.0.0",
+				"entry":"example.exe",
+				"runtime":"process-jsonrpc-stdio",
+				"governance":"optional",
+				"capabilities":[{"id":"example.run","input_schema":{"type":"object"},"risk_level":"__RISK_LEVEL__"}],
+				"permissions":[]
+			}`, "__RISK_LEVEL__", riskLevel))
+			if _, err := ParseManifest(data); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestParseManifestRejectsLegacyAndUnknownRiskLevels(t *testing.T) {
+	for _, riskLevel := range []string{"process", "network", "system", "builtin_policy", "unknown"} {
+		t.Run(riskLevel, func(t *testing.T) {
+			data := []byte(strings.ReplaceAll(`{
+				"id":"com.himind.example.tool",
+				"name":"Example Tool",
+				"author":"Test User",
+				"categories":["software-engineering"],
+				"description":"Example plugin.",
+				"release_notes":"Initial release.",
+				"version":"1.0.0",
+				"entry":"example.exe",
+				"runtime":"process-jsonrpc-stdio",
+				"governance":"optional",
+				"capabilities":[{"id":"example.run","input_schema":{"type":"object"},"risk_level":"__RISK_LEVEL__"}],
+				"permissions":[]
+			}`, "__RISK_LEVEL__", riskLevel))
+			if _, err := ParseManifest(data); err == nil {
+				t.Fatalf("expected risk level %q to be rejected", riskLevel)
+			}
+		})
 	}
 }
 

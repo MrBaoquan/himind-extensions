@@ -85,6 +85,34 @@ func TestArtifactInspectRejectsWorkspaceEscape(t *testing.T) {
 	}
 }
 
+func TestArtifactInspectAcceptsExplicitExternalWorkspace(t *testing.T) {
+	workspace := t.TempDir()
+	artifact := filepath.Join(workspace, "release.zip")
+	writeZIP(t, artifact, map[string]string{"app.exe": "release"})
+	params, _ := json.Marshal(input{
+		WorkspaceRoot: workspace,
+		ArtifactPath:  artifact,
+		ProductID:     "com.example.app",
+		Version:       "1.0.0",
+		Channel:       "stable",
+		Platform:      "windows",
+		Architecture:  "x64",
+		PackageType:   "directory-zip",
+	})
+	value, rpcError := handle(jsonrpc.Request{Method: "software.distribution.artifact.inspect", Params: params})
+	if rpcError != nil {
+		t.Fatal(rpcError)
+	}
+	result := value.(map[string]any)
+	expectedArtifact, err := filepath.EvalSymlinks(artifact)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result["ready"] != true || result["artifact_path"] != expectedArtifact {
+		t.Fatalf("unexpected external workspace result: %#v", result)
+	}
+}
+
 func TestResolveUsesConfiguredDashboardAndNoCredentialInput(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/software-distribution/v1/updates/resolve" {

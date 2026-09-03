@@ -9,7 +9,7 @@ description: 自动设计、创建、编辑、校验、跨客户端测试、打�
 
 ## 工作边界
 
-1. 先调用 `extension.workspace.current` 确认 AI 会话当前工作目录。由 Agent 扩展页进入 HiMind AI 时，直接使用返回的 Skill 项目目录作为 `workspace_root`；不向父目录搜索 HiMind 源码。
+1. 先调用 `extension.workspace.current` 确认当前扩展工作区。外部 AI 工具若返回 Agent 主目录、`source=process_current_dir` 或 `bound=false`，调用 `extension.workspace.bind`，传入聚合仓库根目录或单个 Skill 项目目录；随后重新调用 `extension.workspace.current`。`workspace.open.local` 只是打开目录，不是 MCP 工作区绑定能力。
 2. 用户未给出目标目录时，先确认一个明确的工作区；不得猜测 Agent 安装目录、Dashboard 地址或凭据位置。
 3. 技能只承载触发条件、操作知识和 Capability 编排。确定性解析、转换、构建、设备或网络操作应由插件 Capability 提供。
 4. 用户可见名称、说明、默认提示和正文使用中文；稳定 ID、目录名和 frontmatter `name` 使用小写 ASCII 连字符。
@@ -21,7 +21,7 @@ description: 自动设计、创建、编辑、校验、跨客户端测试、打�
 
 ## 自动开发流程
 
-1. 调用 `extension.workspace.current` 确认当前目录及项目身份，再调用 `extension.authoring.identity` 获取 `user_name`，最后调用 `extension.environment.preflight` 并传入 `kind: skill`。Skill 脚手架、校验、打包和候选测试均可在独立模式完成。
+1. 调用 `extension.workspace.current`；必要时先调用 `extension.workspace.bind` 绑定聚合仓库或 Skill 目录。再调用 `extension.authoring.preflight`（`kind: skill`）检查 Agent、三件套、工作区和运行模式；预检通过后调用 `extension.authoring.identity` 获取 `user_name`，再调用 `extension.environment.preflight` 检查 Skill 工具链。任一预检出现 `state: blocked` 时停止写入并原样返回 `blockers` 与 `next_steps`。Skill 脚手架、校验、打包和候选测试均可在独立模式完成。
 2. 根据用户场景确定触发语、必要输入、工作步骤、输出格式、风险门禁、支持客户端、Capability 和插件依赖。
 3. 调用 `extension.skill.scaffold`，传入绝对 `workspace_root`、工作区内的 `output_dir`、ASCII `slug`、稳定 `id`、中文 `name`、版本、中文说明、身份返回的 `author`、`categories`、`release_notes` 和 `supported_clients`。通用技能默认声明 `supported_clients: ["agent-skills"]`；只有明确依赖某个客户端私有行为时才改成具体客户端 ID。
 4. 编辑生成的 `SKILL.md`、`skill.json` 和 `agents/openai.yaml`。frontmatter 只包含 `name` 与 `description`；`description` 同时写明用途和触发场景。把 `agents/openai.yaml` 加入 `contents`，保持中文展示名、简短说明和默认提示与正文一致。Skill 正文引用的每项 MCP Capability 都必须出现在 `capabilities`；必需/可选与最低版本必须和正文降级策略一致。
@@ -33,9 +33,15 @@ description: 自动设计、创建、编辑、校验、跨客户端测试、打�
 
 ## 协作修订
 
+外部 AI 工具也可以迭代三件套自身。先将 AI 会话工作区切换到对应的三件套工程目录，再按本流程修改源码或文档；调用 `extension.revision.create` 时传入 `kind: skill`、稳定 `id` 和当前 `version`，Agent 会创建下一个补丁版本并清除旧测试、确认和提审状态。三件套的确定性文件操作仍由 `com.himind.extension-development-tools` 执行，Agent 的 `extension.test` 才是候选闭环门禁。
+
 1. 其他同事接手已上架 Skill 时，仅在 Connected 模式下调用 `extension.skill.submission.status` 定位产品、当前版本、提交 ID 和自己的协作角色；本地工程开发不依赖该状态。
 2. 开发者自行取得并管理源码工作副本。基于已发布版本修改时提升语义版本，更新 `release_notes`，重新完成校验、打包和所有声明客户端的测试。
 3. 保存候选时除 `package_path` 外传入 `revision_of_version` 和 `parent_submission_id`，使 Dashboard 能把新提交挂到同一产品和父版本。不得创建同版本替换包。
+
+### 受阻点协议
+
+所有 Agent 创作编排能力在失败时返回 JSON 诊断：`state`、`blockers[]`、`warnings[]` 和 `next_steps[]`。每个 blocker 含稳定 `code`、`stage`、`message`、`remediation` 和 `retryable`；外部 AI 必须按 code 分支处理，不解析中文错误句子。常见阶段包括 `workspace`、`toolchain`、`dependencies`、`package`、`client_registration`、`cleanup` 和 `submission`。独立模式下提审不可用属于 warning，不是本地创作阻塞。
 
 ## 完成标准
 

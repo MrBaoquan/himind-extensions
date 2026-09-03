@@ -34,11 +34,11 @@ type manifest struct {
 }
 
 type capability struct {
-	ID          string          `json:"id"`
-	Description string          `json:"description"`
-	InputSchema json.RawMessage `json:"input_schema"`
-	RiskLevel   string          `json:"risk_level"`
-	Availability string         `json:"availability"`
+	ID           string          `json:"id"`
+	Description  string          `json:"description"`
+	InputSchema  json.RawMessage `json:"input_schema"`
+	RiskLevel    string          `json:"risk_level"`
+	Availability string          `json:"availability"`
 }
 
 type contributions struct {
@@ -64,7 +64,7 @@ var (
 	platforms      = map[string]bool{"windows-x64": true, "windows-arm64": true}
 	governances    = map[string]bool{"required": true, "managed": true, "optional": true, "blocked": true}
 	runtimes       = map[string]bool{"process-jsonrpc-stdio": true}
-	riskLevels     = map[string]bool{"read_only": true, "local_write": true, "process": true, "network": true, "system": true, "builtin_policy": true}
+	riskLevels     = map[string]bool{"read_only": true, "local_action": true, "local_write": true, "network_write": true, "admin_action": true, "R1": true, "R2": true, "R3": true, "R4": true}
 	availability   = map[string]bool{"local": true, "network_service": true, "control_plane": true}
 )
 

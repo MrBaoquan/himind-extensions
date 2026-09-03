@@ -92,20 +92,41 @@ func preflight(kind string) map[string]any {
 	if kind == "" {
 		kind = "plugin"
 	}
-	result := map[string]any{"checked_at": time.Now().UTC().Format(time.RFC3339), "kind": kind}
+	result := map[string]any{
+		"checked_at": time.Now().UTC().Format(time.RFC3339),
+		"kind":       kind,
+		"state":      "blocked",
+		"ready":      false,
+		"blockers":   []map[string]any{},
+		"warnings":   []map[string]any{},
+		"next_steps": []string{},
+	}
+	addBlocker := func(code, stage, message, remediation string, retryable bool) {
+		result["blockers"] = append(result["blockers"].([]map[string]any), map[string]any{
+			"code":        code,
+			"stage":       stage,
+			"severity":    "error",
+			"message":     message,
+			"remediation": remediation,
+			"retryable":   retryable,
+		})
+	}
 	if kind == "skill" {
+		result["state"] = "ready"
 		result["ready"] = true
 		result["go"] = map[string]any{"required": false}
+		result["next_steps"] = []string{"继续执行 extension.skill.scaffold、validate、package，然后调用 Agent 的 extension.test"}
 		return result
 	}
 	if kind != "plugin" {
-		result["blockers"] = []string{"kind 必须是 plugin 或 skill"}
+		addBlocker("invalid_extension_kind", "preflight", "kind 必须是 plugin 或 skill", "使用 kind=plugin 或 kind=skill 重新调用", false)
 		return result
 	}
 	result["go"] = map[string]any{"installed": false, "required": true}
 	path, err := exec.LookPath("go")
 	if err != nil {
-		result["blockers"] = []string{"未在 PATH 中找到 Go 工具链"}
+		addBlocker("toolchain_missing", "toolchain", "未在 PATH 中找到 Go 工具链", "安装 Go 并确保 go 在 PATH 中，然后重新预检", true)
+		result["next_steps"] = []string{"修复工具链后重新调用 extension.environment.preflight"}
 		return result
 	}
 	output, err := exec.Command(path, "version").CombinedOutput()
@@ -115,9 +136,12 @@ func preflight(kind string) map[string]any {
 	}
 	result["go"] = goResult
 	if err != nil {
-		result["blockers"] = []string{"Go 工具链无法执行"}
+		addBlocker("toolchain_unavailable", "toolchain", "Go 工具链无法执行", "修复 Go 安装或 PATH 后重新预检", true)
+		result["next_steps"] = []string{"修复工具链后重新调用 extension.environment.preflight"}
 	} else {
+		result["state"] = "ready"
 		result["ready"] = true
+		result["next_steps"] = []string{"继续执行 extension.plugin.scaffold、validate、build、package，然后调用 Agent 的 extension.test"}
 	}
 	return result
 }

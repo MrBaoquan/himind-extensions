@@ -3,10 +3,10 @@
   "name": "插件开发助手",
   "author": "马宝全",
   "categories": ["software-engineering"],
-  "version": "1.6.0",
+  "version": "1.7.0",
   "scope": "organization",
   "description": "使用中文规范设计、构建、校验、调试并打包 HiMind Agent 插件。",
-  "release_notes": "要求插件显式声明运行时依赖，并通过统一 extension.test 完成依赖、制品和 Registry 候选测试闭环。",
+  "release_notes": "增加 Agent 统一预检、扩展修订入口和结构化 blockers，支持外部 AI 完成插件及三件套自身迭代闭环。",
   "min_agent_version": "0.3.37",
   "supported_clients": [
     "himind-ai",
@@ -16,12 +16,16 @@
   ],
   "capabilities": [
     {"id": "extension.authoring.identity", "required": true, "min_version": "1.0.0", "provider": "agent"},
+    {"id": "extension.authoring.preflight", "required": true, "min_version": "1.0.0", "provider": "agent"},
     {"id": "extension.workspace.current", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.environment.preflight", "required": true, "min_version": "1.1.0", "provider": "com.himind.extension-development-tools"},
-    {"id": "extension.plugin.scaffold", "required": true, "min_version": "1.1.0", "provider": "com.himind.extension-development-tools"},
-    {"id": "extension.plugin.validate", "required": true, "min_version": "1.1.0", "provider": "com.himind.extension-development-tools"},
-    {"id": "extension.plugin.build", "required": true, "min_version": "1.1.0", "provider": "com.himind.extension-development-tools"},
-    {"id": "extension.plugin.package", "required": true, "min_version": "1.1.0", "provider": "com.himind.extension-development-tools"},
+    {"id": "extension.workspace.bind", "required": true, "min_version": "1.0.0", "provider": "agent"},
+    {"id": "extension.workspace.clear", "required": false, "min_version": "1.0.0", "provider": "agent"},
+    {"id": "extension.revision.create", "required": true, "min_version": "1.0.0", "provider": "agent"},
+    {"id": "extension.environment.preflight", "required": true, "min_version": "1.3.1", "provider": "com.himind.extension-development-tools"},
+    {"id": "extension.plugin.scaffold", "required": true, "min_version": "1.3.1", "provider": "com.himind.extension-development-tools"},
+    {"id": "extension.plugin.validate", "required": true, "min_version": "1.3.1", "provider": "com.himind.extension-development-tools"},
+    {"id": "extension.plugin.build", "required": true, "min_version": "1.3.1", "provider": "com.himind.extension-development-tools"},
+    {"id": "extension.plugin.package", "required": true, "min_version": "1.3.1", "provider": "com.himind.extension-development-tools"},
     {"id": "extension.plugin.candidate.save", "required": true, "min_version": "1.0.0", "provider": "agent"},
     {"id": "extension.test", "required": true, "min_version": "1.0.0", "provider": "agent"},
     {"id": "extension.plugin.submission.submit", "required": false, "min_version": "1.0.0", "provider": "agent"},
@@ -31,7 +35,7 @@
     {
       "plugin_id": "com.himind.extension-development-tools",
       "required": true,
-      "min_version": "1.1.0"
+      "min_version": "1.3.1"
     }
   ],
   "risk_summary": "local_write_and_process; submission_requires_confirmation; publication_requires_admin_review",

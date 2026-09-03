@@ -1,4 +1,4 @@
 interface:
   display_name: "软件分发对接"
   short_description: "诊断接入和制品，受控发布并验证更新"
-  default_prompt: "使用 $software-distribution 为当前应用完成分发接入；先确认当前 AI 工作区并检查项目与制品，独立模式完成本地校验，连接组织分发服务后携带预检收据展示发布摘要并等待本机确认。"
+  default_prompt: "使用 $software-distribution 为当前应用完成分发接入；检查用户明确指定的项目与制品，独立模式完成本地校验，连接组织分发服务后携带预检收据展示发布摘要，并按用户当前授权决定是否发布。"

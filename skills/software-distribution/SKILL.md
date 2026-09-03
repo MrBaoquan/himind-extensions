@@ -5,14 +5,23 @@ description: 为 WPF、Unity Windows 或 Unity Android 项目完成软件分发�
 
 # 软件分发对接
 
-HiMind Agent 将本地工程检查与组织分发服务分成两个能力层。独立模式可以完成项目识别、制品校验和本地客户端接入准备；连接组织分发服务后，才继续执行产品、渠道、制品发布和更新解析。
+本 Skill 通过外部 AI 工具的 `himind-agent-mcp` 编排 Agent 能力。它只负责软件分发接入、制品校验和发布流程，不直接修改插件或 Skill 源码。
 
-软件分发采用单一分层链路：Skill 负责编排；官方软件分发插件负责项目、制品和 Manifest 领域规则；Agent 内核负责当前工作区、预检收据、本机确认、OAuth broker 和同一文件句柄上传。不得在 Skill 或插件中复制发布鉴权逻辑，也不得在 Agent 内核中加入具体软件项目规则。
+软件分发采用单一分层链路：Skill 负责编排；官方软件分发插件负责项目、制品和 Manifest 领域规则；Agent 内核负责预检收据、OAuth broker 和同一文件句柄上传。`workspace_root` 是本次明确指定的项目或制品目录，可以位于 AI 会话当前目录之外；扩展创作的工作区约束只由对应开发助手执行。
+
+## 扩展创作闭环
+
+当任务涉及插件或 Skill 的创建、修改、构建或打包时，不在本 Skill 中直接编辑文件：
+
+1. 外部 AI 工具通过 `himind-agent-mcp` 的 `tools/list` / `tools/call` 发现并调用 Agent Capability。
+2. 插件任务使用 `插件开发助手`，Skill 任务使用 `技能开发助手`。
+3. 两个开发助手通过 MCP 调用 `extension.*` 能力，由 `com.himind.extension-development-tools` 执行脚手架、校验、构建和打包。
+4. 候选包完成测试后，再由本 Skill 编排软件分发发布；不要复制三件套的源码修改、构建或提交流程。
 
 ## 能力边界
 
-- `software.distribution.project.inspect`：识别项目类型并给出接入建议，只读。
-- `software.distribution.artifact.inspect`：检查工作区内制品，计算大小和 SHA-256，只读。
+- `software.distribution.project.inspect`：在显式指定的本机目录中识别项目类型并给出接入建议，只读。
+- `software.distribution.artifact.inspect`：在显式指定的本机目录中检查制品，计算大小和 SHA-256，只读。
 - `software.distribution.release.publish`：由 Agent 内置 broker 使用短时用户委托身份创建产品、上传制品并发布，属于网络写操作。
 - `software.distribution.release.resolve`：调用 Agent 配置的组织分发服务解析接口验证发布，只读网络操作；独立模式不可用属于正常边界。
 
@@ -20,17 +29,17 @@ Skill 和插件都不得接收、读取、输出或保存 Token、Cookie、Agent
 
 ## 接入流程
 
-1. 确认明确的项目工作区、应用类型、稳定 `product_id`、版本、渠道、平台和架构。稳定 ID 使用小写 ASCII，例如 `com.himind.media-resolver`。
-2. 先调用 `workspace.current` 获取 Agent 认可的当前 AI 工作区，再调用 `software.distribution.project.inspect`；`workspace_root` 必须与前者完全一致，`project_path` 必须位于工作区内。
+1. 确认明确的项目或制品目录、应用类型、稳定 `product_id`、版本、渠道、平台和架构。稳定 ID 使用小写 ASCII，例如 `com.himind.media-resolver`。
+2. 直接调用 `software.distribution.project.inspect`；`workspace_root` 必须是用户指定的可访问本机目录，`project_path` 必须位于该目录内。不需要先调用 `workspace.current`，也不要求与 AI 会话目录相同。
 3. 检查项目是否已有分发客户端：
    - .NET/WPF 使用 `HiMind.Distribution`；Windows 文件替换使用 `HiMind.Distribution.Windows` 和独立 Updater。
    - Unity Windows 可复用 `netstandard2.0` 协议层，安装仍使用 Windows 平台适配器。
    - Unity Android 使用相同 resolve manifest；APK 安装、商店更新或 MDM 策略由 Android 适配层负责，不调用 Windows Updater。
 4. 应用配置必须包含分发服务 HTTPS 基址、`productId`、渠道、平台、架构和 `/api/software-distribution/v1/updates/resolve`。不得包含后台身份凭据。
 5. 构建不可变制品。Windows 目录包使用 `directory-zip`，Android 使用 `apk`，Addressables 使用 `unity-addressables`，其他单文件使用 `content`。
-6. 调用 `software.distribution.artifact.inspect`。只有返回 `ready=true`、`inspection_receipt`，且文件名、版本、目标、大小和 SHA-256 与预期一致时才能进入发布。预检收据短时有效、绑定当前 AI 会话和工作区，并且只能使用一次。
+6. 调用 `software.distribution.artifact.inspect`。只有返回 `ready=true`、`inspection_receipt`，且文件名、版本、目标、大小和 SHA-256 与预期一致时才能进入发布。预检收据短时有效，绑定调用主体、显式工作区和制品摘要，并且只能使用一次。
 7. 向用户展示发布摘要：产品、版本、渠道、平台、架构、包类型、文件、大小、SHA-256、是否强制、灰度比例。没有用户本轮明确确认时，不得调用发布能力，也不得自行把 `confirmed` 设为 `true`。
-8. 用户确认后调用 `software.distribution.release.publish`，参数必须与检查结果完全一致，并传入 `inspection_receipt`、`expected_size`、`expected_sha256` 和 `confirmed=true`。Agent 仍会显示本机原生确认摘要；模型不得代替用户确认。禁止同版本替换不同内容；内容变化必须提升版本。
+8. 用户在当前任务中明确授权发布后，调用 `software.distribution.release.publish`，参数必须与检查结果完全一致，并传入 `inspection_receipt`、`expected_size`、`expected_sha256` 和 `confirmed=true`。禁止同版本替换不同内容；内容变化必须提升版本。
 9. 发布成功后调用 `software.distribution.release.resolve`，用低于新版本的 `current_version` 验证有更新，再用等于新版本的版本验证 `update=null`。
 10. 在目标项目运行真实客户端测试：下载短时 URL、校验大小和 SHA-256，并按平台执行安装或模拟替换。只有连接真实组织分发服务完成 resolve 与下载后，才能报告完整更新链路打通；独立模式应明确报告本地检查已通过。
 
