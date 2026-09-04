@@ -28,16 +28,6 @@ if ($Repository -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') {
 }
 $PrivateKeyPath = Resolve-Setting $PrivateKeyPath 'HIMIND_EXTENSION_SIGNING_PRIVATE_KEY_PATH'
 $SigningKeyId = Resolve-Setting $SigningKeyId 'HIMIND_EXTENSION_SIGNING_KEY_ID'
-if ([string]::IsNullOrWhiteSpace($PrivateKeyPath) -or [string]::IsNullOrWhiteSpace($SigningKeyId)) {
-    throw 'Extension publication requires HIMIND_EXTENSION_SIGNING_PRIVATE_KEY_PATH and HIMIND_EXTENSION_SIGNING_KEY_ID.'
-}
-if ($SigningKeyId -notmatch '^[A-Za-z0-9._-]+$') {
-    throw 'SigningKeyId contains invalid characters.'
-}
-$PrivateKeyPath = [IO.Path]::GetFullPath($PrivateKeyPath)
-if (-not (Test-Path -LiteralPath $PrivateKeyPath -PathType Leaf)) {
-    throw "Private signing key not found: $PrivateKeyPath"
-}
 
 $source = (Resolve-Path (Join-Path $repoRoot $ExtensionPath)).Path
 $relativeSource = $source.Substring($repoRoot.Length).TrimStart('\', '/').Replace('\', '/')
@@ -122,6 +112,16 @@ if ($releaseExists) {
     }
 }
 else {
+    if ([string]::IsNullOrWhiteSpace($PrivateKeyPath) -or [string]::IsNullOrWhiteSpace($SigningKeyId)) {
+        throw 'Creating a new extension Release requires HIMIND_EXTENSION_SIGNING_PRIVATE_KEY_PATH and HIMIND_EXTENSION_SIGNING_KEY_ID.'
+    }
+    if ($SigningKeyId -notmatch '^[A-Za-z0-9._-]+$') {
+        throw 'SigningKeyId contains invalid characters.'
+    }
+    $PrivateKeyPath = [IO.Path]::GetFullPath($PrivateKeyPath)
+    if (-not (Test-Path -LiteralPath $PrivateKeyPath -PathType Leaf)) {
+        throw "Private signing key not found: $PrivateKeyPath"
+    }
     & (Join-Path $PSScriptRoot 'build-extension.ps1') -Kind $Kind -ExtensionPath $ExtensionPath -OutputDirectory $outputRoot
     if ($LASTEXITCODE -ne 0) { throw 'Extension packaging failed.' }
     & (Join-Path $PSScriptRoot 'sign-extension.ps1') -ArtifactPath $artifact -PrivateKeyPath $PrivateKeyPath -KeyId $SigningKeyId -OutputPath $signature
