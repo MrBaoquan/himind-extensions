@@ -9,7 +9,7 @@
 5. 提交 Pull Request，说明变更、风险、兼容性和验证结果。
 6. 合并后在 Agent 工作台打开对应子目录，构建并提交审核。
 
-独立分发由仓库维护者在 `main` 上运行 `Release extension` 工作流。贡献者不提交 `.hmpkg`、`.hmskill`、签名或目录摘要，也不复用已发布版本号。Release 已创建但 catalog 更新失败时，由维护者重跑同一提交，或在主分支已经前进后运行 `Repair extension catalog`；恢复只复用既有签名制品。
+独立分发由仓库维护者在 `main` 上运行 `tools/release/publish-extension.ps1`。贡献者不提交 `.hmpkg`、`.hmskill`、签名或目录摘要，也不复用已发布版本号。Release 已创建但 catalog 更新失败时，维护者在同一源提交上重跑命令复用既有签名制品；主分支已经前进时，必须恢复对应源提交或提升扩展版本。
 
 ## 边界
 

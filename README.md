@@ -87,9 +87,17 @@ go run ./tools/cmd/himind-agent-workspace-sync -commit (git rev-parse HEAD)
 
 源码仓库和运行时分发目录彼此独立：`extensions.json` 用于本地多项目开发，`.himind/catalog.json` 用于 Agent 的 GitHub 扩展源。生产安装只使用签名的 GitHub Release 制品，不直接运行源码目录或仓库 ZIP。
 
-每个扩展按自己的语义版本单独发布，不跟随 Agent 版本。仓库维护者在 GitHub Actions 中运行 `Release extension`，选择 `plugin` 或 `skill` 并填写 `extensions.json` 中的项目路径。流水线会完成测试、打包、RSA-PSS/SHA-256 签名、不可变 Release 创建和公共目录更新。同一提交因 catalog 推送失败而重跑时会复用既有 Release 制品，不重新签名或覆盖版本；其他提交仍必须提升版本号。
+每个扩展按自己的语义版本单独发布，不跟随 Agent 版本。仓库维护者在本机运行 `tools/release/publish-extension.ps1`，传入 `plugin` 或 `skill` 及仓库内路径。脚本会完成测试、打包、RSA-PSS/SHA-256 签名、不可变 Release 创建和公共目录更新，不依赖 GitHub Actions。同一提交重跑时会复用既有 Release 制品，不重新签名或覆盖版本；其他提交仍必须提升版本号。
 
-如果 Release 已成功后主分支又产生了新提交，运行 `Repair extension catalog`，填写原始扩展类型、原始仓库内路径和 Release tag。恢复流程从 Release 记录的源提交读取 manifest、下载并校验既有制品，然后只修复当前 `main` 的 catalog；重复运行不会产生重复版本或替换 Release。
+示例：
+
+```powershell
+$env:HIMIND_EXTENSION_SIGNING_PRIVATE_KEY_PATH = 'C:\keys\himind-extension-private.pem'
+$env:HIMIND_EXTENSION_SIGNING_KEY_ID = 'himind-production-2026'
+./tools/release/publish-extension.ps1 -Kind skill -ExtensionPath skills/software-distribution
+```
+
+Release 创建后如果只需要修复目录，应在同一源提交上重跑同一命令；脚本会下载并复用不可变 Release 资产。若主分支已经前进，必须先恢复对应源提交或提升扩展版本，禁止用新提交伪装旧制品来源。
 
 仓库需要配置：
 
