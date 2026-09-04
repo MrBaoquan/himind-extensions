@@ -83,13 +83,30 @@ New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
 $artifact = Join-Path $outputRoot "$safeId-$version$(if ($Kind -eq 'plugin') { '.hmpkg' } else { '.hmskill' })"
 $signature = "$artifact.signature.json"
 
-$existing = gh release view $tag --repo $Repository --json targetCommitish,publishedAt 2>$null
+function Resolve-ReleaseCommit {
+    param([string]$ReleaseTag)
+
+    $ref = gh api "repos/$Repository/git/ref/tags/$ReleaseTag" 2>$null | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0 -or $null -eq $ref.object.sha) {
+        throw "Unable to resolve GitHub Release tag: $ReleaseTag"
+    }
+    if ($ref.object.type -eq 'tag') {
+        $tagObject = gh api "repos/$Repository/git/tags/$($ref.object.sha)" 2>$null | ConvertFrom-Json
+        if ($LASTEXITCODE -ne 0 -or $null -eq $tagObject.object.sha) {
+            throw "Unable to resolve annotated GitHub Release tag: $ReleaseTag"
+        }
+        return [string]$tagObject.object.sha
+    }
+    return [string]$ref.object.sha
+}
+
+$existing = gh release view $tag --repo $Repository --json publishedAt 2>$null
 $releaseExists = $LASTEXITCODE -eq 0
 $commit = (git rev-parse HEAD).Trim()
 if ($releaseExists) {
-    $release = ($existing -join "`n") | ConvertFrom-Json
-    if ([string]$release.targetCommitish -ne $commit) {
-        throw "Release $tag already exists for another source commit. Increase the extension version or use a dedicated repair procedure."
+    $releaseCommit = Resolve-ReleaseCommit $tag
+    if ($releaseCommit -ne $commit) {
+        throw "Release $tag already exists for source commit $releaseCommit, but HEAD is $commit. Increase the extension version or restore the original source commit."
     }
     Write-Host "Reusing immutable Release $tag."
     $downloadRoot = Join-Path ([IO.Path]::GetTempPath()) "himind-extension-existing-$([guid]::NewGuid().ToString('N'))"
