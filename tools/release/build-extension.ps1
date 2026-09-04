@@ -7,7 +7,11 @@ param(
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $source = (Resolve-Path (Join-Path $repoRoot $ExtensionPath)).Path
-$outputRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot $OutputDirectory))
+$outputRoot = if ([IO.Path]::IsPathRooted($OutputDirectory)) {
+    [IO.Path]::GetFullPath($OutputDirectory)
+} else {
+    [IO.Path]::GetFullPath((Join-Path $repoRoot $OutputDirectory))
+}
 if (-not $source.StartsWith($repoRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Extension path must stay inside the repository.' }
 New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
 
