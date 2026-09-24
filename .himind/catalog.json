@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-cf43db6d9deb9701",
+  "generation": "sync-cabe0faa441e27ac",
   "plugins": [
     {
       "allow_disable": true,
@@ -588,20 +588,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "kind": "plugin",
           "id": "com.himind.extension-development-tools",
-          "required": true,
+          "kind": "plugin",
           "min_version": "1.3.2",
-          "version": "1.4.2",
+          "pinned": true,
+          "required": true,
           "sha256": "0b9fdef89d128bb1a56d742dce1bf692d6c13aaaad6b302a7681362e9fe1c23e",
           "source": {
-            "kind": "github",
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg",
             "id": "github:MrBaoquan/himind-extensions",
-            "repository": "MrBaoquan/himind-extensions",
+            "kind": "github",
             "reference": "plugin/com.himind.extension-development-tools@1.4.2",
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg"
+            "repository": "MrBaoquan/himind-extensions"
           },
-          "pinned": true
+          "version": "1.4.2"
         }
       ],
       "description": "使用中文规范设计、构建、校验、调试并打包 HiMind Agent 插件。",
@@ -920,6 +920,49 @@
         "agent-skills"
       ],
       "version": "1.0.2"
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:skill/com.himind.skill.git-svn-commit-summary@1.1.1:com.himind.skill.git-svn-commit-summary-1.1.1.hmskill",
+      "artifact_sha256": "996b510647fc24cfb4d8e008335984b6fb72517495bdb09638fedbb0b69a14ed",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [],
+      "categories": [
+        "collaboration-delivery"
+      ],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "根据 Git 或 SVN 的真实差异生成提交摘要，并且只执行用户明确确认的提交。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.himind.skill.git-svn-commit-summary@1.1.1/com.himind.skill.git-svn-commit-summary-1.1.1.hmskill",
+      "file_name": "com.himind.skill.git-svn-commit-summary-1.1.1.hmskill",
+      "file_size": 4435,
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.2.0",
+      "name": "Git/SVN 提交摘要",
+      "organization_reason": "",
+      "plugin_dependencies": [],
+      "published_at": "2026-09-24T15:00:39Z",
+      "release_notes": "1.1.1：触发说明收敛到 140 字内。",
+      "release_tag": "skill/com.himind.skill.git-svn-commit-summary@1.1.1",
+      "risk_summary": "read_only_by_default; commit_requires_explicit_confirmation",
+      "sha256": "996b510647fc24cfb4d8e008335984b6fb72517495bdb09638fedbb0b69a14ed",
+      "signature": "Zmsc5myWMyw8MhkJTQsoci1sfGyeok3424ieHxL0VUt6BFSsGOt9wmMq8uMwwhLc4SLotMzhH5jyRw91aXNkSqE4LbSizVtIr4BjtQrX0F5plzJrh34JxWOnL6R4m1m9sr2watZU2bV/CCIrB23vzcws6c7E9UomLOM6y0o4pzN1aDi4ALDd92W30NCfwOBzvXd+KbY3kI9wxaVuwh2FlKkElz2I71I9HVblYZ/gV00n6C5Y2Li4aUN90VgOsK2x7G26GSr1fzqDoOOWXptFvLkNSRMX5TupWBSeaB4I5nMQf4b1vd8U/aOE0r7+joR6TQEM37o/Komf/hxguetrNB7ytqF0DrkiluQinpss6kGbrLOYvydsTXMtM/VHWpyKdC8PmBxW1uQbLXW1QzkndpdgrZCBgcNop3QDvwZGjb3YRVpoysYxALlyGPr2NqpektnmFiIclcYeSWHPiFI7OEn9F6EVdiQ/HyZBYa29mxaR33XmQWmrastFfMi/R2hN",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "skill_id": "com.himind.skill.git-svn-commit-summary",
+      "source": "github",
+      "source_commit": "1ba80b8b692dd6e5da3df6cc66e5d1fcd6345b18",
+      "source_tree": "df8ee1786c8fad50274c14eb616da17ef1880349",
+      "supported_clients": [
+        "codex",
+        "github-copilot",
+        "workbuddy"
+      ],
+      "version": "1.1.1"
     },
     {
       "allow_disable": true,
