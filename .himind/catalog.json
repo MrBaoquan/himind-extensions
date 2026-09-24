@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-cabe0faa441e27ac",
+  "generation": "sync-194f6268bafaf2c7",
   "plugins": [
     {
       "allow_disable": true,
@@ -1408,7 +1408,122 @@
       "version": "1.0.0"
     }
   ],
-  "workflows": [],
+  "workflows": [
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:workflow/com.himind.workflow.software-release@1.0.2:com.himind.workflow.software-release-1.0.2.hmwf",
+      "artifact_sha256": "e264dcd4302435eb4b6d24d92a350b314255f837e792e9c201290d47ab195af0",
+      "assignment": "optional",
+      "author_name": "",
+      "capability_ids": [
+        "software.distribution.project.inspect",
+        "software.distribution.artifact.inspect",
+        "software.distribution.release.publish",
+        "software.distribution.release.resolve",
+        "software.distribution.channel.resolve"
+      ],
+      "categories": [],
+      "channel": "stable",
+      "dependencies": [
+        {
+          "kind": "plugin",
+          "id": "com.himind.software-distribution",
+          "required": true,
+          "min_version": "",
+          "version": "1.2.4",
+          "sha256": "9ead5149b025b088ad64aaeb709a275067710cab9593ec5a9358c2f1d19ef300",
+          "source": {
+            "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
+            "reference": "plugin/com.himind.software-distribution@1.2.4",
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.software-distribution@1.2.4/com.himind.software-distribution-1.2.4.hmpkg"
+          },
+          "pinned": true
+        }
+      ],
+      "description": "对已构建制品完成接入检查、制品校验、渠道发布与更新验证，发布凭据不经过 AI。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/workflow%2Fcom.himind.workflow.software-release@1.0.2/com.himind.workflow.software-release-1.0.2.hmwf",
+      "extension_lock": {
+        "dependencies": [
+          {
+            "id": "com.himind.software-distribution",
+            "kind": "plugin",
+            "required": true,
+            "sha256": "c7764e0bd9696f1a4d3c7332969cc97086320f1fa3a8b22883e25ea78f7af8b1",
+            "source_id": "development",
+            "version": "1.2.4"
+          }
+        ],
+        "environment": {
+          "capabilities": [
+            {
+              "availability": "local",
+              "id": "software.distribution.project.inspect",
+              "provider": "plugin:com.himind.software-distribution",
+              "required": true
+            },
+            {
+              "availability": "local",
+              "id": "software.distribution.artifact.inspect",
+              "provider": "plugin:com.himind.software-distribution",
+              "required": true
+            },
+            {
+              "availability": "control_plane",
+              "id": "software.distribution.release.publish",
+              "provider": "builtin",
+              "required": true
+            },
+            {
+              "availability": "local",
+              "id": "software.distribution.release.resolve",
+              "provider": "plugin:com.himind.software-distribution",
+              "required": true
+            },
+            {
+              "availability": "local",
+              "id": "software.distribution.channel.resolve",
+              "provider": "plugin:com.himind.software-distribution",
+              "required": true
+            }
+          ],
+          "connectors": [],
+          "runtimes": []
+        },
+        "generated_at": "unix-ms:1790262051642",
+        "root": {
+          "id": "com.himind.workflow.software-release",
+          "kind": "workflow",
+          "sha256": "e264dcd4302435eb4b6d24d92a350b314255f837e792e9c201290d47ab195af0",
+          "version": "1.0.2"
+        },
+        "schema_version": "extension_lock.v1"
+      },
+      "file_name": "com.himind.workflow.software-release-1.0.2.hmwf",
+      "file_size": 7900,
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.47",
+      "name": "软件分发与发布",
+      "organization_reason": "",
+      "plugin_dependencies": [],
+      "published_at": "2026-09-24T15:00:54Z",
+      "release_notes": "",
+      "release_tag": "workflow/com.himind.workflow.software-release@1.0.2",
+      "sha256": "e264dcd4302435eb4b6d24d92a350b314255f837e792e9c201290d47ab195af0",
+      "signature": "T5NhvMUP11d4QMfAXFad64evKYkVr1ezZ8v7dgcSAIKF1R6z9PVwHsM0IPUolBCJHEn7Y7dwT2GnSbYQCMgJvP8aZpyI0JdSg+5g+4rUvvDxCIDm/F8l9RPQlgoKPobMk280rHprXYhXbYnybgDT5iWN7I1MdsC+76h4L6ZWpXxVrAo90CZj3NL6sDU04tTLXsTIplE1BqJYvVP6GTW9RG2HY8DqI9Bpvmb0FBY00MZpXkWXAXGbOpR0JHT+ljcGVinBnbKhFgAbPlsU5H545SwZn8eL7/yIB2fxOypfJeoE8ZetK0B/RgUUmz36ycLx3sfTyCP/ThU+p5xz0GNlee6sRQiLC7+o3bfiTlYxKFgOWEA7WSKBTY0hIlqM2uvJITDt6VC5XXciKSpeQvuD4spjtC5+WqaUSj/LuxpHVuoM+XUoRLsA48SQJ/HapTmouFKQE7IQhYuYy0DSGSiJVbaGlpOozVkytm7UU4VACwxvig+KE0TWQc0ZOFhmJ8MP",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "source": "github",
+      "source_commit": "2497ea900d015647e3dbe240f05b8513e6de07e8",
+      "source_tree": "f1ffb6e8661321e889e70aadb56f659a5d6e754c",
+      "version": "1.0.2",
+      "workflow_id": "com.himind.workflow.software-release"
+    }
+  ],
   "feature_packs": [
     {
       "id": "com.himind.feature.extension-authoring",
