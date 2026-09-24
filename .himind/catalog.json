@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-a7b3ba90950a6bca",
+  "generation": "sync-06322be52951b3ab",
   "plugins": [
     {
       "allow_disable": true,
@@ -384,6 +384,58 @@
       "signature_key_id": "himind-production-2026",
       "source": "github",
       "version": "1.2.1",
+      "view_count": 0
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:plugin/com.himind.tech-radar@0.4.2:com.himind.tech-radar-0.4.2.hmpkg",
+      "artifact_sha256": "44286c5531fb8e272a413bc34d72d9fa3bf131bc6f177f21659d59e52bc75cef",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [
+        "tech-radar.collect",
+        "tech-radar.report",
+        "tech-radar.archive.list",
+        "tech-radar.archive.read",
+        "tech-radar.link.open"
+      ],
+      "categories": [
+        "data-automation",
+        "docs-knowledge"
+      ],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "采集公开科技热点仓库并按领域规则筛选、与历史台账对比，生成可归档的网页报告，并自带历史归档视图。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.tech-radar@0.4.2/com.himind.tech-radar-0.4.2.hmpkg",
+      "file_name": "com.himind.tech-radar-0.4.2.hmpkg",
+      "file_size": 5194487,
+      "governance": "optional",
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.47",
+      "name": "科技雷达",
+      "organization_reason": "",
+      "permissions": [
+        "filesystem.workspace.read",
+        "filesystem.workspace.write",
+        "network.github.read"
+      ],
+      "plugin_dependencies": [],
+      "plugin_id": "com.himind.tech-radar",
+      "published_at": "2026-09-24T14:57:17Z",
+      "release_notes": "0.4.2：能力说明收敛到一句，去掉冗余描述。",
+      "release_tag": "plugin/com.himind.tech-radar@0.4.2",
+      "review_status": "published",
+      "sha256": "44286c5531fb8e272a413bc34d72d9fa3bf131bc6f177f21659d59e52bc75cef",
+      "signature": "Se8UAIsYpZo9dZQLHDFfXO/3XD47aGOx68auHdUA9f5OA3cD/PeKsT6Y2XPrXm7bUchnVySaZjPI94Yws3y98b2/TIiNiontqIJ2kAllgvmdf/1bgz1sUnEhzc6m9ocb9Hm1ldv4F1MBkzs9Xc4RGPmj7JDHAWdSMp2nChs1Az+KZWuUoKt1NV78kujlUbbMbtm3NpBf0/L61xaI8aOkWUIESqkZTGpZFYKMef3DruE/2jCJ5Q69IRR3Dgck4M6wybZD+DUa4zFxQfY66Uvl3eBzFF27C7UG2EkVXVyVo6tMMMeluNTA5p88M14XpOAgRvon5g4A0YAB5ZBne3zB6Hmg+38wgA9jIS3FAbajIqCqxpUX6onMXY0awKJiFz31hoNZQKDexlCRJ3RslTfN/on55fAqlgLPVRCE3XWBK7YSxN2WGgq5ykQ+qURzNEtgjuUZg5xWDzkZSuBJwzQ3Rle6t1Sw1iIRJoJuAmjGoq8q3YyF5/aLHNPKmQ38AcRX",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "source": "github",
+      "source_commit": "48f1b27424466348ae7f55587987e3cefa81dab2",
+      "source_tree": "84861c6e35c384d8e031c9cb4e7cfa3adada11b1",
+      "version": "0.4.2",
       "view_count": 0
     }
   ],
