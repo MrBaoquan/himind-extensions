@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-d23a4efe88b728d1",
+  "generation": "sync-44a05a93cfd12a2b",
   "plugins": [
     {
       "allow_disable": true,
@@ -709,6 +709,48 @@
     {
       "allow_disable": true,
       "allow_uninstall": true,
+      "artifact_id": "github:skill/com.himind.skill.mcp-experience-feedback@1.0.1:com.himind.skill.mcp-experience-feedback-1.0.1.hmskill",
+      "artifact_sha256": "aa91c8ae793ece56d606f8583064c2463b6078a53bdcaeb29886b38e05d75a18",
+      "assignment": "optional",
+      "author_name": "超级管理员",
+      "capability_ids": [],
+      "categories": [
+        "software-engineering",
+        "collaboration-delivery"
+      ],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "通过 MCP 完成任务后复盘使用体验，输出可落地的优化需求项。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.himind.skill.mcp-experience-feedback@1.0.1/com.himind.skill.mcp-experience-feedback-1.0.1.hmskill",
+      "file_name": "com.himind.skill.mcp-experience-feedback-1.0.1.hmskill",
+      "file_size": 6818,
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.0",
+      "name": "MCP 使用体验反馈",
+      "organization_reason": "",
+      "plugin_dependencies": [],
+      "published_at": "2026-09-24T14:58:48Z",
+      "release_notes": "1.0.1：名称与说明收敛到约定长度。",
+      "release_tag": "skill/com.himind.skill.mcp-experience-feedback@1.0.1",
+      "risk_summary": "read_only",
+      "sha256": "aa91c8ae793ece56d606f8583064c2463b6078a53bdcaeb29886b38e05d75a18",
+      "signature": "UO0xmQ1uDwvN3YuFWAQ0oltDoW0T5M4/lsMVwdQH0Ra/Zvi9sKl0FyxbTXIpXv3DHAXrzwxDX3k7zzENp0J2KZE2BY3UyX2InKP8N56XP6UIAONY5qAn+Twcxy2kGuFwnLtK6TC+d4469/yOTbJe+xkykvFQBu3GOueRIPEBibnHSkC7qYhsOg3ERVXgzh+TJLBI+/5HaXctSWjliwsZQBYzczC99IZ04cSOv/Hq3sy5W7z+ds7PLv16ch09xDmM0qFAr76LArVVAZ90prgiE6ImLtwV1/2WEs7hhaeApxzBTMaYohZKUfus2FSC2FuQmcdgwnDjk92LkP8FADT9M5OKttNmUNUfyXphqR5mOZ/7GWPN1tE7UxRui1Zt+ZCguT82q5iZv+nGwrkT8tFo4F+3bBbRSrVmi4RH50NU2bZY7SIHeZz6zwpJW67YgsO3OIyf8vitR4V4UMZgv6oU5OwKgpfYex4JGiS81UPbuzaSNLn4wAzunqd1+/YukJTL",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "skill_id": "com.himind.skill.mcp-experience-feedback",
+      "source": "github",
+      "source_commit": "5c231638bf6f3e1147112fb7b9a21bf6bbf9e5b2",
+      "source_tree": "9dd3e2612bf3dd7610add9fdd5fead12b052ea43",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "version": "1.0.1"
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
       "artifact_id": "github:skill/com.himind.skill.software-distribution@1.3.3:com.himind.skill.software-distribution-1.3.3.hmskill",
       "artifact_sha256": "9f22293dd57131f16cc2f474146fb87d6390e35b5ea3c5c96f4c6d3219015e7f",
       "assignment": "optional",
@@ -727,20 +769,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "kind": "plugin",
           "id": "com.himind.software-distribution",
-          "required": true,
+          "kind": "plugin",
           "min_version": "1.2.1",
-          "version": "1.2.4",
+          "pinned": true,
+          "required": true,
           "sha256": "9ead5149b025b088ad64aaeb709a275067710cab9593ec5a9358c2f1d19ef300",
           "source": {
-            "kind": "github",
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.software-distribution@1.2.4/com.himind.software-distribution-1.2.4.hmpkg",
             "id": "github:MrBaoquan/himind-extensions",
-            "repository": "MrBaoquan/himind-extensions",
+            "kind": "github",
             "reference": "plugin/com.himind.software-distribution@1.2.4",
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.software-distribution@1.2.4/com.himind.software-distribution-1.2.4.hmpkg"
+            "repository": "MrBaoquan/himind-extensions"
           },
-          "pinned": true
+          "version": "1.2.4"
         }
       ],
       "description": "为 WPF 与 Unity 项目做分发接入检查、制品校验和更新验证。",
