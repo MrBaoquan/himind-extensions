@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-4afc57d3fe87e9b1",
+  "generation": "sync-252c20c5f321d1b4",
   "plugins": [
     {
       "allow_disable": true,
@@ -198,6 +198,53 @@
       "signature_key_id": "himind-production-2026",
       "source": "github",
       "version": "1.3.1",
+      "view_count": 0
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:plugin/com.himind.image-optimizer@1.0.3:com.himind.image-optimizer-1.0.3.hmpkg",
+      "artifact_sha256": "4a3e3b6c07f808963362e9e771f4ed1506d56c4f59a1c07ecd053286dbdc3d2c",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [
+        "image.optimize"
+      ],
+      "categories": [
+        "visual-design",
+        "content-production"
+      ],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "压缩 JPEG 与 PNG 图片，并按最大边长等比例缩放，始终输出新文件。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.image-optimizer@1.0.3/com.himind.image-optimizer-1.0.3.hmpkg",
+      "file_name": "com.himind.image-optimizer-1.0.3.hmpkg",
+      "file_size": 2196014,
+      "governance": "optional",
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.2.0",
+      "name": "图片压缩与缩放",
+      "organization_reason": "",
+      "permissions": [
+        "fs.read.user_selected",
+        "fs.write.user_selected"
+      ],
+      "plugin_dependencies": [],
+      "plugin_id": "com.himind.image-optimizer",
+      "published_at": "2026-09-24T14:56:31Z",
+      "release_notes": "1.0.3：能力说明收敛到一句，去掉冗余描述。",
+      "release_tag": "plugin/com.himind.image-optimizer@1.0.3",
+      "review_status": "published",
+      "sha256": "4a3e3b6c07f808963362e9e771f4ed1506d56c4f59a1c07ecd053286dbdc3d2c",
+      "signature": "UnRdkZd7Jq1dp/DHpSA+HeS1KZn+FFUIDu3NlP2yzUx9Np3C014D2dDxkjJMhfqPFc09V+Zo8qRsg4X0on8D4AVCiudA530SfoxmCMcFli8C2xADAWRyk2q36BQY6ydHKjSNorR85SptYp9JicsVfOSRVscbhLf7J1/VuqBXe2QIE24NtHJMu2v9ecJuCY/UWULlc57geg5APKCpfRpMdcwRxM1gEwGgqS3WkS7RmEMhvHOoRNzldBktofB04qbW8erkX8hdDovBfaNebg4v6vNoOD5C9ITerb23FnbETEDXfBmYMgy9Uocun4Q/5LGCD1MBiKcGa60g1/7IiJe5ENTlZumiNUDMX7+uO1+JRLyMO3WyXHbG7uf7UM5U48NOBJt8g1NdM5DlUfI4M17SzTkHvjIjb8cBHHdWwguknBCa0Kkj63bIo4QB+DvtjlI//rktQAIISXr/nVRY6doEgqjnBTH1SWPtuUw6Vv7ZNzmzP1HBrmPmEUKAMXdT0MOf",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "source": "github",
+      "source_commit": "b5cbb575f5571f83908d7f5ae5fd55171762bf97",
+      "source_tree": "e1f309cb108d8b227328fa054d940ae099d582fc",
+      "version": "1.0.3",
       "view_count": 0
     },
     {
