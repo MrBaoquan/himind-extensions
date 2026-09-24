@@ -1,6 +1,9 @@
 package distribution
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestReleaseTagAndParseRoundTrip(t *testing.T) {
 	tag, err := ReleaseTag("plugin", "com.himind.software-distribution", "1.2.1")
@@ -55,11 +58,29 @@ func TestArtifactAndManifestNames(t *testing.T) {
 	if name != "com.himind.skill.develop-himind-skills-1.8.0.hmskill" {
 		t.Fatalf("artifact = %q", name)
 	}
-	if SignatureName(name) != name+".signature.json" {
-		t.Fatalf("signature = %q", SignatureName(name))
-	}
 	if ManifestName("com.himind.x", "1.0.0") != "com.himind.x@1.0.0.json" {
 		t.Fatalf("manifest = %q", ManifestName("com.himind.x", "1.0.0"))
+	}
+}
+
+func TestArtifactNameCoversEveryKind(t *testing.T) {
+	want := map[string]string{
+		"plugin":   "com.himind.x-1.0.0.hmpkg",
+		"skill":    "com.himind.x-1.0.0.hmskill",
+		"workflow": "com.himind.x-1.0.0.hmwf",
+	}
+	for kind, expected := range want {
+		name, err := ArtifactName(kind, "com.himind.x", "1.0.0")
+		if err != nil {
+			t.Fatalf("ArtifactName(%s): %v", kind, err)
+		}
+		if name != expected {
+			t.Fatalf("ArtifactName(%s) = %q, want %q", kind, name, expected)
+		}
+		// 签名内嵌在发布清单里，任何交付物名都不该再出现分离签名。
+		if strings.HasSuffix(name, ".signature.json") {
+			t.Fatalf("%s 出现分离签名资产 %q", kind, name)
+		}
 	}
 }
 

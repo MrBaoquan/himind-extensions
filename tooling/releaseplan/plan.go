@@ -27,7 +27,6 @@ type Plan struct {
 	Tag             string                           `json:"tag"`
 	ArtifactName    string                           `json:"artifact_name"`
 	Extension       string                           `json:"extension"`
-	SignatureName   string                           `json:"signature_name"`
 	ManifestName    string                           `json:"manifest_name"`
 	LockName        string                           `json:"lock_name"`
 	SourceCommit    string                           `json:"source_commit"`
@@ -70,9 +69,8 @@ func Build(kind, source, repository, channel, catalogPath string) (Plan, error) 
 		Channel: strings.TrimSpace(channel), Repository: repository,
 		MinAgentVersion: manifest.MinAgentVersion,
 		Tag:             tag, ArtifactName: artifactName, Extension: extension,
-		SignatureName: distribution.SignatureName(artifactName),
-		ManifestName:  distribution.ManifestName(manifest.ID, manifest.Version),
-		LockName:      manifest.ID + "-" + manifest.Version + ".extension-lock.json",
+		ManifestName: distribution.ManifestName(manifest.ID, manifest.Version),
+		LockName:     manifest.ID + "-" + manifest.Version + ".extension-lock.json",
 	}
 	if plan.Channel == "" {
 		plan.Channel = "stable"

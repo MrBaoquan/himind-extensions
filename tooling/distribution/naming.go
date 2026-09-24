@@ -11,8 +11,11 @@ import (
 //
 //	tag      <kind>/<id>@<version>      例如 plugin/com.himind.image-optimizer@1.0.2
 //	制品     <id>-<version>.<ext>       例如 com.himind.image-optimizer-1.0.2.hmpkg
-//	签名     <制品名>.signature.json
 //	清单     <id>@<version>.json
+//
+// 签名不单独成资产：RSA-PSS/SHA-256 的 signature、signature_key_id 与
+// signature_algorithm 内嵌在发布清单里，与制品摘要同一次写入，避免
+// 「制品和签名文件走散」这种无法自证的组合。
 //
 // 选择 `<kind>/<id>@<version>` 而不是扁平前缀的原因：聚合仓库里 tag 列表按 kind
 // 分组可读；`@version` 与精确 pin、溯源一一对应；与 changesets 生态的通行做法一致。
@@ -113,11 +116,6 @@ func ArtifactName(kind, id, version string) (string, error) {
 // ManifestName 返回发布清单文件名：`<id>@<version>.json`。
 func ManifestName(id, version string) string {
 	return fmt.Sprintf("%s@%s.json", strings.TrimSpace(id), strings.TrimSpace(version))
-}
-
-// SignatureName 返回分离签名的文件名：`<制品名>.signature.json`。
-func SignatureName(artifactName string) string {
-	return artifactName + ".signature.json"
 }
 
 // DownloadURL 返回制品在 GitHub Release 上的下载地址。

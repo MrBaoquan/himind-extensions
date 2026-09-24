@@ -184,7 +184,7 @@ func WriteReleaseManifest(path string, value ReleaseManifest) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
-// SignatureOf 把清单里的签名转成本地 `.signature.json` 的形状。
+// SignatureOf 返回发布清单里的内嵌签名。
 func (m ReleaseManifest) SignatureOf() (ReleaseSignature, error) {
 	if m.Signature == nil {
 		return ReleaseSignature{}, errors.New("发布清单没有签名")
