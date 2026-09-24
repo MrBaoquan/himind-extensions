@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-9d6da880e512e265",
+  "generation": "sync-73aab3ddc1b92eab",
   "plugins": [
     {
       "allow_disable": true,
@@ -757,6 +757,49 @@
         "workbuddy"
       ],
       "version": "1.3.2"
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:skill/com.mrbaoquan.skill.unihper-unity-development@1.0.1:com.mrbaoquan.skill.unihper-unity-development-1.0.1.hmskill",
+      "artifact_sha256": "b95037927d650317aa47290b3ca7171dbe51350e680b32b433eadb886a83d65b",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [],
+      "categories": [
+        "software-engineering"
+      ],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "指导基于 UNIHper 框架的 Unity 项目的场景脚本、UI、资源与配置开发。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.mrbaoquan.skill.unihper-unity-development@1.0.1/com.mrbaoquan.skill.unihper-unity-development-1.0.1.hmskill",
+      "file_name": "com.mrbaoquan.skill.unihper-unity-development-1.0.1.hmskill",
+      "file_size": 7781,
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.1",
+      "name": "UNIHper 开发助手",
+      "organization_reason": "",
+      "plugin_dependencies": [],
+      "published_at": "2026-09-24T14:57:56Z",
+      "release_notes": "1.0.1：名称与说明收敛到约定长度。",
+      "release_tag": "skill/com.mrbaoquan.skill.unihper-unity-development@1.0.1",
+      "risk_summary": "可能按用户要求修改目标 Unity 工程内的 C#、JSON、UXML、USS、asmdef 与资源配置；禁止访问项目外路径、凭据和生成缓存，涉及迁移、删除、发布或提交时必须先确认范围。",
+      "sha256": "b95037927d650317aa47290b3ca7171dbe51350e680b32b433eadb886a83d65b",
+      "signature": "iUGElEhNRVJJtDd8LFvwvLUZLUT9MQr29Jx4tATP0vdkbUs1oQwD/ZSMB2jIXiSRXUrW3Vx56mA2HQNtVHrV9tMTsLpjgKY+wCs3BCtez0wY2pMUQEIPdl4CYmO8fQ28kUNA4jLpxnU6vtVjO/iDOfL5iw9MPvYTMSMAVkSssrDnOtvo2fYDiN8UHIaDXfKVB318PWYH1tJ2w2xP3bMtp0yGbPQo1vaLivC8kTBuJYikjC7c9ZFhkozbApbYOdmOqk28nREOig+KzclPEPRfPFzCuj7KV+Fc0suMK1J7qQkQpp9ynf/i2f6wdEwwjqHhExWKJQ/3FIl37xIwsOVz2xyGHqRsPxtGV3J2ZEKUlvwHwhEqBtYyIzqsH618cAbUtpKzRKGZ0a+C/zJE41PrqJXnIzEhu2KF5JoJRrLVeZey7P9dXjmiGOAsi2ZybJY+D7itm8FQtQhA3LqydaLO0ZxcIsB/XfAQhomwXUz7hMJv83o8VVXjQ62Yu3G/XyGf",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "skill_id": "com.mrbaoquan.skill.unihper-unity-development",
+      "source": "github",
+      "source_commit": "0176721880b5e39accd91adf3766bec47776016a",
+      "source_tree": "9b12cc85c0e50cc839060d854643dc65535b09b9",
+      "supported_clients": [
+        "codex",
+        "github-copilot",
+        "workbuddy"
+      ],
+      "version": "1.0.1"
     },
     {
       "allow_disable": true,
