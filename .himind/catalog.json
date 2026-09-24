@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-05b6e91a328cef70",
+  "generation": "sync-4afc57d3fe87e9b1",
   "plugins": [
     {
       "allow_disable": true,
@@ -91,6 +91,64 @@
       "signature_key_id": "himind-production-2026",
       "source": "github",
       "version": "1.0.1",
+      "view_count": 0
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:plugin/com.himind.extension-development-tools@1.4.2:com.himind.extension-development-tools-1.4.2.hmpkg",
+      "artifact_sha256": "0b9fdef89d128bb1a56d742dce1bf692d6c13aaaad6b302a7681362e9fe1c23e",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [
+        "extension.environment.preflight",
+        "extension.plugin.scaffold",
+        "extension.plugin.validate",
+        "extension.plugin.build",
+        "extension.plugin.package",
+        "extension.skill.scaffold",
+        "extension.skill.validate",
+        "extension.skill.package",
+        "extension.workflow.scaffold",
+        "extension.workflow.validate",
+        "extension.workflow.build",
+        "extension.workflow.package"
+      ],
+      "categories": [
+        "software-engineering"
+      ],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "为 AI 助手提供不依赖业务项目上下文的插件、技能和工作流脚手架、校验、构建和打包能力。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg",
+      "file_name": "com.himind.extension-development-tools-1.4.2.hmpkg",
+      "file_size": 2786531,
+      "governance": "optional",
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.0",
+      "name": "AI 扩展开发工具",
+      "organization_reason": "",
+      "permissions": [
+        "filesystem.workspace.read",
+        "filesystem.workspace.write",
+        "process.go"
+      ],
+      "plugin_dependencies": [],
+      "plugin_id": "com.himind.extension-development-tools",
+      "published_at": "2026-09-24T14:56:13Z",
+      "release_notes": "1.4.2：目录名阈值放宽到 28，Capability ID 只设上限，触发说明扩到 140，存量豁免取消。",
+      "release_tag": "plugin/com.himind.extension-development-tools@1.4.2",
+      "review_status": "published",
+      "sha256": "0b9fdef89d128bb1a56d742dce1bf692d6c13aaaad6b302a7681362e9fe1c23e",
+      "signature": "QhpcKiiMhTl5vFmyjV8gnSODvJ3vCJVTcyaJDWb6fL2Zd2G2sgg6sCQu8HXKP4i6Yii74yxlNLpDixEGPfrYnesgIZvsTVzMJhwScXbIRFXola6xY3k1JZMIa5e/y1WbU7iBBmpml9Nq7pNnqR59ccSa67gT9Azsy8mLzNzgsTjVjFAq6xN+7NHfCNH30R+ROqfTZ5r1Kt7Vkx2gyAJKrrJqyAYDwOJJJwcwTGenUmc4uOPKKD6HklALwN2SA73WYpTL4CW15zf0iEGUEw9j5zcvGerhbEjd1DjIO1Yr+rcSL/SdijEXfbO3RJJC1zC5/YrhkGvJpVys+c6OblBE3DemcJpjIQszvkYIRC9AB6cAAtmUlpcNlcReq0qRxqD37jsFiJpX2IXt5375PJQsyx1IFMuWZ33NcnhDJ7B3lZE05OqTvuNOigKIoxRapx8kGpJJS03oD/1h2ls1gHGOj1Eh1uQe3lhRoHUfjMtV01YA2tP8l3bjEf6QoPo4juAy",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "source": "github",
+      "source_commit": "3bf57308debce81f91cc1d1d5e70d9a52a1275e9",
+      "source_tree": "3f924f22327d37a0e62659104ae226dadbef26ca",
+      "version": "1.4.2",
       "view_count": 0
     },
     {
