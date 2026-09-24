@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)][string]$ArtifactPath,
     [Parameter(Mandatory = $true)][string]$PrivateKeyPath,
     [Parameter(Mandatory = $true)][ValidatePattern('^[A-Za-z0-9._-]+$')][string]$KeyId,

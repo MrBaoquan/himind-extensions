@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)][ValidateSet('plugin', 'skill', 'workflow')][string]$Kind,
     [Parameter(Mandatory = $true)][string]$ExtensionPath,
     [Parameter(Mandatory = $true)][string]$OutputDirectory,
