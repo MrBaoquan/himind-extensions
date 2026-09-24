@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-21a90bb2f7cdb5d7",
+  "generation": "sync-b1f0273b6499202c",
   "plugins": [
     {
       "allow_disable": true,
@@ -1057,6 +1057,80 @@
     {
       "allow_disable": true,
       "allow_uninstall": true,
+      "artifact_id": "github:workflow/com.himind.workflow.tech-radar@0.4.4:com.himind.workflow.tech-radar-0.4.4.hmwf",
+      "artifact_sha256": "1693823f47f4c45c54b775173dd67d6c4560e8cc48d37c2fc0cf9802a070d3aa",
+      "assignment": "optional",
+      "author_name": "",
+      "capability_ids": [
+        "tech-radar.collect",
+        "tech-radar.report"
+      ],
+      "categories": [],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "按领域采集公开科技仓库，用历史快照算星数增量，由内置 AI 给出解读，产出按天归档的网页报告。零参数即可启动。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/workflow%2Fcom.himind.workflow.tech-radar@0.4.4/com.himind.workflow.tech-radar-0.4.4.hmwf",
+      "extension_lock": {
+        "dependencies": [],
+        "environment": {
+          "capabilities": [
+            {
+              "availability": "local",
+              "id": "tech-radar.collect",
+              "provider": "plugin:com.himind.tech-radar",
+              "required": true
+            },
+            {
+              "availability": "local",
+              "id": "tech-radar.report",
+              "provider": "plugin:com.himind.tech-radar",
+              "required": true
+            }
+          ],
+          "connectors": [],
+          "runtimes": [
+            {
+              "id": "himind.builtin",
+              "required": true,
+              "status": "ready",
+              "version": "0.1.5-rc.2"
+            }
+          ]
+        },
+        "generated_at": "unix-ms:1790263633209",
+        "root": {
+          "id": "com.himind.workflow.tech-radar",
+          "kind": "workflow",
+          "sha256": "1693823f47f4c45c54b775173dd67d6c4560e8cc48d37c2fc0cf9802a070d3aa",
+          "version": "0.4.4"
+        },
+        "schema_version": "extension_lock.v1"
+      },
+      "file_name": "com.himind.workflow.tech-radar-0.4.4.hmwf",
+      "file_size": 13739,
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.47",
+      "name": "科技雷达日报",
+      "organization_reason": "",
+      "plugin_dependencies": [],
+      "published_at": "2026-09-24T15:27:16Z",
+      "release_notes": "",
+      "release_tag": "workflow/com.himind.workflow.tech-radar@0.4.4",
+      "sha256": "1693823f47f4c45c54b775173dd67d6c4560e8cc48d37c2fc0cf9802a070d3aa",
+      "signature": "HWpUk/EJqdt373Xbb5M8s2hC+Vzyo5+D6MG//A8FUKixXFFyLoSl8QWux/Dk6FZm3uBaC2Lv+X5abSrljXsr0a6ts+89ofwBNXlwheBznrDzPZTd8P8ZknYt2T2zIKSbHSVW8EjK5bohWi0gjXRayVssmVkPboadITmNECfRvcqZFizHhu9FlIogt0SbVQ/Ty/x7IN9x6Xvu+rPuisD6IVOBImBA64CvhaTsTGYUYoDOuC6eHA2XKKEHMySsgRsAQcGOMcExVAJC1nacxw8ndT8W7BsGYqQv6dpuDzdzXZo+NsAESR5wv6Wg2sruto+4mcTqXI/cfRZONto7c5rzvqgkJqyzL9p7ZuT1lQ4jdcHsn9OUa34LJrembFCJ5zBPFzLcQTsIQeUZVQl3oKvWhwRullQHJh2Hdvmxg61eKNiiGI7yEJ5hvCLWzPDa6x0W+Y47HnuQEKfQHXwxc9VUkOyQLZGNRe691+zAvdZMhE4OyVLREvBMEPzsjYT84rzD",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "source": "github",
+      "source_commit": "91f6f80d0abba65e45109197f953e34e459e91e9",
+      "source_tree": "96b2cdbff3f942fc63aae94594470ea8da2b7b28",
+      "version": "0.4.4",
+      "workflow_id": "com.himind.workflow.tech-radar"
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
       "artifact_id": "github:workflow/com.himind.workflow.wechat-experience-upload@1.2.4:com.himind.workflow.wechat-experience-upload-1.2.4.hmwf",
       "artifact_sha256": "ffc66e08d2ebaecab1855aaa4c3458b8806aef692e1d45394032e36710a32e97",
       "assignment": "optional",
@@ -1071,20 +1145,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "kind": "plugin",
           "id": "com.himind.wechat-miniprogram-tools",
-          "required": true,
+          "kind": "plugin",
           "min_version": "",
-          "version": "0.3.13",
+          "pinned": true,
+          "required": true,
           "sha256": "2be33b927d4aea01a010f2df60e92dc91d759a1b17e8c8ad3d84fb2aaa666aa8",
           "source": {
-            "kind": "github",
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.wechat-miniprogram-tools@0.3.13/com.himind.wechat-miniprogram-tools-0.3.13.hmpkg",
             "id": "github:MrBaoquan/himind-extensions",
-            "repository": "MrBaoquan/himind-extensions",
+            "kind": "github",
             "reference": "plugin/com.himind.wechat-miniprogram-tools@0.3.13",
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.wechat-miniprogram-tools@0.3.13/com.himind.wechat-miniprogram-tools-0.3.13.hmpkg"
+            "repository": "MrBaoquan/himind-extensions"
           },
-          "pinned": true
+          "version": "0.3.13"
         }
       ],
       "description": "选择项目和展馆、指定开发或生产环境，可选通过 DSH 完成功能或 Bug 修复，构建后上传微信体验版。",
