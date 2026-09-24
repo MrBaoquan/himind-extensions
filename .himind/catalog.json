@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-baf70563118bde85",
+  "generation": "sync-d23a4efe88b728d1",
   "plugins": [
     {
       "allow_disable": true,
@@ -705,6 +705,80 @@
         "github-copilot"
       ],
       "version": "1.0.3"
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:skill/com.himind.skill.software-distribution@1.3.3:com.himind.skill.software-distribution-1.3.3.hmskill",
+      "artifact_sha256": "9f22293dd57131f16cc2f474146fb87d6390e35b5ea3c5c96f4c6d3219015e7f",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [
+        "software.distribution.project.inspect",
+        "software.distribution.artifact.inspect",
+        "software.distribution.release.publish",
+        "software.distribution.release.resolve"
+      ],
+      "categories": [
+        "software-engineering",
+        "collaboration-delivery",
+        "testing-quality"
+      ],
+      "channel": "stable",
+      "dependencies": [
+        {
+          "kind": "plugin",
+          "id": "com.himind.software-distribution",
+          "required": true,
+          "min_version": "1.2.1",
+          "version": "1.2.4",
+          "sha256": "9ead5149b025b088ad64aaeb709a275067710cab9593ec5a9358c2f1d19ef300",
+          "source": {
+            "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
+            "reference": "plugin/com.himind.software-distribution@1.2.4",
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.software-distribution@1.2.4/com.himind.software-distribution-1.2.4.hmpkg"
+          },
+          "pinned": true
+        }
+      ],
+      "description": "为 WPF 与 Unity 项目做分发接入检查、制品校验和更新验证。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.himind.skill.software-distribution@1.3.3/com.himind.skill.software-distribution-1.3.3.hmskill",
+      "file_name": "com.himind.skill.software-distribution-1.3.3.hmskill",
+      "file_size": 4870,
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.37",
+      "name": "软件分发对接",
+      "organization_reason": "",
+      "plugin_dependencies": [
+        {
+          "min_version": "1.2.1",
+          "plugin_id": "com.himind.software-distribution",
+          "required": true
+        }
+      ],
+      "published_at": "2026-09-24T14:58:31Z",
+      "release_notes": "1.3.3：说明收敛到一句，去掉冗余描述。",
+      "release_tag": "skill/com.himind.skill.software-distribution@1.3.3",
+      "risk_summary": "read_only_by_default; publish_requires_user_confirmation_and_agent_oauth_scope",
+      "sha256": "9f22293dd57131f16cc2f474146fb87d6390e35b5ea3c5c96f4c6d3219015e7f",
+      "signature": "QXXbvUb/qlfXvvtgjm+jT19ivGzxygKOaCbavssmT0eLClNjlq8lWClVb70syWv8CMnFwDICLwdJEk2Mh22SXmiNVq0DCrXwy2XHzKzUBbDkcoaEHBRoFB9hmZzn3sHKV3bRJP4DmDrCUims7ULcpcsV0qZjKDAQLQI4qEAOuDHcszigRMz6Aoqd+W5PV4oBU/nWGfeegWBOh/fs7+skTYiEtWToykHk5ei3e8VIIoNEmh6/LxKfPZ7n5Br/DcDcG6m+qpGArDgxojd2VGXQJQg06xzh3YgqPhaDqmJpeeWDz2joaA2v3ABG1078dBxCiy6K3coe4oDVOXDHgfb6dfiF9fVPNfu9V50Sis7hiKb7vUST54X3aemA5FvcMS2Ha0kKGh0VGvhVb60O7IRmRd/5UsHVJXWEzQGXgYap0ClDuLK9SCQq2GuYG/TguZ8Yf0Bw3/E0bTmbukUI2LFMgEXRZ4ZBL9OINa4a/pAL38M2InfwmmOX+v97k0sluoZt",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "skill_id": "com.himind.skill.software-distribution",
+      "source": "github",
+      "source_commit": "e25ce614c38a0a3021bd4b750edef8add7a80055",
+      "source_tree": "07962816e66cd038703f10aa9f7ecf201cf6d6a5",
+      "supported_clients": [
+        "himind-ai",
+        "codex",
+        "github-copilot",
+        "workbuddy"
+      ],
+      "version": "1.3.3"
     },
     {
       "allow_disable": true,
