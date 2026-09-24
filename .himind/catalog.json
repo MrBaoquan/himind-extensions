@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-c56e36ce6baa26d2",
+  "generation": "sync-526530eeaaa0fc96",
   "plugins": [
     {
       "allow_disable": true,
@@ -507,6 +507,60 @@
     {
       "allow_disable": true,
       "allow_uninstall": true,
+      "artifact_id": "github:skill/com.himind.skill.dev-workflow-orchestrator@1.0.2:com.himind.skill.dev-workflow-orchestrator-1.0.2.hmskill",
+      "artifact_sha256": "1df0b0718987f731ce981a1b53a6e343371d5c67596e57262f6aa0033078a9c4",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [
+        "engineering.project.resolve",
+        "engineering.checkpoint.create",
+        "engineering.workspace.lease.acquire",
+        "engineering.workspace.lease.release",
+        "engineering.workspace.lease.list",
+        "workflow.catalog.list",
+        "workflow.catalog.describe",
+        "workflow.run.start",
+        "workflow.run.get",
+        "workflow.run.feedback",
+        "workflow.run.cancel"
+      ],
+      "categories": [
+        "software-engineering",
+        "collaboration-delivery"
+      ],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "让 DSH 和外部 AI 工具按工程、工作区租约、开发检查点和 Workflow 生命周期完成开发与交付协作。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.himind.skill.dev-workflow-orchestrator@1.0.2/com.himind.skill.dev-workflow-orchestrator-1.0.2.hmskill",
+      "file_name": "com.himind.skill.dev-workflow-orchestrator-1.0.2.hmskill",
+      "file_size": 3344,
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.47",
+      "name": "工程工作流编排",
+      "organization_reason": "",
+      "plugin_dependencies": [],
+      "published_at": "2026-09-24T14:59:30Z",
+      "release_notes": "1.0.2：目录名与稳定 ID 收敛到约定长度。",
+      "release_tag": "skill/com.himind.skill.dev-workflow-orchestrator@1.0.2",
+      "risk_summary": "workspace_lease; checkpoint; workflow_start; workflow_cancel; approvals_require_user",
+      "sha256": "1df0b0718987f731ce981a1b53a6e343371d5c67596e57262f6aa0033078a9c4",
+      "signature": "Jxi5+EU2/kBzxYcAxmV5gIzLpRNLKVquVzP2/+DVyLD2IZ5k4Jks0ugldLNSTwxyfBljcStfbKL5GUMhP63PTgvvQFQCKCRIkco23mxrpBKqZ47ysSfHUsmnCcKZfnfC240vcKODO4TggjzkCB/EMTvXDkUeYfL/4E7BF0LWaFf0r9Q00AmudTnmDXxMtmrUgJzq0EkW+ye7nM8vh66NPuEe1wz6IN7CPS7WUpQ2B2TxLxADp3vW+w9GkIahgD3X4Kv2vtiS36RRB1qSPLWC3mHZEruiqz8PpZXjg9mq/96lwL0OSRcr/BA7Rtr7KuUf+SzuNgtvwEzOtPMnllQWy4Pv7L3rA+DsSPykBSIR5WRktItnmAPoDIEGYZmxOv9oNVJow5/sW4UHRAYv1+Q35MkUCo5yQnQ6VyD2yxh3mnkRZr2OztNPuZ9DlS/ealhUwnjazKxHw77zmptj+WeJxNUyT3WUFdElc08N4Dzfzpu0zubFreArXeCOjLwFdEgr",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "skill_id": "com.himind.skill.dev-workflow-orchestrator",
+      "source": "github",
+      "source_commit": "a4b7ff9477e14fb1338d0aefb22071dac0473d17",
+      "source_tree": "515b25a8c7855097a1661186ccbf4ca42d227c4d",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "version": "1.0.2"
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
       "artifact_id": "github:skill-com.himind.skill.develop-himind-plugins-v1.7.0:com.himind.skill.develop-himind-plugins-1.7.0.hmskill",
       "assignment": "optional",
       "author_name": "马宝全",
@@ -677,20 +731,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "kind": "plugin",
           "id": "com.himind.image-optimizer",
-          "required": true,
+          "kind": "plugin",
           "min_version": "1.0.0",
-          "version": "1.0.3",
+          "pinned": true,
+          "required": true,
           "sha256": "4a3e3b6c07f808963362e9e771f4ed1506d56c4f59a1c07ecd053286dbdc3d2c",
           "source": {
-            "kind": "github",
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.image-optimizer@1.0.3/com.himind.image-optimizer-1.0.3.hmpkg",
             "id": "github:MrBaoquan/himind-extensions",
-            "repository": "MrBaoquan/himind-extensions",
+            "kind": "github",
             "reference": "plugin/com.himind.image-optimizer@1.0.3",
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.image-optimizer@1.0.3/com.himind.image-optimizer-1.0.3.hmpkg"
+            "repository": "MrBaoquan/himind-extensions"
           },
-          "pinned": true
+          "version": "1.0.3"
         }
       ],
       "description": "在图片优化或交付前检查 Agent、图片处理插件、输入范围和交付约束。",
