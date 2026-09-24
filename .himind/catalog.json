@@ -4,8 +4,54 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "2585f4d097b9de0d84b7e67be549d66d5493d35e-skill-com.mrbaoquan.skill.unihper-unity-development-v1.0.0",
+  "generation": "sync-05b6e91a328cef70",
   "plugins": [
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:plugin/com.himind.document-inspector@1.0.2:com.himind.document-inspector-1.0.2.hmpkg",
+      "artifact_sha256": "26090cbe14f8d35705ffe63bdcbe7393485612de4bb6571cd3313efdd9eb5fb4",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [
+        "document.inspect"
+      ],
+      "categories": [
+        "docs-knowledge",
+        "data-automation"
+      ],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "解析 DOCX、TXT 与 Markdown 文档，提取文本、字数和基础元数据。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.document-inspector@1.0.2/com.himind.document-inspector-1.0.2.hmpkg",
+      "file_name": "com.himind.document-inspector-1.0.2.hmpkg",
+      "file_size": 2125475,
+      "governance": "optional",
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.2.0",
+      "name": "项目文档解析",
+      "organization_reason": "",
+      "permissions": [
+        "fs.read.user_selected"
+      ],
+      "plugin_dependencies": [],
+      "plugin_id": "com.himind.document-inspector",
+      "published_at": "2026-09-24T14:38:04Z",
+      "release_notes": "1.0.2：能力说明收敛到一句，去掉冗余描述。",
+      "release_tag": "plugin/com.himind.document-inspector@1.0.2",
+      "review_status": "published",
+      "sha256": "26090cbe14f8d35705ffe63bdcbe7393485612de4bb6571cd3313efdd9eb5fb4",
+      "signature": "RFnecv17X6rg1aL7vN/os1yHs+FSFhBLPErqqr6kwUqwiPwrrSpk9T2KpfakuJExdkU/WhtZFQl73NUdu7BsPzTqrf7iPe9K0OxF1gRgQKE8o7Yg76qYAOvIYVfgAwMbgg2jax2LL34pFEkBRH3awWUHKKY417+NJp5GUl9xTxuVN0iQOIUSJH4UvcOvZsEsSnZH+VEcIqJt5SS5PUtUuvMPLznALHMdlrfFLRqq44yIDFOtyXzbS1bxrUB4tfqHmYPl5KAw58N+O/yk5rCqnIL8h6oKj6IU06eRBCxM9c+AiGf7EWMcNHGt95dfu5LUaxkEYC6MkykHorewD3FTnqOxUSy1+LtIARphvoShErHw62TITIOOd46lHcdDLKJp8/B1+X6NSun6GLjYnA7cVlKDTFRRX3yBtMwMcpnuO5hV7a3+ywiQ912NfZQKVIuK897W3v0je8zBYRLowk8eEOIpvZ4LK+DB0KsMrVK0O8Ar8gzr3XsxAiZfT625XaVN",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "source": "github",
+      "source_commit": "ef776569db941e810ace53b4a6a14b475ddb281b",
+      "source_tree": "eeaf8ddd623744b1f6bf1deab7d57d35187cf94d",
+      "version": "1.0.2",
+      "view_count": 0
+    },
     {
       "allow_disable": true,
       "allow_uninstall": true,
@@ -478,6 +524,7 @@
       "version": "1.0.0"
     }
   ],
+  "workflows": [],
   "feature_packs": [
     {
       "id": "com.himind.feature.extension-authoring",
