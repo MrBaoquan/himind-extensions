@@ -1,0 +1,97 @@
+{
+  "schema_version": "workflow_view.v1",
+  "title": "科技雷达日报",
+  "sections": [
+    {
+      "id": "scope",
+      "title": "关注范围",
+      "fields": [
+        {
+          "id": "domains",
+          "label": "关注领域",
+          "type": "list",
+          "default": ["cv", "llm", "ar-vr"],
+          "options": ["cv", "llm", "ar-vr", "general"],
+          "placeholder": "每行一个：cv / llm / ar-vr / general",
+          "hint": "留空等于 cv + llm + ar-vr 三个默认领域；每行一个，行内不要用逗号连写。"
+        },
+        {
+          "id": "topics",
+          "label": "自定义主题",
+          "type": "list",
+          "placeholder": "每行一条 GitHub 标签，例如 3d-gaussian-splatting",
+          "hint": "可选；填了就在默认领域之外追加查询。"
+        },
+        {
+          "id": "languages",
+          "label": "语言过滤",
+          "type": "list",
+          "placeholder": "留空表示不限，例如 TypeScript / Go / Python"
+        },
+        {
+          "id": "exclude_owners",
+          "label": "排除组织",
+          "type": "list",
+          "placeholder": "每行一个 owner，用于排除长期霸榜的大厂官仓"
+        }
+      ]
+    },
+    {
+      "id": "intensity",
+      "title": "采集强度",
+      "fields": [
+        {
+          "id": "window_days",
+          "label": "统计窗口（天）",
+          "type": "number",
+          "default": 7
+        },
+        {
+          "id": "top_n",
+          "label": "每段条目数",
+          "type": "number",
+          "default": 10
+        },
+        {
+          "id": "min_stars",
+          "label": "基础盘星数下限",
+          "type": "number",
+          "default": 800,
+          "hint": "长期活跃项目的总星数门槛，抬高可以只看头部。"
+        },
+        {
+          "id": "new_min_stars",
+          "label": "新星星数下限",
+          "type": "number",
+          "default": 150,
+          "hint": "窗口内新建仓库的星数门槛，抬高可以过滤早期噪声。"
+        }
+      ]
+    },
+    {
+      "id": "output",
+      "title": "报告归档",
+      "fields": [
+        {
+          "id": "report_root",
+          "label": "报告归档目录",
+          "type": "text",
+          "picker": "directory",
+          "placeholder": "留空即用扩展默认归档目录",
+          "hint": "默认写进扩展私有数据目录；填了会被记住，自带“历史归档”视图读同一目录。"
+        },
+        {
+          "id": "report_date",
+          "label": "报告日期",
+          "type": "text",
+          "placeholder": "留空取当天 YYYY-MM-DD"
+        }
+      ]
+    }
+  ],
+  "actions": [
+    "collect",
+    "insight",
+    "publish"
+  ]
+}

@@ -95,6 +95,12 @@ func packageFiles(root, output string) ([]string, error) {
 			return walkErr
 		}
 		if info.IsDir() {
+			if shouldSkipPackageDirectory(info.Name()) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if shouldSkipPackageFile(info.Name()) {
 			return nil
 		}
 		absolutePath, absoluteErr := filepath.Abs(path)
@@ -113,6 +119,22 @@ func packageFiles(root, output string) ([]string, error) {
 	})
 	sort.Strings(files)
 	return files, err
+}
+
+// Generated dependency trees and local package-manager locks are never part of
+// a portable HiMind plugin. Keeping them out makes packaging deterministic and
+// prevents large UI plugins from timing out while being archived.
+func shouldSkipPackageDirectory(name string) bool {
+	switch strings.ToLower(name) {
+	case ".git", "node_modules", "dist", "target", "test-output":
+		return true
+	default:
+		return false
+	}
+}
+
+func shouldSkipPackageFile(name string) bool {
+	return strings.EqualFold(name, "package-lock.json") || strings.EqualFold(name, "yarn.lock") || strings.EqualFold(name, "pnpm-lock.yaml")
 }
 
 func sha256File(path string) (string, error) {

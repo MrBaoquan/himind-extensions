@@ -1,6 +1,9 @@
 {
   "schema_version": 1,
   "source_id": "",
+  "distribution_id": "mrbaoquan/himind-extensions",
+  "channel": "stable",
+  "catalog_id": "public",
   "generation": "2585f4d097b9de0d84b7e67be549d66d5493d35e-skill-com.mrbaoquan.skill.unihper-unity-development-v1.0.0",
   "plugins": [
     {

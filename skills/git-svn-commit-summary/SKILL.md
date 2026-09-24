@@ -1,6 +1,6 @@
 ---
 name: git-svn-commit-summary
-description: Generate accurate, concise commit summaries for Git or SVN changes and optionally carry out a confirmed commit. Use when asked to summarize current changes, draft or improve a commit message, prepare a Git/SVN commit, review staged or working-copy changes before committing, or explain what a revision contains. Supports Codex, GitHub Copilot, and WorkBuddy project workflows.
+description: Summarize real Git or SVN diffs into a commit message, and commit only after explicit confirmation. Use for diff review or commit prep.
 ---
 
 # Git/SVN 提交摘要

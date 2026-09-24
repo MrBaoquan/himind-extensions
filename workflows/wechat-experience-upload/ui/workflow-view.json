@@ -1,0 +1,153 @@
+{
+  "schema_version": "workflow_view.v1",
+  "title": "微信小程序体验版上传",
+  "sections": [
+    {
+      "id": "target",
+      "title": "项目与目标",
+      "fields": [
+        {
+          "id": "workspace_root",
+          "label": "工作区目录",
+          "type": "text",
+          "required": true,
+          "default": "F:\\WebProjects\\kerun_user",
+          "placeholder": "例如 F:\\WebProjects\\kerun_user"
+        },
+        {
+          "id": "source_root",
+          "label": "源码根目录",
+          "type": "text",
+          "default": "F:\\WebProjects\\kerun_user",
+          "placeholder": "默认等于工作区目录"
+        },
+        {
+          "id": "project_root",
+          "label": "小程序产物目录",
+          "type": "text",
+          "required": true,
+          "default": "F:\\WebProjects\\kerun_user\\dist\\wx",
+          "placeholder": "包含 project.config.json 的构建产物目录"
+        },
+        {
+          "id": "venue",
+          "label": "展馆",
+          "type": "select",
+          "required": true,
+          "default": "szkjg",
+          "options": [
+            "fdkjg",
+            "szsng",
+            "zzkjg",
+            "yjhlq",
+            "szkjg",
+            "sxkjg",
+            "qzkjg",
+            "hzkjg",
+            "gskjg",
+            "jykjg",
+            "hdcybwg",
+            "sdjywhg",
+            "sanxia"
+          ]
+        },
+        {
+          "id": "environment",
+          "label": "服务器环境",
+          "type": "select",
+          "required": true,
+          "default": "development",
+          "options": [
+            "development",
+            "production"
+          ]
+        },
+        {
+          "id": "version",
+          "label": "体验版版本号",
+          "type": "text",
+          "required": true,
+          "placeholder": "例如 1.26.0917"
+        },
+        {
+          "id": "description",
+          "label": "版本说明",
+          "type": "text",
+          "placeholder": "说明本次修复或功能变化"
+        }
+      ]
+    },
+    {
+      "id": "development",
+      "title": "DSH 开发与修复",
+      "fields": [
+        {
+          "id": "development_requested",
+          "label": "先进行代码开发或修复",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "requirement",
+          "label": "功能或 Bug 描述",
+          "type": "textarea",
+          "placeholder": "填写本次需要修复的问题或需要完成的功能"
+        },
+        {
+          "id": "acceptance_criteria",
+          "label": "验收标准",
+          "type": "list",
+          "placeholder": "每行一条验收标准"
+        },
+        {
+          "id": "constraints",
+          "label": "约束条件",
+          "type": "list",
+          "placeholder": "每行一条技术或业务约束"
+        },
+        {
+          "id": "feedback",
+          "label": "首轮开发反馈",
+          "type": "textarea",
+          "placeholder": "可选：补充 DSH 首轮开发需要关注的内容"
+        }
+      ]
+    },
+    {
+      "id": "upload",
+      "title": "上传通道",
+      "fields": [
+        {
+          "id": "upload_channel",
+          "label": "上传通道",
+          "type": "select",
+          "required": true,
+          "default": "wechatide",
+          "options": [
+            "wechatide",
+            "ci"
+          ]
+        },
+        {
+          "id": "wechatide_client",
+          "label": "wechatide Client",
+          "type": "text",
+          "default": "Copilot",
+          "placeholder": "须与微信开发者工具授权弹窗中的 clientName 一致"
+        },
+        {
+          "id": "credential_handles",
+          "label": "CI 上传私钥凭据",
+          "type": "credential",
+          "target": "private_key_path",
+          "default": "wechat-upload-private-key"
+        }
+      ]
+    }
+  ],
+  "actions": [
+    "develop",
+    "build",
+    "upload"
+  ]
+}

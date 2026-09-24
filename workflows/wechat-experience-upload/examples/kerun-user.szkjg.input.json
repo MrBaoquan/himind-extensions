@@ -1,0 +1,21 @@
+{
+  "workspace_root": "F:\\WebProjects\\kerun_user",
+  "source_root": "F:\\WebProjects\\kerun_user",
+  "project_root": "F:\\WebProjects\\kerun_user\\dist\\wx",
+  "project_id": "kerun-user",
+  "target_id": "szkjg",
+  "venue": "szkjg",
+  "environment": "development",
+  "version": "1.26.0917",
+  "description": "随州科技馆体验版",
+  "upload_channel": "wechatide",
+  "wechatide_client": "Copilot",
+  "development_requested": false,
+  "requirement": "",
+  "acceptance_criteria": [],
+  "constraints": [],
+  "feedback": "",
+  "credential_handles": {
+    "private_key_path": "wechat-upload-private-key"
+  }
+}

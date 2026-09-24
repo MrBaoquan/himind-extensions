@@ -1,0 +1,26 @@
+{
+  "id": "com.himind.skill.mcp-experience-feedback",
+  "name": "MCP 使用体验反馈",
+  "author": "超级管理员",
+  "categories": [
+    "software-engineering",
+    "collaboration-delivery"
+  ],
+  "version": "1.0.1",
+  "distribution_targets": ["workbench", "github"],
+  "scope": "organization",
+  "description": "通过 MCP 完成任务后复盘使用体验，输出可落地的优化需求项。",
+  "release_notes": "1.0.1：名称与说明收敛到约定长度。",
+  "min_agent_version": "0.3.0",
+  "supported_clients": [
+    "agent-skills"
+  ],
+  "capabilities": [],
+  "plugin_dependencies": [],
+  "risk_summary": "read_only",
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml"
+  ]
+}

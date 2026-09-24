@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "分发接入检查记录",
+  "type": "object",
+  "required": ["product_id", "project_type", "client_status"],
+  "properties": {
+    "product_id": { "type": "string" },
+    "project_type": { "type": "string" },
+    "client_status": { "type": "string" },
+    "recommendations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "checked_at": { "type": "string" }
+  },
+  "additionalProperties": true
+}

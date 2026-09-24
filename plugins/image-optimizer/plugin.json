@@ -4,8 +4,9 @@
   "author": "马宝全",
   "categories": ["visual-design", "content-production"],
   "description": "压缩 JPEG 与 PNG 图片，并按最大边长等比例缩放，始终输出新文件。",
-  "release_notes": "补充作者、功能分类与版本更新说明，纳入统一扩展源码仓库。",
-  "version": "1.0.2",
+  "release_notes": "1.0.3：能力说明收敛到一句，去掉冗余描述。",
+  "version": "1.0.3",
+  "distribution_targets": ["workbench", "github"],
   "entry": "image-optimizer.exe",
   "runtime": "process-jsonrpc-stdio",
   "platforms": ["windows-x64"],
@@ -14,7 +15,7 @@
   "capabilities": [
     {
       "id": "image.optimize",
-      "description": "压缩 JPEG/PNG 图片并可按最大边长等比例缩放，始终写入新文件",
+      "description": "压缩图片并可按最大边长等比缩放",
       "input_schema": {
         "type": "object",
         "properties": {

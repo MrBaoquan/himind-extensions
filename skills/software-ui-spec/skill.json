@@ -1,0 +1,26 @@
+{
+  "id": "com.himind.skill.software-ui-spec",
+  "name": "软件开发 UI 规范",
+  "author": "超级管理员",
+  "categories": [
+    "visual-design",
+    "software-engineering"
+  ],
+  "version": "1.0.1",
+  "distribution_targets": ["workbench", "github"],
+  "scope": "organization",
+  "description": "定义软件开发 UI/UX 规范并据此审查界面，给出问题清单与验收标准。",
+  "release_notes": "1.0.1：说明收敛到一句，去掉冗余描述。",
+  "min_agent_version": "0.3.40",
+  "supported_clients": [
+    "agent-skills"
+  ],
+  "capabilities": [],
+  "plugin_dependencies": [],
+  "risk_summary": "read_only",
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml"
+  ]
+}

@@ -1,0 +1,359 @@
+{
+  "id": "com.himind.wechat-miniprogram-tools",
+  "name": "微信小程序交付工具",
+  "author": "马宝全",
+  "categories": ["software-engineering", "release"],
+  "description": "提供微信小程序项目检查、依赖准备、测试、构建、预览、体验版上传、审核材料、发布记录和回滚证据能力。",
+  "release_notes": "0.3.13：能力说明收敛到一句，去掉冗余描述。",
+  "version": "0.3.13",
+  "distribution_targets": ["workbench", "github"],
+  "entry": "wechat-miniprogram-tools.exe",
+  "runtime": "process-jsonrpc-stdio",
+  "platforms": ["windows-x64"],
+  "min_agent_version": "0.3.47",
+  "governance": "managed",
+  "capabilities": [
+    {
+      "id": "wechat.miniprogram.requirements.snapshot",
+      "description": "把真实需求、验收标准和约束固化成本地需求快照",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {"type": "string"},
+          "source_root": {"type": "string"},
+          "project_root": {"type": "string"},
+          "artifact_dir": {"type": "string"},
+          "requirement": {"type": "string"},
+          "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
+          "constraints": {"type": "array", "items": {"type": "string"}},
+          "candidate": {"type": "object"},
+          "workflow_context": {"type": "object"}
+        },
+        "required": ["workspace_root", "requirement"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write",
+      "availability": "local"
+    },
+    {
+      "id": "wechat.miniprogram.project.inspect",
+      "description": "检查真实小程序工程、AppID、目录结构和工具配置",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {"type": "string"},
+          "source_root": {"type": "string"},
+          "project_root": {"type": "string"},
+          "candidate": {"type": "object"},
+          "workflow_context": {"type": "object"}
+        },
+        "required": ["workspace_root", "project_root"],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only",
+      "availability": "local"
+    },
+    {
+      "id": "wechat.miniprogram.ci.readiness",
+      "description": "检查 miniprogram-ci、上传私钥与工程配置",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {"type": "string"},
+          "project_root": {"type": "string"},
+          "app_id": {"type": "string"},
+          "private_key_path": {"type": "string"},
+          "venue": {"type": "string"},
+          "environment": {"type": "string", "enum": ["development", "production"]},
+          "upload_channel": {"type": "string", "enum": ["ci", "wechatide"]},
+          "wechatide_client": {"type": "string"},
+          "require_ci_installed": {"type": "boolean"},
+          "candidate": {"type": "object"},
+          "workflow_context": {"type": "object"}
+        },
+        "required": ["workspace_root"],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only",
+      "availability": "local"
+    },
+    {
+      "id": "wechat.miniprogram.development.record",
+      "description": "记录开发计划、代码变更与证据文件",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {"type": "string"},
+          "project_root": {"type": "string"},
+          "artifact_dir": {"type": "string"},
+          "stage": {"type": "string", "enum": ["plan", "changes"]},
+          "evidence_paths": {"type": "array", "items": {"type": "string"}},
+          "change_summary": {"type": "string"},
+          "commit_sha": {"type": "string"},
+          "candidate": {"type": "object"},
+          "workflow_context": {"type": "object"}
+        },
+        "required": ["workspace_root", "project_root", "stage", "change_summary"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write",
+      "availability": "local"
+    },
+    {
+      "id": "wechat.miniprogram.dependencies.prepare",
+      "description": "在真实小程序工程中执行受控依赖安装",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {"type": "string"},
+          "source_root": {"type": "string"},
+          "project_root": {"type": "string"},
+          "package_manager": {"type": "string", "enum": ["npm", "pnpm", "yarn"]},
+          "install_mode": {"type": "string", "enum": ["ci", "install"]},
+          "timeout_seconds": {"type": "integer", "minimum": 30, "maximum": 1800},
+          "candidate": {"type": "object"},
+          "workflow_context": {"type": "object"}
+        },
+        "required": ["workspace_root", "project_root"],
+        "additionalProperties": false
+      },
+      "risk_level": "process",
+      "availability": "local",
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "wechat.miniprogram.acceptance.record",
+      "description": "记录真实人工验收结果、测试人、截图或视频证据",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {"type": "string"},
+          "project_root": {"type": "string"},
+          "artifact_dir": {"type": "string"},
+          "tester": {"type": "string"},
+          "passed": {"type": "boolean"},
+          "evidence_paths": {"type": "array", "items": {"type": "string"}},
+          "notes": {"type": "string"},
+          "candidate": {"type": "object"},
+          "workflow_context": {"type": "object"}
+        },
+        "required": ["workspace_root", "tester", "passed", "evidence_paths"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write",
+      "availability": "local"
+    },
+    {
+      "id": "wechat.miniprogram.test",
+      "description": "执行小程序工程的测试、静态检查和类型检查脚本并生成测试报告",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {"type": "string"},
+          "source_root": {"type": "string"},
+          "project_root": {"type": "string"},
+          "package_manager": {"type": "string", "enum": ["npm", "pnpm", "yarn"]},
+          "scripts": {"type": "array", "items": {"type": "string"}},
+          "artifact_dir": {"type": "string"},
+          "timeout_seconds": {"type": "integer", "minimum": 30, "maximum": 1800},
+          "candidate": {"type": "object"},
+          "workflow_context": {"type": "object"}
+        },
+        "required": ["workspace_root", "project_root"],
+        "additionalProperties": false
+      },
+      "risk_level": "process",
+      "availability": "local",
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "wechat.miniprogram.build",
+      "description": "按展馆和开发/生产环境构建小程序工程，或回退到通用构建脚本",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {"type": "string"},
+          "source_root": {"type": "string"},
+          "project_root": {"type": "string"},
+          "package_manager": {"type": "string", "enum": ["npm", "pnpm", "yarn"]},
+          "script": {"type": "string"},
+          "build_script": {"type": "string"},
+          "venue": {"type": "string"},
+          "environment": {"type": "string", "enum": ["development", "production"]},
+          "timeout_seconds": {"type": "integer", "minimum": 30, "maximum": 3600},
+          "candidate": {"type": "object"},
+          "workflow_context": {"type": "object"}
+        },
+        "required": ["workspace_root"],
+        "additionalProperties": false
+      },
+      "risk_level": "process",
+      "availability": "local",
+      "timeout_seconds": 3600
+    },
+    {
+      "id": "wechat.miniprogram.preview",
+      "description": "使用 miniprogram-ci 生成真实预览码",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {"type": "string"},
+          "project_root": {"type": "string"},
+          "app_id": {"type": "string"},
+          "private_key_path": {"type": "string"},
+          "venue": {"type": "string"},
+          "environment": {"type": "string", "enum": ["development", "production"]},
+          "version": {"type": "string"},
+          "qrcode_output_dest": {"type": "string"},
+          "description": {"type": "string"},
+          "timeout_seconds": {"type": "integer", "minimum": 60, "maximum": 1800},
+          "candidate": {"type": "object"},
+          "workflow_context": {"type": "object"}
+        },
+        "required": ["workspace_root", "private_key_path", "version"],
+        "additionalProperties": false
+      },
+      "risk_level": "network",
+      "availability": "local",
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "wechat.miniprogram.upload",
+      "description": "用构建产物上传真实体验版",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {"type": "string"},
+          "project_root": {"type": "string"},
+          "app_id": {"type": "string"},
+          "private_key_path": {"type": "string"},
+          "venue": {"type": "string"},
+          "environment": {"type": "string", "enum": ["development", "production"]},
+          "upload_channel": {"type": "string", "enum": ["ci", "wechatide"]},
+          "wechatide_client": {"type": "string"},
+          "version": {"type": "string"},
+          "description": {"type": "string"},
+          "artifact_dir": {"type": "string"},
+          "timeout_seconds": {"type": "integer", "minimum": 60, "maximum": 1800},
+          "candidate": {"type": "object"},
+          "workflow_context": {"type": "object"}
+        },
+        "required": ["workspace_root", "version"],
+        "additionalProperties": false
+      },
+      "risk_level": "network",
+      "availability": "local",
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "wechat.miniprogram.review.prepare",
+      "description": "生成微信审核说明、页面路径和人工提交检查清单",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {"type": "string"},
+          "project_root": {"type": "string"},
+          "artifact_dir": {"type": "string"},
+          "version": {"type": "string"},
+          "review_notes": {"type": "string"},
+          "candidate": {"type": "object"},
+          "workflow_context": {"type": "object"}
+        },
+        "required": ["workspace_root", "project_root", "version"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write",
+      "availability": "local"
+    },
+    {
+      "id": "wechat.miniprogram.review.submit",
+      "description": "记录人工提交审核的证据；平台未开放接口时明确阻断自动提交",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {"type": "string"},
+          "artifact_dir": {"type": "string"},
+          "submission_receipt": {"type": "string"},
+          "manual_evidence_path": {"type": "string"},
+          "candidate": {"type": "object"},
+          "workflow_context": {"type": "object"}
+        },
+        "required": ["workspace_root"],
+        "additionalProperties": false
+      },
+      "risk_level": "system",
+      "availability": "local"
+    },
+    {
+      "id": "wechat.miniprogram.release.record",
+      "description": "记录审核通过、正式版本和发布证据，不伪造平台状态",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {"type": "string"},
+          "artifact_dir": {"type": "string"},
+          "app_id": {"type": "string"},
+          "version": {"type": "string"},
+          "release_evidence_path": {"type": "string"},
+          "candidate": {"type": "object"},
+          "workflow_context": {"type": "object"}
+        },
+        "required": ["workspace_root", "app_id", "version"],
+        "additionalProperties": false
+      },
+      "risk_level": "system",
+      "availability": "local"
+    },
+    {
+      "id": "wechat.miniprogram.rollback",
+      "description": "校验稳定回滚版本；确认执行时只记录回滚动作和目标版本",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {"type": "string"},
+          "artifact_dir": {"type": "string"},
+          "app_id": {"type": "string"},
+          "version": {"type": "string"},
+          "target_version": {"type": "string"},
+          "rollback_requested": {"type": "boolean"},
+          "confirm": {"type": "boolean"},
+          "candidate": {"type": "object"},
+          "workflow_context": {"type": "object"}
+        },
+        "required": ["workspace_root", "app_id", "version", "target_version"],
+        "additionalProperties": false
+      },
+      "risk_level": "system",
+      "availability": "local"
+    },
+    {
+      "id": "wechat.miniprogram.delivery.verify",
+      "description": "只读校验预览、体验版、验收与发布记录的一致性",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {"type": "string"},
+          "app_id": {"type": "string"},
+          "version": {"type": "string"},
+          "artifact_paths": {
+            "type": "object",
+            "additionalProperties": {"type": "string"}
+          },
+          "candidate": {"type": "object"},
+          "workflow_context": {"type": "object"}
+        },
+        "required": ["workspace_root", "app_id", "version", "artifact_paths", "candidate"],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only",
+      "availability": "local"
+    }
+  ],
+  "permissions": [
+    "filesystem.workspace.read",
+    "filesystem.workspace.write",
+    "process.go",
+    "process.node",
+    "network.wechat"
+  ]
+}

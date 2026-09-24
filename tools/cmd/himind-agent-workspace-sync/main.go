@@ -79,6 +79,8 @@ func syncRegistry(repositoryRoot, registry, commit string) error {
 		manifestName := "plugin.json"
 		if extension.Type == "skill" {
 			manifestName = "skill.json"
+		} else if extension.Type == "workflow" {
+			manifestName = "workflow.json"
 		}
 		workspace := filepath.Join(root, filepath.FromSlash(extension.Path))
 		manifestData, err := os.ReadFile(filepath.Join(workspace, manifestName))

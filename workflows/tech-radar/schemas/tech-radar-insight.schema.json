@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "科技雷达解读结果",
+  "type": "object",
+  "required": ["insights", "summary"],
+  "properties": {
+    "insights": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["entry_id", "relevance", "reason"],
+        "properties": {
+          "entry_id": { "type": "string", "minLength": 1 },
+          "relevance": { "type": "string", "enum": ["high", "medium", "low"] },
+          "reason": { "type": "string", "maxLength": 120 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "highlights": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "summary": { "type": "string", "maxLength": 200 },
+    "degraded": { "type": "boolean" }
+  },
+  "additionalProperties": true
+}

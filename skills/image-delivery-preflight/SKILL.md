@@ -1,6 +1,6 @@
 ---
 name: image-delivery-preflight
-description: 在图片优化、压缩、缩放或交付开始前，检查 Agent 健康状态、图片优化插件依赖、源目录、输出格式与交付约束，并返回就绪项、阻塞项和下一步。用户要求图片交付预检、图片优化前检查、验证图片处理环境或排查 image delivery readiness 时使用。支持 Codex 与 GitHub Copilot。
+description: 在图片优化或交付开始前检查 Agent 状态、图片插件依赖、输入范围与交付约束，返回就绪项与阻塞项。用户要求图片交付预检或排查图片处理环境时使用。
 ---
 
 # 图片交付预检

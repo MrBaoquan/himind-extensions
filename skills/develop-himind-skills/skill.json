@@ -3,10 +3,11 @@
   "name": "技能开发助手",
   "author": "马宝全",
   "categories": ["software-engineering"],
-  "version": "1.8.0",
+  "version": "1.8.2",
+  "distribution_targets": ["workbench", "github"],
   "scope": "organization",
   "description": "使用中文规范创建、校验、跨客户端测试、打包并受控提交 HiMind 技能。",
-  "release_notes": "增加 Agent 统一预检、扩展修订入口和结构化 blockers，支持外部 AI 完成 Skill 及三件套自身迭代闭环。",
+  "release_notes": "1.8.2：目录名阈值改为 28，触发说明改为 140，并取消存量豁免。",
   "min_agent_version": "0.3.37",
   "supported_clients": ["agent-skills"],
   "capabilities": [

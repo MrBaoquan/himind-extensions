@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/MrBaoquan/himind-extensions/tooling/metaguide"
 )
 
 type Config struct {
@@ -45,11 +47,11 @@ type Manifest struct {
 }
 
 type Capability struct {
-	ID          string         `json:"id"`
-	Description string         `json:"description"`
-	InputSchema map[string]any `json:"input_schema"`
-	RiskLevel   string         `json:"risk_level"`
-	Availability string        `json:"availability"`
+	ID           string         `json:"id"`
+	Description  string         `json:"description"`
+	InputSchema  map[string]any `json:"input_schema"`
+	RiskLevel    string         `json:"risk_level"`
+	Availability string         `json:"availability"`
 }
 
 type Contributions struct {
@@ -98,6 +100,21 @@ func Create(config Config) (Result, error) {
 	}
 	if len(config.Categories) == 0 {
 		return Result{}, fmt.Errorf("at least one functional category is required")
+	}
+	id := "com.himind." + strings.ReplaceAll(name, "_", "-")
+	for _, item := range []struct {
+		field metaguide.Field
+		value string
+	}{
+		{metaguide.StableID, id},
+		{metaguide.Slug, name},
+		{metaguide.DisplayName, displayName},
+		{metaguide.Description, config.Description},
+		{metaguide.ReleaseNotes, config.ReleaseNotes},
+	} {
+		if err := metaguide.Check(item.field, item.value); err != nil {
+			return Result{}, err
+		}
 	}
 	root := filepath.Join(config.OutputDir, name)
 	if config.OutputDir == "" {

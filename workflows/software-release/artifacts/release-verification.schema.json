@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "线上更新解析验证记录",
+  "type": "object",
+  "required": ["product_id", "current_version", "update_available"],
+  "properties": {
+    "product_id": { "type": "string" },
+    "current_version": { "type": "string" },
+    "update_available": { "type": "boolean" },
+    "resolved_version": { "type": "string" },
+    "resolved_sha256": { "type": "string" },
+    "current_version_has_update": { "type": "boolean" },
+    "verified_at": { "type": "string" }
+  },
+  "additionalProperties": true
+}

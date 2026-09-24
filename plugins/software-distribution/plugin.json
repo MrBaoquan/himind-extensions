@@ -4,8 +4,9 @@
   "author": "马宝全",
   "categories": ["software-engineering", "collaboration-delivery", "testing-quality"],
   "description": "为 AI 提供项目接入诊断、软件制品结构与摘要校验；连接组织分发服务后可继续验证更新。",
-  "release_notes": "支持 AI 会话目录之外的显式本机项目，并修复 Windows 短路径与真实路径差异导致的合法目录误判。",
-  "version": "1.2.1",
+  "release_notes": "1.2.4：能力说明收敛到一句，去掉冗余描述。",
+  "version": "1.2.4",
+  "distribution_targets": ["workbench", "github"],
   "entry": "bin/software-distribution.exe",
   "runtime": "process-jsonrpc-stdio",
   "platforms": ["windows-x64"],
@@ -14,7 +15,7 @@
   "capabilities": [
     {
       "id": "software.distribution.project.inspect",
-      "description": "识别 WPF 或 Unity 项目并返回分发接入建议，不修改工程",
+      "description": "识别 WPF 或 Unity 项目并给出接入建议",
       "availability": "local",
       "input_schema": {
         "type": "object",
@@ -26,7 +27,7 @@
     },
     {
       "id": "software.distribution.artifact.inspect",
-      "description": "在用户显式指定的本机目录内检查发布制品并计算大小与 SHA-256",
+      "description": "检查本机制品并计算大小与 SHA-256",
       "availability": "local",
       "input_schema": {
         "type": "object",
@@ -42,8 +43,8 @@
     },
     {
       "id": "software.distribution.release.resolve",
-      "description": "使用 Agent 配置的可信组织分发服务检查指定产品更新，不接收凭据或任意 URL",
-      "availability": "control_plane",
+      "description": "用 Agent 配置的组织分发服务查询产品更新",
+      "availability": "local",
       "input_schema": {
         "type": "object",
         "properties": {"product_id":{"type":"string"},"current_version":{"type":"string"},"channel":{"type":"string"},"platform":{"type":"string"},"architecture":{"type":"string"}},
@@ -51,9 +52,27 @@
         "additionalProperties": false
       },
       "risk_level": "network_write"
+    },
+    {
+      "id": "software.distribution.channel.resolve",
+      "description": "读取 GitHub 渠道描述并返回更新结果",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "product_id":{"type":"string"},"current_version":{"type":"string"},"channel":{"type":"string"},
+          "platform":{"type":"string"},"architecture":{"type":"string"},
+          "package_type":{"type":"string","enum":["directory-zip","apk","unity-addressables","content"]},
+          "repository":{"type":"string"},"channel_url":{"type":"string"},"reference":{"type":"string"},
+          "allow_unsigned":{"type":"boolean"},"allow_downgrade":{"type":"boolean"},"instance_id":{"type":"string"}
+        },
+        "required": ["product_id","current_version","platform","architecture"],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
     }
   ],
-  "permissions": ["filesystem.workspace.read", "network.dashboard.public"],
+  "permissions": ["filesystem.workspace.read", "network.dashboard.public", "network.github.read"],
   "contributes": {
     "commands": [
       {"id":"software.distribution.project.inspect","title":"检查软件分发接入"},

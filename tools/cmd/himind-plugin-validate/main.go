@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/MrBaoquan/himind-extensions/tooling/metaguide"
 )
 
 type manifest struct {
@@ -64,8 +66,12 @@ var (
 	platforms      = map[string]bool{"windows-x64": true, "windows-arm64": true}
 	governances    = map[string]bool{"required": true, "managed": true, "optional": true, "blocked": true}
 	runtimes       = map[string]bool{"process-jsonrpc-stdio": true}
-	riskLevels     = map[string]bool{"read_only": true, "local_action": true, "local_write": true, "network_write": true, "admin_action": true, "R1": true, "R2": true, "R3": true, "R4": true}
-	availability   = map[string]bool{"local": true, "network_service": true, "control_plane": true}
+	riskLevels     = map[string]bool{
+		"read_only": true, "local_action": true, "local_write": true, "process": true,
+		"network": true, "network_write": true, "system": true, "admin_action": true,
+		"builtin_policy": true, "R1": true, "R2": true, "R3": true, "R4": true,
+	}
+	availability = map[string]bool{"local": true, "network_service": true, "control_plane": true}
 )
 
 func Main() {
@@ -230,6 +236,21 @@ func ParseManifest(data []byte) (manifest, error) {
 	if !versionPattern.MatchString(item.Version) {
 		return item, errors.New("version must use semantic version format, for example 1.0.0")
 	}
+	if err := metaguide.Check(metaguide.StableID, item.ID); err != nil {
+		return item, err
+	}
+	if err := metaguide.Check(metaguide.Slug, metaguide.SlugOf(item.ID)); err != nil {
+		return item, err
+	}
+	if err := metaguide.Check(metaguide.DisplayName, item.Name); err != nil {
+		return item, err
+	}
+	if err := metaguide.Check(metaguide.Description, item.Description); err != nil {
+		return item, err
+	}
+	if err := metaguide.Check(metaguide.ReleaseNotes, item.ReleaseNotes); err != nil {
+		return item, err
+	}
 	if filepath.IsAbs(item.Entry) || invalidRelativePath(item.Entry) {
 		return item, errors.New("entry must be a relative path inside the package")
 	}
@@ -262,6 +283,12 @@ func ParseManifest(data []byte) (manifest, error) {
 		if len(capability.InputSchema) == 0 || !json.Valid(capability.InputSchema) {
 			return item, fmt.Errorf("input_schema must be valid JSON for %s", capability.ID)
 		}
+		if err := metaguide.Check(metaguide.CapabilityID, capability.ID); err != nil {
+			return item, err
+		}
+		if err := metaguide.Check(metaguide.CapabilityDescription, capability.Description); err != nil {
+			return item, err
+		}
 	}
 	viewIDs := map[string]bool{}
 	for _, view := range item.Contributes.Views {
@@ -271,6 +298,14 @@ func ParseManifest(data []byte) (manifest, error) {
 		viewIDs[view.ID] = true
 		if filepath.IsAbs(view.Entry) || invalidRelativePath(view.Entry) {
 			return item, fmt.Errorf("view entry must be relative: %s", view.Entry)
+		}
+		if err := metaguide.Check(metaguide.CommandTitle, view.Title); err != nil {
+			return item, err
+		}
+	}
+	for _, command := range item.Contributes.Commands {
+		if err := metaguide.Check(metaguide.CommandTitle, command.Title); err != nil {
+			return item, err
 		}
 	}
 	return item, nil

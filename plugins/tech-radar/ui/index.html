@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>科技雷达 · 历史归档</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">📡</span>
+        <div class="brand-text">
+          <strong>科技雷达</strong>
+          <small>历史归档与网页报告</small>
+        </div>
+      </div>
+      <div class="toolbar">
+        <label class="field">
+          <span>主题</span>
+          <input id="topics" type="text" value="ai-agent, llm" spellcheck="false" />
+        </label>
+        <label class="field narrow">
+          <span>窗口</span>
+          <select id="window">
+            <option value="7">7 天</option>
+            <option value="14" selected>14 天</option>
+            <option value="30">30 天</option>
+          </select>
+        </label>
+        <label class="field narrow">
+          <span>条数</span>
+          <select id="topn">
+            <option value="10">10</option>
+            <option value="12" selected>12</option>
+            <option value="20">20</option>
+          </select>
+        </label>
+        <button id="collect" class="btn primary" type="button">采集一期</button>
+        <button id="refresh" class="btn" type="button">刷新</button>
+      </div>
+    </header>
+
+    <p class="notice" id="notice" hidden></p>
+
+    <main class="layout">
+      <aside class="rail">
+        <div class="rail-head">
+          <strong>归档期次</strong>
+          <span id="archive-count" class="pill">—</span>
+        </div>
+        <ul id="archive-list" class="archive-list" aria-label="归档期次"></ul>
+        <p class="rail-foot" id="data-root" title=""></p>
+      </aside>
+
+      <section class="detail">
+        <div class="detail-head">
+          <div>
+            <h1 id="detail-title">选择一期报告</h1>
+            <p id="detail-subtitle">左侧按期次浏览每日采集结果与解读。</p>
+          </div>
+          <div class="detail-tools">
+            <span id="detail-badges" class="badges"></span>
+          </div>
+        </div>
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="ranking" role="tab" type="button">榜单</button>
+          <button class="tab" data-tab="summary" role="tab" type="button">摘要</button>
+          <button class="tab" data-tab="source" role="tab" type="button">网页原稿</button>
+        </div>
+        <div class="panel">
+          <section id="panel-ranking" class="panel-body"></section>
+          <section id="panel-summary" class="panel-body" hidden></section>
+          <section id="panel-source" class="panel-body" hidden></section>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

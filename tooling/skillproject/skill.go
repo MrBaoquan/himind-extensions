@@ -13,6 +13,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/MrBaoquan/himind-extensions/tooling/metaguide"
 )
 
 type CapabilityDependency struct {
@@ -70,6 +72,9 @@ func Create(config CreateConfig) (string, error) {
 	}
 	if strings.TrimSpace(config.ID) == "" {
 		config.ID = "com.himind.skill." + config.Slug
+	}
+	if err := metaguide.Check(metaguide.Slug, config.Slug); err != nil {
+		return "", err
 	}
 	if strings.TrimSpace(config.Version) == "" {
 		config.Version = "0.1.0"
@@ -145,6 +150,9 @@ func Validate(path string) error {
 	if err := validateDeclaredFiles(manifest, files); err != nil {
 		return err
 	}
+	if err := validateSkillDocument(files); err != nil {
+		return err
+	}
 	return validateChecksums(files)
 }
 
@@ -211,6 +219,9 @@ func readDirectory(root string) (Manifest, map[string][]byte, error) {
 		}
 		files[name] = content
 	}
+	if err := validateSkillDocument(files); err != nil {
+		return Manifest{}, nil, err
+	}
 	return manifest, files, nil
 }
 
@@ -263,6 +274,18 @@ func validateManifest(manifest Manifest) error {
 	if strings.TrimSpace(manifest.Name) == "" {
 		return errors.New("skill name is required")
 	}
+	if err := metaguide.Check(metaguide.StableID, manifest.ID); err != nil {
+		return err
+	}
+	if err := metaguide.Check(metaguide.DisplayName, manifest.Name); err != nil {
+		return err
+	}
+	if err := metaguide.Check(metaguide.Description, manifest.Description); err != nil {
+		return err
+	}
+	if err := metaguide.Check(metaguide.ReleaseNotes, manifest.ReleaseNotes); err != nil {
+		return err
+	}
 	if strings.TrimSpace(manifest.Author) == "" {
 		return errors.New("skill author is required")
 	}
@@ -292,6 +315,35 @@ func validateManifest(manifest Manifest) error {
 		return errors.New("contents must include skill.json and SKILL.md")
 	}
 	return nil
+}
+
+var frontmatterDescriptionPattern = regexp.MustCompile(`(?m)^description:[ \t]*(.+)$`)
+
+// validateSkillDocument 约束 SKILL.md frontmatter 中的 description，它同时承载用途与触发场景。
+func validateSkillDocument(files map[string][]byte) error {
+	data, ok := files["SKILL.md"]
+	if !ok {
+		return nil
+	}
+	header := frontmatter(string(data))
+	match := frontmatterDescriptionPattern.FindSubmatch(header)
+	if match == nil {
+		return nil
+	}
+	return metaguide.Check(metaguide.TriggerDescription, string(match[1]))
+}
+
+func frontmatter(document string) []byte {
+	document = strings.TrimPrefix(document, "\ufeff")
+	if !strings.HasPrefix(document, "---") {
+		return nil
+	}
+	rest := document[3:]
+	end := strings.Index(rest, "\n---")
+	if end < 0 {
+		return nil
+	}
+	return []byte(rest[:end])
 }
 
 func validateDeclaredFiles(manifest Manifest, files map[string][]byte) error {

@@ -1,9 +1,9 @@
 ---
 name: unihper-unity-development
-description: 面向基于 UNIHper 框架的 Unity 项目开发，设计、实现、审查和排查场景脚本、UGUI、UI Toolkit、资源、配置及相关管理器；当用户提到 UNIHper、SceneScriptBase、UIBase、UIToolkitBase、ResourceManager、UConfig、Managements 门面或要求按 UNIHper 约定编写 Unity 功能时使用。
+description: 指导基于 UNIHper 框架的 Unity 项目开发，覆盖场景脚本、UGUI、UI Toolkit、资源与配置。用户提到 UNIHper、SceneScriptBase、UIBase、ResourceManager 或 UConfig 时使用。
 ---
 
-# UNIHper Unity 开发助手
+# UNIHper 开发助手
 
 以目标 Unity 工程的实际 UNIHper 版本和配置为准，完成符合框架生命周期与资源边界的实现。不要把本技能所在仓库或其他项目的业务约定带入目标工程。
 

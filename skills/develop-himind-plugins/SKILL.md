@@ -1,6 +1,6 @@
 ---
 name: develop-himind-plugins
-description: 自动设计、创建、实现、测试、校验、打包和受控提交 HiMind Agent 插件。用户要求开发插件、创建 Capability、生成 plugin.json、构建 JSON-RPC/stdio 插件、生成 .hmpkg、在空白目录开发、提交审核或排查插件工程问题时使用。展示名称和用户文案使用中文，稳定 ID、目录名、二进制名和 Capability ID 使用 ASCII。
+description: 开发 HiMind Agent 插件：设计 Capability、编写 plugin.json、测试、打包 .hmpkg 并受控提交审核。用户要求新建、修改、排查或提交插件时使用。ID 用 ASCII，展示名用中文。
 ---
 
 # 插件开发助手
@@ -18,6 +18,24 @@ description: 自动设计、创建、实现、测试、校验、打包和受控�
 7. 每个新版本必须在 `plugin.json.release_notes` 中填写中文更新说明，并从功能分类 ID `software-engineering`、`visual-design`、`video-post`、`3d-animation`、`content-production`、`audio-sound`、`data-automation`、`docs-knowledge`、`testing-quality`、`collaboration-delivery`、`system-device` 中选择至少一个 `categories` 分类。分类描述能力领域，不填写岗位名称、权限或客户端名称。
 8. Agent 不执行 Git clone、pull、commit、push 或凭据管理。开发者可自行用 Git 管理源码；本技能只处理当前 `workspace_root` 中的工作副本和不可变候选包。
 9. `plugin.json` 必须显式声明插件依赖。只在确有运行时依赖时填写 `plugin_dependencies`；不得把本技能、技能开发助手或 AI 扩展开发工具声明为业务插件运行时依赖。
+
+## 命名与文案约束
+
+长度按字符计，1 个汉字算 1 个字符。超过上限时脚手架和校验直接拒绝，建议值只作提示。
+
+| 字段 | 建议 | 上限 |
+| --- | --- | --- |
+| 稳定 ID | 48 | 64 |
+| 目录名 / ID 末段 | 28 | 32 |
+| 显示名称 | 14 | 18 |
+| 用途说明 `description` | 60 | 120 |
+| SKILL.md frontmatter `description` | 140 | 160 |
+| `release_notes` | 60 | 120 |
+| Capability ID | 无建议值 | 40 |
+| Capability 说明 | 30 | 48 |
+| 命令与视图标题 | 12 | 16 |
+
+名称用名词短语，只说是什么；说明写“做什么 + 什么时候用”一句，不复述需求、不列功能清单；更新说明只写本次变化；不用“一站式、全方位、赋能、助力”这类空词。阈值定义在 `tooling/metaguide`，超限报错会带上限和建议值；Capability ID 是结构性标识，只设上限。存量扩展已按上表对齐。
 
 ## 自动开发流程
 

@@ -1,6 +1,6 @@
 ---
 name: software-distribution
-description: 为 WPF、Unity Windows 或 Unity Android 项目完成软件分发接入检查、制品校验，并在连接组织分发服务后创建产品、发布版本和验证更新链路。用户提到软件分发、自更新、发布渠道、MediaResolver、Unity APK 或 Windows 更新包时使用。
+description: 为 WPF 与 Unity 项目完成分发接入检查、制品校验、渠道发布与更新验证。用户提到软件分发、自更新、发布渠道或更新包时使用。
 ---
 
 # 软件分发对接

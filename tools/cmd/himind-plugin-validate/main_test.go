@@ -40,8 +40,12 @@ func TestParseManifestAcceptsCanonicalRiskLevels(t *testing.T) {
 		"read_only",
 		"local_action",
 		"local_write",
+		"process",
+		"network",
 		"network_write",
+		"system",
 		"admin_action",
+		"builtin_policy",
 		"R1",
 		"R2",
 		"R3",
@@ -69,8 +73,8 @@ func TestParseManifestAcceptsCanonicalRiskLevels(t *testing.T) {
 	}
 }
 
-func TestParseManifestRejectsLegacyAndUnknownRiskLevels(t *testing.T) {
-	for _, riskLevel := range []string{"process", "network", "system", "builtin_policy", "unknown"} {
+func TestParseManifestRejectsUnknownRiskLevels(t *testing.T) {
+	for _, riskLevel := range []string{"unknown"} {
 		t.Run(riskLevel, func(t *testing.T) {
 			data := []byte(strings.ReplaceAll(`{
 				"id":"com.himind.example.tool",

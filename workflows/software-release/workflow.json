@@ -1,0 +1,202 @@
+{
+  "schema_version": "workflow_package.v1",
+  "id": "com.himind.workflow.software-release",
+  "version": "1.0.2",
+  "distribution_targets": ["workbench", "github"],
+  "name": "软件分发与发布",
+  "description": "对已构建制品完成接入检查、制品校验、渠道发布与更新验证，发布凭据不经过 AI。",
+  "min_agent_version": "0.3.47",
+  "local_requirements": {
+    "platform": "windows",
+    "workspace": "directory",
+    "required_tools": [],
+    "recommended_tools": []
+  },
+  "execution_policy": "segmented",
+  "entrypoints": [
+    {
+      "id": "inspect",
+      "at_step": "SD-PROJECT",
+      "label": "接入检查",
+      "requires": ["workspace_root", "project_path", "product_id"]
+    },
+    {
+      "id": "artifact",
+      "at_step": "SD-ARTIFACT",
+      "label": "制品校验并签发预检收据",
+      "requires": ["workspace_root", "artifact_path", "product_id", "version"]
+    },
+    {
+      "id": "publish",
+      "at_step": "SD-PUBLISH",
+      "label": "发布到组织渠道",
+      "requires": ["artifact_path", "product_id", "version", "confirmed"]
+    },
+    {
+      "id": "verify",
+      "at_step": "SD-RESOLVE",
+      "label": "发布后线上验证",
+      "requires": ["product_id", "version", "current_version"]
+    },
+    {
+      "id": "channel",
+      "at_step": "SD-CHANNEL",
+      "label": "解析 GitHub 更新",
+      "requires": ["product_id", "repository", "platform", "architecture"]
+    }
+  ],
+  "exits": [
+    {
+      "id": "integration_ready",
+      "at_step": "SD-PROJECT",
+      "label": "接入信息已确认",
+      "produces": ["distribution_integration"]
+    },
+    {
+      "id": "artifact_ready",
+      "at_step": "SD-ARTIFACT",
+      "label": "制品与预检收据已就绪",
+      "produces": ["artifact_inspection"]
+    },
+    {
+      "id": "released",
+      "at_step": "SD-PUBLISH",
+      "label": "组织 Release 已发布",
+      "produces": ["software_release"]
+    },
+    {
+      "id": "verified",
+      "at_step": "SD-RESOLVE",
+      "label": "线上更新解析已验证",
+      "produces": ["release_verification"]
+    },
+    {
+      "id": "accepted",
+      "at_step": "SD-ACCEPT",
+      "label": "目标端验收已记录",
+      "produces": ["release_acceptance"]
+    },
+    {
+      "id": "channel_resolved",
+      "at_step": "SD-CHANNEL",
+      "label": "GitHub 渠道已解析",
+      "produces": ["channel_resolution"]
+    }
+  ],
+  "capabilities": [
+    "software.distribution.project.inspect",
+    "software.distribution.artifact.inspect",
+    "software.distribution.release.publish",
+    "software.distribution.release.resolve",
+    "software.distribution.channel.resolve"
+  ],
+  "dependencies": {
+    "skills": [],
+    "plugins": [
+      "com.himind.software-distribution"
+    ],
+    "connectors": [],
+    "runtimes": []
+  },
+  "steps": [
+    {
+      "id": "SD-PROJECT",
+      "title": "识别项目与分发接入状态",
+      "kind": "capability",
+      "capability_id": "software.distribution.project.inspect",
+      "execution_mode": "sync",
+      "risk_level": "read_only"
+    },
+    {
+      "id": "SD-ARTIFACT",
+      "title": "校验制品并签发预检收据",
+      "kind": "capability",
+      "capability_id": "software.distribution.artifact.inspect",
+      "execution_mode": "sync",
+      "risk_level": "read_only",
+      "depends_on": ["SD-PROJECT"]
+    },
+    {
+      "id": "SD-PUBLISH",
+      "title": "发布到组织渠道",
+      "kind": "capability",
+      "capability_id": "software.distribution.release.publish",
+      "execution_mode": "long_running",
+      "risk_level": "R3",
+      "approval_required": true,
+      "depends_on": ["SD-ARTIFACT"]
+    },
+    {
+      "id": "SD-RESOLVE",
+      "title": "验证线上更新解析",
+      "kind": "capability",
+      "capability_id": "software.distribution.release.resolve",
+      "execution_mode": "sync",
+      "risk_level": "R3",
+      "approval_required": true,
+      "depends_on": ["SD-PUBLISH"]
+    },
+    {
+      "id": "SD-ACCEPT",
+      "title": "目标端安装与验收",
+      "kind": "manual",
+      "execution_mode": "sync",
+      "risk_level": "R3",
+      "approval_required": true,
+      "depends_on": ["SD-RESOLVE"]
+    },
+    {
+      "id": "SD-CHANNEL",
+      "title": "解析 GitHub 更新",
+      "kind": "capability",
+      "capability_id": "software.distribution.channel.resolve",
+      "execution_mode": "sync",
+      "risk_level": "read_only"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "distribution-integration",
+      "artifact_type": "distribution_integration",
+      "name": "分发接入检查记录",
+      "schema": "artifacts/distribution-integration.schema.json",
+      "required": false,
+      "validation": "advisory",
+      "max_bytes": 262144
+    },
+    {
+      "id": "artifact-inspection",
+      "artifact_type": "artifact_inspection",
+      "name": "制品校验与预检收据",
+      "schema": "artifacts/artifact-inspection.schema.json",
+      "required": false,
+      "validation": "advisory",
+      "max_bytes": 1048576
+    },
+    {
+      "id": "software-release",
+      "artifact_type": "software_release",
+      "name": "组织 Release 记录",
+      "schema": "artifacts/software-release.schema.json",
+      "required": false,
+      "validation": "advisory",
+      "max_bytes": 1048576
+    },
+    {
+      "id": "release-verification",
+      "artifact_type": "release_verification",
+      "name": "线上更新解析验证记录",
+      "schema": "artifacts/release-verification.schema.json",
+      "required": false,
+      "validation": "advisory",
+      "max_bytes": 1048576
+    }
+  ],
+  "ui": {
+    "mode": "declarative",
+    "surfaces": ["agent", "dashboard"],
+    "entry": "ui/workflow-view.json"
+  },
+  "supported_runtimes": [],
+  "created_at": "2026-09-19T00:00:00Z"
+}

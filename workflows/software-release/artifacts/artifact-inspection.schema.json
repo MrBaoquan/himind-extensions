@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "制品校验与预检收据",
+  "type": "object",
+  "required": ["product_id", "version", "sha256", "size_bytes", "inspection_receipt"],
+  "properties": {
+    "product_id": { "type": "string" },
+    "version": { "type": "string" },
+    "artifact_path": { "type": "string" },
+    "file_name": { "type": "string" },
+    "size_bytes": { "type": "integer", "minimum": 1 },
+    "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "package_type": { "type": "string" },
+    "inspection_receipt": { "type": "string", "minLength": 32 },
+    "ready": { "type": "boolean" }
+  },
+  "additionalProperties": true
+}

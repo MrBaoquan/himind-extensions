@@ -1,0 +1,136 @@
+{
+  "id": "com.himind.tech-radar",
+  "name": "科技雷达",
+  "author": "马宝全",
+  "categories": ["data-automation", "docs-knowledge"],
+  "description": "采集公开科技热点仓库并按领域规则筛选、与历史台账对比，生成可归档的网页报告，并自带历史归档视图。",
+  "release_notes": "0.4.2：能力说明收敛到一句，去掉冗余描述。",
+  "version": "0.4.2",
+  "distribution_targets": ["workbench", "github"],
+  "entry": "bin/tech-radar.exe",
+  "runtime": "process-jsonrpc-stdio",
+  "platforms": ["windows-x64"],
+  "min_agent_version": "0.3.47",
+  "governance": "optional",
+  "capabilities": [
+    {
+      "id": "tech-radar.collect",
+      "description": "按领域采集公开仓库，用历史快照计算星数增量",
+      "availability": "local",
+      "timeout_seconds": 300,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "domains":{"type":"array","items":{"enum":["cv","llm","ar-vr","general"]}},
+          "topics":{"type":"array","items":{"type":"string"}},
+          "extra_topics":{"type":"array","items":{"type":"string"}},
+          "languages":{"type":"array","items":{"type":"string"}},
+          "exclude_owners":{"type":"array","items":{"type":"string"}},
+          "min_stars":{"type":"integer","minimum":0,"maximum":200000},
+          "new_min_stars":{"type":"integer","minimum":0,"maximum":200000},
+          "query_interval_ms":{"type":"integer","minimum":0,"maximum":60000},
+          "max_queries":{"type":"integer","minimum":1,"maximum":40},
+          "max_entries":{"type":"integer","minimum":1,"maximum":200},
+          "description_max_chars":{"type":"integer","minimum":0,"maximum":2000},
+          "topics_max":{"type":"integer","minimum":0,"maximum":50},
+          "timeout_seconds":{"type":"integer","minimum":30,"maximum":1800},
+          "window_days":{"type":"integer","minimum":1,"maximum":90},
+          "top_n":{"type":"integer","minimum":1,"maximum":100},
+          "report_root":{"type":"string"},
+          "report_date":{"type":"string"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "tech-radar.report",
+      "description": "把热点快照（与可选解读）渲染为自包含网页报告并按天归档",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "snapshot":{"type":"object"},
+          "insight":{"type":"object"},
+          "report_root":{"type":"string"},
+          "report_date":{"type":"string"},
+          "summary":{"type":"string"},
+          "workflow_context":{"type":"object"},
+          "snapshot_step":{"type":"string"},
+          "insight_step":{"type":"string"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "tech-radar.archive.list",
+      "description": "读取扩展自己的归档索引，供视图列出历史报告并按日期筛选",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "report_root":{"type":"string"},
+          "report_date":{"type":"string"},
+          "top_n":{"type":"integer","minimum":1,"maximum":365}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "tech-radar.archive.read",
+      "description": "读取某期归档报告的 HTML、快照与解读",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "report_root":{"type":"string"},
+          "report_date":{"type":"string"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "tech-radar.link.open",
+      "description": "用系统默认程序打开条目链接",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url":{"type":"string"}
+        },
+        "required": ["url"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_action"
+    }
+  ],
+  "permissions": ["filesystem.workspace.read", "filesystem.workspace.write", "network.github.read"],
+  "contributes": {
+    "views": [
+      {
+        "id": "tech-radar.archive",
+        "title": "科技雷达 · 历史归档",
+        "short_title": "科技雷达",
+        "icon": "radar",
+        "quick_access": true,
+        "order": 40,
+        "location": "plugin_navigation",
+        "entry": "ui/index.html"
+      }
+    ],
+    "commands": [
+      {"id":"tech-radar.collect","title":"采集科技雷达热点"},
+      {"id":"tech-radar.report","title":"生成科技雷达报告"},
+      {"id":"tech-radar.archive.list","title":"查看科技雷达归档"},
+      {"id":"tech-radar.archive.read","title":"查看某一期科技雷达报告"},
+      {"id":"tech-radar.link.open","title":"在默认浏览器打开条目链接"}
+    ]
+  }
+}

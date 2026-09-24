@@ -3,7 +3,8 @@
   "name": "图片交付预检",
   "author": "马宝全",
   "categories": ["testing-quality", "collaboration-delivery"],
-  "version": "1.0.3",
+  "version": "1.0.4",
+  "distribution_targets": ["workbench", "github"],
   "scope": "organization",
   "description": "在图片优化或交付前检查 Agent、图片处理插件、输入范围和交付约束。",
   "min_agent_version": "0.2.0",
@@ -27,7 +28,7 @@
     }
   ],
   "risk_summary": "read_only",
-  "release_notes": "补充作者、功能分类与版本更新说明，纳入统一扩展源码仓库。",
+  "release_notes": "1.0.4：触发说明收敛到 140 字内。",
   "contents": [
     "skill.json",
     "SKILL.md",

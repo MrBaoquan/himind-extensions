@@ -1,0 +1,196 @@
+{
+  "schema_version": "workflow_view.v1",
+  "title": "软件分发与发布",
+  "sections": [
+    {
+      "id": "product",
+      "title": "产品与制品",
+      "fields": [
+        {
+          "id": "workspace_root",
+          "label": "制品所在目录",
+          "type": "text",
+          "required": true,
+          "placeholder": "例如 F:\\WebProjects\\MediaResolver"
+        },
+        {
+          "id": "project_path",
+          "label": "项目路径",
+          "type": "text",
+          "required": true,
+          "placeholder": "相对制品目录，例如 src 或 MediaResolver"
+        },
+        {
+          "id": "product_id",
+          "label": "产品稳定 ID",
+          "type": "text",
+          "required": true,
+          "placeholder": "例如 com.himind.media-resolver"
+        },
+        {
+          "id": "product_name",
+          "label": "产品名称",
+          "type": "text",
+          "required": true,
+          "placeholder": "例如 MediaResolver"
+        },
+        {
+          "id": "product_type",
+          "label": "产品类型",
+          "type": "select",
+          "required": true,
+          "default": "desktop_app",
+          "options": [
+            "desktop_app",
+            "desktop_agent",
+            "agent_plugin",
+            "organization_skill",
+            "runtime_component",
+            "edge_node",
+            "knowledge_edge_node"
+          ]
+        },
+        {
+          "id": "version",
+          "label": "版本号",
+          "type": "text",
+          "required": true,
+          "placeholder": "例如 1.4.0，同一版本不得替换不同内容"
+        },
+        {
+          "id": "release_notes",
+          "label": "版本说明",
+          "type": "textarea",
+          "placeholder": "本次变更、修复和已知问题"
+        }
+      ]
+    },
+    {
+      "id": "channel",
+      "title": "渠道与制品格式",
+      "fields": [
+        {
+          "id": "channel",
+          "label": "发布渠道",
+          "type": "select",
+          "required": true,
+          "default": "stable",
+          "options": ["stable", "beta", "canary"]
+        },
+        {
+          "id": "platform",
+          "label": "平台",
+          "type": "select",
+          "required": true,
+          "default": "windows",
+          "options": ["windows", "android"]
+        },
+        {
+          "id": "architecture",
+          "label": "架构",
+          "type": "select",
+          "required": true,
+          "default": "x64",
+          "options": ["x64", "arm64"]
+        },
+        {
+          "id": "package_type",
+          "label": "包类型",
+          "type": "select",
+          "required": true,
+          "default": "directory-zip",
+          "options": ["directory-zip", "apk", "unity-addressables", "content"]
+        },
+        {
+          "id": "artifact_path",
+          "label": "制品文件",
+          "type": "text",
+          "required": true,
+          "placeholder": "例如 dist\\MediaResolver-1.4.0.zip"
+        },
+        {
+          "id": "rollout_percent",
+          "label": "灰度比例",
+          "type": "number",
+          "default": 100,
+          "placeholder": "1-100，公共匿名解析只消费 100"
+        },
+        {
+          "id": "mandatory",
+          "label": "强制更新",
+          "type": "boolean",
+          "default": false
+        }
+      ]
+    },
+    {
+      "id": "receipt",
+      "title": "发布凭据",
+      "fields": [
+        {
+          "id": "inspection_receipt",
+          "label": "制品校验收据",
+          "type": "text",
+          "placeholder": "从上一步“制品校验并签发预检收据”的结果复制，收据短时有效且只能用一次"
+        },
+        {
+          "id": "expected_size",
+          "label": "制品字节数",
+          "type": "number",
+          "placeholder": "校验结果中的 size_bytes"
+        },
+        {
+          "id": "expected_sha256",
+          "label": "制品 SHA-256",
+          "type": "text",
+          "placeholder": "校验结果中的 sha256，必须与本地文件一致"
+        },
+        {
+          "id": "confirmed",
+          "label": "我确认以上发布摘要无误",
+          "type": "boolean",
+          "default": false
+        }
+      ]
+    },
+    {
+      "id": "verification",
+      "title": "发布后验证",
+      "fields": [
+        {
+          "id": "current_version",
+          "label": "设备当前版本",
+          "type": "text",
+          "required": true,
+          "placeholder": "低于新版本，用于验证能解析到更新"
+        },
+        {
+          "id": "repository",
+          "label": "GitHub 分发仓库",
+          "type": "text",
+          "placeholder": "owner/repo，例如 MrBaoquan/MediaResolver（用于 GitHub 渠道解析）"
+        },
+        {
+          "id": "reference",
+          "label": "渠道文件分支",
+          "type": "text",
+          "placeholder": "默认 HEAD，可指定分支或标签"
+        },
+        {
+          "id": "allow_downgrade",
+          "label": "允许解析到更低版本",
+          "type": "boolean",
+          "default": false
+        }
+      ]
+    }
+  ],
+  "actions": [
+    "inspect",
+    "artifact",
+    "publish",
+    "verify",
+    "accept",
+    "channel"
+  ]
+}

@@ -6,6 +6,9 @@ out/
 *.pdb
 *.hmpkg
 *.hmskill
+*.hmwf
+extension-lock.json
+*.release-manifest.json
 checksums.sha256
 
 # Local state
@@ -16,6 +19,8 @@ Thumbs.db
 *.log
 *.tmp
 .himind-candidate-*
+.himind-video/
+node_modules/
 
 # Credentials and environment files
 .env

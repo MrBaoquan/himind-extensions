@@ -1,0 +1,4 @@
+interface:
+  display_name: "软件开发 UI 规范"
+  short_description: "定义软件开发 UI/UX 规范并审查界面体验"
+  default_prompt: "使用 $software-ui-spec 完成这项任务。"

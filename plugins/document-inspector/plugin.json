@@ -4,8 +4,9 @@
   "author": "马宝全",
   "categories": ["docs-knowledge", "data-automation"],
   "description": "解析 DOCX、TXT 与 Markdown 文档，提取文本、字数和基础元数据。",
-  "release_notes": "补充作者、功能分类与版本更新说明，纳入统一扩展源码仓库。",
-  "version": "1.0.1",
+  "release_notes": "1.0.2：能力说明收敛到一句，去掉冗余描述。",
+  "version": "1.0.2",
+  "distribution_targets": ["workbench", "github"],
   "entry": "document-inspector.exe",
   "runtime": "process-jsonrpc-stdio",
   "platforms": ["windows-x64"],
@@ -14,7 +15,7 @@
   "capabilities": [
     {
       "id": "document.inspect",
-      "description": "解析 DOCX、TXT 或 Markdown 文档的文本、字数和基础元数据",
+      "description": "提取 DOCX、TXT、Markdown 的正文与字数",
       "input_schema": {
         "type": "object",
         "properties": {

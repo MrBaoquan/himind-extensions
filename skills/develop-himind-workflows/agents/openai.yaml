@@ -1,0 +1,4 @@
+interface:
+  display_name: "工作流开发助手"
+  short_description: "设计、校验、打包并受控提交 HiMind 工作流"
+  default_prompt: "使用 $develop-himind-workflows 设计、校验、打包并测试当前 HiMind 工作流；仅在我明确要求时提交审核。"

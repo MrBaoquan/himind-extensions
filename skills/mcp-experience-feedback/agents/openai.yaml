@@ -1,0 +1,4 @@
+interface:
+  display_name: "MCP 使用体验反馈与优化需求总结"
+  short_description: "复盘 HiMind MCP 使用体验，输出结构化优化需求项"
+  default_prompt: "使用 $mcp-experience-feedback 完成这项任务。"

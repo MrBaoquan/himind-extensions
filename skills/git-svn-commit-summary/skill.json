@@ -3,10 +3,11 @@
   "name": "Git/SVN 提交摘要",
   "author": "马宝全",
   "categories": ["collaboration-delivery"],
-  "version": "1.1.0",
+  "version": "1.1.1",
+  "distribution_targets": ["workbench", "github"],
   "scope": "organization",
   "description": "根据 Git 或 SVN 的真实差异生成提交摘要，并且只执行用户明确确认的提交。",
-  "release_notes": "统一 Git 与 SVN 的差异审查、提交摘要和受控提交工作流，并补充 WorkBuddy 支持。",
+  "release_notes": "1.1.1：触发说明收敛到 140 字内。",
   "min_agent_version": "0.2.0",
   "supported_clients": [
     "codex",

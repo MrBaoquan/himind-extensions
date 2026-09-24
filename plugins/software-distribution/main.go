@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
@@ -22,6 +23,8 @@ import (
 )
 
 var identifierPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,127}$`)
+var repositoryPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
+var sha256Pattern = regexp.MustCompile(`^[0-9a-fA-F]{64}$`)
 
 type input struct {
 	WorkspaceRoot  string `json:"workspace_root"`
@@ -34,6 +37,44 @@ type input struct {
 	Platform       string `json:"platform"`
 	Architecture   string `json:"architecture"`
 	PackageType    string `json:"package_type"`
+	Repository     string `json:"repository"`
+	ChannelURL     string `json:"channel_url"`
+	Reference      string `json:"reference"`
+	AllowUnsigned  bool   `json:"allow_unsigned"`
+	AllowDowngrade bool   `json:"allow_downgrade"`
+	InstanceID     string `json:"instance_id"`
+}
+
+type channelSignature struct {
+	KeyID     string `json:"key_id"`
+	Algorithm string `json:"algorithm"`
+	Value     string `json:"value"`
+}
+
+type channelRelease struct {
+	Version          string            `json:"version"`
+	FileName         string            `json:"file_name"`
+	SizeBytes        int64             `json:"size_bytes"`
+	SHA256           string            `json:"sha256"`
+	DownloadURL      string            `json:"download_url"`
+	Signature        *channelSignature `json:"signature"`
+	Mandatory        bool              `json:"mandatory"`
+	RolloutPercent   int               `json:"rollout_percent"`
+	MinClientVersion string            `json:"min_client_version"`
+	PublishedAt      string            `json:"published_at"`
+	ReleaseNotes     string            `json:"release_notes"`
+	Revoked          bool              `json:"revoked"`
+}
+
+type softwareDistributionChannel struct {
+	SchemaVersion string         `json:"schema_version"`
+	ProductID     string         `json:"product_id"`
+	ProductName   string         `json:"product_name"`
+	Channel       string         `json:"channel"`
+	Platform      string         `json:"platform"`
+	Architecture  string         `json:"architecture"`
+	PackageType   string         `json:"package_type"`
+	Release       channelRelease `json:"release"`
 }
 
 type softwareUpdateManifest struct {
@@ -93,9 +134,250 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 	case "software.distribution.release.resolve":
 		result, err := resolveRelease(in)
 		return rpcResult(result, err)
+	case "software.distribution.channel.resolve":
+		result, err := resolveChannel(in)
+		return rpcResult(result, err)
 	default:
 		return nil, &jsonrpc.Error{Code: -32602, Message: "不支持的软件分发能力"}
 	}
+}
+
+// resolveChannel 读取 GitHub 渠道描述文件并给出与 Dashboard 渠道同形的更新结果，
+// 使调用方无需区分分发源。凭据不参与：公共仓直接读取，私有仓由 Agent 侧代理。
+func resolveChannel(in input) (any, error) {
+	documentURL, err := channelDocumentURL(in)
+	if err != nil {
+		return nil, err
+	}
+	request, err := http.NewRequest(http.MethodGet, documentURL, nil)
+	if err != nil {
+		return nil, errors.New("GitHub channel 文档地址无效")
+	}
+	request.Header.Set("User-Agent", "HiMind-Agent")
+	request.Header.Set("Accept", "application/json")
+	client := &http.Client{Timeout: 20 * time.Second}
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, errors.New("GitHub channel 文档读取失败")
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub channel 文档返回 HTTP %d", response.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+	if err != nil {
+		return nil, errors.New("GitHub channel 文档读取中断")
+	}
+	return evaluateChannelDocument(in, body, documentURL)
+}
+
+func channelDocumentURL(in input) (string, error) {
+	if trimmed := strings.TrimSpace(in.ChannelURL); trimmed != "" {
+		parsed, err := url.Parse(trimmed)
+		if err != nil || parsed.Scheme != "https" ||
+			(parsed.Host != "raw.githubusercontent.com" && parsed.Host != "github.com") {
+			return "", errors.New("channel_url 必须是受信任的 GitHub HTTPS 地址")
+		}
+		return trimmed, nil
+	}
+	if !repositoryPattern.MatchString(strings.TrimSpace(in.Repository)) {
+		return "", errors.New("repository 必须是 owner/repo")
+	}
+	// 渠道地址只取决于产品与渠道，不要求平台、架构与包类型。
+	if !identifierPattern.MatchString(strings.TrimSpace(in.ProductID)) {
+		return "", errors.New("product_id 不是有效的稳定标识")
+	}
+	reference := defaultValue(strings.TrimSpace(in.Reference), "HEAD")
+	channel := defaultValue(strings.TrimSpace(in.Channel), "stable")
+	if !identifierPattern.MatchString(strings.TrimSpace(channel)) {
+		return "", errors.New("channel 不是有效的稳定标识")
+	}
+	return fmt.Sprintf(
+		"https://raw.githubusercontent.com/%s/%s/distribution/%s/%s.json",
+		strings.TrimSpace(in.Repository), reference, in.ProductID, channel,
+	), nil
+}
+
+// evaluateChannelDocument 是纯函数：只做一致性与信任校验，便于契约测试。
+func evaluateChannelDocument(in input, body []byte, documentURL string) (any, error) {
+	var channel softwareDistributionChannel
+	if err := json.Unmarshal(body, &channel); err != nil {
+		return nil, errors.New("channel 文档不是合法 JSON")
+	}
+	if channel.SchemaVersion != "software_distribution_channel.v1" {
+		return nil, fmt.Errorf("不支持的 channel schema_version: %s", channel.SchemaVersion)
+	}
+	if channel.ProductID != in.ProductID {
+		return nil, errors.New("channel 文档 product_id 与请求不一致")
+	}
+	if in.Channel != "" && channel.Channel != in.Channel {
+		return nil, errors.New("channel 文档 channel 与请求不一致")
+	}
+	if in.Platform != "" && channel.Platform != in.Platform {
+		return nil, errors.New("channel 文档 platform 与请求不一致")
+	}
+	if in.Architecture != "" && channel.Architecture != in.Architecture {
+		return nil, errors.New("channel 文档 architecture 与请求不一致")
+	}
+	if in.PackageType != "" && channel.PackageType != "" && channel.PackageType != in.PackageType {
+		return nil, errors.New("channel 文档 package_type 与请求不一致")
+	}
+	release := channel.Release
+	if !sha256Pattern.MatchString(release.SHA256) {
+		return nil, errors.New("channel 文档 sha256 无效")
+	}
+	if release.SizeBytes <= 0 {
+		return nil, errors.New("channel 文档 size_bytes 无效")
+	}
+	if !strings.HasPrefix(release.DownloadURL, "https://github.com/") {
+		return nil, errors.New("channel 文档 download_url 必须指向 github.com")
+	}
+	signatureRequired := !in.AllowUnsigned
+	if release.Signature == nil || strings.TrimSpace(release.Signature.Value) == "" || strings.TrimSpace(release.Signature.KeyID) == "" {
+		if signatureRequired {
+			return nil, errors.New("channel 文档缺少有效签名，已按 fail-closed 拒绝")
+		}
+	}
+
+	current := defaultValue(strings.TrimSpace(in.CurrentVersion), "0.0.0")
+	var update *softwareUpdateManifest
+	reason := ""
+	switch comparison := compareVersions(release.Version, current); {
+	case release.Revoked:
+		reason = "该版本已被撤销"
+	case comparison > 0:
+		manifest := softwareUpdateManifest{
+			ProductID:          channel.ProductID,
+			Version:            release.Version,
+			ReleaseName:        strings.TrimSpace(channel.ProductName + " " + release.Version),
+			ReleaseNotes:       release.ReleaseNotes,
+			Channel:            channel.Channel,
+			ArtifactURL:        release.DownloadURL,
+			FileName:           release.FileName,
+			PackageType:        channel.PackageType,
+			SHA256:             strings.ToLower(release.SHA256),
+			Size:               release.SizeBytes,
+			Mandatory:          release.Mandatory,
+			PublishedAt:        release.PublishedAt,
+			SignatureAlgorithm: "ed25519",
+		}
+		if release.Signature != nil {
+			manifest.Signature = release.Signature.Value
+			manifest.SignatureKeyID = release.Signature.KeyID
+			if strings.TrimSpace(release.Signature.Algorithm) != "" {
+				manifest.SignatureAlgorithm = release.Signature.Algorithm
+			}
+		}
+		update = &manifest
+	case comparison == 0:
+		reason = "已是最新版本"
+	default:
+		if in.AllowDowngrade {
+			update = &softwareUpdateManifest{
+				ProductID:    channel.ProductID,
+				Version:      release.Version,
+				ReleaseName:  strings.TrimSpace(channel.ProductName + " " + release.Version),
+				ReleaseNotes: release.ReleaseNotes,
+				Channel:      channel.Channel,
+				ArtifactURL:  release.DownloadURL,
+				FileName:     release.FileName,
+				PackageType:  channel.PackageType,
+				SHA256:       strings.ToLower(release.SHA256),
+				Size:         release.SizeBytes,
+				Mandatory:    release.Mandatory,
+				PublishedAt:  release.PublishedAt,
+			}
+		} else {
+			reason = "线上版本低于当前版本，默认拒绝降级"
+		}
+	}
+
+	result := map[string]any{
+		"source":             "github-channel",
+		"channel_file":       documentURL,
+		"product_id":         channel.ProductID,
+		"channel":            channel.Channel,
+		"current_version":    current,
+		"signature_required": signatureRequired,
+		// 显式区分"没有更新"与"有更新"：typed nil 会让消费者把空指针当成有更新。
+		"update": nil,
+	}
+	if update != nil {
+		result["update"] = *update
+	}
+	if reason != "" {
+		result["reason"] = reason
+	}
+	// 灰度：只有声明了稳定实例 ID 时才参与分级，避免用 IP 或随机数代替设备身份。
+	if update != nil && release.RolloutPercent > 0 && release.RolloutPercent < 100 {
+		if strings.TrimSpace(in.InstanceID) == "" {
+			result["update"] = nil
+			result["reason"] = "该版本为灰度发布，缺少稳定实例 ID，已按未放量处理"
+		} else if !instanceInRollout(in.InstanceID, release.Version, release.RolloutPercent) {
+			result["update"] = nil
+			result["reason"] = fmt.Sprintf("该版本正在灰度（%d%%），本实例暂未放量", release.RolloutPercent)
+		}
+	}
+	return result, nil
+}
+
+// instanceInRollout 用稳定实例 ID 与版本号的哈希取模决定是否放量：
+// 同一实例对同一版本的结果稳定，不依赖 IP、时间或随机数。
+func instanceInRollout(instanceID, version string, percent int) bool {
+	if percent >= 100 {
+		return true
+	}
+	if percent <= 0 {
+		return false
+	}
+	digest := sha256.Sum256([]byte(strings.TrimSpace(instanceID) + "|" + strings.TrimSpace(version)))
+	bucket := int(binary.BigEndian.Uint32(digest[:4]) % 100)
+	return bucket < percent
+}
+
+// compareVersions 只比较语义化版本的核心数字段；预发布后缀视为低于同核心版本。
+func compareVersions(left, right string) int {
+	core := func(value string) ([]int, bool) {
+		trimmed := strings.TrimSpace(value)
+		prerelease := strings.ContainsAny(trimmed, "-+")
+		base := strings.FieldsFunc(strings.SplitN(strings.SplitN(trimmed, "-", 2)[0], "+", 2)[0], func(r rune) bool { return r == '.' })
+		numbers := make([]int, 0, len(base))
+		for _, part := range base {
+			number := 0
+			for _, digit := range part {
+				if digit < '0' || digit > '9' {
+					return nil, prerelease
+				}
+				number = number*10 + int(digit-'0')
+			}
+			numbers = append(numbers, number)
+		}
+		return numbers, prerelease
+	}
+	leftParts, leftPre := core(left)
+	rightParts, rightPre := core(right)
+	for index := 0; index < len(leftParts) || index < len(rightParts); index++ {
+		leftValue, rightValue := 0, 0
+		if index < len(leftParts) {
+			leftValue = leftParts[index]
+		}
+		if index < len(rightParts) {
+			rightValue = rightParts[index]
+		}
+		if leftValue != rightValue {
+			if leftValue > rightValue {
+				return 1
+			}
+			return -1
+		}
+	}
+	if leftPre == rightPre {
+		return 0
+	}
+	if leftPre {
+		return -1
+	}
+	return 1
 }
 
 func rpcResult(result any, err error) (any, *jsonrpc.Error) {

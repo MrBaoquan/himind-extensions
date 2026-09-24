@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "组织 Release 记录",
+  "type": "object",
+  "required": ["product_id", "version", "channel", "platform", "architecture"],
+  "properties": {
+    "product_id": { "type": "string" },
+    "version": { "type": "string" },
+    "channel": { "type": "string" },
+    "platform": { "type": "string" },
+    "architecture": { "type": "string" },
+    "package_type": { "type": "string" },
+    "file_name": { "type": "string" },
+    "size_bytes": { "type": "integer" },
+    "sha256": { "type": "string" },
+    "mandatory": { "type": "boolean" },
+    "rollout_percent": { "type": "integer" },
+    "published_at": { "type": "string" }
+  },
+  "additionalProperties": true
+}

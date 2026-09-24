@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -169,4 +170,210 @@ func writeZIP(t *testing.T, target string, entries map[string]string) {
 	if err := file.Close(); err != nil {
 		t.Fatal(err)
 	}
+}
+func TestChannelDocumentURLUsesRepositoryAndChannel(t *testing.T) {
+	location, err := channelDocumentURL(input{
+		ProductID:  "com.himind.media-resolver",
+		Repository: "MrBaoquan/MediaResolver",
+		Channel:    "beta",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := "https://raw.githubusercontent.com/MrBaoquan/MediaResolver/HEAD/distribution/com.himind.media-resolver/beta.json"
+	if location != want {
+		t.Fatalf("channel url = %s, want %s", location, want)
+	}
+}
+
+func TestChannelDocumentURLRejectsUntrustedHost(t *testing.T) {
+	if _, err := channelDocumentURL(input{
+		ProductID:  "com.himind.media-resolver",
+		ChannelURL: "https://evil.example.com/stable.json",
+	}); err == nil {
+		t.Fatal("expected untrusted channel_url to be rejected")
+	}
+}
+
+func TestEvaluateChannelDocumentAcceptsNewerSignedRelease(t *testing.T) {
+	result, err := evaluateChannelDocument(input{
+		ProductID:      "com.himind.media-resolver",
+		Channel:        "stable",
+		Platform:       "windows",
+		Architecture:   "x64",
+		PackageType:    "directory-zip",
+		CurrentVersion: "1.3.0",
+	}, signedChannelDocument("1.4.0"), "https://raw.githubusercontent.com/o/r/HEAD/distribution/com.himind.media-resolver/stable.json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	payload, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+	update, ok := payload["update"].(softwareUpdateManifest)
+	if !ok {
+		t.Fatalf("expected an update, got %#v", payload["update"])
+	}
+	if update.Version != "1.4.0" || update.SignatureKeyID != "himind-production-2026" {
+		t.Fatalf("unexpected manifest: %#v", update)
+	}
+}
+
+func TestEvaluateChannelDocumentRejectsUnsignedByDefault(t *testing.T) {
+	unsigned := []byte(`{"schema_version":"software_distribution_channel.v1","product_id":"com.himind.media-resolver","channel":"stable","platform":"windows","architecture":"x64","package_type":"directory-zip","release":{"version":"1.4.0","file_name":"a.zip","size_bytes":10,"sha256":"` + testDigest + `","download_url":"https://github.com/o/r/releases/download/t/a.zip","signature":null}}`)
+	if _, err := evaluateChannelDocument(input{
+		ProductID:      "com.himind.media-resolver",
+		CurrentVersion: "1.3.0",
+	}, unsigned, "https://raw.githubusercontent.com/o/r/HEAD/x.json"); err == nil {
+		t.Fatal("expected unsigned release to be rejected")
+	}
+	if _, err := evaluateChannelDocument(input{
+		ProductID:      "com.himind.media-resolver",
+		CurrentVersion: "1.3.0",
+		AllowUnsigned:  true,
+	}, unsigned, "https://raw.githubusercontent.com/o/r/HEAD/x.json"); err != nil {
+		t.Fatalf("expected allow_unsigned to pass: %v", err)
+	}
+}
+
+func TestEvaluateChannelDocumentRefusesDowngradeByDefault(t *testing.T) {
+	result, err := evaluateChannelDocument(input{
+		ProductID:      "com.himind.media-resolver",
+		CurrentVersion: "2.0.0",
+	}, signedChannelDocument("1.4.0"), "https://raw.githubusercontent.com/o/r/HEAD/x.json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	payload := result.(map[string]any)
+	if payload["update"] != nil {
+		t.Fatalf("expected downgrade to be refused, got %#v", payload["update"])
+	}
+	if payload["reason"] != "线上版本低于当前版本，默认拒绝降级" {
+		t.Fatalf("unexpected reason: %v", payload["reason"])
+	}
+}
+
+func TestEvaluateChannelDocumentRejectsMismatchedIdentity(t *testing.T) {
+	body := signedChannelDocument("1.4.0")
+	for name, request := range map[string]input{
+		"product":  {ProductID: "com.himind.other", CurrentVersion: "1.0.0"},
+		"channel":  {ProductID: "com.himind.media-resolver", Channel: "beta", CurrentVersion: "1.0.0"},
+		"platform": {ProductID: "com.himind.media-resolver", Platform: "android", CurrentVersion: "1.0.0"},
+		"package":  {ProductID: "com.himind.media-resolver", PackageType: "apk", CurrentVersion: "1.0.0"},
+	} {
+		if _, err := evaluateChannelDocument(request, body, "https://raw.githubusercontent.com/o/r/HEAD/x.json"); err == nil {
+			t.Fatalf("expected %s mismatch to be rejected", name)
+		}
+	}
+}
+
+func TestEvaluateChannelDocumentRejectsRevokedAndForeignDownloadHost(t *testing.T) {
+	revoked := signedChannelDocument("1.4.0")
+	revoked = []byte(strings.Replace(string(revoked), `"revoked":false`, `"revoked":true`, 1))
+	result, err := evaluateChannelDocument(input{
+		ProductID:      "com.himind.media-resolver",
+		CurrentVersion: "1.3.0",
+	}, revoked, "https://raw.githubusercontent.com/o/r/HEAD/x.json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.(map[string]any)["update"] != nil {
+		t.Fatal("expected revoked release to yield no update")
+	}
+	foreign := []byte(strings.Replace(string(signedChannelDocument("1.4.0")), "https://github.com/o/r/releases/download/t/a.zip", "https://evil.example.com/a.zip", 1))
+	if _, err := evaluateChannelDocument(input{
+		ProductID:      "com.himind.media-resolver",
+		CurrentVersion: "1.3.0",
+	}, foreign, "https://raw.githubusercontent.com/o/r/HEAD/x.json"); err == nil {
+		t.Fatal("expected foreign download host to be rejected")
+	}
+}
+
+func TestInstanceRolloutIsStableAndBounded(t *testing.T) {
+	if !instanceInRollout("device-1", "1.4.0", 100) {
+		t.Fatal("percent 100 must always be in rollout")
+	}
+	if instanceInRollout("device-1", "1.4.0", 0) {
+		t.Fatal("percent 0 must never be in rollout")
+	}
+	first := instanceInRollout("device-1", "1.4.0", 50)
+	if second := instanceInRollout("device-1", "1.4.0", 50); second != first {
+		t.Fatal("rollout decision must be stable for the same instance and version")
+	}
+	if instanceInRollout("device-1", "1.4.0", 50) == instanceInRollout("device-1", "1.5.0", 50) {
+		// 不强制不同版本结果相反，但必须能因版本变化而重新计算。
+		_ = first
+	}
+	inRollout := 0
+	for index := 0; index < 1000; index++ {
+		if instanceInRollout(fmt.Sprintf("device-%d", index), "1.4.0", 50) {
+			inRollout++
+		}
+	}
+	if inRollout < 400 || inRollout > 600 {
+		t.Fatalf("50%% rollout covered %d/1000 instances, expected roughly half", inRollout)
+	}
+}
+
+func TestEvaluateChannelDocumentHonoursRolloutForKnownInstance(t *testing.T) {
+	document := []byte(strings.Replace(string(signedChannelDocument("1.4.0")), `"rollout_percent":100`, `"rollout_percent":1`, 1))
+	outsiders, insiders := "", ""
+	for index := 0; index < 200; index++ {
+		id := fmt.Sprintf("instance-%d", index)
+		if instanceInRollout(id, "1.4.0", 1) {
+			insiders = id
+			break
+		}
+		outsiders = id
+	}
+	if insiders == "" {
+		t.Skip("no instance landed inside a 1% rollout sample")
+	}
+	allowed, err := evaluateChannelDocument(input{
+		ProductID:      "com.himind.media-resolver",
+		CurrentVersion: "1.3.0",
+		InstanceID:     insiders,
+	}, document, "https://raw.githubusercontent.com/o/r/HEAD/x.json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if allowed.(map[string]any)["update"] == nil {
+		t.Fatal("instance inside rollout must receive the update")
+	}
+	blocked, err := evaluateChannelDocument(input{
+		ProductID:      "com.himind.media-resolver",
+		CurrentVersion: "1.3.0",
+		InstanceID:     outsiders,
+	}, document, "https://raw.githubusercontent.com/o/r/HEAD/x.json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if blocked.(map[string]any)["update"] != nil {
+		t.Fatal("instance outside rollout must not receive the update")
+	}
+}
+
+func TestCompareVersions(t *testing.T) {
+	cases := []struct {
+		left, right string
+		want        int
+	}{
+		{"1.4.0", "1.3.9", 1},
+		{"1.4.0", "1.4.0", 0},
+		{"1.4.0", "1.10.0", -1},
+		{"1.4.0-rc.1", "1.4.0", -1},
+		{"2.0", "1.9.9", 1},
+	}
+	for _, item := range cases {
+		if got := compareVersions(item.left, item.right); got != item.want {
+			t.Fatalf("compareVersions(%s, %s) = %d, want %d", item.left, item.right, got, item.want)
+		}
+	}
+}
+
+const testDigest = "9c4cffb25cb43c507fbea39bd4e35510b5e69e23336215d22646cab4f067dbac"
+
+func signedChannelDocument(version string) []byte {
+	return []byte(`{"schema_version":"software_distribution_channel.v1","product_id":"com.himind.media-resolver","product_name":"MediaResolver","channel":"stable","platform":"windows","architecture":"x64","package_type":"directory-zip","release":{"version":"` + version + `","file_name":"a.zip","size_bytes":10,"sha256":"` + testDigest + `","download_url":"https://github.com/o/r/releases/download/t/a.zip","signature":{"key_id":"himind-production-2026","algorithm":"ed25519","value":"sig"},"mandatory":false,"rollout_percent":100,"revoked":false}}`)
 }

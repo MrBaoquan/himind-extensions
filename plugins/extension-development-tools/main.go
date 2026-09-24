@@ -13,6 +13,7 @@ import (
 	"github.com/MrBaoquan/himind-extensions/tooling/pluginpack"
 	"github.com/MrBaoquan/himind-extensions/tooling/pluginproject"
 	"github.com/MrBaoquan/himind-extensions/tooling/skillproject"
+	"github.com/MrBaoquan/himind-extensions/tooling/workflowproject"
 	validator "github.com/MrBaoquan/himind-extensions/tools/cmd/himind-plugin-validate"
 )
 
@@ -82,6 +83,23 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 			return nil, jsonrpc.InternalError(err.Error())
 		}
 		return map[string]any{"ok": true, "output": in.Output}, nil
+	case "extension.workflow.scaffold":
+		return workflowScaffold(in)
+	case "extension.workflow.validate":
+		return validatePath(in.WorkspaceRoot, in.Path, workflowproject.Validate)
+	case "extension.workflow.build":
+		return workflowBuild(in)
+	case "extension.workflow.package":
+		if err := ensureWithin(in.WorkspaceRoot, in.Path); err != nil {
+			return nil, jsonrpc.InvalidParams(err.Error())
+		}
+		if err := ensureWithin(in.WorkspaceRoot, in.Output); err != nil {
+			return nil, jsonrpc.InvalidParams(err.Error())
+		}
+		if err := workflowproject.Package(in.Path, in.Output); err != nil {
+			return nil, jsonrpc.InternalError(err.Error())
+		}
+		return map[string]any{"ok": true, "output": in.Output}, nil
 	default:
 		return nil, jsonrpc.InvalidParams("unsupported extension development capability")
 	}
@@ -118,8 +136,15 @@ func preflight(kind string) map[string]any {
 		result["next_steps"] = []string{"继续执行 extension.skill.scaffold、validate、package，然后调用 Agent 的 extension.test"}
 		return result
 	}
+	if kind == "workflow" {
+		result["state"] = "ready"
+		result["ready"] = true
+		result["go"] = map[string]any{"required": false}
+		result["next_steps"] = []string{"继续执行 extension.workflow.scaffold、validate、build、package，然后调用 Agent 的 extension.test"}
+		return result
+	}
 	if kind != "plugin" {
-		addBlocker("invalid_extension_kind", "preflight", "kind 必须是 plugin 或 skill", "使用 kind=plugin 或 kind=skill 重新调用", false)
+		addBlocker("invalid_extension_kind", "preflight", "kind 必须是 plugin、skill 或 workflow", "使用 kind=plugin、kind=skill 或 kind=workflow 重新调用", false)
 		return result
 	}
 	result["go"] = map[string]any{"installed": false, "required": true}
@@ -129,7 +154,9 @@ func preflight(kind string) map[string]any {
 		result["next_steps"] = []string{"修复工具链后重新调用 extension.environment.preflight"}
 		return result
 	}
-	output, err := exec.Command(path, "version").CombinedOutput()
+	versionCommand := exec.Command(path, "version")
+	configureHiddenCommand(versionCommand)
+	output, err := versionCommand.CombinedOutput()
 	goResult := map[string]any{"installed": true, "path": path, "version": firstLine(string(output))}
 	if err != nil {
 		goResult["error"] = err.Error()
@@ -166,6 +193,46 @@ func skillScaffold(in input) (any, *jsonrpc.Error) {
 		return nil, jsonrpc.InternalError(err.Error())
 	}
 	return map[string]any{"root": root}, nil
+}
+
+func workflowScaffold(in input) (any, *jsonrpc.Error) {
+	if err := ensureWithin(in.WorkspaceRoot, in.OutputDir); err != nil {
+		return nil, jsonrpc.InvalidParams(err.Error())
+	}
+	result, err := workflowproject.Create(workflowproject.Config{
+		Slug:            in.Slug,
+		ID:              in.ID,
+		Name:            in.Name,
+		Description:     in.Description,
+		Author:          in.Author,
+		Version:         in.Version,
+		MinAgentVersion: in.MinAgentVersion,
+		ReleaseNotes:    in.ReleaseNotes,
+		Categories:      in.Categories,
+		Template:        in.Template,
+		OutputDir:       in.OutputDir,
+	})
+	if err != nil {
+		return nil, jsonrpc.InternalError(err.Error())
+	}
+	return result, nil
+}
+
+func workflowBuild(in input) (any, *jsonrpc.Error) {
+	if err := ensureWithin(in.WorkspaceRoot, in.Path); err != nil {
+		return nil, jsonrpc.InvalidParams(err.Error())
+	}
+	manifest, err := workflowproject.Build(in.Path)
+	if err != nil {
+		return nil, jsonrpc.InternalError(err.Error())
+	}
+	return map[string]any{
+		"ok":          true,
+		"path":        in.Path,
+		"workflow_id": manifest.ID,
+		"version":     manifest.Version,
+		"step_count":  len(manifest.Steps),
+	}, nil
 }
 
 func pluginBuild(in input) (any, *jsonrpc.Error) {
@@ -232,6 +299,7 @@ func runGo(directory string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	command := exec.CommandContext(ctx, goPath, args...)
+	configureHiddenCommand(command)
 	command.Dir = directory
 	output, err := command.CombinedOutput()
 	text := string(output)

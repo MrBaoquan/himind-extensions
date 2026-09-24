@@ -1,238 +1,127 @@
+// Command himind-catalog-upsert 把一次发布写进市场索引。
+//
+// 输入是刚创建的 Release 清单：索引记录里的制品名、摘要、签名全部来自这份清单，
+// 展示信息来自该版本的源码清单。脚本不重新推断任何字段，也就不存在
+// 「索引说的」和「Release 上的」两份事实。
 package main
 
 import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
+
+	"github.com/MrBaoquan/himind-extensions/tooling/catalog"
+	"github.com/MrBaoquan/himind-extensions/tooling/distribution"
 )
 
-type catalog struct {
-	SchemaVersion int                      `json:"schema_version"`
-	SourceID      string                   `json:"source_id"`
-	Generation    string                   `json:"generation"`
-	Plugins       []map[string]interface{} `json:"plugins"`
-	Skills        []map[string]interface{} `json:"skills"`
-	FeaturePacks  []featurePack            `json:"feature_packs"`
-}
-
-type featurePack struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name"`
-	PluginIDs []string `json:"plugin_ids"`
-	SkillIDs  []string `json:"skill_ids"`
-}
-
-type signatureMetadata struct {
-	FileName           string `json:"file_name"`
-	FileSize           int64  `json:"file_size"`
-	SHA256             string `json:"sha256"`
-	Signature          string `json:"signature"`
-	SignatureKeyID     string `json:"signature_key_id"`
-	SignatureAlgorithm string `json:"signature_algorithm"`
-}
-
-type capability struct {
-	ID string `json:"id"`
-}
-
-type manifest struct {
-	ID                 string                   `json:"id"`
-	Name               string                   `json:"name"`
-	Author             string                   `json:"author"`
-	Categories         []string                 `json:"categories"`
-	Description        string                   `json:"description"`
-	Version            string                   `json:"version"`
-	ReleaseNotes       string                   `json:"release_notes"`
-	MinAgentVersion    string                   `json:"min_agent_version"`
-	SupportedClients   []string                 `json:"supported_clients"`
-	Capabilities       []capability             `json:"capabilities"`
-	PluginDependencies []map[string]interface{} `json:"plugin_dependencies"`
-	RiskSummary        string                   `json:"risk_summary"`
-	Permissions        []string                 `json:"permissions"`
-	Views              []map[string]interface{} `json:"views"`
-}
-
 func main() {
-	kind := flag.String("kind", "", "plugin or skill")
-	source := flag.String("source", "", "extension source directory")
-	artifact := flag.String("artifact", "", "release artifact")
-	signature := flag.String("signature", "", "signature metadata JSON")
-	repository := flag.String("repository", "", "GitHub owner/repository")
-	tag := flag.String("tag", "", "GitHub release tag")
-	catalogPath := flag.String("catalog", ".himind/catalog.json", "catalog file")
-	generation := flag.String("generation", "", "catalog generation")
-	publishedAt := flag.String("published-at", "", "RFC3339 publication time")
+	kind := flag.String("kind", "", "plugin, skill or workflow")
+	source := flag.String("source", "", "扩展源码目录")
+	releaseManifest := flag.String("release-manifest", "", "Release 上发布清单的本地副本")
+	artifact := flag.String("artifact", "", "本地制品，提供时校验与清单一致")
+	lock := flag.String("lock", "", "工作流扩展锁")
+	catalogPath := flag.String("catalog", ".himind/catalog.json", "索引文件")
+	publishedAt := flag.String("published-at", "", "RFC3339 发布时间，缺省取当前时间")
+	sourceTree := flag.String("source-tree", "", "Git 源码树对象")
+	repository := flag.String("repository", "", "GitHub owner/repo，覆盖发布清单里的写法")
 	flag.Parse()
-	if err := upsert(*kind, *source, *artifact, *signature, *repository, *tag, *catalogPath, *generation, *publishedAt); err != nil {
+	if err := upsert(*kind, *source, *releaseManifest, *artifact, *lock, *catalogPath, *publishedAt, *sourceTree, *repository); err != nil {
 		fmt.Fprintln(os.Stderr, "catalog update failed:", err)
 		os.Exit(1)
 	}
 }
 
-func upsert(kind, source, artifactPath, signaturePath, repository, tag, catalogPath, generation, publishedAt string) error {
-	if kind != "plugin" && kind != "skill" {
-		return errors.New("kind must be plugin or skill")
+func upsert(kind, source, releaseManifestPath, artifactPath, lockPath, catalogPath, publishedAt, sourceTree, repository string) error {
+	if !distribution.KnownKind(kind) {
+		return fmt.Errorf("kind 必须是 plugin、skill 或 workflow")
 	}
-	if len(strings.Split(repository, "/")) != 2 || tag == "" || generation == "" {
-		return errors.New("repository, tag and generation are required")
+	for name, value := range map[string]string{"source": source, "release-manifest": releaseManifestPath} {
+		if strings.TrimSpace(value) == "" {
+			return fmt.Errorf("-%s 必填", name)
+		}
 	}
 	if publishedAt == "" {
 		publishedAt = time.Now().UTC().Format(time.RFC3339)
 	}
 	if _, err := time.Parse(time.RFC3339, publishedAt); err != nil {
-		return fmt.Errorf("published-at: %w", err)
+		return fmt.Errorf("-published-at: %w", err)
 	}
-	manifestName := "plugin.json"
-	if kind == "skill" {
-		manifestName = "skill.json"
-	}
-	var value manifest
-	if err := readJSON(filepath.Join(source, manifestName), &value); err != nil {
-		return err
-	}
-	if value.ID == "" || value.Name == "" || value.Version == "" || value.Author == "" {
-		return errors.New("manifest must declare id, name, version and author")
-	}
-	var signed signatureMetadata
-	if err := readJSON(signaturePath, &signed); err != nil {
-		return err
-	}
-	if err := verifyMetadata(artifactPath, signed); err != nil {
-		return err
-	}
-
-	var target catalog
-	if err := readJSON(catalogPath, &target); err != nil {
-		return err
-	}
-	if target.SchemaVersion != 1 {
-		return errors.New("catalog schema_version must be 1")
-	}
-	entry := catalogEntry(kind, value, signed, repository, tag, publishedAt)
-	if kind == "plugin" {
-		target.Plugins = replaceVersion(target.Plugins, "plugin_id", value.ID, value.Version, entry)
-	} else {
-		target.Skills = replaceVersion(target.Skills, "skill_id", value.ID, value.Version, entry)
-	}
-	target.Generation = generation
-	if len(target.FeaturePacks) == 0 {
-		target.FeaturePacks = defaultFeaturePacks()
-	}
-	sortEntries(target.Plugins, "plugin_id")
-	sortEntries(target.Skills, "skill_id")
-	data, err := json.MarshalIndent(target, "", "  ")
+	manifest, err := catalog.ReadManifest(source, kind)
 	if err != nil {
 		return err
 	}
-	data = append(data, '\n')
-	return os.WriteFile(catalogPath, data, 0o644)
-}
-
-func catalogEntry(kind string, value manifest, signed signatureMetadata, repository, tag, publishedAt string) map[string]interface{} {
-	capabilityIDs := make([]string, 0, len(value.Capabilities))
-	for _, item := range value.Capabilities {
-		if item.ID != "" {
-			capabilityIDs = append(capabilityIDs, item.ID)
+	if err := catalog.ValidateManifest(kind, manifest); err != nil {
+		return err
+	}
+	release, err := distribution.ReadReleaseManifest(releaseManifestPath)
+	if err != nil {
+		return err
+	}
+	if err := release.Validate(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(artifactPath) != "" {
+		if err := verifyArtifact(artifactPath, release); err != nil {
+			return err
 		}
 	}
-	if value.Categories == nil {
-		value.Categories = []string{}
+	var extensionLock json.RawMessage
+	if kind == distribution.KindWorkflow {
+		if strings.TrimSpace(lockPath) == "" {
+			return fmt.Errorf("工作流发布必须提供 -lock")
+		}
+		data, err := os.ReadFile(lockPath)
+		if err != nil {
+			return err
+		}
+		if !json.Valid(data) {
+			return fmt.Errorf("-lock 不是合法 JSON: %s", lockPath)
+		}
+		extensionLock = append(json.RawMessage(nil), data...)
 	}
-	if value.PluginDependencies == nil {
-		value.PluginDependencies = []map[string]interface{}{}
+	target, err := catalog.Load(catalogPath)
+	if err != nil {
+		return err
 	}
-	if value.Permissions == nil {
-		value.Permissions = []string{}
+	entry, err := catalog.Entry(kind, manifest, catalog.ReleaseFacts{
+		Release: release, PublishedAt: publishedAt, SourceTree: sourceTree,
+		ExtensionLock: extensionLock, Repository: repository,
+	})
+	if err != nil {
+		return err
 	}
-	if value.SupportedClients == nil {
-		value.SupportedClients = []string{}
+	if err := catalog.ValidateEntry(kind, entry, release); err != nil {
+		return err
 	}
-	base := map[string]interface{}{
-		"name": value.Name, "description": value.Description, "author_name": value.Author,
-		"categories": value.Categories, "version": value.Version, "release_notes": value.ReleaseNotes,
-		"published_at": publishedAt, "min_agent_version": value.MinAgentVersion, "channel": "stable",
-		"artifact_id": "github:" + tag + ":" + signed.FileName, "file_name": signed.FileName,
-		"file_size": signed.FileSize, "sha256": signed.SHA256, "signature": signed.Signature,
-		"signature_key_id": signed.SignatureKeyID, "signature_algorithm": signed.SignatureAlgorithm,
-		"download_url": fmt.Sprintf("https://github.com/%s/releases/download/%s/%s", repository, url.PathEscape(tag), url.PathEscape(signed.FileName)),
-		"source":       "github", "assignment": "optional", "management": "user_managed", "install_mode": "prompt",
-		"organization_reason": "", "managed": false, "allow_disable": true, "allow_uninstall": true,
-		"capability_ids": capabilityIDs, "plugin_dependencies": value.PluginDependencies,
+	if err := target.Upsert(kind, entry); err != nil {
+		return err
 	}
-	if kind == "plugin" {
-		base["plugin_id"] = value.ID
-		base["review_status"] = "published"
-		base["governance"] = "optional"
-		base["permissions"] = value.Permissions
-		base["view_count"] = len(value.Views)
-	} else {
-		base["skill_id"] = value.ID
-		base["supported_clients"] = value.SupportedClients
-		base["risk_summary"] = value.RiskSummary
-	}
-	return base
+	return target.Save(catalogPath)
 }
 
-func verifyMetadata(artifactPath string, metadata signatureMetadata) error {
+// verifyArtifact 用清单里的摘要核对本地制品，避免把一个改过的包写进索引。
+func verifyArtifact(artifactPath string, release distribution.ReleaseManifest) error {
 	data, err := os.ReadFile(artifactPath)
 	if err != nil {
 		return err
 	}
 	digest := sha256.Sum256(data)
-	if metadata.FileName != filepath.Base(artifactPath) || metadata.FileSize != int64(len(data)) || !strings.EqualFold(metadata.SHA256, hex.EncodeToString(digest[:])) {
-		return errors.New("signature metadata does not match artifact")
-	}
-	if metadata.Signature == "" || metadata.SignatureKeyID == "" || metadata.SignatureAlgorithm != "rsa-pss-sha256" {
-		return errors.New("signature metadata is incomplete")
-	}
-	return nil
-}
-
-func replaceVersion(items []map[string]interface{}, idField, id, version string, entry map[string]interface{}) []map[string]interface{} {
-	result := make([]map[string]interface{}, 0, len(items)+1)
-	for _, item := range items {
-		if fmt.Sprint(item[idField]) == id && fmt.Sprint(item["version"]) == version {
-			continue
+	if release.Signature != nil && strings.TrimSpace(release.Signature.FileName) != "" {
+		if release.Signature.FileName != filepath.Base(artifactPath) {
+			return fmt.Errorf("本地制品名与发布清单签名不一致: %s", artifactPath)
 		}
-		result = append(result, item)
 	}
-	return append(result, entry)
-}
-
-func sortEntries(items []map[string]interface{}, idField string) {
-	sort.SliceStable(items, func(i, j int) bool {
-		left, right := fmt.Sprint(items[i][idField]), fmt.Sprint(items[j][idField])
-		if left != right {
-			return left < right
-		}
-		return fmt.Sprint(items[i]["version"]) > fmt.Sprint(items[j]["version"])
-	})
-}
-
-func defaultFeaturePacks() []featurePack {
-	return []featurePack{{
-		ID: "com.himind.feature.extension-authoring", Name: "扩展创作",
-		PluginIDs: []string{"com.himind.extension-development-tools"},
-		SkillIDs:  []string{"com.himind.skill.develop-himind-plugins", "com.himind.skill.develop-himind-skills"},
-	}}
-}
-
-func readJSON(path string, target interface{}) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
+	if !strings.EqualFold(hex.EncodeToString(digest[:]), release.Artifact.SHA256) {
+		return fmt.Errorf("本地制品摘要与发布清单不一致: %s", artifactPath)
 	}
-	if err := json.Unmarshal(data, target); err != nil {
-		return fmt.Errorf("%s: %w", path, err)
+	if release.Artifact.SizeBytes != int64(len(data)) {
+		return fmt.Errorf("本地制品大小与发布清单不一致: %s", artifactPath)
 	}
 	return nil
 }

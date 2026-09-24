@@ -1,0 +1,33 @@
+{
+  "id": "com.himind.skill.dev-workflow-orchestrator",
+  "name": "工程工作流编排",
+  "author": "马宝全",
+  "categories": ["software-engineering", "collaboration-delivery"],
+  "version": "1.0.2",
+  "distribution_targets": ["workbench", "github"],
+  "scope": "organization",
+  "description": "让 DSH 和外部 AI 工具按工程、工作区租约、开发检查点和 Workflow 生命周期完成开发与交付协作。",
+  "release_notes": "1.0.2：目录名与稳定 ID 收敛到约定长度。",
+  "min_agent_version": "0.3.47",
+  "supported_clients": ["agent-skills"],
+  "capabilities": [
+    {"id": "engineering.project.resolve", "required": true, "min_version": "0.3.47", "provider": "agent"},
+    {"id": "engineering.checkpoint.create", "required": true, "min_version": "0.3.47", "provider": "agent"},
+    {"id": "engineering.workspace.lease.acquire", "required": true, "min_version": "0.3.47", "provider": "agent"},
+    {"id": "engineering.workspace.lease.release", "required": true, "min_version": "0.3.47", "provider": "agent"},
+    {"id": "engineering.workspace.lease.list", "required": true, "min_version": "0.3.47", "provider": "agent"},
+    {"id": "workflow.catalog.list", "required": true, "min_version": "0.3.47", "provider": "agent"},
+    {"id": "workflow.catalog.describe", "required": true, "min_version": "0.3.47", "provider": "agent"},
+    {"id": "workflow.run.start", "required": true, "min_version": "0.3.47", "provider": "agent"},
+    {"id": "workflow.run.get", "required": true, "min_version": "0.3.47", "provider": "agent"},
+    {"id": "workflow.run.feedback", "required": true, "min_version": "0.3.47", "provider": "agent"},
+    {"id": "workflow.run.cancel", "required": true, "min_version": "0.3.47", "provider": "agent"}
+  ],
+  "plugin_dependencies": [],
+  "risk_summary": "workspace_lease; checkpoint; workflow_start; workflow_cancel; approvals_require_user",
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml"
+  ]
+}
