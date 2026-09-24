@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-44a05a93cfd12a2b",
+  "generation": "sync-c56e36ce6baa26d2",
   "plugins": [
     {
       "allow_disable": true,
@@ -659,6 +659,74 @@
         "workbuddy"
       ],
       "version": "1.1.0"
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:skill/com.himind.skill.image-delivery-preflight@1.0.4:com.himind.skill.image-delivery-preflight-1.0.4.hmskill",
+      "artifact_sha256": "cc2112b3549bcb9f1f84ef3aa3686f014cf832c22bc9f713bfa26cf090dbbf49",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [
+        "system.health"
+      ],
+      "categories": [
+        "testing-quality",
+        "collaboration-delivery"
+      ],
+      "channel": "stable",
+      "dependencies": [
+        {
+          "kind": "plugin",
+          "id": "com.himind.image-optimizer",
+          "required": true,
+          "min_version": "1.0.0",
+          "version": "1.0.3",
+          "sha256": "4a3e3b6c07f808963362e9e771f4ed1506d56c4f59a1c07ecd053286dbdc3d2c",
+          "source": {
+            "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
+            "reference": "plugin/com.himind.image-optimizer@1.0.3",
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.image-optimizer@1.0.3/com.himind.image-optimizer-1.0.3.hmpkg"
+          },
+          "pinned": true
+        }
+      ],
+      "description": "在图片优化或交付前检查 Agent、图片处理插件、输入范围和交付约束。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.himind.skill.image-delivery-preflight@1.0.4/com.himind.skill.image-delivery-preflight-1.0.4.hmskill",
+      "file_name": "com.himind.skill.image-delivery-preflight-1.0.4.hmskill",
+      "file_size": 2626,
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.2.0",
+      "name": "图片交付预检",
+      "organization_reason": "",
+      "plugin_dependencies": [
+        {
+          "min_version": "1.0.0",
+          "plugin_id": "com.himind.image-optimizer",
+          "required": true
+        }
+      ],
+      "published_at": "2026-09-24T14:59:15Z",
+      "release_notes": "1.0.4：触发说明收敛到 140 字内。",
+      "release_tag": "skill/com.himind.skill.image-delivery-preflight@1.0.4",
+      "risk_summary": "read_only",
+      "sha256": "cc2112b3549bcb9f1f84ef3aa3686f014cf832c22bc9f713bfa26cf090dbbf49",
+      "signature": "HUw82m80U7PsIYSXo9izFXSvJ6V8G4krmIy0LZrdB46Ob6wAxf/z5FAgxw0o/QSejbRWYfKsJQQ0mpCvg0AQ3ddIhv4dZmPDf3oDkkYL0jrhHhYApB3tRQNPmS5h29GYZHeZ60NxIn3t+V5YUNf4JULkzHIASrN2u4uzBFJl638r+E3kvIEv747wuxsVJuiRV78Uo2oXCq2nQfS6LeqiG+51pA9qxNwx26jozsRiTOqJyRYU8fJVg7owKJxm7Jm4sK3+ZNe0EETJ9DPpGw809AP5J6ve2YquwcKOcx4zXxfMXg8BpCY4Ie0rT3kAC5CsubIjehDfcgCX8NOtNWKE9LhHLH9rNarGAFX2S9UtTmx87DLpPbJ1PUfd719JH8P/5gWZsGprmLd4pp+UIG8xQcqVSWI68r+ppLUUsQ0u+tu0Bh/wBGL9LWLah71Kn3aU4h1fOQ8kkSi3x8hZSqUZcZ6Q2d1WbBrt/qInjG+16Fqtx6eC8GtEiSGtz3lBqqPc",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "skill_id": "com.himind.skill.image-delivery-preflight",
+      "source": "github",
+      "source_commit": "a4724ad64630ed60daceb7b89bb81914ba8c572e",
+      "source_tree": "b2073f61efa5feddc297a8ae08eba240abc5adca",
+      "supported_clients": [
+        "codex",
+        "github-copilot"
+      ],
+      "version": "1.0.4"
     },
     {
       "allow_disable": true,
