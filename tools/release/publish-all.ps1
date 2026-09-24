@@ -53,16 +53,22 @@ foreach ($name in @('SkipTests', 'SkipPush', 'AllowDirty', 'AllowVersionReuse'))
 $results = @()
 $failures = @()
 $publish = Join-Path $PSScriptRoot 'publish-extension.ps1'
+$resultRoot = Join-Path ([IO.Path]::GetTempPath()) "himind-publish-results-$([guid]::NewGuid().ToString('N'))"
+New-Item -ItemType Directory -Force -Path $resultRoot | Out-Null
 
 foreach ($extension in $ordered) {
     $kind = [string]$extension.type
     $path = [string]$extension.path
+    $resultPath = Join-Path $resultRoot "$($kind)-$([IO.Path]::GetFileName($path)).json"
     Write-Host ''
     Write-Host "=== $kind $path ==="
     try {
-        $raw = & $publish -Kind $kind -ExtensionPath $path @common
+        & $publish -Kind $kind -ExtensionPath $path -ResultPath $resultPath @common
         if ($LASTEXITCODE -ne 0) { throw "publish-extension.ps1 退出码 $LASTEXITCODE" }
-        $result = ($raw -join "`n").Trim() | ConvertFrom-Json
+        if (-not (Test-Path -LiteralPath $resultPath -PathType Leaf)) {
+            throw "publish-extension.ps1 未写出结果文件：$resultPath"
+        }
+        $result = Get-Content -LiteralPath $resultPath -Raw -Encoding UTF8 | ConvertFrom-Json
         $results += $result
         Write-Host "OK  $($result.tag)"
     }
@@ -72,6 +78,8 @@ foreach ($extension in $ordered) {
         break
     }
 }
+
+Remove-Item -LiteralPath $resultRoot -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host ''
 Write-Host '--- 发布汇总 ---'

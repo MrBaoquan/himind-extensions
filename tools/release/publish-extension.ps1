@@ -15,7 +15,8 @@ param(
     [switch]$SkipTests,
     [switch]$SkipPush,
     [switch]$AllowDirty,
-    [switch]$AllowVersionReuse
+    [switch]$AllowVersionReuse,
+    [string]$ResultPath = ''
 )
 
 # 一次发布的完整交付：
@@ -31,6 +32,25 @@ function Resolve-Setting {
     param([string]$Value, [string]$EnvironmentName)
     if (-not [string]::IsNullOrWhiteSpace($Value)) { return $Value }
     return [Environment]::GetEnvironmentVariable($EnvironmentName, 'Process')
+}
+
+# 发布结果是一份机器可读的交付事实。调用方（例如 publish-all.ps1）不应该去解析
+# 本脚本的完整输出：go test、仓库校验、gh 都会往同一条输出流里写字。
+function Write-Summary {
+    param([Parameter(Mandatory = $true)]$Value)
+
+    $json = $Value | ConvertTo-Json -Depth 10
+    if (-not [string]::IsNullOrWhiteSpace($ResultPath)) {
+        $resultFile = if ([IO.Path]::IsPathRooted($ResultPath)) {
+            [IO.Path]::GetFullPath($ResultPath)
+        } else {
+            [IO.Path]::GetFullPath((Join-Path $repoRoot $ResultPath))
+        }
+        $parent = Split-Path -Parent $resultFile
+        if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+        [IO.File]::WriteAllText($resultFile, $json, [Text.UTF8Encoding]::new($false))
+    }
+    Write-Output $json
 }
 
 function Invoke-ReleasePlan {
@@ -296,7 +316,7 @@ else {
 
 # 只发工作台时索引里没有可定位的 Release 资产，条目由 Agent 扩展工作区提交审核。
 if (-not $allowGithub) {
-    [pscustomobject]@{
+    Write-Summary ([pscustomobject]@{
         repository = $Repository
         id = [string]$manifest.id
         version = $version
@@ -307,7 +327,7 @@ if (-not $allowGithub) {
         distribution_targets = $targets
         github_tag = $null
         next_step = '在 Agent 扩展工作区提交该候选版本，由组织审核后对内分发。'
-    } | ConvertTo-Json
+    })
     return
 }
 
@@ -342,7 +362,7 @@ if ($catalogChanged) {
     }
 }
 
-[pscustomobject]@{
+Write-Summary ([pscustomobject]@{
     repository = $Repository
     tag = $tag
     id = [string]$manifest.id
@@ -357,4 +377,4 @@ if ($catalogChanged) {
     distribution_targets = $targets
     workbench_submission = if ($allowWorkbench) { 'pending' } else { $null }
     pushed = (-not $SkipPush)
-} | ConvertTo-Json -Depth 10
+})
