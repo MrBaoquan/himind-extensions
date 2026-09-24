@@ -213,6 +213,20 @@ $lock = Join-Path $outputRoot ([string]$plan.lock_name)
 $commit = (git rev-parse HEAD).Trim()
 $releaseAssets = @($artifact, $manifestFile)
 
+# Release 的 --target 与清单的 source_commit 都指向 HEAD，所以 HEAD 必须先到达
+# 远端分支。否则 GitHub 会因为目标提交不存在而报 5xx，清单也会指向一个别人
+# 取不到的提交。
+if ($allowGithub) {
+    $releaseBranch = [string]$extensionsConfig.default_branch
+    if ([string]::IsNullOrWhiteSpace($releaseBranch)) { $releaseBranch = 'main' }
+    git fetch --quiet origin $releaseBranch
+    if ($LASTEXITCODE -ne 0) { throw "Unable to fetch origin/$releaseBranch." }
+    $containingBranches = @(git branch -r --contains $commit --format='%(refname:short)')
+    if ($containingBranches -notcontains "origin/$releaseBranch") {
+        throw "HEAD $commit is not on origin/$releaseBranch yet. Push the release commit before publishing to GitHub."
+    }
+}
+
 function Resolve-ReleaseCommit {
     param([string]$ReleaseTag)
 
