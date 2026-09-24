@@ -9,7 +9,7 @@
 5. 提交 Pull Request，说明变更、风险、兼容性和验证结果。
 6. 合并后在 Agent 工作台打开对应子目录，构建并提交审核。
 
-分发由仓库维护者在 `main` 上运行 `tools/release/publish-extension.ps1`，脚本按清单声明的 `distribution_targets` 决定发工作台、发 GitHub 还是两者都发。贡献者不提交 `.hmpkg`、`.hmskill`、签名或目录摘要，也不复用已发布版本号。Release 已创建但 catalog 更新失败时，维护者在同一源提交上重跑命令复用既有签名制品；主分支已经前进时，必须恢复对应源提交或提升扩展版本。
+分发由仓库维护者在 `main` 上运行 `tools/release/publish-extension.ps1`，脚本按清单声明的 `distribution_targets` 决定发工作台、发 GitHub 还是两者都发。贡献者不提交 `.hmpkg`、`.hmskill`、签名或目录摘要，也不复用已发布版本号；签名由发布流水线生成，内嵌在发布清单 `<id>@<version>.json` 的 `signature` 字段里，不单独产出签名文件。Release 已创建但 catalog 更新失败时，维护者在同一源提交上重跑命令复用既有签名制品；主分支已经前进时，必须恢复对应源提交或提升扩展版本。
 
 ## 边界
 

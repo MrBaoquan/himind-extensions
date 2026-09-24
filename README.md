@@ -124,7 +124,7 @@ Release 创建后如果只需要修复目录，应在同一源提交上重跑同
 
 ### Agent 内置发布器
 
-扩展开发者不走本仓库时，可以在 Agent 的扩展开发工作区直接发布，落点约束、签名元数据结构与这里完全一致（同一份契约 `contracts/agent-core/v1/extension-release-manifest.schema.json`），签名也读同一套环境变量。区别只在命名空间：Agent 内置发布器用 `<kind>/<id>@<version>` 作 Tag、同时上传 `<id>@<version>.json` 发布清单和 `<id>-<version>.<ext>.signature.json`；本仓库脚本用 `<kind>-<id>-v<version>` 作 Tag，目录条目写在 `.himind/catalog.json`。两者互不覆盖，也不会互相复用 Release。
+扩展开发者不走本仓库时，可以在 Agent 的扩展开发工作区直接发布。命名、资产和签名口径与这里完全一致：Tag 为 `<kind>/<id>@<version>`，制品为 `<id>-<version>.<hmpkg|hmskill|hmwf>`，发布清单为 `<id>@<version>.json`（Workflow 再加 `<id>-<version>.extension-lock.json`），签名内嵌在发布清单的 `signature` 字段，不产独立的 `.signature.json`；同一份契约 `contracts/agent-core/v1/extension-release-manifest.schema.json`，同一套签名环境变量。区别只在落点：Agent 内置发布器按扩展自己的 `distribution_targets` 投递，要写公开目录时更新目标仓库的 `.himind/catalog.json`；本仓库脚本只写本仓库的 `.himind/catalog.json`。
 
 ### 安装侧
 
