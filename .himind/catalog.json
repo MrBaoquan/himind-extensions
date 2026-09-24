@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-526530eeaaa0fc96",
+  "generation": "sync-bb07b202692dc80a",
   "plugins": [
     {
       "allow_disable": true,
@@ -675,6 +675,89 @@
         "agent-skills"
       ],
       "version": "1.8.0"
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:skill/com.himind.skill.develop-himind-workflows@1.0.2:com.himind.skill.develop-himind-workflows-1.0.2.hmskill",
+      "artifact_sha256": "a361685464922aebf5be8a8fb7ca8559c45c8d5ec465af1837d989edc1a7150f",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [
+        "extension.authoring.identity",
+        "extension.authoring.preflight",
+        "extension.workspace.current",
+        "extension.workspace.bind",
+        "extension.workspace.clear",
+        "extension.revision.create",
+        "extension.environment.preflight",
+        "extension.workflow.scaffold",
+        "extension.workflow.validate",
+        "extension.workflow.build",
+        "extension.workflow.package",
+        "extension.workflow.candidate.save",
+        "extension.workflow.candidate.test",
+        "extension.workflow.candidate.confirm",
+        "extension.test",
+        "extension.workflow.submission.submit",
+        "extension.workflow.submission.status"
+      ],
+      "categories": [
+        "software-engineering",
+        "collaboration-delivery"
+      ],
+      "channel": "stable",
+      "dependencies": [
+        {
+          "kind": "plugin",
+          "id": "com.himind.extension-development-tools",
+          "required": true,
+          "min_version": "1.4.0",
+          "version": "1.4.2",
+          "sha256": "0b9fdef89d128bb1a56d742dce1bf692d6c13aaaad6b302a7681362e9fe1c23e",
+          "source": {
+            "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
+            "reference": "plugin/com.himind.extension-development-tools@1.4.2",
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg"
+          },
+          "pinned": true
+        }
+      ],
+      "description": "设计、创建、校验、契约测试、打包并受控提交 HiMind 工作流。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.himind.skill.develop-himind-workflows@1.0.2/com.himind.skill.develop-himind-workflows-1.0.2.hmskill",
+      "file_name": "com.himind.skill.develop-himind-workflows-1.0.2.hmskill",
+      "file_size": 5851,
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.47",
+      "name": "工作流开发助手",
+      "organization_reason": "",
+      "plugin_dependencies": [
+        {
+          "min_version": "1.4.0",
+          "plugin_id": "com.himind.extension-development-tools",
+          "required": true
+        }
+      ],
+      "published_at": "2026-09-24T14:59:44Z",
+      "release_notes": "1.0.2：目录名阈值改为 28，并取消存量豁免。",
+      "release_tag": "skill/com.himind.skill.develop-himind-workflows@1.0.2",
+      "risk_summary": "local_write; workflow_contract; candidate_freeze; submission_requires_confirmation; publication_requires_admin_review",
+      "sha256": "a361685464922aebf5be8a8fb7ca8559c45c8d5ec465af1837d989edc1a7150f",
+      "signature": "J1hIJhod+k5UnZEGUINS51/DbrwJC8foFuZXnLZfcv2y45sJvOV+b1z1YEBPAm40/EXJSNUD0uNWnZMmhsQQfkfnq99FiRZdeF921XGSJh4Jsg+FQdz4sDIw7fUQ3b8o+1Mm4/vCEt+HN7SG94/JbIepSE6Hkxzo6VOpno9+p8vBtiHRPVVhdIqoZGZCx0yF7idBd6YHhwblEKH+AnJESv9SBZExu6PYeRXLphlh8sbXiDLLL/6EGLh+bguCJBwi5vynFGwkDDYDJFb9F9Zy/Aj6iXM8lSGx8jp7eO/kbYIqi+cG3F3rnCIyp013xMdE3LNjg72wdwdk2/IgPv+lqM/CRM0nbV26FsUJiWTNThLTg7fWwtsmpmeDNK4s5ePruaVvk9xggHQFpdOQ7+czCAjzXIewXay0+bdsPnKNvGvU+a0dMRECmNdL7yp3yD2dv7nMckFhe7ddAMHJFk53l4cSngY+gR44N5i6kEAclJ8h0Zhk+yxAtZ+/AZQZz8GC",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "skill_id": "com.himind.skill.develop-himind-workflows",
+      "source": "github",
+      "source_commit": "0f4f470678c39ad991786170c280ee9054707124",
+      "source_tree": "7f2f889affcd6229edeb5fdd257be7a406f0451c",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "version": "1.0.2"
     },
     {
       "allow_disable": true,
