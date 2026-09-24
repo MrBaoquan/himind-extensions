@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-73aab3ddc1b92eab",
+  "generation": "sync-baf70563118bde85",
   "plugins": [
     {
       "allow_disable": true,
@@ -757,6 +757,48 @@
         "workbuddy"
       ],
       "version": "1.3.2"
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:skill/com.himind.skill.software-ui-spec@1.0.1:com.himind.skill.software-ui-spec-1.0.1.hmskill",
+      "artifact_sha256": "da9a15ae3d5694b49bcc2cccf830e342d806004f666478bf412b988ebc946247",
+      "assignment": "optional",
+      "author_name": "超级管理员",
+      "capability_ids": [],
+      "categories": [
+        "visual-design",
+        "software-engineering"
+      ],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "定义软件开发 UI/UX 规范并据此审查界面，给出问题清单与验收标准。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.himind.skill.software-ui-spec@1.0.1/com.himind.skill.software-ui-spec-1.0.1.hmskill",
+      "file_name": "com.himind.skill.software-ui-spec-1.0.1.hmskill",
+      "file_size": 11244,
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.40",
+      "name": "软件开发 UI 规范",
+      "organization_reason": "",
+      "plugin_dependencies": [],
+      "published_at": "2026-09-24T14:58:12Z",
+      "release_notes": "1.0.1：说明收敛到一句，去掉冗余描述。",
+      "release_tag": "skill/com.himind.skill.software-ui-spec@1.0.1",
+      "risk_summary": "read_only",
+      "sha256": "da9a15ae3d5694b49bcc2cccf830e342d806004f666478bf412b988ebc946247",
+      "signature": "Helzs53AfhWvYKVodpJcQEATyqkm2sBOddHswWucJ0dFqXo4gLxR4uFt4pAG4ctOpo4lP6min6Ljp/CrW6DLMGPG7wClbPqNanLSDWJ99w79k3tvcNDpTvwDFwx/NswPc0t5w9zhsX4ho+uzFUBejiCcBd0Qwv5nzxfQDeqYQ7vNH25tqebDZfhkDhk/OAmXrGZZcP1N4f0ZkBQxmKKSi/hA4YRs6rhaQcVvXbJ4oY3FhmZwS3LOgO1x2xRtYB1EilZfgskGl0r8dhfR5LH/jJGXCS03eeMsa8O6zLs2Cpte83Pi+DZzAngm/wOUDSGXeZ4nK/l3a10dv2rbvVrpiHlk4tArnvNPZK69fvOZoxygsVdl7DHCwYt6qWV/X9VWikDQOHC/BirgUYEqQdH3GW5DOrpD7NJEqhl+NxBvPP3W5k8JUECMmiWZFY3l0/91547oA4yH1DiGSVfRFOV2cfeXdAXZmUeRYmiQ6buf/60vq742jbVzxO/jT0PGV/22",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "skill_id": "com.himind.skill.software-ui-spec",
+      "source": "github",
+      "source_commit": "557ff0c34b6c2b17771b76928f6df734492aa533",
+      "source_tree": "89ab7e7616d63ff6fe9bb0dbc3e37cf25f32d0cc",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "version": "1.0.1"
     },
     {
       "allow_disable": true,
