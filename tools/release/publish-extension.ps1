@@ -61,6 +61,29 @@ function Invoke-ReleasePlan {
     return ($output -join "`n") | ConvertFrom-Json
 }
 
+# 读市场索引里该扩展的条目：单条扩展在索引里只有一条，记录着上一次规范发布
+# 的全部事实（tag、版本、源码树、制品摘要、签名）。
+function Get-CatalogEntry {
+    param([string]$CatalogFile, [string]$Kind, [string]$ID)
+
+    if (-not (Test-Path -LiteralPath $CatalogFile -PathType Leaf)) { return $null }
+    $catalog = Get-Content -LiteralPath $CatalogFile -Raw -Encoding UTF8 | ConvertFrom-Json
+    $entries = switch ($Kind) {
+        'plugin' { @($catalog.plugins) }
+        'skill' { @($catalog.skills) }
+        default { @($catalog.workflows) }
+    }
+    $idField = switch ($Kind) {
+        'plugin' { 'plugin_id' }
+        'skill' { 'skill_id' }
+        default { 'workflow_id' }
+    }
+    foreach ($entry in $entries) {
+        if ([string]$entry.$idField -eq $ID) { return $entry }
+    }
+    return $null
+}
+
 # CanonicalVersion 只认规范 tag 的索引条目：历史扁平 tag 不参与版本比较，
 # 否则「重做分发」时会被旧命名拦住。
 function Get-LatestCanonicalVersion {
@@ -233,6 +256,33 @@ if ($releaseExists) {
     if ($releaseSourceTree -ne $currentSourceTree) {
         throw "Release $tag already exists for $relativeSource at $releaseCommit ($releaseSourceTree), but HEAD has $currentSourceTree. Increase the extension version or restore the original source."
     }
+    # 索引已经记录了这次发布的全部事实时，重跑是空操作：制品、清单、签名都已
+    # 在 Release 与索引里，不需要再下载一次制品来证明同一件事。
+    $indexed = Get-CatalogEntry -CatalogFile $catalogPath -Kind $Kind -ID ([string]$manifest.id)
+    if ($null -ne $indexed -and
+        [string]$indexed.release_tag -eq $tag -and
+        [string]$indexed.version -eq $version -and
+        [string]$indexed.source_tree -eq $currentSourceTree) {
+        Write-Host "Already published and indexed: $tag"
+        Write-Summary ([pscustomobject]@{
+            repository = $Repository
+            tag = $tag
+            id = [string]$manifest.id
+            version = $version
+            kind = $Kind
+            artifact = [string]$indexed.file_name
+            release_manifest = [string]$plan.manifest_name
+            signed = (-not [string]::IsNullOrWhiteSpace([string]$indexed.signature))
+            reused_release = $true
+            already_indexed = $true
+            catalog = '.himind/catalog.json'
+            dependencies = @($plan.dependencies)
+            distribution_targets = $targets
+            workbench_submission = if ($allowWorkbench) { 'pending' } else { $null }
+            pushed = $false
+        })
+        return
+    }
     Write-Host "Reusing immutable Release $tag."
     $downloadRoot = Join-Path ([IO.Path]::GetTempPath()) "himind-extension-existing-$([guid]::NewGuid().ToString('N'))"
     New-Item -ItemType Directory -Force -Path $downloadRoot | Out-Null
@@ -249,6 +299,14 @@ if ($releaseExists) {
         }
         if ($Kind -eq 'workflow') {
             Copy-Item -LiteralPath (Join-Path $downloadRoot ([string]$plan.lock_name)) -Destination $lock -Force
+        }
+        # 复用不等于免检：取回的制品必须与取回的清单摘要逐字节一致，否则这次
+        # 「复用」会把一个来源不明的字节写进市场索引。
+        $downloadedManifest = Get-Content -LiteralPath $manifestFile -Raw -Encoding UTF8 | ConvertFrom-Json
+        $expectedDigest = ([string]$downloadedManifest.artifact.sha256).Trim().ToLowerInvariant()
+        $actualDigest = (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($expectedDigest -ne $actualDigest) {
+            throw "Release $tag artifact $([IO.Path]::GetFileName($artifact)) does not match its release manifest."
         }
     }
     finally {
