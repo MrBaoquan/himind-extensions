@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-480a7af0be02ce3f",
+  "generation": "sync-5c7e8d7ae4fb5e2f",
   "plugins": [
     {
       "allow_disable": true,
@@ -207,56 +207,6 @@
       "source_commit": "1790498447ee4faa3a4fb730c76d9969182cff82",
       "source_tree": "2d1fac3f33c18b7276c0e4265e50a47748b11858",
       "version": "1.2.4",
-      "view_count": 0
-    },
-    {
-      "allow_disable": true,
-      "allow_uninstall": true,
-      "artifact_id": "github:plugin/com.himind.software-distribution@1.2.1:com.himind.software-distribution-1.2.1.hmpkg",
-      "artifact_sha256": "26fdbd5688eae298d3059fe2f313bb8c91c233b88f94b9028ed4e8e6c41d6c22",
-      "assignment": "optional",
-      "author_name": "马宝全",
-      "capability_ids": [
-        "software.distribution.project.inspect",
-        "software.distribution.artifact.inspect",
-        "software.distribution.release.resolve"
-      ],
-      "categories": [
-        "software-engineering",
-        "collaboration-delivery",
-        "testing-quality"
-      ],
-      "channel": "stable",
-      "dependencies": [],
-      "description": "为 AI 提供项目接入诊断、软件制品结构与摘要校验；连接组织分发服务后可继续验证更新。",
-      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.software-distribution@1.2.1/com.himind.software-distribution-1.2.1.hmpkg",
-      "file_name": "com.himind.software-distribution-1.2.1.hmpkg",
-      "file_size": 21539749,
-      "governance": "optional",
-      "install_mode": "prompt",
-      "managed": false,
-      "management": "user_managed",
-      "min_agent_version": "0.3.33",
-      "name": "软件分发对接",
-      "organization_reason": "",
-      "permissions": [
-        "filesystem.workspace.read",
-        "network.dashboard.public"
-      ],
-      "plugin_dependencies": [],
-      "plugin_id": "com.himind.software-distribution",
-      "published_at": "2026-09-23T07:36:41Z",
-      "release_notes": "支持 AI 会话目录之外的显式本机项目，并修复 Windows 短路径与真实路径差异导致的合法目录误判。",
-      "release_tag": "plugin/com.himind.software-distribution@1.2.1",
-      "review_status": "published",
-      "sha256": "26fdbd5688eae298d3059fe2f313bb8c91c233b88f94b9028ed4e8e6c41d6c22",
-      "signature": "",
-      "signature_algorithm": "",
-      "signature_key_id": "",
-      "source": "github",
-      "source_commit": "338948697e5abe54952d7feb5374057dfa0c7304",
-      "source_tree": "252fdb7a4a85476fdba9fc4b3022fecba54f7d09",
-      "version": "1.2.1",
       "view_count": 0
     },
     {
