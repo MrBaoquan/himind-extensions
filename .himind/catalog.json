@@ -48,7 +48,7 @@
       "signature_key_id": "himind-production-2026",
       "source": "github",
       "source_commit": "ef776569db941e810ace53b4a6a14b475ddb281b",
-      "source_tree": "2a621e600f7d86607f37b35b08e7ac6f82685003",
+      "source_tree": "eeaf8ddd623744b1f6bf1deab7d57d35187cf94d",
       "version": "1.0.2",
       "view_count": 0
     },
@@ -106,7 +106,7 @@
       "signature_key_id": "himind-production-2026",
       "source": "github",
       "source_commit": "3bf57308debce81f91cc1d1d5e70d9a52a1275e9",
-      "source_tree": "2d4c1d53b07960fe5c80a44feb93d846b4d47da4",
+      "source_tree": "3f924f22327d37a0e62659104ae226dadbef26ca",
       "version": "1.4.2",
       "view_count": 0
     },
@@ -153,7 +153,7 @@
       "signature_key_id": "himind-production-2026",
       "source": "github",
       "source_commit": "b5cbb575f5571f83908d7f5ae5fd55171762bf97",
-      "source_tree": "c570f8d70487958d759537c4f5cccdfb70e5fd16",
+      "source_tree": "e1f309cb108d8b227328fa054d940ae099d582fc",
       "version": "1.0.3",
       "view_count": 0
     },
@@ -205,7 +205,7 @@
       "signature_key_id": "himind-production-2026",
       "source": "github",
       "source_commit": "1790498447ee4faa3a4fb730c76d9969182cff82",
-      "source_tree": "2d1fac3f33c18b7276c0e4265e50a47748b11858",
+      "source_tree": "a867e6c8159dc71f48c4f233564a53ee2d0ff04a",
       "version": "1.2.4",
       "view_count": 0
     },
@@ -257,7 +257,7 @@
       "signature_key_id": "himind-production-2026",
       "source": "github",
       "source_commit": "48f1b27424466348ae7f55587987e3cefa81dab2",
-      "source_tree": "d0ec24a48dc7d3b8869783d6ce0c94f02c8adb0a",
+      "source_tree": "84861c6e35c384d8e031c9cb4e7cfa3adada11b1",
       "version": "0.4.2",
       "view_count": 0
     },
@@ -321,7 +321,7 @@
       "signature_key_id": "himind-production-2026",
       "source": "github",
       "source_commit": "4eae4b4572d12b496084c9314cbebcb1f4bc4075",
-      "source_tree": "22a9b36306b148e9453cd929ab9fd93a0f4a5fd0",
+      "source_tree": "3c6c97f49765c5c8f859d52bca6e8a1ff5e65f06",
       "version": "0.3.13",
       "view_count": 0
     }
@@ -375,7 +375,7 @@
       "skill_id": "com.himind.skill.dev-workflow-orchestrator",
       "source": "github",
       "source_commit": "a4b7ff9477e14fb1338d0aefb22071dac0473d17",
-      "source_tree": "84692544964f91ea4df2d4ec7a7babd71bf65ec1",
+      "source_tree": "515b25a8c7855097a1661186ccbf4ca42d227c4d",
       "supported_clients": [
         "agent-skills"
       ],
@@ -411,20 +411,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "id": "com.himind.extension-development-tools",
           "kind": "plugin",
-          "min_version": "1.3.2",
-          "pinned": true,
+          "id": "com.himind.extension-development-tools",
           "required": true,
+          "min_version": "1.3.2",
+          "version": "1.4.2",
           "sha256": "0b9fdef89d128bb1a56d742dce1bf692d6c13aaaad6b302a7681362e9fe1c23e",
           "source": {
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg",
-            "id": "github:MrBaoquan/himind-extensions",
             "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
             "reference": "plugin/com.himind.extension-development-tools@1.4.2",
-            "repository": "MrBaoquan/himind-extensions"
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg"
           },
-          "version": "1.4.2"
+          "pinned": true
         }
       ],
       "description": "使用中文规范设计、构建、校验、调试并打包 HiMind Agent 插件。",
@@ -455,7 +455,7 @@
       "skill_id": "com.himind.skill.develop-himind-plugins",
       "source": "github",
       "source_commit": "ab9705ea30a69b2a5bfe025d08b64bf70cbfe6eb",
-      "source_tree": "5b6266ca6b4a96ebeb7bde614d630a37bb3dc52f",
+      "source_tree": "e69889dc19d20738079a528412acc448475606b8",
       "supported_clients": [
         "himind-ai",
         "codex",
@@ -493,20 +493,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "id": "com.himind.extension-development-tools",
           "kind": "plugin",
-          "min_version": "1.3.1",
-          "pinned": true,
+          "id": "com.himind.extension-development-tools",
           "required": true,
+          "min_version": "1.3.1",
+          "version": "1.4.2",
           "sha256": "0b9fdef89d128bb1a56d742dce1bf692d6c13aaaad6b302a7681362e9fe1c23e",
           "source": {
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg",
-            "id": "github:MrBaoquan/himind-extensions",
             "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
             "reference": "plugin/com.himind.extension-development-tools@1.4.2",
-            "repository": "MrBaoquan/himind-extensions"
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg"
           },
-          "version": "1.4.2"
+          "pinned": true
         }
       ],
       "description": "使用中文规范创建、校验、跨客户端测试、打包并受控提交 HiMind 技能。",
@@ -537,7 +537,7 @@
       "skill_id": "com.himind.skill.develop-himind-skills",
       "source": "github",
       "source_commit": "8dc4c63ef8135c435d86ecc7bad8ef25b7a38eeb",
-      "source_tree": "7e17d6faed8439934a35104f241f4fe251e52e9a",
+      "source_tree": "c3b88d9be61ff5a973e05981f94f731e2a6b517d",
       "supported_clients": [
         "agent-skills"
       ],
@@ -576,20 +576,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "id": "com.himind.extension-development-tools",
           "kind": "plugin",
-          "min_version": "1.4.0",
-          "pinned": true,
+          "id": "com.himind.extension-development-tools",
           "required": true,
+          "min_version": "1.4.0",
+          "version": "1.4.2",
           "sha256": "0b9fdef89d128bb1a56d742dce1bf692d6c13aaaad6b302a7681362e9fe1c23e",
           "source": {
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg",
-            "id": "github:MrBaoquan/himind-extensions",
             "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
             "reference": "plugin/com.himind.extension-development-tools@1.4.2",
-            "repository": "MrBaoquan/himind-extensions"
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg"
           },
-          "version": "1.4.2"
+          "pinned": true
         }
       ],
       "description": "设计、创建、校验、契约测试、打包并受控提交 HiMind 工作流。",
@@ -620,7 +620,7 @@
       "skill_id": "com.himind.skill.develop-himind-workflows",
       "source": "github",
       "source_commit": "0f4f470678c39ad991786170c280ee9054707124",
-      "source_tree": "529246907b39daa2687e121abe7187d10baae6f4",
+      "source_tree": "7f2f889affcd6229edeb5fdd257be7a406f0451c",
       "supported_clients": [
         "agent-skills"
       ],
@@ -661,7 +661,7 @@
       "skill_id": "com.himind.skill.git-svn-commit-summary",
       "source": "github",
       "source_commit": "1ba80b8b692dd6e5da3df6cc66e5d1fcd6345b18",
-      "source_tree": "31c6eaf7004e747114811c1e62c837d15a10854c",
+      "source_tree": "df8ee1786c8fad50274c14eb616da17ef1880349",
       "supported_clients": [
         "codex",
         "github-copilot",
@@ -686,20 +686,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "id": "com.himind.image-optimizer",
           "kind": "plugin",
-          "min_version": "1.0.0",
-          "pinned": true,
+          "id": "com.himind.image-optimizer",
           "required": true,
+          "min_version": "1.0.0",
+          "version": "1.0.3",
           "sha256": "4a3e3b6c07f808963362e9e771f4ed1506d56c4f59a1c07ecd053286dbdc3d2c",
           "source": {
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.image-optimizer@1.0.3/com.himind.image-optimizer-1.0.3.hmpkg",
-            "id": "github:MrBaoquan/himind-extensions",
             "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
             "reference": "plugin/com.himind.image-optimizer@1.0.3",
-            "repository": "MrBaoquan/himind-extensions"
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.image-optimizer@1.0.3/com.himind.image-optimizer-1.0.3.hmpkg"
           },
-          "version": "1.0.3"
+          "pinned": true
         }
       ],
       "description": "在图片优化或交付前检查 Agent、图片处理插件、输入范围和交付约束。",
@@ -730,7 +730,7 @@
       "skill_id": "com.himind.skill.image-delivery-preflight",
       "source": "github",
       "source_commit": "a4724ad64630ed60daceb7b89bb81914ba8c572e",
-      "source_tree": "8a680bb5fae341837d4ae43279ccbc1baba879f1",
+      "source_tree": "b2073f61efa5feddc297a8ae08eba240abc5adca",
       "supported_clients": [
         "codex",
         "github-copilot"
@@ -773,7 +773,7 @@
       "skill_id": "com.himind.skill.mcp-experience-feedback",
       "source": "github",
       "source_commit": "5c231638bf6f3e1147112fb7b9a21bf6bbf9e5b2",
-      "source_tree": "7a655eda15b41caf3deeb4d4a2f23aaf9ec303c2",
+      "source_tree": "9dd3e2612bf3dd7610add9fdd5fead12b052ea43",
       "supported_clients": [
         "agent-skills"
       ],
@@ -800,20 +800,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "id": "com.himind.software-distribution",
           "kind": "plugin",
-          "min_version": "1.2.1",
-          "pinned": true,
+          "id": "com.himind.software-distribution",
           "required": true,
+          "min_version": "1.2.1",
+          "version": "1.2.4",
           "sha256": "9ead5149b025b088ad64aaeb709a275067710cab9593ec5a9358c2f1d19ef300",
           "source": {
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.software-distribution@1.2.4/com.himind.software-distribution-1.2.4.hmpkg",
-            "id": "github:MrBaoquan/himind-extensions",
             "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
             "reference": "plugin/com.himind.software-distribution@1.2.4",
-            "repository": "MrBaoquan/himind-extensions"
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.software-distribution@1.2.4/com.himind.software-distribution-1.2.4.hmpkg"
           },
-          "version": "1.2.4"
+          "pinned": true
         }
       ],
       "description": "为 WPF 与 Unity 项目做分发接入检查、制品校验和更新验证。",
@@ -844,7 +844,7 @@
       "skill_id": "com.himind.skill.software-distribution",
       "source": "github",
       "source_commit": "e25ce614c38a0a3021bd4b750edef8add7a80055",
-      "source_tree": "134304b212659327d6a2821c9e08ff7e4a7ee40e",
+      "source_tree": "07962816e66cd038703f10aa9f7ecf201cf6d6a5",
       "supported_clients": [
         "himind-ai",
         "codex",
@@ -889,7 +889,7 @@
       "skill_id": "com.himind.skill.software-ui-spec",
       "source": "github",
       "source_commit": "557ff0c34b6c2b17771b76928f6df734492aa533",
-      "source_tree": "7081b8ab0c2a86d137cef13d44aba9a115c84702",
+      "source_tree": "89ab7e7616d63ff6fe9bb0dbc3e37cf25f32d0cc",
       "supported_clients": [
         "agent-skills"
       ],
@@ -930,7 +930,7 @@
       "skill_id": "com.mrbaoquan.skill.unihper-unity-development",
       "source": "github",
       "source_commit": "0176721880b5e39accd91adf3766bec47776016a",
-      "source_tree": "245f9fed8bc931ba7c3c097f2236ecdf40603ac3",
+      "source_tree": "9b12cc85c0e50cc839060d854643dc65535b09b9",
       "supported_clients": [
         "codex",
         "github-copilot",
@@ -958,20 +958,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "id": "com.himind.software-distribution",
           "kind": "plugin",
-          "min_version": "",
-          "pinned": true,
+          "id": "com.himind.software-distribution",
           "required": true,
+          "min_version": "",
+          "version": "1.2.4",
           "sha256": "9ead5149b025b088ad64aaeb709a275067710cab9593ec5a9358c2f1d19ef300",
           "source": {
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.software-distribution@1.2.4/com.himind.software-distribution-1.2.4.hmpkg",
-            "id": "github:MrBaoquan/himind-extensions",
             "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
             "reference": "plugin/com.himind.software-distribution@1.2.4",
-            "repository": "MrBaoquan/himind-extensions"
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.software-distribution@1.2.4/com.himind.software-distribution-1.2.4.hmpkg"
           },
-          "version": "1.2.4"
+          "pinned": true
         }
       ],
       "description": "对已构建制品完成接入检查、制品校验、渠道发布与更新验证，发布凭据不经过 AI。",
@@ -1050,7 +1050,7 @@
       "signature_key_id": "himind-production-2026",
       "source": "github",
       "source_commit": "2497ea900d015647e3dbe240f05b8513e6de07e8",
-      "source_tree": "7f7f3b778158adfb24b59648ce2cbf3b102a5e9e",
+      "source_tree": "f1ffb6e8661321e889e70aadb56f659a5d6e754c",
       "version": "1.0.2",
       "workflow_id": "com.himind.workflow.software-release"
     },
@@ -1145,20 +1145,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "id": "com.himind.wechat-miniprogram-tools",
           "kind": "plugin",
-          "min_version": "",
-          "pinned": true,
+          "id": "com.himind.wechat-miniprogram-tools",
           "required": true,
+          "min_version": "",
+          "version": "0.3.13",
           "sha256": "2be33b927d4aea01a010f2df60e92dc91d759a1b17e8c8ad3d84fb2aaa666aa8",
           "source": {
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.wechat-miniprogram-tools@0.3.13/com.himind.wechat-miniprogram-tools-0.3.13.hmpkg",
-            "id": "github:MrBaoquan/himind-extensions",
             "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
             "reference": "plugin/com.himind.wechat-miniprogram-tools@0.3.13",
-            "repository": "MrBaoquan/himind-extensions"
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.wechat-miniprogram-tools@0.3.13/com.himind.wechat-miniprogram-tools-0.3.13.hmpkg"
           },
-          "version": "0.3.13"
+          "pinned": true
         }
       ],
       "description": "选择项目和展馆、指定开发或生产环境，可选通过 DSH 完成功能或 Bug 修复，构建后上传微信体验版。",
@@ -1285,36 +1285,36 @@
       "channel": "stable",
       "dependencies": [
         {
-          "id": "com.himind.wechat-miniprogram-tools",
           "kind": "plugin",
-          "min_version": "",
-          "pinned": true,
+          "id": "com.himind.wechat-miniprogram-tools",
           "required": true,
+          "min_version": "",
+          "version": "0.3.13",
           "sha256": "2be33b927d4aea01a010f2df60e92dc91d759a1b17e8c8ad3d84fb2aaa666aa8",
           "source": {
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.wechat-miniprogram-tools@0.3.13/com.himind.wechat-miniprogram-tools-0.3.13.hmpkg",
-            "id": "github:MrBaoquan/himind-extensions",
             "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
             "reference": "plugin/com.himind.wechat-miniprogram-tools@0.3.13",
-            "repository": "MrBaoquan/himind-extensions"
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.wechat-miniprogram-tools@0.3.13/com.himind.wechat-miniprogram-tools-0.3.13.hmpkg"
           },
-          "version": "0.3.13"
+          "pinned": true
         },
         {
-          "id": "wechatide-skill",
           "kind": "skill",
-          "min_version": "0.4.0",
-          "pinned": false,
+          "id": "wechatide-skill",
           "required": false,
+          "min_version": "0.4.0",
+          "version": "0.4.0",
           "sha256": "",
           "source": {
-            "artifact_url": "",
-            "id": "",
             "kind": "",
+            "id": "",
+            "repository": "",
             "reference": "",
-            "repository": ""
+            "artifact_url": ""
           },
-          "version": "0.4.0"
+          "pinned": false
         }
       ],
       "description": "外层交付状态机加内层多轮开发 Loop：修改、测试、构建、自我复核、冻结候选、预览、上传、验收、审核、发布和条件回滚。",

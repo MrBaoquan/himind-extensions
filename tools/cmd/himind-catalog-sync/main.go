@@ -147,7 +147,7 @@ func sync(repository, catalogPath, extensionsPath, token, apiBase string, allowM
 			Repository:  repository,
 		}
 		if release.SourceCommit != "" {
-			tree, err := client.treeOf(repository, release.SourceCommit)
+			tree, err := client.sourceTreeOf(repository, release.SourceCommit, sourcePath)
 			if err != nil {
 				return summary{}, fmt.Errorf("%s: %w", item.TagName, err)
 			}
@@ -326,19 +326,39 @@ func (c *client) fileAt(repository, tag, filePath string) ([]byte, error) {
 	return decoded, nil
 }
 
-func (c *client) treeOf(repository, commit string) (string, error) {
-	endpoint := fmt.Sprintf("%s/repos/%s/git/commits/%s", c.base, repository, commit)
+// sourceTreeOf 返回某个提交里「扩展源码目录」的 git tree 哈希，等价于
+// `git rev-parse <commit>:<sourcePath>`。
+//
+// 索引里的 source_tree 必须与发布时写进索引的值可比：发布侧（以及消费侧判断
+// 「发布后源码改没改」）比的是这个目录的树，所以这里不能取提交的根树。
+func (c *client) sourceTreeOf(repository, commit, sourcePath string) (string, error) {
+	endpoint := fmt.Sprintf("%s/repos/%s/git/trees/%s?recursive=1", c.base, repository, commit)
 	data, err := c.get(endpoint, "application/vnd.github+json")
 	if err != nil {
 		return "", err
 	}
 	var payload struct {
-		Tree struct {
-			SHA string `json:"sha"`
+		Truncated bool `json:"truncated"`
+		Tree      []struct {
+			Path string `json:"path"`
+			Type string `json:"type"`
+			SHA  string `json:"sha"`
 		} `json:"tree"`
 	}
 	if err := json.Unmarshal(data, &payload); err != nil {
 		return "", err
 	}
-	return payload.Tree.SHA, nil
+	if payload.Truncated {
+		return "", fmt.Errorf("提交 %s 的树太大，无法解析", commit)
+	}
+	wanted := strings.Trim(strings.ReplaceAll(sourcePath, "\\", "/"), "/")
+	if wanted == "" {
+		return "", fmt.Errorf("源码目录不能为空")
+	}
+	for _, entry := range payload.Tree {
+		if entry.Type == "tree" && entry.Path == wanted {
+			return entry.SHA, nil
+		}
+	}
+	return "", fmt.Errorf("提交 %s 里找不到源码目录 %s", commit, sourcePath)
 }
