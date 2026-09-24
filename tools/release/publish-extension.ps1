@@ -187,6 +187,18 @@ function Resolve-ReleaseCommit {
     return [string]$ref.object.sha
 }
 
+# Release 绑定的是「扩展源码的字节」，不是整个仓库的 HEAD。工具脚本或其它扩展
+# 的提交不应该让一个内容未变的版本被判定为必须重新发布。
+function Resolve-SourceTree {
+    param([string]$Revision, [string]$Path)
+
+    $tree = (git rev-parse "$Revision`:$Path" 2>$null).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($tree)) {
+        throw "Unable to resolve source tree for $Path at $Revision."
+    }
+    return $tree
+}
+
 $releaseExists = $false
 if ($allowGithub) {
     gh release view $tag --repo $Repository --json publishedAt 2>$null | Out-Null
@@ -194,10 +206,12 @@ if ($allowGithub) {
 }
 
 if ($releaseExists) {
-    # 同一 tag 只允许指向同一源提交：Release 是不可变交付，复用不等于重发。
+    # 同一 tag 只允许对应同一份扩展源码：Release 是不可变交付，复用不等于重发。
     $releaseCommit = Resolve-ReleaseCommit $tag
-    if ($releaseCommit -ne $commit) {
-        throw "Release $tag already exists for source commit $releaseCommit, but HEAD is $commit. Increase the extension version or restore the original source commit."
+    $releaseSourceTree = Resolve-SourceTree $releaseCommit $relativeSource
+    $currentSourceTree = Resolve-SourceTree $commit $relativeSource
+    if ($releaseSourceTree -ne $currentSourceTree) {
+        throw "Release $tag already exists for $relativeSource at $releaseCommit ($releaseSourceTree), but HEAD has $currentSourceTree. Increase the extension version or restore the original source."
     }
     Write-Host "Reusing immutable Release $tag."
     $downloadRoot = Join-Path ([IO.Path]::GetTempPath()) "himind-extension-existing-$([guid]::NewGuid().ToString('N'))"
@@ -299,10 +313,7 @@ if (-not $allowGithub) {
 
 $publishedAt = (gh release view $tag --repo $Repository --json publishedAt --jq .publishedAt).Trim()
 if ($LASTEXITCODE -ne 0 -or $publishedAt -notmatch 'T') { throw "Unable to resolve publication time for $tag." }
-$sourceTree = (git rev-parse "$commit`:$relativeSource").Trim()
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($sourceTree)) {
-    throw "Unable to resolve source tree for $relativeSource at $commit."
-}
+$sourceTree = Resolve-SourceTree $commit $relativeSource
 
 $catalogArguments = @(
     'run', './tools/cmd/himind-catalog-upsert',
