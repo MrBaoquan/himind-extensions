@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-252c20c5f321d1b4",
+  "generation": "sync-a7b3ba90950a6bca",
   "plugins": [
     {
       "allow_disable": true,
@@ -287,6 +287,58 @@
       "signature_key_id": "himind-production-2026",
       "source": "github",
       "version": "1.0.2",
+      "view_count": 0
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:plugin/com.himind.software-distribution@1.2.4:com.himind.software-distribution-1.2.4.hmpkg",
+      "artifact_sha256": "9ead5149b025b088ad64aaeb709a275067710cab9593ec5a9358c2f1d19ef300",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [
+        "software.distribution.project.inspect",
+        "software.distribution.artifact.inspect",
+        "software.distribution.release.resolve",
+        "software.distribution.channel.resolve"
+      ],
+      "categories": [
+        "software-engineering",
+        "collaboration-delivery",
+        "testing-quality"
+      ],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "为 AI 提供项目接入诊断、软件制品结构与摘要校验；连接组织分发服务后可继续验证更新。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.software-distribution@1.2.4/com.himind.software-distribution-1.2.4.hmpkg",
+      "file_name": "com.himind.software-distribution-1.2.4.hmpkg",
+      "file_size": 5404815,
+      "governance": "optional",
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.33",
+      "name": "软件分发对接",
+      "organization_reason": "",
+      "permissions": [
+        "filesystem.workspace.read",
+        "network.dashboard.public",
+        "network.github.read"
+      ],
+      "plugin_dependencies": [],
+      "plugin_id": "com.himind.software-distribution",
+      "published_at": "2026-09-24T14:56:58Z",
+      "release_notes": "1.2.4：能力说明收敛到一句，去掉冗余描述。",
+      "release_tag": "plugin/com.himind.software-distribution@1.2.4",
+      "review_status": "published",
+      "sha256": "9ead5149b025b088ad64aaeb709a275067710cab9593ec5a9358c2f1d19ef300",
+      "signature": "XkgETmEWDt9fESq0QHEmXmeTdvoJdKwZKlMJBIn0HQRX/vZ3BMULxhc+8T60cOnl52fVbgw8Oy68nJnnTJPCnQ3Gb/j1dkS5VogxPiSAAFdO/YDBPMglM5iZ2mC8gGXqF4WmZNO3xKxSFZBcPRnkGCftO9pFQllnr9W4/tbij2hfF9dQP8dnTK4qtm1Pjd/sIXzqQmL4YU6kZtDAzXdkiBP/sJr2HTtjpY9TWQ+2Q7t/wura/h8soULaLtf62/W67qXjqf6ssnxQk7Lem7HV6t6IFYs2l97EfqGyluEhH6NMzR5rophFCXi4Uh8x4hYqqLz9pxnI+aBl0BdVa9qwLqQk2Y49j/7gy3s2gkO6Iu4mo/nJi5z9Kl9hPhJaPfr33oxpMd9HKPKLPqUPRcOsYxisQ/xcEQ5CRYxFCwWYna1Thp/DUQOkFVJpoq8WJAaLJh5yHUmlhbDF/65EPLz93DehnZCQr2bYnF1rIapZQPHL3BbH7PTXhOknAuzc3w56",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "source": "github",
+      "source_commit": "1790498447ee4faa3a4fb730c76d9969182cff82",
+      "source_tree": "a867e6c8159dc71f48c4f233564a53ee2d0ff04a",
+      "version": "1.2.4",
       "view_count": 0
     },
     {
