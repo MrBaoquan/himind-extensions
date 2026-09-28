@@ -1,24 +1,10 @@
+// Command himind-skill-package 把一个技能工程打成 .hmskill。
+//
+// 实现放在 tooling/commands，官方仓与生态里其它扩展仓共用同一份打包规则。
 package main
 
-import (
-	"flag"
-	"fmt"
-	"os"
-
-	"github.com/MrBaoquan/himind-extensions/tooling/skillproject"
-)
+import "github.com/MrBaoquan/himind-extensions/tooling/commands"
 
 func main() {
-	input := flag.String("input", "", "skill project directory")
-	output := flag.String("output", "", "output .hmskill path")
-	flag.Parse()
-	if *input == "" || *output == "" {
-		fmt.Fprintln(os.Stderr, "input and output are required")
-		os.Exit(2)
-	}
-	if err := skillproject.Package(*input, *output); err != nil {
-		fmt.Fprintln(os.Stderr, "package failed:", err)
-		os.Exit(1)
-	}
-	fmt.Println("created skill package:", *output)
+	commands.SkillPackageMain()
 }

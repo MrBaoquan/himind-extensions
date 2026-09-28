@@ -24,7 +24,7 @@ func TestReleaseTagAndParseRoundTrip(t *testing.T) {
 
 func TestParseReleaseTagRejectsLegacyAndMalformed(t *testing.T) {
 	// 历史扁平前缀在门禁里必须直接失败，否则两套命名会同时存在。
-	legacy := "plugin-com.himind.image-optimizer-v1.0.2"
+	legacy := "plugin-com.himind.tech-radar-v0.4.2"
 	if _, _, _, err := ParseReleaseTag(legacy); err == nil {
 		t.Fatalf("legacy tag %q should be rejected", legacy)
 	}

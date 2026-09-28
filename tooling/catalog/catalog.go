@@ -164,8 +164,11 @@ func (c *Catalog) Save(path string) error {
 	if c.Workflows == nil {
 		c.Workflows = []map[string]interface{}{}
 	}
-	if len(c.FeaturePacks) == 0 {
-		c.FeaturePacks = DefaultFeaturePacks()
+	// 能力包是「哪个仓托管了这些扩展」的事实，只由该仓的索引声明，不在写盘时
+	// 兜底注入：否则任何扩展仓一发布就会带上官方仓的能力包，安装侧会把它读成
+	// 同 id 的跨来源冲突。官方仓的全量重建路径（catalog.New）仍然带默认能力包。
+	if c.FeaturePacks == nil {
+		c.FeaturePacks = []FeaturePack{}
 	}
 	c.RefreshGeneration()
 	c.SortEntries()

@@ -9,8 +9,8 @@ import (
 // 扩展制品的命名规范。发布方（仓库脚本、Agent 内置发布器）与消费方
 // （目录清单、按 Release 安装）必须解析同一份规则，否则会出现「发了但装不上」。
 //
-//	tag      <kind>/<id>@<version>      例如 plugin/com.himind.image-optimizer@1.0.2
-//	制品     <id>-<version>.<ext>       例如 com.himind.image-optimizer-1.0.2.hmpkg
+//	tag      <kind>/<id>@<version>      例如 plugin/com.himind.tech-radar@0.4.2
+//	制品     <id>-<version>.<ext>       例如 com.himind.tech-radar-0.4.2.hmpkg
 //	清单     <id>@<version>.json
 //
 // 签名不单独成资产：RSA-PSS/SHA-256 的 signature、signature_key_id 与

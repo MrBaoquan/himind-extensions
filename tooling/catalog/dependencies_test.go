@@ -1,9 +1,23 @@
 package catalog
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+const miniprogramToolsDownloadURL = "https://github.com/MrBaoquan/himind-extensions/releases/download/" +
+	"plugin%2Fcom.himind.wechat-miniprogram-tools@0.3.13/com.himind.wechat-miniprogram-tools-0.3.13.hmpkg"
+
+func pluginEntry(id, version, downloadURL string) map[string]interface{} {
+	return map[string]interface{}{
+		"plugin_id": id,
+		"version":   version,
+		"release_tag": "plugin/" + id + "@" + version,
+		"sha256":      strings.Repeat("a", 64),
+		"download_url": downloadURL,
+	}
+}
 
 func workflowManifestWithDependencies(skills, plugins interface{}) Manifest {
 	return Manifest{
@@ -86,5 +100,72 @@ func TestPinDependenciesKeepsExternalDependencyUnpinned(t *testing.T) {
 	}
 	if len(optional) != 1 || optional[0].Pinned || optional[0].MinVersion != "0.4.0" || optional[0].Version != "0.4.0" {
 		t.Fatalf("unexpected pin: %+v", optional)
+	}
+}
+
+// 依赖由别的分发仓发布时，索引里解析到的 pin 必须指向依赖自己的发货仓：
+// 写成本仓会让安装器去本仓找一个不存在的 Release。
+func TestPinDependenciesPointsAtDependencyDistribution(t *testing.T) {
+	official := New("mrbaoquan/himind-extensions", "stable", "public")
+	official.FeaturePacks = []FeaturePack{}
+	official.SetEntries("plugin", []map[string]interface{}{
+		pluginEntry("com.himind.wechat-miniprogram-tools", "0.3.13", miniprogramToolsDownloadURL),
+	})
+	declared := []DeclaredDependency{{
+		Kind: "plugin", ID: "com.himind.wechat-miniprogram-tools",
+		Required: true, MinVersion: "0.3.13",
+	}}
+	pins, err := PinDependencies(declared, official, "MrBaoquan/himind-ext-projects")
+	if err != nil {
+		t.Fatalf("cross-distribution dependency should resolve: %v", err)
+	}
+	if len(pins) != 1 {
+		t.Fatalf("got %d pins, want 1", len(pins))
+	}
+	pin := pins[0]
+	if !pin.Pinned || pin.Version != "0.3.13" {
+		t.Fatalf("unexpected pin: %+v", pin)
+	}
+	if pin.Source.Repository != "MrBaoquan/himind-extensions" {
+		t.Fatalf("pin should point at the dependency distribution, got %q", pin.Source.Repository)
+	}
+	if pin.Source.Reference != "plugin/com.himind.wechat-miniprogram-tools@0.3.13" ||
+		pin.Source.ArtifactURL != miniprogramToolsDownloadURL {
+		t.Fatalf("unexpected pin source: %+v", pin.Source)
+	}
+}
+
+// 合并索引：本仓索引里没有的依赖，从依赖仓索引里解析；路径不存在按空索引处理。
+func TestLoadMergedResolvesDependencyFromAnotherDistribution(t *testing.T) {
+	directory := t.TempDir()
+	officialPath := filepath.Join(directory, "official.json")
+	official := New("mrbaoquan/himind-extensions", "stable", "public")
+	official.FeaturePacks = []FeaturePack{}
+	official.SetEntries("plugin", []map[string]interface{}{
+		pluginEntry("com.himind.wechat-miniprogram-tools", "0.3.13", miniprogramToolsDownloadURL),
+	})
+	if err := official.Save(officialPath); err != nil {
+		t.Fatalf("save official catalog: %v", err)
+	}
+	ownPath := filepath.Join(directory, "own.json")
+	own := New("mrbaoquan/himind-ext-projects", "stable", "public")
+	own.FeaturePacks = []FeaturePack{}
+	if err := own.Save(ownPath); err != nil {
+		t.Fatalf("save own catalog: %v", err)
+	}
+
+	index, err := LoadMerged(ownPath, filepath.Join(directory, "missing.json"), officialPath)
+	if err != nil {
+		t.Fatalf("load merged: %v", err)
+	}
+	declared := []DeclaredDependency{{
+		Kind: "plugin", ID: "com.himind.wechat-miniprogram-tools", Required: true,
+	}}
+	pins, err := PinDependencies(declared, index, "MrBaoquan/himind-ext-projects")
+	if err != nil {
+		t.Fatalf("merged index should resolve the dependency: %v", err)
+	}
+	if pins[0].Source.Repository != "MrBaoquan/himind-extensions" {
+		t.Fatalf("unexpected pin source: %+v", pins[0].Source)
 	}
 }

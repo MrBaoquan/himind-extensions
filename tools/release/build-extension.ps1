@@ -4,6 +4,9 @@
     [Parameter(Mandatory = $true)][string]$OutputDirectory,
     [string]$Repository = '',
     [string]$Channel = 'stable',
+    # 依赖所在仓的市场索引：跨分发依赖靠它 pin 到发货仓。缺省读 extensions.json
+    # 的 dependency_catalogs。
+    [string[]]$DependencyCatalog = @(),
     [string]$AgentExecutable = 'himind-agent',
     [string]$AgentProfile = ''
 )
@@ -11,6 +14,7 @@
 # 打包只管「把源码变成制品」：名字从 himind-release-plan 取，脚本不拼 tag 与文件名。
 # 这样本地产出的制品名与安装器解析的名字来自同一份规则。
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-config.ps1')
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $source = (Resolve-Path (Join-Path $repoRoot $ExtensionPath)).Path
 $outputRoot = if ([IO.Path]::IsPathRooted($OutputDirectory)) {
@@ -31,12 +35,20 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw "$manife
 
 Push-Location $repoRoot
 try {
-    $planJson = & go run ./tools/cmd/himind-release-plan `
-        -kind $Kind `
-        -path $ExtensionPath `
-        -repository $Repository `
-        -channel $Channel `
-        -catalog (Join-Path $repoRoot '.himind/catalog.json')
+    $repoConfig = Read-ExtensionRepoConfig -RepoRoot $repoRoot
+    $Repository = Resolve-ReleaseRepository -Config $repoConfig -Override $Repository
+    $planArguments = @(
+        'run', './tools/cmd/himind-release-plan',
+        '-kind', $Kind,
+        '-path', $ExtensionPath,
+        '-repository', $Repository,
+        '-channel', $Channel,
+        '-catalog', (Join-Path $repoRoot '.himind/catalog.json')
+    )
+    foreach ($dependencyCatalog in @(Resolve-DependencyCatalogs -Config $repoConfig -RepoRoot $repoRoot -Override $DependencyCatalog)) {
+        $planArguments += @('-dependency-catalog', $dependencyCatalog)
+    }
+    $planJson = & go @planArguments
 }
 finally { Pop-Location }
 if ($LASTEXITCODE -ne 0) { throw 'Release plan failed.' }

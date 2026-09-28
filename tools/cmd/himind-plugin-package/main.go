@@ -1,32 +1,10 @@
+// Command himind-plugin-package 把一个已构建的插件目录打成 .hmpkg。
+//
+// 实现放在 tooling/commands，官方仓与生态里其它扩展仓共用同一份打包规则。
 package main
 
-import (
-	"flag"
-	"fmt"
-	"os"
-	"strings"
-
-	"github.com/MrBaoquan/himind-extensions/tooling/pluginpack"
-)
+import "github.com/MrBaoquan/himind-extensions/tooling/commands"
 
 func main() {
-	input := flag.String("path", "", "built plugin directory")
-	output := flag.String("output", "", "output .hmpkg path")
-	flag.Parse()
-	if strings.TrimSpace(*input) == "" || strings.TrimSpace(*output) == "" {
-		fail("-path and -output are required")
-	}
-	if err := packagePlugin(*input, *output); err != nil {
-		fail(err.Error())
-	}
-	fmt.Printf("created plugin package: %s\n", *output)
-}
-
-func packagePlugin(input, output string) error {
-	return pluginpack.Package(input, output)
-}
-
-func fail(message string) {
-	fmt.Fprintf(os.Stderr, "package failed: %s\n", message)
-	os.Exit(1)
+	commands.PluginPackageMain()
 }

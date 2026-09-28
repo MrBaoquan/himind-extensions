@@ -5,9 +5,13 @@ param(
     [string]$Kind,
     [Parameter(Mandatory = $true)]
     [string]$ExtensionPath,
-    [string]$Repository = 'MrBaoquan/himind-extensions',
+    [string]$Repository = '',
     [string]$OutputDirectory = 'dist',
     [string]$Channel = '',
+    # 依赖所在仓的市场索引：清单声明的依赖可能由别的分发仓发布，合并索引后
+    # release-plan 才能把跨分发依赖 pin 到真正的发货仓。缺省读 extensions.json
+    # 的 dependency_catalogs。
+    [string[]]$DependencyCatalog = @(),
     [string]$PrivateKeyPath,
     [string]$SigningKeyId,
     [string]$AgentExecutable = 'himind-agent',
@@ -33,6 +37,8 @@ function Resolve-Setting {
     if (-not [string]::IsNullOrWhiteSpace($Value)) { return $Value }
     return [Environment]::GetEnvironmentVariable($EnvironmentName, 'Process')
 }
+
+. (Join-Path $PSScriptRoot 'release-config.ps1')
 
 # 发布结果是一份机器可读的交付事实。调用方（例如 publish-all.ps1）不应该去解析
 # 本脚本的完整输出：go test、仓库校验、gh 都会往同一条输出流里写字。
@@ -111,9 +117,6 @@ function Get-LatestCanonicalVersion {
     return [string]($versions | Sort-Object { [version](($_ -replace '[-+].*$', '')) } -Descending | Select-Object -First 1)
 }
 
-if ($Repository -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') {
-    throw 'Repository must be a GitHub owner/repo.'
-}
 $PrivateKeyPath = Resolve-Setting $PrivateKeyPath 'HIMIND_EXTENSION_SIGNING_PRIVATE_KEY_PATH'
 $SigningKeyId = Resolve-Setting $SigningKeyId 'HIMIND_EXTENSION_SIGNING_KEY_ID'
 
@@ -166,19 +169,26 @@ if (@($targets | Select-Object -Unique).Count -ne $targets.Count) {
 $allowGithub = $targets -contains 'github'
 $allowWorkbench = $targets -contains 'workbench'
 
-$extensionsConfig = Get-Content -LiteralPath (Join-Path $repoRoot 'extensions.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$extensionsConfig = Read-ExtensionRepoConfig -RepoRoot $repoRoot
 if ([string]::IsNullOrWhiteSpace($Channel)) { $Channel = [string]$extensionsConfig.channel }
 if ([string]::IsNullOrWhiteSpace($Channel)) { $Channel = 'stable' }
 
+$Repository = Resolve-ReleaseRepository -Config $extensionsConfig -Override $Repository
+$resolvedDependencyCatalogs = @(Resolve-DependencyCatalogs -Config $extensionsConfig -RepoRoot $repoRoot -Override $DependencyCatalog)
+
 # 发布前先算计划：命名、依赖 pin、以及「必需依赖还没发布」这类前置条件都在这里拦下。
 $catalogPath = Join-Path $repoRoot '.himind/catalog.json'
-$plan = Invoke-ReleasePlan -Arguments @(
+$planArguments = @(
     '-kind', $Kind,
     '-path', $relativeSource,
     '-repository', $Repository,
     '-channel', $Channel,
     '-catalog', $catalogPath
 )
+foreach ($dependencyCatalog in $resolvedDependencyCatalogs) {
+    $planArguments += @('-dependency-catalog', $dependencyCatalog)
+}
+$plan = Invoke-ReleasePlan -Arguments $planArguments
 $tag = [string]$plan.tag
 
 # A release is an immutable hand-off from a clean source tree. An explicit
@@ -359,16 +369,24 @@ else {
     if ($LASTEXITCODE -ne 0) { throw 'Extension signing failed.' }
 
     # 发布清单写盘前会校验：制品名是规范名、签名与制品逐字节一致、必需依赖已 pin 到确定版本。
-    & go run ./tools/cmd/himind-release-plan `
-        -kind $Kind `
-        -path $relativeSource `
-        -repository $Repository `
-        -channel $Channel `
-        -catalog $catalogPath `
-        -artifact $artifact `
-        -signature $signature `
-        -manifest-out $manifestFile `
-        -source-commit $commit | Out-Null
+    $manifestArguments = @(
+        'run', './tools/cmd/himind-release-plan',
+        '-kind', $Kind,
+        '-path', $relativeSource,
+        '-repository', $Repository,
+        '-channel', $Channel,
+        '-catalog', $catalogPath
+    )
+    foreach ($dependencyCatalog in $resolvedDependencyCatalogs) {
+        $manifestArguments += @('-dependency-catalog', $dependencyCatalog)
+    }
+    $manifestArguments += @(
+        '-artifact', $artifact,
+        '-signature', $signature,
+        '-manifest-out', $manifestFile,
+        '-source-commit', $commit
+    )
+    & go @manifestArguments | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Release manifest generation failed.' }
     Remove-Item -LiteralPath $signature -Force -ErrorAction SilentlyContinue
     if ($Kind -eq 'workflow') {

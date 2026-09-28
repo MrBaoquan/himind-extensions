@@ -8,7 +8,6 @@ package releaseplan
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/MrBaoquan/himind-extensions/tooling/catalog"
@@ -37,10 +36,12 @@ type Plan struct {
 
 // Build 读取源码清单与市场索引，算出这次发布的命名与依赖 pin。
 //
-// catalogPath 允许不存在：此时索引视为空，依赖解析会按「索引里还没有发布」处理
-// （必需依赖会因此阻断，而不是悄悄按最低版本发出去）。dry-run 场景直接把
-// catalogPath 传空串即可。
-func Build(kind, source, repository, channel, catalogPath string) (Plan, error) {
+// catalogPath 是本仓索引；dependencyCatalogs 是依赖所在仓的索引（可多个）。
+// 两者合并后查依赖 pin，跨分发依赖因此能 pin 到真正的发货仓。任何路径允许不
+// 存在：不存在的索引视为空，依赖解析会按「索引里还没有发布」处理（必需依赖会
+// 因此阻断，而不是悄悄按最低版本发出去）。dry-run 场景直接把 catalogPath 传
+// 空串即可。
+func Build(kind, source, repository, channel, catalogPath string, dependencyCatalogs ...string) (Plan, error) {
 	if !distribution.KnownKind(kind) {
 		return Plan{}, errors.New("kind 必须是 plugin、skill 或 workflow")
 	}
@@ -87,16 +88,9 @@ func Build(kind, source, repository, channel, catalogPath string) (Plan, error) 
 		plan.Dependencies = []distribution.ReleaseDependency{}
 		return plan, nil
 	}
-	var index *catalog.Catalog
-	if strings.TrimSpace(catalogPath) == "" {
-		index = catalog.New("", "", "")
-	} else if _, err := os.Stat(catalogPath); err == nil {
-		index, err = catalog.Load(catalogPath)
-		if err != nil {
-			return Plan{}, err
-		}
-	} else {
-		index = catalog.New("", "", "")
+	index, err := catalog.LoadMerged(append([]string{catalogPath}, dependencyCatalogs...)...)
+	if err != nil {
+		return Plan{}, err
 	}
 	pins, err := catalog.PinDependencies(declared, index, repository)
 	if err != nil {

@@ -76,6 +76,11 @@ type Published struct {
 	Tag         string
 	DownloadURL string
 	ArtifactID  string
+	// Repository 是这条发布所在的分发仓（owner/repo）。
+	//
+	// 依赖可以来自别的分发仓（例如项目仓的工作流依赖官方仓的插件），pin 必须
+	// 指向依赖**自己**的发货地，而不是当前正在发布的仓。
+	Repository string
 }
 
 // Published 返回某扩展在索引里最新的规范发布。
@@ -103,10 +108,37 @@ func (c *Catalog) LatestPublished(kind, id string) (Published, bool) {
 		best = Published{
 			Version: version, SHA256: textOf(entry, "sha256"), Tag: tag,
 			DownloadURL: textOf(entry, "download_url"), ArtifactID: textOf(entry, "artifact_id"),
+			Repository: RepositoryOfEntry(entry),
 		}
 		found = true
 	}
 	return best, found
+}
+
+// RepositoryOfEntry 从索引条目的下载地址推出该扩展所在的分发仓。
+func RepositoryOfEntry(entry map[string]interface{}) string {
+	return repositoryFromDownloadURL(textOf(entry, "download_url"))
+}
+
+// repositoryFromDownloadURL 从 `https://github.com/<owner>/<repo>/releases/...`
+// 这类地址里取出 owner/repo；识别不出来时返回空串，由调用方决定回退策略。
+func repositoryFromDownloadURL(raw string) string {
+	value := strings.TrimSpace(raw)
+	for _, prefix := range []string{"https://github.com/", "http://github.com/"} {
+		if !strings.HasPrefix(value, prefix) {
+			continue
+		}
+		parts := strings.SplitN(strings.TrimPrefix(value, prefix), "/", 3)
+		if len(parts) < 3 {
+			return ""
+		}
+		repository, err := NormalizeRepository(parts[0]+"/"+parts[1], "")
+		if err != nil {
+			return ""
+		}
+		return repository
+	}
+	return ""
 }
 
 // PinDependencies 把声明层依赖解析成发布清单里的精确 pin。
@@ -115,6 +147,9 @@ func (c *Catalog) LatestPublished(kind, id string) (Published, bool) {
 //   - 索引里有该扩展的规范发布 → 精确到 `version + sha256 + tag + 下载地址`；
 //   - 索引里没有、但声明了最低版本 → 只写最低版本并标记 `pinned=false`（非必需依赖）；
 //   - 索引里没有、又是必需依赖 → 阻断发布，而不是发一个装不上的版本。
+//
+// 传进来的索引可以是「本仓 + 依赖仓」合并出来的（见 LoadMerged）。跨分发依赖
+// 在合并索引里解析到规范发布时，pin 指向依赖仓的制品，而不是本仓。
 //
 // 依赖顺序按声明解析结果排序（插件在前、技能在后），保证同一份输入产出同样字节。
 func PinDependencies(declared []DeclaredDependency, c *Catalog, repository string) ([]distribution.ReleaseDependency, error) {
@@ -143,9 +178,15 @@ func PinDependencies(declared []DeclaredDependency, c *Catalog, repository strin
 			pin.Version = published.Version
 			pin.SHA256 = published.SHA256
 			pin.Pinned = published.Version != "" && published.SHA256 != ""
-			if repository != "" && published.Tag != "" {
+			// pin 指向依赖自己的发货地：跨分发依赖（依赖由别的仓发布）必须回到
+			// 那个仓，写成本仓会让安装器去本仓找一个不存在的 Release。
+			origin := repository
+			if published.Repository != "" {
+				origin = published.Repository
+			}
+			if origin != "" && published.Tag != "" {
 				pin.Source = distribution.ReleaseDependencySource{
-					Kind: "github", ID: "github:" + repository, Repository: repository,
+					Kind: "github", ID: "github:" + origin, Repository: origin,
 					Reference: published.Tag, ArtifactURL: published.DownloadURL,
 				}
 			}
