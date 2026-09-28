@@ -16,6 +16,14 @@
 - `tools/cmd`：仓库维护命令。
 - `extensions.json`：扩展 ID 与源码子目录的权威清单。
 
+## 两个扩展仓的分工
+
+本仓只收通用能力：换一个项目、换一个客户仍然成立的功能放这里。
+
+只对单个项目或交付现场有效的功能放独立仓，例如 [MrBaoquan/himind-ext-projects](https://github.com/MrBaoquan/himind-ext-projects.git)。项目仓通过 `extensions.json` 的 `dependency_catalogs` 引用本仓目录，依赖仍然 pin 到本仓的发布版本；发布链路只有一份实现，项目仓的 `tools/` 用 `replace` 指回本仓，规则不会在两个仓之间漂移。
+
+判断标准：离开该项目就没有意义的功能，不放公共目录。
+
 Agent 工作台绑定同一个仓库地址，并为每个工程保存自己的仓库内目录。例如：
 
 ```text

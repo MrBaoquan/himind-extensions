@@ -1,10 +1,11 @@
 {
   "schema_version": "workflow_package.v1",
   "id": "com.himind.workflow.software-release",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "distribution_targets": ["workbench", "github"],
   "name": "软件发布",
   "description": "对已构建制品完成接入检查、制品校验、渠道发布与更新验证，发布凭据不经过 AI。",
+  "release_notes": "补充扩展清单的版本更新说明字段，执行行为与 1.0.2 一致。",
   "min_agent_version": "0.3.47",
   "local_requirements": {
     "platform": "windows",

@@ -1,10 +1,11 @@
 {
   "schema_version": "workflow_package.v1",
   "id": "com.himind.workflow.tech-radar",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "distribution_targets": ["workbench", "github"],
   "name": "科技雷达日报",
   "description": "按领域采集公开科技仓库，用历史快照算星数增量，由内置 AI 给出解读，产出按天归档的网页报告。",
+  "release_notes": "补充扩展清单的版本更新说明字段，执行行为与 0.4.4 一致。",
   "min_agent_version": "0.3.47",
   "local_requirements": {
     "platform": "windows",
