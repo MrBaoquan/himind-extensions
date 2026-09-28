@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-faa3d984155c16af",
+  "generation": "sync-143e046e633509a8",
   "plugins": [
     {
       "allow_disable": true,
@@ -328,6 +328,89 @@
         "agent-skills"
       ],
       "version": "1.0.0"
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:skill/com.himind.skill.develop-himind-plugins@1.7.4:com.himind.skill.develop-himind-plugins-1.7.4.hmskill",
+      "artifact_sha256": "e8977c48fc5040674a9df633ec614184bcc625b1b2d5ed6364cd5d44c6884679",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [
+        "extension.authoring.identity",
+        "extension.authoring.preflight",
+        "extension.workspace.current",
+        "extension.workspace.bind",
+        "extension.workspace.clear",
+        "extension.revision.create",
+        "extension.environment.preflight",
+        "extension.plugin.scaffold",
+        "extension.plugin.validate",
+        "extension.plugin.build",
+        "extension.plugin.package",
+        "extension.plugin.candidate.save",
+        "extension.test",
+        "extension.plugin.submission.submit",
+        "extension.plugin.submission.status"
+      ],
+      "categories": [
+        "software-engineering"
+      ],
+      "channel": "stable",
+      "dependencies": [
+        {
+          "kind": "plugin",
+          "id": "com.himind.extension-development-tools",
+          "required": true,
+          "min_version": "1.3.2",
+          "version": "1.4.2",
+          "sha256": "0b9fdef89d128bb1a56d742dce1bf692d6c13aaaad6b302a7681362e9fe1c23e",
+          "source": {
+            "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
+            "reference": "plugin/com.himind.extension-development-tools@1.4.2",
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg"
+          },
+          "pinned": true
+        }
+      ],
+      "description": "使用中文规范设计、构建、校验、调试并打包 HiMind Agent 插件。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.himind.skill.develop-himind-plugins@1.7.4/com.himind.skill.develop-himind-plugins-1.7.4.hmskill",
+      "file_name": "com.himind.skill.develop-himind-plugins-1.7.4.hmskill",
+      "file_size": 5927,
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.37",
+      "name": "插件开发助手",
+      "organization_reason": "",
+      "plugin_dependencies": [
+        {
+          "min_version": "1.3.2",
+          "plugin_id": "com.himind.extension-development-tools",
+          "required": true
+        }
+      ],
+      "published_at": "2026-09-28T09:07:25Z",
+      "release_notes": "1.7.4：命名与文案规则改为引用扩展开发规范。",
+      "release_tag": "skill/com.himind.skill.develop-himind-plugins@1.7.4",
+      "risk_summary": "local_write_and_process; submission_requires_confirmation; publication_requires_admin_review",
+      "sha256": "e8977c48fc5040674a9df633ec614184bcc625b1b2d5ed6364cd5d44c6884679",
+      "signature": "Dc/eG04FZzvmq2cHefCiyQ6x0cDYpjK8APMvK7Fnpcj2J0zt7BrNK+ygNRgjp5U/do/0j0kly1P7CPNsJTLDBjoAONU/taG6ibWjFFLUHGnp6Qrp3fTYgEhHp+x9exqpMqUD+/bCLPsrSEK8wxzrjQfWmXpAlIKXuHrSh37SKLnylwxSJ0jKxS0YzZBa6RnjgQUTIqb+vFMjhrdNHL6uC1AvhrYBHLHvzxc3mnLKHTJFfmU27VdllaIjK6I2c1ZgECqaq6uYtGxfomJFi9xs/Vm7ceFTxxsT4ui0awCHb6gZTuL8jvtxuwnL0TN1pDCSwMonbyIpVhJinjqWgI20WpIJSLBrcYRx5J7/YP/Tp6EyLMAjKeMpp4lFDGW3pviKvsy/b1xszuVjYP77uejj2qRSbiv4JPD/9qTHPz3j4S0+AKP5MOW0KUu1Qyn3Cz3D1RM8GQpOZ3fnwbglTA/8EEBdx/AKvyW2Lr9kRsQaSWJ0GaHxJzXKnd8D8bvweZtF",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "skill_id": "com.himind.skill.develop-himind-plugins",
+      "source": "github",
+      "source_commit": "6e879dd65361b4ce508050787ebf9d72347f8290",
+      "source_tree": "cd32595238110570662374b22bea728e706b90a3",
+      "supported_clients": [
+        "himind-ai",
+        "codex",
+        "github-copilot",
+        "workbuddy"
+      ],
+      "version": "1.7.4"
     },
     {
       "allow_disable": true,
