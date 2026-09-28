@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-4e4b3c92cc82380f",
+  "generation": "sync-5b26ff1187f1405d",
   "plugins": [
     {
       "allow_disable": true,
@@ -120,6 +120,58 @@
       "source_commit": "3bf57308debce81f91cc1d1d5e70d9a52a1275e9",
       "source_tree": "3f924f22327d37a0e62659104ae226dadbef26ca",
       "version": "1.4.2",
+      "view_count": 0
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:plugin/com.himind.software-distribution@1.2.5:com.himind.software-distribution-1.2.5.hmpkg",
+      "artifact_sha256": "4c6a58c3658d73232b59eb4a406dc392bf0bfec74b22267bfd676471d6d7779d",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [
+        "software.distribution.project.inspect",
+        "software.distribution.artifact.inspect",
+        "software.distribution.release.resolve",
+        "software.distribution.channel.resolve"
+      ],
+      "categories": [
+        "software-engineering",
+        "collaboration-delivery",
+        "testing-quality"
+      ],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "为 AI 提供项目接入诊断、软件制品结构与摘要校验；连接组织分发服务后可继续验证更新。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.software-distribution@1.2.5/com.himind.software-distribution-1.2.5.hmpkg",
+      "file_name": "com.himind.software-distribution-1.2.5.hmpkg",
+      "file_size": 5404812,
+      "governance": "optional",
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.33",
+      "name": "软件分发工具",
+      "organization_reason": "",
+      "permissions": [
+        "filesystem.workspace.read",
+        "network.dashboard.public",
+        "network.github.read"
+      ],
+      "plugin_dependencies": [],
+      "plugin_id": "com.himind.software-distribution",
+      "published_at": "2026-09-28T09:09:14Z",
+      "release_notes": "1.2.5：名称改为软件分发工具，与技能侧口径一致。",
+      "release_tag": "plugin/com.himind.software-distribution@1.2.5",
+      "review_status": "published",
+      "sha256": "4c6a58c3658d73232b59eb4a406dc392bf0bfec74b22267bfd676471d6d7779d",
+      "signature": "DV/s/L35EHlonjTc16BR2pKFobtVJBvMIh1YZcHQOyYXYKI3tpCUUHV3bZEPY/aSfu9gqQjA4iWhh9qK6D2CWYSiGqztd8bmOfzqxDFu3LCZ5EFOLT7xGrlMeg6fHj3Gi1jLdkYthrIeTbiDc8r1junP7Ysp1b3G6BNTmTDagOb4Vh7dt0IL8LQb3AHEuOkpS5hMadPuROP0y9a+qCeRk0zVts1SiydUQ1RoGfB237azEhWCiTLWfWNdST5umqqBwF/EqDee7L2ao5FmrfftaLkKhS/B3pkVPTHtJxksZilgCVVWl6pef57/UQ9cNfh8EZTBtoz0+7ULuaIfJjuxMZGTrv9XM/+5CZjyiwmlHgEhjNOESQVXyIacxfWr9hG5eFMIPSPbPDmhDmQ/zqg/mHfQ5zN4iaay885wHJxe7UWkTXoN08Ak9EN5onS8+W1vd/NAmPxaLz83tCwaU7AaMUzCAkwGDaTnsK8X8SMsAP8DwYYmMNvp/ssckyOFWobC",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "source": "github",
+      "source_commit": "42c6977a5f477f0299c3afe0fc25a49ae57e1b56",
+      "source_tree": "ba5ece0b7348c970f9b6bbe95273e0701a19a22a",
+      "version": "1.2.5",
       "view_count": 0
     },
     {
