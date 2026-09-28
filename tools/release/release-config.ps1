@@ -78,7 +78,9 @@ function Resolve-DependencyCatalogs {
 # 版本号的陈旧构建不会因此污染锁。
 function Resolve-DependencyArtifactDirs {
     param(
-        [Parameter(Mandatory = $true)][string[]]$CatalogPaths,
+        # 没有跨仓依赖时调用方会传空数组，Mandatory 的 [string[]] 会拒绝绑定，
+        # 所以这里只声明类型、允许空集合。候选目录本身总是包含本仓 dist。
+        [AllowEmptyCollection()][string[]]$CatalogPaths = @(),
         [Parameter(Mandatory = $true)][string]$RepoRoot
     )
 
