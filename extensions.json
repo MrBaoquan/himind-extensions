@@ -21,7 +21,6 @@
     {"type": "skill", "id": "com.himind.skill.software-distribution", "path": "skills/software-distribution"},
     {"type": "skill", "id": "com.himind.skill.software-ui-spec", "path": "skills/software-ui-spec"},
     {"type": "skill", "id": "com.mrbaoquan.skill.unihper-unity-development", "path": "skills/unihper-unity-development"},
-    {"type": "workflow", "id": "com.himind.workflow.wechat-experience-upload", "path": "workflows/wechat-experience-upload"},
     {"type": "workflow", "id": "com.himind.workflow.software-release", "path": "workflows/software-release"},
     {"type": "workflow", "id": "com.himind.workflow.tech-radar", "path": "workflows/tech-radar"}
   ]

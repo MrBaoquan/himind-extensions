@@ -27,19 +27,16 @@ description: 协调 DSH、外部 AI 工具、工程开发会话与 Workflow 生�
 
 ```json
 {
-  "workflow_id": "com.himind.workflow.wechat-experience-upload",
+  "workflow_id": "com.himind.workflow.software-release",
   "input": {
-    "workspace_root": "F:\\WebProjects\\kerun_user",
-    "project_id": "kerun-user",
-    "target_id": "szkjg",
-    "environment": "development",
-    "source_root": "F:\\WebProjects\\kerun_user",
-    "project_root": "F:\\WebProjects\\kerun_user\\dist\\wx"
+    "workspace_root": "F:\\WebProjects\\example-product",
+    "project_id": "example-product",
+    "target_id": "windows-x64",
+    "environment": "development"
   },
   "execution": {
-    "entrypoint": "upload",
-    "exitpoint": "experience_version",
-    "seed_artifacts": ["development-checkpoint"]
+    "entrypoint": "inspect",
+    "exitpoint": "integration_ready"
   }
 }
 ```
@@ -60,6 +57,6 @@ description: 协调 DSH、外部 AI 工具、工程开发会话与 Workflow 生�
 - Workflow ID、Run ID 和最终状态。
 - Project、Target 和 Environment。
 - Candidate Commit SHA 和 Tree Digest。
-- 体验版、审核材料或发布 Artifact。
+- 交付 Artifact 与更新验证结果。
 - 等待审批时提供 Approval ID，并提示在统一审批中心处理。
 - 失败时返回结构化错误和可继续开发的 DevelopmentCheckpoint。
