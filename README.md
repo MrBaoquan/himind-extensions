@@ -2,9 +2,9 @@
 
 马宝全维护的 HiMind Agent 插件、Skill 与 Workflow 源码仓库。仓库统一版本控制和协作入口，每个扩展仍独立版本化、构建、测试和发布。
 
-扩展创作采用 1+3 四件套：一个共享的 `com.himind.extension-development-tools` 工具插件，加上插件开发助手、技能开发助手和工作流开发助手。三类创作共用 Workspace、Candidate、Extension Lock、测试报告和提审生命周期，但保留各自的确定性校验与运行语义。
+扩展创作工具链是一个共享的 `com.himind.extension-development-tools` 工具插件，加上插件开发助手、技能开发助手、工作流开发助手和扩展开发规范四个 Skill。三类创作共用 Workspace、Candidate、Extension Lock、测试报告和提审生命周期，但保留各自的确定性校验与运行语义。
 
-稳定 ID、目录名、显示名称、用途说明、触发说明和更新说明都有长度上限，脚手架和校验超限即拒绝；阈值与文案规则以 `tooling/metaguide` 为准。
+稳定 ID、目录名、显示名称、用途说明、触发说明和更新说明都有长度上限，脚手架和校验超限即拒绝，阈值以 `tooling/metaguide` 为准。类型专属的字段清单和流程写在各自的开发助手里；跨类型的命名、分类、依赖和分发规则统一由 `skills/develop-himind-conventions`（扩展开发规范）承载，`extension.environment.preflight` 会把同一份规则和字段约束一起返回给创作方。
 
 ## 目录
 
@@ -111,7 +111,7 @@ go run ./tools/cmd/himind-agent-workspace-sync -commit (git rev-parse HEAD)
 $env:HIMIND_EXTENSION_SIGNING_PRIVATE_KEY_PATH = 'C:\keys\himind-extension-private.pem'
 $env:HIMIND_EXTENSION_SIGNING_KEY_ID = 'himind-production-2026'
 ./tools/release/publish-extension.ps1 -Kind skill -ExtensionPath skills/software-distribution
-./tools/release/publish-extension.ps1 -Kind workflow -ExtensionPath workflows/wechat-miniprogram-delivery
+./tools/release/publish-extension.ps1 -Kind workflow -ExtensionPath workflows/software-release
 ```
 
 只声明 `workbench` 的扩展不会创建 Release，也不会写入 Catalog——公开目录条目的定位信息就是 Release 资产，没有 Release 就没有可写入的条目。脚本会输出 JSON 说明下一步（在 Agent 扩展工作区提审）。

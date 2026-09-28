@@ -5,7 +5,7 @@ description: 开发 HiMind Agent Workflow：设计 Step DAG、入口出口、Loo
 
 # 工作流开发助手
 
-通过 HiMind Agent 和 AI 扩展开发工具完成 Workflow 全流程。不要假设当前项目包含 HiMind Agent 源码、历史设计文档或已有 Workflow；空白目录也必须能独立创建、校验、测试和打包。
+通过 HiMind Agent 和扩展开发工具完成 Workflow 全流程。不要假设当前项目包含 HiMind Agent 源码、历史设计文档或已有 Workflow；空白目录也必须能独立创建、校验、测试和打包。
 
 ## 工作边界
 
@@ -31,11 +31,11 @@ description: 开发 HiMind Agent Workflow：设计 Step DAG、入口出口、Loo
 | `release_notes` | 60 | 120 |
 | 步骤标题 | 12 | 16 |
 
-名称用名词短语，只说是什么；说明写“做什么 + 什么时候用”一句，不复述需求、不列功能清单；更新说明只写本次变化；不用“一站式、全方位、赋能、助力”这类空词。阈值定义在 `tooling/metaguide`，超限报错会带上限和建议值。存量扩展已按上表对齐。
+上表是字段级长度约束，阈值定义在 `tooling/metaguide`，脚手架和校验超限即拒绝，报错会带上限和建议值。命名、文案、分类、依赖和分发目标的判断规则见「扩展开发规范」（`develop-himind-conventions`），不在这里重复。存量扩展已按上表对齐。
 
 ## 自动开发流程
 
-1. 调用 `extension.workspace.current`，必要时调用 `extension.workspace.bind`。再调用 `extension.authoring.preflight`（`kind: workflow`）检查工作区、四件套、Agent 和运行模式。任一预检返回 `state: blocked` 时停止写入并原样返回结构化 `blockers` 与 `next_steps`。
+1. 调用 `extension.workspace.current`，必要时调用 `extension.workspace.bind`。再调用 `extension.authoring.preflight`（`kind: workflow`）检查工作区、扩展创作工具链、Agent 和运行模式。任一预检返回 `state: blocked` 时停止写入并原样返回结构化 `blockers` 与 `next_steps`。
 2. 调用 `extension.environment.preflight`（`kind: workflow`），确认 Workflow 工具链可用。
 3. 先确认业务场景，再选择模板：
    - `strict`：不可跳步的固定流程。

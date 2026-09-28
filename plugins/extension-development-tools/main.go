@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/MrBaoquan/himind-extensions/sdk/jsonrpc"
+	"github.com/MrBaoquan/himind-extensions/tooling/metaguide"
 	"github.com/MrBaoquan/himind-extensions/tooling/pluginpack"
 	"github.com/MrBaoquan/himind-extensions/tooling/pluginproject"
 	"github.com/MrBaoquan/himind-extensions/tooling/skillproject"
@@ -118,6 +119,10 @@ func preflight(kind string) map[string]any {
 		"blockers":   []map[string]any{},
 		"warnings":   []map[string]any{},
 		"next_steps": []string{},
+		// 创作规则与字段约束随预检一起返回：只写在技能正文里，AI 不一定读到；
+		// 只写在常量里，没有任何环节会把它送出去（曾长期如此）。
+		"authoring_rules":   metaguide.Rules,
+		"field_constraints": metaguide.Fields(),
 	}
 	addBlocker := func(code, stage, message, remediation string, retryable bool) {
 		result["blockers"] = append(result["blockers"].([]map[string]any), map[string]any{

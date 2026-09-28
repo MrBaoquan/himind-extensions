@@ -1,0 +1,21 @@
+{
+  "id": "com.himind.skill.develop-himind-conventions",
+  "name": "扩展开发规范",
+  "author": "马宝全",
+  "categories": ["software-engineering"],
+  "version": "1.0.0",
+  "distribution_targets": ["workbench", "github"],
+  "scope": "organization",
+  "description": "定义插件、技能和工作流共用的命名、分类、依赖与分发规则，创作或评审扩展时使用。",
+  "release_notes": "1.0.0：首次发布，沉淀三类扩展共用的命名、分类、依赖与分发规则。",
+  "min_agent_version": "0.3.47",
+  "supported_clients": ["agent-skills"],
+  "capabilities": [],
+  "plugin_dependencies": [],
+  "risk_summary": "read_only",
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml"
+  ]
+}

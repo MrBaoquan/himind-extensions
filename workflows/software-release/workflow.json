@@ -3,7 +3,7 @@
   "id": "com.himind.workflow.software-release",
   "version": "1.0.2",
   "distribution_targets": ["workbench", "github"],
-  "name": "软件分发与发布",
+  "name": "软件发布",
   "description": "对已构建制品完成接入检查、制品校验、渠道发布与更新验证，发布凭据不经过 AI。",
   "min_agent_version": "0.3.47",
   "local_requirements": {

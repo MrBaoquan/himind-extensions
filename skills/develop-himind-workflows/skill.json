@@ -3,11 +3,11 @@
   "name": "工作流开发助手",
   "author": "马宝全",
   "categories": ["software-engineering", "collaboration-delivery"],
-  "version": "1.0.2",
+  "version": "1.0.3",
   "distribution_targets": ["workbench", "github"],
   "scope": "organization",
   "description": "设计、创建、校验、契约测试、打包并受控提交 HiMind 工作流。",
-  "release_notes": "1.0.2：目录名阈值改为 28，并取消存量豁免。",
+  "release_notes": "1.0.3：命名与文案规则改为引用扩展开发规范，预检表述改用扩展创作工具链。",
   "min_agent_version": "0.3.47",
   "supported_clients": ["agent-skills"],
   "capabilities": [

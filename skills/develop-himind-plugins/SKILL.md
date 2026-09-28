@@ -17,7 +17,7 @@ description: 开发 HiMind Agent 插件：设计 Capability、编写 plugin.json
 6. 调用 `extension.authoring.identity` 获取当前 Agent 的本地或 Dashboard 作者资料，将返回的 `user_name` 写入 `plugin.json.author`。独立模式使用本地作者资料，不因未连接 Dashboard 停止本地创作。
 7. 每个新版本必须在 `plugin.json.release_notes` 中填写中文更新说明，并从功能分类 ID `software-engineering`、`visual-design`、`video-post`、`3d-animation`、`content-production`、`audio-sound`、`data-automation`、`docs-knowledge`、`testing-quality`、`collaboration-delivery`、`system-device` 中选择至少一个 `categories` 分类。分类描述能力领域，不填写岗位名称、权限或客户端名称。
 8. Agent 不执行 Git clone、pull、commit、push 或凭据管理。开发者可自行用 Git 管理源码；本技能只处理当前 `workspace_root` 中的工作副本和不可变候选包。
-9. `plugin.json` 必须显式声明插件依赖。只在确有运行时依赖时填写 `plugin_dependencies`；不得把本技能、技能开发助手或 AI 扩展开发工具声明为业务插件运行时依赖。
+9. `plugin.json` 必须显式声明插件依赖。只在确有运行时依赖时填写 `plugin_dependencies`；不得把本技能、技能开发助手或扩展开发工具声明为业务插件运行时依赖。
 
 ## 命名与文案约束
 
@@ -35,7 +35,7 @@ description: 开发 HiMind Agent 插件：设计 Capability、编写 plugin.json
 | Capability 说明 | 30 | 48 |
 | 命令与视图标题 | 12 | 16 |
 
-名称用名词短语，只说是什么；说明写“做什么 + 什么时候用”一句，不复述需求、不列功能清单；更新说明只写本次变化；不用“一站式、全方位、赋能、助力”这类空词。阈值定义在 `tooling/metaguide`，超限报错会带上限和建议值；Capability ID 是结构性标识，只设上限。存量扩展已按上表对齐。
+上表是字段级长度约束，阈值定义在 `tooling/metaguide`，脚手架和校验超限即拒绝，报错会带上限和建议值；Capability ID 是结构性标识，只设上限。命名、文案、分类、依赖和分发目标的判断规则见「扩展开发规范」（`develop-himind-conventions`），不在这里重复。存量扩展已按上表对齐。
 
 ## 自动开发流程
 

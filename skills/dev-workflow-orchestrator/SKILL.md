@@ -3,7 +3,7 @@ name: dev-workflow-orchestrator
 description: 协调 DSH、外部 AI 工具、工程开发会话与 Workflow 生命周期。用户要求选择工程或展馆、持续开发、创建开发检查点、从指定阶段启动 Workflow、查询运行状态、提交开发反馈、取消运行或把开发结果交给交付流程时使用。
 ---
 
-# 工程工作流编排
+# 工程工作流助手
 
 把对话式开发与确定性 Workflow 连接起来。不要用对话记录代替项目、检查点、Run 和 Artifact 事实。
 

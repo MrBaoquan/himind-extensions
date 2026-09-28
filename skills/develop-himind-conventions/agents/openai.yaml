@@ -1,0 +1,4 @@
+interface:
+  display_name: "扩展开发规范"
+  short_description: "插件、技能和工作流共用的创作规则"
+  default_prompt: "使用 $develop-himind-conventions 对齐扩展创作规则。"

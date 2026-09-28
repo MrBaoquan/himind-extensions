@@ -3,7 +3,7 @@ name: software-distribution
 description: 为 WPF 与 Unity 项目完成分发接入检查、制品校验、渠道发布与更新验证。用户提到软件分发、自更新、发布渠道或更新包时使用。
 ---
 
-# 软件分发对接
+# 软件分发助手
 
 本 Skill 通过外部 AI 工具的 `himind-agent-mcp` 编排 Agent 能力。它只负责软件分发接入、制品校验和发布流程，不直接修改插件或 Skill 源码。
 

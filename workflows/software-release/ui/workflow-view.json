@@ -1,6 +1,6 @@
 {
   "schema_version": "workflow_view.v1",
-  "title": "软件分发与发布",
+  "title": "软件发布",
   "sections": [
     {
       "id": "product",

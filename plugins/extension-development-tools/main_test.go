@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/MrBaoquan/himind-extensions/sdk/jsonrpc"
+	"github.com/MrBaoquan/himind-extensions/tooling/metaguide"
 	"github.com/MrBaoquan/himind-extensions/tooling/pluginproject"
 	"github.com/MrBaoquan/himind-extensions/tooling/workflowproject"
 )
@@ -21,6 +22,22 @@ func invoke(t *testing.T, method string, params any) any {
 		t.Fatalf("%s failed: %s", method, rpcError.Message)
 	}
 	return result
+}
+
+func TestPreflightReturnsAuthoringGuidance(t *testing.T) {
+	for _, kind := range []string{"plugin", "skill", "workflow"} {
+		result, ok := invoke(t, "extension.environment.preflight", map[string]any{"kind": kind}).(map[string]any)
+		if !ok {
+			t.Fatalf("preflight %s returned an unexpected result type", kind)
+		}
+		if result["authoring_rules"] != metaguide.Rules {
+			t.Fatalf("preflight %s must return the authoring rules, got %v", kind, result["authoring_rules"])
+		}
+		fields, ok := result["field_constraints"].([]metaguide.Field)
+		if !ok || len(fields) == 0 {
+			t.Fatalf("preflight %s must return the field constraints, got %T", kind, result["field_constraints"])
+		}
+	}
 }
 
 func TestSkillWorkflowInBlankWorkspace(t *testing.T) {

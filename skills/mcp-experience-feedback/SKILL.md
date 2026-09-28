@@ -3,7 +3,7 @@ name: mcp-experience-feedback
 description: 通过 HiMind Agent MCP 完成任务后复盘使用体验，找出阻碍与可优化点，输出结构化优化需求项。用户要求反馈 MCP 使用问题、记录优化点或提出改进需求时使用。
 ---
 
-# MCP 使用体验反馈
+# MCP 体验反馈
 
 ## 用途定位
 

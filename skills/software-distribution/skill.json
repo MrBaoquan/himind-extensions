@@ -1,6 +1,6 @@
 {
   "id": "com.himind.skill.software-distribution",
-  "name": "软件分发对接",
+  "name": "软件分发助手",
   "author": "马宝全",
   "categories": ["software-engineering", "collaboration-delivery", "testing-quality"],
   "version": "1.3.3",

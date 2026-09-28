@@ -1,6 +1,6 @@
 {
   "id": "com.himind.software-distribution",
-  "name": "软件分发对接",
+  "name": "软件分发工具",
   "author": "马宝全",
   "categories": ["software-engineering", "collaboration-delivery", "testing-quality"],
   "description": "为 AI 提供项目接入诊断、软件制品结构与摘要校验；连接组织分发服务后可继续验证更新。",
