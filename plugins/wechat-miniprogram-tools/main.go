@@ -24,7 +24,13 @@ import (
 
 const defaultArtifactDir = ".himind/artifacts/wechat-miniprogram"
 const defaultWechatideHome = `C:\Program Files (x86)\Tencent\微信web开发者工具`
-const wechatidePollInterval = 2 * time.Second
+const wechatidePollInterval = 5 * time.Second
+const pendingUploadStateFile = "wechatide-pending-upload.json"
+
+// 上传确认是「人要在开发者工具窗口里点一下」的动作：等太久只会让工作流长时间卡在
+// 一个不可能自动完成的等待上。因此只等一个短窗口，超时就如实返回「待确认」，
+// 用户确认后重跑即可续上同一个任务。
+var wechatideConfirmWindow = 2 * time.Minute
 
 var scriptPattern = regexp.MustCompile(`^[A-Za-z0-9:_-]+$`)
 var venuePattern = regexp.MustCompile(`^[a-z0-9_-]+$`)
@@ -222,7 +228,7 @@ func ciReadiness(in input) (any, *jsonrpc.Error) {
 	if appID == "" {
 		return nil, jsonrpc.InvalidParams("app_id 不能为空")
 	}
-	uploadChannel, err := normalizeUploadChannel(in.UploadChannel)
+	uploadChannel, channelSource, privateKeyPath, err := resolveUploadChannel(in, projectRoot)
 	if err != nil {
 		return nil, jsonrpc.InvalidParams(err.Error())
 	}
@@ -250,21 +256,25 @@ func ciReadiness(in input) (any, *jsonrpc.Error) {
 			)
 		}
 		return map[string]any{
-			"ok":                true,
-			"app_id":            appID,
-			"project_root":      projectRoot,
-			"upload_channel":    "wechatide",
-			"wechatide_path":    executable,
-			"wechatide_client":  clientName,
-			"login_expired":     false,
-			"ready_for_upload":  true,
-			"missing":           []string{},
-			"wechatide_output":  tail(output, 4000),
-			"raw_result_status": asString(result["status"]),
+			"ok":                    true,
+			"app_id":                appID,
+			"project_root":          projectRoot,
+			"upload_channel":        "wechatide",
+			"upload_channel_source": channelSource,
+			"wechatide_path":        executable,
+			"wechatide_client":      clientName,
+			"login_expired":         false,
+			"ready_for_upload":      true,
+			"missing":               []string{},
+			"wechatide_output":      tail(output, 4000),
+			"raw_result_status":     asString(result["status"]),
 		}, nil
 	}
-	privateKey, err := resolveFile(projectRoot, in.PrivateKeyPath)
-	if err != nil || !isFile(privateKey) {
+	privateKey := privateKeyPath
+	if privateKey == "" {
+		privateKey, _ = resolveFile(projectRoot, in.PrivateKeyPath)
+	}
+	if !isFile(privateKey) {
 		return nil, jsonrpc.InvalidParams("private_key_path 必须是可读取的本机文件")
 	}
 	privateKeyBytes, err := os.ReadFile(privateKey)
@@ -313,6 +323,8 @@ process.stdout.write(JSON.stringify({ path: root, version: pkg.version || '' }))
 			"app_id":                 appID,
 			"app_id_matches":         true,
 			"project_root":           projectRoot,
+			"upload_channel":         "ci",
+			"upload_channel_source":  channelSource,
 			"node_path":              nodePath,
 			"node_version":           strings.TrimSpace(nodeVersion),
 			"miniprogram_ci_path":    "",
@@ -345,6 +357,8 @@ process.stdout.write(JSON.stringify({ path: root, version: pkg.version || '' }))
 		"app_id":                 appID,
 		"app_id_matches":         true,
 		"project_root":           projectRoot,
+		"upload_channel":         "ci",
+		"upload_channel_source":  channelSource,
 		"node_path":              nodePath,
 		"node_version":           strings.TrimSpace(nodeVersion),
 		"miniprogram_ci_path":    ciPath,
@@ -656,13 +670,15 @@ func runUpload(in input) (any, *jsonrpc.Error) {
 	if err != nil {
 		return nil, jsonrpc.InvalidParams(err.Error())
 	}
-	uploadChannel, err := normalizeUploadChannel(in.UploadChannel)
+	uploadChannel, channelSource, privateKeyPath, err := resolveUploadChannel(in, projectRoot)
 	if err != nil {
 		return nil, jsonrpc.InvalidParams(err.Error())
 	}
-	if strings.TrimSpace(in.Version) == "" {
-		return nil, jsonrpc.InvalidParams("version 不能为空")
-	}
+	// 版本号与描述允许留空：启动工作流时不该逼用户每天手填一次日期版本。
+	// 生成规则与工程内的 scripts/wx-cli.js 保持一致（1.YY.MMDD），
+	// 这样「插件上传」和「仓库脚本上传」永远得到同一个版本号口径。
+	version := resolveUploadVersion(in.Version)
+	description := resolveUploadDescription(in.Description, version)
 	appID := ""
 	uploadStatus := "uploaded"
 	wechatideTaskID := ""
@@ -676,23 +692,31 @@ func runUpload(in input) (any, *jsonrpc.Error) {
 		output, wechatideTaskID, err = runWechatideUpload(
 			in,
 			projectRoot,
+			version,
+			description,
 			timeout(in.TimeoutSeconds, 15*time.Minute),
 		)
 		if err != nil {
+			var pending pendingUploadError
+			if errors.As(err, &pending) {
+				writePendingUploadEvidence(in, artifactDir, appID, version, description, uploadChannel, pending.TaskID)
+			}
 			return nil, jsonrpc.InternalError(err.Error())
 		}
 	default:
-		appID, err = validateCIInput(in, projectRoot, artifactDir)
+		ciInput := in
+		ciInput.PrivateKeyPath = privateKeyPath
+		appID, err = validateCIInput(ciInput, projectRoot, artifactDir)
 		if err != nil {
 			return nil, jsonrpc.InvalidParams(err.Error())
 		}
 		output, err = runCIRunner(projectRoot, map[string]any{
 			"operation":    "upload",
 			"app_id":       appID,
-			"private_key":  in.PrivateKeyPath,
+			"private_key":  ciInput.PrivateKeyPath,
 			"project_root": projectRoot,
-			"version":      strings.TrimSpace(in.Version),
-			"description":  in.Description,
+			"version":      version,
+			"description":  description,
 		}, timeout(in.TimeoutSeconds, 15*time.Minute))
 		if err != nil {
 			return nil, jsonrpc.InternalError(err.Error())
@@ -704,20 +728,21 @@ func runUpload(in input) (any, *jsonrpc.Error) {
 	}
 	evidencePath := filepath.Join(artifactDir, "experience-version.json")
 	evidence := map[string]any{
-		"schema_version":    "wechat_experience_version.v1",
-		"candidate_id":      candidateID,
-		"app_id":            appID,
-		"venue":             strings.TrimSpace(in.Venue),
-		"environment":       strings.TrimSpace(in.Environment),
-		"upload_channel":    uploadChannel,
-		"upload_status":     uploadStatus,
-		"wechatide_task_id": wechatideTaskID,
-		"version":           strings.TrimSpace(in.Version),
-		"commit_sha":        commitSHA,
-		"tree_digest":       treeDigest,
-		"description":       in.Description,
-		"uploaded_at":       time.Now().UTC().Format(time.RFC3339),
-		"ci_output":         output,
+		"schema_version":        "wechat_experience_version.v1",
+		"candidate_id":          candidateID,
+		"app_id":                appID,
+		"venue":                 strings.TrimSpace(in.Venue),
+		"environment":           strings.TrimSpace(in.Environment),
+		"upload_channel":        uploadChannel,
+		"upload_channel_source": channelSource,
+		"upload_status":         uploadStatus,
+		"wechatide_task_id":     wechatideTaskID,
+		"version":               version,
+		"commit_sha":            commitSHA,
+		"tree_digest":           treeDigest,
+		"description":           description,
+		"uploaded_at":           time.Now().UTC().Format(time.RFC3339),
+		"ci_output":             output,
 	}
 	if err := writeJSON(evidencePath, evidence); err != nil {
 		return nil, jsonrpc.InternalError(err.Error())
@@ -732,9 +757,56 @@ func runUpload(in input) (any, *jsonrpc.Error) {
 		"upload_channel":    uploadChannel,
 		"upload_status":     uploadStatus,
 		"wechatide_task_id": wechatideTaskID,
-		"version":           strings.TrimSpace(in.Version),
+		"version":           version,
 		"artifacts":         []artifact{item},
 	}, nil
+}
+
+// writePendingUploadEvidence 在「上传已发起、等人确认」时落一份如实状态的证据：
+// 覆盖同一路径的体验版记录，避免 UI 继续显示上一轮的成功结论；等确认真正完成后，
+// 正常流程会用 uploaded 覆盖回来。证据写盘失败不影响错误上报（这一步本来就不算完成）。
+func writePendingUploadEvidence(
+	in input,
+	artifactDir string,
+	appID string,
+	version string,
+	description string,
+	channel string,
+	taskID string,
+) {
+	evidencePath := filepath.Join(artifactDir, "experience-version.json")
+	candidateID, commitSHA, treeDigest, err := candidateIdentity(in)
+	if err != nil {
+		// 身份拿不到时沿用上一轮记录里的身份字段，保证证据文件仍然可被 schema 校验。
+		var previous map[string]any
+		if raw, readErr := os.ReadFile(evidencePath); readErr == nil {
+			_ = json.Unmarshal(raw, &previous)
+		}
+		candidateID = strings.TrimSpace(asString(previous["candidate_id"]))
+		commitSHA = strings.TrimSpace(asString(previous["commit_sha"]))
+		treeDigest = strings.TrimSpace(asString(previous["tree_digest"]))
+	}
+	evidence := map[string]any{
+		"schema_version":    "wechat_experience_version.v1",
+		"candidate_id":      candidateID,
+		"app_id":            appID,
+		"venue":             strings.TrimSpace(in.Venue),
+		"environment":       strings.TrimSpace(in.Environment),
+		"upload_channel":    channel,
+		"upload_status":     "pending_confirmation",
+		"wechatide_task_id": taskID,
+		"version":           version,
+		"commit_sha":        commitSHA,
+		"tree_digest":       treeDigest,
+		"description":       description,
+		"uploaded_at":       time.Now().UTC().Format(time.RFC3339),
+		"ci_output": map[string]any{
+			"channel": channel,
+			"status":  "pending_confirmation",
+			"task_id": taskID,
+		},
+	}
+	_ = writeJSON(evidencePath, evidence)
 }
 
 func acceptanceRecord(in input) (any, *jsonrpc.Error) {
@@ -1319,15 +1391,39 @@ func validateCIInput(in input, projectRoot, artifactDir string) (string, error) 
 	return appID, nil
 }
 
-func normalizeUploadChannel(value string) (string, error) {
-	channel := strings.ToLower(strings.TrimSpace(value))
-	if channel == "" {
-		channel = "ci"
+// resolveUploadChannel 决定本次上传真正走哪条通道，并把「为什么走这条」一并给出。
+//
+// 上传通道是实现细节，不该让用户先做选择题：显式选了就照做；留空 / auto 时自动推断——
+// 本机能读到 CI 上传私钥就走 CI（全程无人值守），读不到才退回微信开发者工具通道
+// （这条通道必须有人在工具窗口点一次确认）。配好私钥之后上传自然变成全自动。
+//
+// 返回值依次是：生效通道、判定来源、可用的 CI 私钥绝对路径（没有则为空）、错误。
+func resolveUploadChannel(in input, projectRoot string) (string, string, string, error) {
+	requested := strings.ToLower(strings.TrimSpace(in.UploadChannel))
+	keyPath := readableFile(projectRoot, in.PrivateKeyPath)
+	switch requested {
+	case "ci", "wechatide":
+		return requested, "explicit", keyPath, nil
+	case "", "auto", "automatic", "default":
+		if keyPath != "" {
+			return "ci", "auto_private_key", keyPath, nil
+		}
+		return "wechatide", "auto_without_private_key", "", nil
+	default:
+		return "", "", "", fmt.Errorf("upload_channel 取值非法: %s", in.UploadChannel)
 	}
-	if channel != "ci" && channel != "wechatide" {
-		return "", fmt.Errorf("upload_channel 取值非法: %s", value)
+}
+
+// readableFile 把配置里的文件路径解析成绝对路径，读不到就返回空串。
+func readableFile(base, path string) string {
+	if strings.TrimSpace(path) == "" {
+		return ""
 	}
-	return channel, nil
+	resolved, err := resolveFile(base, path)
+	if err != nil || !isFile(resolved) {
+		return ""
+	}
+	return resolved
 }
 
 func resolveWechatideExecutable() (string, error) {
@@ -1366,14 +1462,40 @@ func runWechatideTool(
 func runWechatideUpload(
 	in input,
 	projectRoot string,
+	version string,
+	description string,
 	timeoutDuration time.Duration,
 ) (map[string]any, string, error) {
 	clientName := defaultOr(in.WechatideClient, "Copilot")
+	confirmWindow := timeoutDuration
+	if confirmWindow <= 0 || confirmWindow > wechatideConfirmWindow {
+		confirmWindow = wechatideConfirmWindow
+	}
+
+	// 开发者工具里同一时刻只有一个待确认的上传任务：上一轮还没确认完时，
+	// 直接续等旧任务，不再向开发者工具发新的上传请求，免得重复弹确认框。
+	if state, ok := loadPendingUpload(projectRoot); ok {
+		payload, output, err := pollWechatideUploadTask(projectRoot, clientName, state.TaskID, confirmWindow)
+		switch {
+		case err == nil:
+			clearPendingUpload(projectRoot)
+			return wechatideOutput(payload, output, state.TaskID, "uploaded"), state.TaskID, nil
+		case errors.Is(err, errWechatideConfirmationPending):
+			return nil, state.TaskID, pendingUploadError{TaskID: state.TaskID, Err: fmt.Errorf(
+				"上一轮发起的体验版上传仍在等待你在微信开发者工具内确认（taskId=%s）：这次没有重新发起，也不会再弹新的确认框；在开发者工具窗口点确认后重跑本步骤即可续上同一个任务完成上传",
+				state.TaskID,
+			)}
+		default:
+			// 旧任务已经终结（失败 / 取消 / 过期 / 查不到），允许重新发起。
+			clearPendingUpload(projectRoot)
+		}
+	}
+
 	payload, output, err := runWechatideTool(
 		projectRoot,
 		clientName,
 		"upload",
-		wechatideUploadArgs(projectRoot, in.Version, in.Description),
+		wechatideUploadArgs(projectRoot, version, description),
 		timeoutDuration,
 	)
 	if err != nil {
@@ -1390,6 +1512,59 @@ func runWechatideUpload(
 		return nil, "", errors.New("wechatide 上传未返回 taskId")
 	}
 
+	savePendingUpload(pendingWechatideUpload{
+		TaskID:      taskID,
+		ProjectRoot: projectRoot,
+		Version:     version,
+	})
+
+	payload, output, err = pollWechatideUploadTask(projectRoot, clientName, taskID, confirmWindow)
+	if err != nil {
+		if errors.Is(err, errWechatideConfirmationPending) {
+			return nil, taskID, pendingUploadError{TaskID: taskID, Err: fmt.Errorf(
+				"上传已在微信开发者工具发起，正在等待你在开发者工具窗口内确认（taskId=%s）：任务号已记录，重跑本步骤会续等同一任务、不会重复发起；在窗口点确认后重跑即可完成。想彻底免确认，可配置 CI 上传私钥（上传通道留空「自动」即可走直传）",
+				taskID,
+			)}
+		}
+		return nil, taskID, err
+	}
+	clearPendingUpload(projectRoot)
+	return wechatideOutput(payload, output, taskID, "uploaded"), taskID, nil
+}
+
+var errWechatideConfirmationPending = errors.New("wechatide 上传仍在等待开发者工具内确认")
+
+// pendingUploadError 表示「上传请求已发起，但还在等人到开发者工具里确认」：
+// 既不是成功，也不是失败，所以既不能上报成功，也不该丢掉已发起的事实。
+type pendingUploadError struct {
+	TaskID string
+	Err    error
+}
+
+func (e pendingUploadError) Error() string {
+	if e.Err == nil {
+		return "wechatide 上传等待开发者工具内确认"
+	}
+	return e.Err.Error()
+}
+
+func (e pendingUploadError) Unwrap() error { return e.Err }
+
+// pendingWechatideUpload 记录「已发起、等确认」的上传，供下一轮续等，
+// 避免无人值守任务每次重跑都新弹一个确认框。
+type pendingWechatideUpload struct {
+	TaskID      string `json:"task_id"`
+	ProjectRoot string `json:"project_root"`
+	Version     string `json:"version"`
+	CreatedAt   string `json:"created_at"`
+}
+
+func pollWechatideUploadTask(
+	projectRoot string,
+	clientName string,
+	taskID string,
+	timeoutDuration time.Duration,
+) (map[string]any, string, error) {
 	deadline := time.Now().Add(timeoutDuration)
 	taskNotFoundSince := time.Time{}
 	for time.Now().Before(deadline) {
@@ -1414,13 +1589,13 @@ func runWechatideUpload(
 					continue
 				}
 			}
-			return nil, taskID, err
+			return nil, "", err
 		}
 		taskNotFoundSince = time.Time{}
 		pollStatus, _, pollMessage := classifyWechatidePayload(pollPayload)
 		switch pollStatus {
 		case "uploaded":
-			return wechatideOutput(pollPayload, pollOutput, taskID, "uploaded"), taskID, nil
+			return pollPayload, pollOutput, nil
 		case "failed":
 			if isWechatideTaskNotFound(pollMessage) {
 				if taskNotFoundSince.IsZero() {
@@ -1430,13 +1605,156 @@ func runWechatideUpload(
 					continue
 				}
 			}
-			return nil, taskID, fmt.Errorf("wechatide 上传失败: %s", pollMessage)
+			return nil, "", fmt.Errorf("wechatide 上传失败: %s", pollMessage)
 		}
 	}
-	return nil, taskID, fmt.Errorf(
-		"wechatide 上传等待用户确认超时，taskId=%s；请确认开发者工具中的上传操作后重试",
-		taskID,
-	)
+	return nil, "", errWechatideConfirmationPending
+}
+
+// pendingUploadStatePath 指向插件数据目录下的待确认状态文件。
+func pendingUploadStatePath() (string, bool) {
+	root := strings.TrimSpace(os.Getenv("HIMIND_PLUGIN_DATA_ROOT"))
+	if root == "" {
+		return "", false
+	}
+	return filepath.Join(root, pendingUploadStateFile), true
+}
+
+// pendingUploadStore 按项目保存待确认的上传：同一台机器上并行开发多个小程序时，
+// 各项目的待确认任务互不覆盖、互不阻塞。
+type pendingUploadStore struct {
+	Pending map[string]pendingWechatideUpload `json:"pending"`
+}
+
+func pendingUploadKey(projectRoot string) string {
+	abs, err := filepath.Abs(strings.TrimSpace(projectRoot))
+	if err != nil {
+		abs = strings.TrimSpace(projectRoot)
+	}
+	key := trimBuiltOutputSuffix(filepath.Clean(abs))
+	if runtime.GOOS == "windows" {
+		key = strings.ToLower(key)
+	}
+	return key
+}
+
+// trimBuiltOutputSuffix 把「源码根\dist\wx」归一到「源码根」。
+// 同一个工程既可能被写成源码根，也可能被写成默认产物目录（project_root 留空时就是
+// 源码根\dist\wx）。不归一化时，两种写法会被当成两个工程，升级或换入口后认不出
+// 之前那个待确认任务，于是又向开发者工具发一次上传、又弹一次确认框。
+func trimBuiltOutputSuffix(path string) string {
+	if !strings.EqualFold(filepath.Base(path), "wx") {
+		return path
+	}
+	parent := filepath.Dir(path)
+	if !strings.EqualFold(filepath.Base(parent), "dist") {
+		return path
+	}
+	return filepath.Dir(parent)
+}
+
+func loadPendingUploadStore() pendingUploadStore {
+	store := pendingUploadStore{Pending: map[string]pendingWechatideUpload{}}
+	path, ok := pendingUploadStatePath()
+	if !ok {
+		return store
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return store
+	}
+	if err := json.Unmarshal(data, &store); err != nil || store.Pending == nil {
+		// 兼容早期「一个文件只存一个任务」的格式。
+		var legacy pendingWechatideUpload
+		store = pendingUploadStore{Pending: map[string]pendingWechatideUpload{}}
+		if err := json.Unmarshal(data, &legacy); err == nil &&
+			strings.TrimSpace(legacy.TaskID) != "" &&
+			strings.TrimSpace(legacy.ProjectRoot) != "" {
+			store.Pending[pendingUploadKey(legacy.ProjectRoot)] = legacy
+		}
+	}
+	return store
+}
+
+func loadPendingUpload(projectRoot string) (pendingWechatideUpload, bool) {
+	return findPendingUpload(loadPendingUploadStore(), projectRoot)
+}
+
+// findPendingUpload 先按归一化后的键精确命中；未命中时再按每个记录的 ProjectRoot
+// 归一化后比对，兜住历史文件里用旧写法存的键。
+func findPendingUpload(
+	store pendingUploadStore,
+	projectRoot string,
+) (pendingWechatideUpload, bool) {
+	key := pendingUploadKey(projectRoot)
+	if state, ok := store.Pending[key]; ok && pendingUploadUsable(state) {
+		return state, true
+	}
+	for _, state := range store.Pending {
+		if pendingUploadKey(state.ProjectRoot) == key && pendingUploadUsable(state) {
+			return state, true
+		}
+	}
+	return pendingWechatideUpload{}, false
+}
+
+func pendingUploadUsable(state pendingWechatideUpload) bool {
+	return strings.TrimSpace(state.TaskID) != "" && strings.TrimSpace(state.ProjectRoot) != ""
+}
+
+// removePendingUpload 删掉与该工程等价的所有待确认记录（含历史键写法）。
+func removePendingUpload(store *pendingUploadStore, projectRoot string) {
+	key := pendingUploadKey(projectRoot)
+	for existingKey, state := range store.Pending {
+		if existingKey == key || pendingUploadKey(state.ProjectRoot) == key {
+			delete(store.Pending, existingKey)
+		}
+	}
+}
+
+func savePendingUpload(state pendingWechatideUpload) {
+	path, ok := pendingUploadStatePath()
+	if !ok {
+		return
+	}
+	if strings.TrimSpace(state.CreatedAt) == "" {
+		state.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	}
+	store := loadPendingUploadStore()
+	removePendingUpload(&store, state.ProjectRoot)
+	store.Pending[pendingUploadKey(state.ProjectRoot)] = state
+	_ = writeJSON(path, store)
+}
+
+func clearPendingUpload(projectRoot string) {
+	path, ok := pendingUploadStatePath()
+	if !ok {
+		return
+	}
+	store := loadPendingUploadStore()
+	removePendingUpload(&store, projectRoot)
+	if len(store.Pending) == 0 {
+		_ = os.Remove(path)
+		return
+	}
+	_ = writeJSON(path, store)
+}
+
+func sameWorkspacePath(left, right string) bool {
+	leftAbs, err := filepath.Abs(strings.TrimSpace(left))
+	if err != nil {
+		return false
+	}
+	rightAbs, err := filepath.Abs(strings.TrimSpace(right))
+	if err != nil {
+		return false
+	}
+	leftAbs = filepath.Clean(leftAbs)
+	rightAbs = filepath.Clean(rightAbs)
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(leftAbs, rightAbs)
+	}
+	return leftAbs == rightAbs
 }
 
 func isWechatideTaskNotFound(message string) bool {
@@ -1486,18 +1804,22 @@ func classifyWechatidePayload(payload map[string]any) (status, taskID, message s
 		asBool(payload["error"]) {
 		return "failed", taskID, message
 	}
-	if resultSuccess, ok := result["success"].(bool); ok && resultSuccess {
-		return "uploaded", taskID, message
-	}
+	// wechatide 的 upload 会先返回 `success: true` + `status: pending` +
+	// taskType=confirmation_upload：这只代表请求已受理，真正上传要等用户在
+	// 开发者工具内确认。先判 pending，否则会把「待确认」当成上传成功。
 	if resultStatus == "pending" ||
 		resultStatus == "waiting" ||
 		resultStatus == "confirmation" ||
+		resultStatus == "running" ||
 		(taskID != "" &&
 			resultStatus != "success" &&
 			resultStatus != "succeeded" &&
 			resultStatus != "completed" &&
 			resultStatus != "uploaded") {
 		return "pending", taskID, message
+	}
+	if resultSuccess, ok := result["success"].(bool); ok && resultSuccess {
+		return "uploaded", taskID, message
 	}
 	if asBool(result["success"]) ||
 		resultStatus == "success" ||
@@ -1567,6 +1889,26 @@ func resolveBuildTarget(venueValue, environmentValue string) (string, string, er
 		return "", "", fmt.Errorf("environment 取值非法: %s", environmentValue)
 	}
 	return venue, environment, nil
+}
+
+// 体验版版本号留空时按日期生成，规则与工程内 scripts/wx-cli.js 的
+// getDateVersion 一致（1.YY.MMDD），保证「插件上传」与「仓库脚本上传」
+// 得到同一个版本号口径，同一份代码不会因入口不同而分出两个版本。
+func resolveUploadVersion(versionValue string) string {
+	if version := strings.TrimSpace(versionValue); version != "" {
+		return version
+	}
+	now := time.Now()
+	return fmt.Sprintf("1.%02d.%02d%02d", now.Year()%100, int(now.Month()), now.Day())
+}
+
+// 版本说明留空时给出「版本号 + 上传时刻」的默认值：微信后台的体验版列表
+// 需要一条能区分次序的说明，而用户不该为它每次手填。
+func resolveUploadDescription(descriptionValue, version string) string {
+	if description := strings.TrimSpace(descriptionValue); description != "" {
+		return description
+	}
+	return fmt.Sprintf("v%s %s", version, time.Now().UTC().Format("2006-01-02-15-04"))
 }
 
 func projectConfigAppID(projectRoot string) (string, error) {
