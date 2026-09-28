@@ -69,3 +69,28 @@ function Resolve-DependencyCatalogs {
     }
     return $resolved
 }
+
+# Resolve-DependencyArtifactDirs 给出本地依赖制品的候选目录。
+#
+# 每个依赖仓的 dist 就是它自己产出的制品目录（索引在 <depRepo>/.himind/catalog.json）。
+# 打包时优先复用这些已经下过的制品：GitHub Release 的连接抖动不该让一次发布平白
+# 失败。命中与否由 himind-lock-pin 拿发布清单记的制品摘要复核，作者机器上同一个
+# 版本号的陈旧构建不会因此污染锁。
+function Resolve-DependencyArtifactDirs {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$CatalogPaths,
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
+
+    $directories = @()
+    foreach ($catalog in @($CatalogPaths)) {
+        if ([string]::IsNullOrWhiteSpace([string]$catalog)) { continue }
+        $catalogFile = [IO.Path]::GetFullPath([string]$catalog)
+        $repositoryRoot = Split-Path -Parent (Split-Path -Parent $catalogFile)
+        if (-not [string]::IsNullOrWhiteSpace($repositoryRoot)) {
+            $directories += (Join-Path $repositoryRoot 'dist')
+        }
+    }
+    $directories += (Join-Path $RepoRoot 'dist')
+    return $directories | Select-Object -Unique
+}

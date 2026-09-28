@@ -55,6 +55,32 @@ func shouldSkipPackageDirectory(name string) bool {
 	}
 }
 
+// PayloadPath 判断一个相对路径（“/”分隔）是否属于可移植载荷。
+//
+// 与 PayloadFiles 是同一份排除规则，区别只在输入形态：打包时沿着真实目录树
+// 走，可以靠 SkipDir 整棵剪掉；从归档里读时没有目录条目，只能逐条路径判断，
+// 于是需要这个逐段版本。两处共用 shouldSkipPackageDirectory / shouldSkipPackageFile，
+// 规则不会在「打包」与「校验制品」之间漂移。
+func PayloadPath(relative string) bool {
+	normalized := strings.ReplaceAll(relative, "\\", "/")
+	if normalized == "" {
+		return false
+	}
+	components := strings.Split(normalized, "/")
+	for index, component := range components {
+		if component == "" || component == "." || component == ".." {
+			return false
+		}
+		if index == len(components)-1 {
+			return !shouldSkipPackageFile(component)
+		}
+		if shouldSkipPackageDirectory(component) {
+			return false
+		}
+	}
+	return false
+}
+
 // shouldSkipPackageFile 判断单个文件是不是构建输入或生成物。
 //
 // Go 源码与模块文件是构建输入：插件装到用户机器上只需要入口二进制和运行期资源，

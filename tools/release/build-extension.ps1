@@ -37,18 +37,27 @@ Push-Location $repoRoot
 try {
     $repoConfig = Read-ExtensionRepoConfig -RepoRoot $repoRoot
     $Repository = Resolve-ReleaseRepository -Config $repoConfig -Override $Repository
-    $planArguments = @(
-        'run', './tools/cmd/himind-release-plan',
+    # 发布计划与锁 pin 共用同一组定位参数：两个命令各自重新解析一遍依赖事实，
+    # 清单里的 pin 与锁里的 pin 因此不会漂移。这里只放参数，不放 `go run <入口>`，
+    # 否则第二个命令会把 `run` 当成第一个位置参数，后面所有开关都读不到。
+    $planFlags = @(
         '-kind', $Kind,
         '-path', $ExtensionPath,
         '-repository', $Repository,
         '-channel', $Channel,
         '-catalog', (Join-Path $repoRoot '.himind/catalog.json')
     )
-    foreach ($dependencyCatalog in @(Resolve-DependencyCatalogs -Config $repoConfig -RepoRoot $repoRoot -Override $DependencyCatalog)) {
-        $planArguments += @('-dependency-catalog', $dependencyCatalog)
+    $dependencyCatalogs = @(Resolve-DependencyCatalogs -Config $repoConfig -RepoRoot $repoRoot -Override $DependencyCatalog)
+    foreach ($dependencyCatalog in $dependencyCatalogs) {
+        $planFlags += @('-dependency-catalog', $dependencyCatalog)
     }
-    $planJson = & go @planArguments
+    # 锁 pin 的依赖定位与发布清单同源，只是额外给出本地制品候选目录：命中时不必
+    # 从 GitHub 再下一遍（发布资产偶发超时不该让整次发布失败），摘要仍以清单为准。
+    $pinFlags = $planFlags
+    foreach ($artifactDir in @(Resolve-DependencyArtifactDirs -CatalogPaths $dependencyCatalogs -RepoRoot $repoRoot)) {
+        $pinFlags += @('-artifact-dir', $artifactDir)
+    }
+    $planJson = & go run ./tools/cmd/himind-release-plan @planFlags
 }
 finally { Pop-Location }
 if ($LASTEXITCODE -ne 0) { throw 'Release plan failed.' }
@@ -111,6 +120,17 @@ else {
     $workflow = $workflowResult | ConvertFrom-Json
     $artifactSha256 = [string]$workflow.artifact_sha256
     $lockSha256 = [string]$workflow.lock_sha256
+    # 锁里的依赖摘要必须来自依赖**制品**的字节。作者机器上的本地扩展源目录还留着
+    # 源码、历史制品与安装期状态，按那份目录算出的摘要与别人从制品安装后算出的值
+    # 不同，组织分发时会被判成 “content changed”。依赖定位参数与发布清单同源，
+    # 锁里记的版本与来源因此不会与清单漂移。
+    Push-Location $repoRoot
+    try {
+        & go run ./tools/cmd/himind-lock-pin -lock $lock @pinFlags | Out-Null
+    }
+    finally { Pop-Location }
+    if ($LASTEXITCODE -ne 0) { throw 'Workflow extension lock pin failed.' }
+    $lockSha256 = (Get-FileHash -LiteralPath $lock -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
 if (-not (Test-Path -LiteralPath $artifact -PathType Leaf)) {
