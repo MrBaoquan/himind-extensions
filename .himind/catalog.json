@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-ea2ee018eb7672ae",
+  "generation": "sync-552253eda413d1ea",
   "plugins": [
     {
       "allow_disable": true,
@@ -234,6 +234,60 @@
     }
   ],
   "skills": [
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:skill/com.himind.skill.dev-workflow-orchestrator@1.0.3:com.himind.skill.dev-workflow-orchestrator-1.0.3.hmskill",
+      "artifact_sha256": "2d4e77d1bbe572a0ab41be42b421e8000a16814d3e36fd3c0e34ee9eb86d8c75",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [
+        "engineering.project.resolve",
+        "engineering.checkpoint.create",
+        "engineering.workspace.lease.acquire",
+        "engineering.workspace.lease.release",
+        "engineering.workspace.lease.list",
+        "workflow.catalog.list",
+        "workflow.catalog.describe",
+        "workflow.run.start",
+        "workflow.run.get",
+        "workflow.run.feedback",
+        "workflow.run.cancel"
+      ],
+      "categories": [
+        "software-engineering",
+        "collaboration-delivery"
+      ],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "让 DSH 和外部 AI 工具按工程、工作区租约、开发检查点和 Workflow 生命周期完成开发与交付协作。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.himind.skill.dev-workflow-orchestrator@1.0.3/com.himind.skill.dev-workflow-orchestrator-1.0.3.hmskill",
+      "file_name": "com.himind.skill.dev-workflow-orchestrator-1.0.3.hmskill",
+      "file_size": 3394,
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.47",
+      "name": "工程工作流助手",
+      "organization_reason": "",
+      "plugin_dependencies": [],
+      "published_at": "2026-09-28T09:08:18Z",
+      "release_notes": "1.0.3：名称与界面说明对齐扩展创作口径，启动示例改用本仓交付工作流。",
+      "release_tag": "skill/com.himind.skill.dev-workflow-orchestrator@1.0.3",
+      "risk_summary": "workspace_lease; checkpoint; workflow_start; workflow_cancel; approvals_require_user",
+      "sha256": "2d4e77d1bbe572a0ab41be42b421e8000a16814d3e36fd3c0e34ee9eb86d8c75",
+      "signature": "IzCj3WS5OeW1rFm3toJY+/0ClXnLm/OWBA6vXKTdtU2RhULnP8eAD3SOhrYsoRNglE01ZQ4Cq1Y4GKiLLDir25uqKx80dDYfRfBj/oz+9lDkjthpyH86fi0XTXzRp4yj6/miAeZrsemVQHlci0hhKUpQVwyuwpKt1vBBp7TQKnEhxQIdbpYnc1SjICgzu2DAmHf3vsE1n8ujNTi08u99NxDGlTAC9mGZ5ks9mm/UaKkrB2+yBu83x5EuExqMCoMv1XD8c+lC8BQT6011ooTmscaN9Q5c5LDElf52d85CPrWxj+aGYiaSxI59zlRemrqaXSv/bn8MZRE7zOjXmmCeCBzSG2wsymSlSt+22InPxRmuwRqzAS6rZ05ytJPwVEm4UEamXU+Ck3NDTkR+EJLEGKe4dDwwsRPiXt3QpaqlI28A26zDpe3Ju+FPFc6hY+w/qd7fDGevZvOsuP0YFntZxVUP9Ghpk9MWKots0emr9W5kg8fOxYv0V006cMxsWLIw",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "skill_id": "com.himind.skill.dev-workflow-orchestrator",
+      "source": "github",
+      "source_commit": "7174c4dd65c9a51e8f107db8c4851646b9f3a5ac",
+      "source_tree": "dc798f104643667812c950acc5b793346322f277",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "version": "1.0.3"
+    },
     {
       "allow_disable": true,
       "allow_uninstall": true,
@@ -686,20 +740,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "kind": "plugin",
           "id": "com.himind.extension-development-tools",
-          "required": true,
+          "kind": "plugin",
           "min_version": "1.4.0",
-          "version": "1.4.2",
+          "pinned": true,
+          "required": true,
           "sha256": "0b9fdef89d128bb1a56d742dce1bf692d6c13aaaad6b302a7681362e9fe1c23e",
           "source": {
-            "kind": "github",
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg",
             "id": "github:MrBaoquan/himind-extensions",
-            "repository": "MrBaoquan/himind-extensions",
+            "kind": "github",
             "reference": "plugin/com.himind.extension-development-tools@1.4.2",
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg"
+            "repository": "MrBaoquan/himind-extensions"
           },
-          "pinned": true
+          "version": "1.4.2"
         }
       ],
       "description": "设计、创建、校验、契约测试、打包并受控提交 HiMind 工作流。",
