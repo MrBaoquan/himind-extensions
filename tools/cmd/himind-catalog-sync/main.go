@@ -36,6 +36,9 @@ type extensionCatalog struct {
 	Channel        string           `json:"channel"`
 	CatalogID      string           `json:"catalog_id"`
 	Extensions     []extensionEntry `json:"extensions"`
+	// FeaturePacks 由各仓自己的清单声明：能力包是「本仓托管了这些扩展」的事实，
+	// 只有托管这些扩展的仓才能声明，否则消费侧会把同 id 的包读成跨来源冲突。
+	FeaturePacks []catalog.FeaturePack `json:"feature_packs"`
 }
 
 type releaseAsset struct {
@@ -93,6 +96,10 @@ func sync(repository, catalogPath, extensionsPath, token, apiBase string, allowM
 		return summary{}, err
 	}
 	target := catalog.New(config.DistributionID, config.Channel, config.CatalogID)
+	target.FeaturePacks = config.FeaturePacks
+	if target.FeaturePacks == nil {
+		target.FeaturePacks = []catalog.FeaturePack{}
+	}
 
 	releases, err := client.listReleases(repository)
 	if err != nil {

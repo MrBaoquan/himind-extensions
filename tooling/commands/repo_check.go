@@ -28,14 +28,15 @@ const catalogPath = ".himind/catalog.json"
 
 // extensionsIndex 是仓库里 extensions.json 的结构。
 type extensionsIndex struct {
-	SchemaVersion              int                    `json:"schema_version"`
-	Repository                 string                 `json:"repository"`
-	DistributionID             string                 `json:"distribution_id"`
-	Channel                    string                 `json:"channel"`
-	CatalogID                  string                 `json:"catalog_id"`
-	DefaultBranch              string                 `json:"default_branch"`
-	DefaultDistributionTargets []string               `json:"default_distribution_targets"`
-	Extensions                 []extensionsIndexEntry `json:"extensions"`
+	SchemaVersion              int                       `json:"schema_version"`
+	Repository                 string                    `json:"repository"`
+	DistributionID             string                    `json:"distribution_id"`
+	Channel                    string                    `json:"channel"`
+	CatalogID                  string                    `json:"catalog_id"`
+	DefaultBranch              string                    `json:"default_branch"`
+	DefaultDistributionTargets []string                  `json:"default_distribution_targets"`
+	Extensions                 []extensionsIndexEntry    `json:"extensions"`
+	FeaturePacks               []catalogtool.FeaturePack `json:"feature_packs"`
 }
 
 type extensionsIndexEntry struct {
@@ -153,6 +154,9 @@ func RepoCheck(root string) error {
 	if err := validateCatalog(root, seenKinds); err != nil {
 		return err
 	}
+	if err := validateFeaturePacks(root, value.FeaturePacks, seenKinds); err != nil {
+		return err
+	}
 	ids := make([]string, 0, len(seenIDs))
 	for id := range seenIDs {
 		ids = append(ids, id)
@@ -163,6 +167,64 @@ func RepoCheck(root string) error {
 	}
 	fmt.Printf("validated %d extensions\n", len(ids))
 	return nil
+}
+
+// validateFeaturePacks 保证能力包只引用本仓托管的扩展，并与索引里声明的一致。
+//
+// 能力包记录的是「哪个仓托管了这些扩展」这一事实：跨仓引用会让消费侧在合并多个
+// 来源时把同 id 的包判成来源冲突，所以它属于仓库自洽的一部分。历史实现把官方仓的
+// 能力包硬编码进索引构建，任何扩展仓全量重建索引都会被注入一次，这里把它改成由
+// 各仓 extensions.json 显式声明，并在门禁里卡住跨仓引用与索引漂移。
+func validateFeaturePacks(root string, declared []catalogtool.FeaturePack, kinds map[string]string) error {
+	seen := map[string]bool{}
+	for _, pack := range declared {
+		if strings.TrimSpace(pack.ID) == "" || strings.TrimSpace(pack.Name) == "" {
+			return errors.New("extensions.json: 能力包必须声明 id 与 name")
+		}
+		if seen[pack.ID] {
+			return fmt.Errorf("extensions.json: 能力包 %s 重复声明", pack.ID)
+		}
+		seen[pack.ID] = true
+		for _, id := range append(append([]string{}, pack.PluginIDs...), pack.SkillIDs...) {
+			if _, ok := kinds[id]; !ok {
+				return fmt.Errorf("extensions.json: 能力包 %s 引用的 %s 不在本仓 extensions.json 里", pack.ID, id)
+			}
+		}
+	}
+	index, err := catalogtool.Load(filepath.Join(root, filepath.FromSlash(catalogPath)))
+	if err != nil {
+		return fmt.Errorf("%s: %w", catalogPath, err)
+	}
+	expected, err := canonicalPacks(declared)
+	if err != nil {
+		return err
+	}
+	actual, err := canonicalPacks(index.FeaturePacks)
+	if err != nil {
+		return err
+	}
+	if expected != actual {
+		return fmt.Errorf("%s 的能力包与 extensions.json 声明不一致，重新构建索引", catalogPath)
+	}
+	return nil
+}
+
+func canonicalPacks(packs []catalogtool.FeaturePack) (string, error) {
+	normalized := make([]catalogtool.FeaturePack, 0, len(packs))
+	for _, pack := range packs {
+		copied := pack
+		copied.PluginIDs = append([]string{}, pack.PluginIDs...)
+		copied.SkillIDs = append([]string{}, pack.SkillIDs...)
+		sort.Strings(copied.PluginIDs)
+		sort.Strings(copied.SkillIDs)
+		normalized = append(normalized, copied)
+	}
+	sort.Slice(normalized, func(left, right int) bool { return normalized[left].ID < normalized[right].ID })
+	data, err := json.Marshal(normalized)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
 
 // declaredTargets 读取清单里的分发落点。

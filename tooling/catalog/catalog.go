@@ -146,7 +146,7 @@ func New(distributionID, channel, catalogID string) *Catalog {
 		SchemaVersion: SchemaVersion, DistributionID: strings.TrimSpace(distributionID),
 		Channel: strings.TrimSpace(channel), CatalogID: strings.TrimSpace(catalogID),
 		Plugins: []map[string]interface{}{}, Skills: []map[string]interface{}{},
-		Workflows: []map[string]interface{}{}, FeaturePacks: DefaultFeaturePacks(),
+		Workflows: []map[string]interface{}{}, FeaturePacks: []FeaturePack{},
 	}
 }
 
@@ -358,23 +358,6 @@ func NormalizeRepository(override, fallback string) (string, error) {
 		return "", fmt.Errorf("仓库不是 owner/repo 形式: %q", value)
 	}
 	return value, nil
-}
-
-// DefaultFeaturePacks 返回默认能力包。
-func DefaultFeaturePacks() []FeaturePack {
-	return []FeaturePack{{
-		ID: "com.himind.feature.extension-authoring", Name: "扩展创作",
-		PluginIDs: []string{"com.himind.extension-development-tools"},
-		// 能力包必须成套：插件负责脚手架与校验，四个技能分别覆盖插件、技能、
-		// 工作流的创作规范与三类扩展共用的通用约定。少一个，AI 就可能按自己
-		// 的理解去命名或分类，产出的扩展进不了分发链路。
-		SkillIDs: []string{
-			"com.himind.skill.develop-himind-plugins",
-			"com.himind.skill.develop-himind-skills",
-			"com.himind.skill.develop-himind-workflows",
-			"com.himind.skill.develop-himind-conventions",
-		},
-	}}
 }
 
 // ReadJSON 读取一个 JSON 文件。

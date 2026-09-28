@@ -23,5 +23,18 @@
     {"type": "skill", "id": "com.mrbaoquan.skill.unihper-unity-development", "path": "skills/unihper-unity-development"},
     {"type": "workflow", "id": "com.himind.workflow.software-release", "path": "workflows/software-release"},
     {"type": "workflow", "id": "com.himind.workflow.tech-radar", "path": "workflows/tech-radar"}
+  ],
+  "feature_packs": [
+    {
+      "id": "com.himind.feature.extension-authoring",
+      "name": "扩展创作",
+      "plugin_ids": ["com.himind.extension-development-tools"],
+      "skill_ids": [
+        "com.himind.skill.develop-himind-plugins",
+        "com.himind.skill.develop-himind-skills",
+        "com.himind.skill.develop-himind-workflows",
+        "com.himind.skill.develop-himind-conventions"
+      ]
+    }
   ]
 }

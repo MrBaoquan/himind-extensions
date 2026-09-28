@@ -109,6 +109,26 @@ go run ./tools/cmd/himind-agent-workspace-sync -commit (git rev-parse HEAD)
 
 `extensions.json` 里的 `default_distribution_targets` 是新建扩展时的脚手架默认值，不参与运行时分发判断：实际落点只认各扩展清单的声明，且 `go run ./tools/cmd/himind-repo-check` 会拒绝缺少该字段的清单。
 
+### 能力包由托管仓声明
+
+能力包（`feature_packs`）记录「哪个仓托管了这一组协同安装的扩展」，只能由托管这些扩展的仓在自己的 `extensions.json` 里声明，全量重建索引（`himind-catalog-sync`）会原样落盘。跨仓声明能力包没有意义：消费侧合并多个来源时会把同 id 的包判成来源冲突。仓库校验同时卡两件事——能力包引用的扩展必须在本仓，以及索引里的能力包必须与本仓声明一致。
+
+```json
+"feature_packs": [
+  {
+    "id": "com.himind.feature.extension-authoring",
+    "name": "扩展创作",
+    "plugin_ids": ["com.himind.extension-development-tools"],
+    "skill_ids": [
+      "com.himind.skill.develop-himind-plugins",
+      "com.himind.skill.develop-himind-skills",
+      "com.himind.skill.develop-himind-workflows",
+      "com.himind.skill.develop-himind-conventions"
+    ]
+  }
+]
+```
+
 ### 发布命令
 
 每个扩展按自己的语义版本单独发布，不跟随 Agent 版本。仓库维护者在本机运行 `tools/release/publish-extension.ps1`，传入 `plugin`、`skill` 或 `workflow` 及仓库内路径。脚本按清单声明执行，完成测试、打包、RSA-PSS/SHA-256 签名、Release 创建和公共目录更新，不依赖 GitHub Actions。Workflow 发布还会生成并上传 `extension_lock.v1`，Catalog 同时写入制品和 Lock。
@@ -125,6 +145,8 @@ $env:HIMIND_EXTENSION_SIGNING_KEY_ID = 'himind-production-2026'
 只声明 `workbench` 的扩展不会创建 Release，也不会写入 Catalog——公开目录条目的定位信息就是 Release 资产，没有 Release 就没有可写入的条目。脚本会输出 JSON 说明下一步（在 Agent 扩展工作区提审）。
 
 签名材料通过进程环境变量提供：`HIMIND_EXTENSION_SIGNING_PRIVATE_KEY_PATH` 指向 PKCS#8/PEM 私钥文件，`HIMIND_EXTENSION_SIGNING_KEY_ID` 是该密钥在 Agent 受信公钥目录中的稳定 key ID。私钥只属于本仓库发布流水线，不得交给 Agent、Dashboard 或扩展开发者。对应公钥及同一个 key ID 还必须配置到 `himind-dashboard` 的正式 Agent 安装包构建流程，安装器会把它写入本机 `trusted-keys`；开发环境通过用户级 `HIMIND_TRUSTED_SIGNING_KEYS_DIR` 注入测试公钥。
+
+发布脚本用的是 `HIMIND_EXTENSION_SIGNING_*` 这一组变量，和 Agent 运行时的 `HIMIND_SIGNING_PRIVATE_KEY_PATH` / `HIMIND_SIGNING_KEY_ID` 不是同一组，改一组不会影响另一组。上传 Release 用的 GitHub App 私钥（`*.private-key.pem`）也不能拿来签制品：它的 key ID 不在 Agent 的受信公钥目录里，用它签出来的清单装不上。本机生产私钥固定放在 `%LOCALAPPDATA%\HiMind\signing\private\himind-production-2026.key.pem`，同名公钥在 `%LOCALAPPDATA%\HiMind\signing\trusted\`。
 
 Release 创建后如果只需要修复目录，应在同一源提交上重跑同一命令；脚本会下载并复用不可变 Release 资产。若主分支已经前进，必须先恢复对应源提交或提升扩展版本，禁止用新提交伪装旧制品来源。
 
