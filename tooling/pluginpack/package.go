@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	validator "github.com/MrBaoquan/himind-extensions/tools/cmd/himind-plugin-validate"
@@ -85,56 +84,27 @@ func Package(input, output string) error {
 }
 
 func packageFiles(root, output string) ([]string, error) {
-	var files []string
 	outputPath, err := filepath.Abs(output)
 	if err != nil {
 		return nil, err
 	}
-	err = filepath.Walk(root, func(path string, info os.FileInfo, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if info.IsDir() {
-			if shouldSkipPackageDirectory(info.Name()) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if shouldSkipPackageFile(info.Name()) {
-			return nil
-		}
-		absolutePath, absoluteErr := filepath.Abs(path)
+	files, err := PayloadFiles(root)
+	if err != nil {
+		return nil, err
+	}
+	// 输出制品可能就落在源码目录里，别把上一次的产物打进这一次的包。
+	kept := make([]string, 0, len(files))
+	for _, relative := range files {
+		absolutePath, absoluteErr := filepath.Abs(filepath.Join(root, filepath.FromSlash(relative)))
 		if absoluteErr != nil {
-			return absoluteErr
+			return nil, absoluteErr
 		}
 		if absolutePath == outputPath {
-			return nil
+			continue
 		}
-		relative, relativeErr := filepath.Rel(root, path)
-		if relativeErr != nil {
-			return relativeErr
-		}
-		files = append(files, filepath.ToSlash(relative))
-		return nil
-	})
-	sort.Strings(files)
-	return files, err
-}
-
-// Generated dependency trees and local package-manager locks are never part of
-// a portable HiMind plugin. Keeping them out makes packaging deterministic and
-// prevents large UI plugins from timing out while being archived.
-func shouldSkipPackageDirectory(name string) bool {
-	switch strings.ToLower(name) {
-	case ".git", "node_modules", "dist", "target", "test-output":
-		return true
-	default:
-		return false
+		kept = append(kept, relative)
 	}
-}
-
-func shouldSkipPackageFile(name string) bool {
-	return strings.EqualFold(name, "package-lock.json") || strings.EqualFold(name, "yarn.lock") || strings.EqualFold(name, "pnpm-lock.yaml")
+	return kept, nil
 }
 
 func sha256File(path string) (string, error) {

@@ -74,19 +74,22 @@ elseif ($Kind -eq 'plugin') {
         if ([string]::IsNullOrWhiteSpace($entry) -or [IO.Path]::IsPathRooted($entry) -or $entry.Contains('..')) { throw 'Plugin entry is invalid.' }
         $binary = Join-Path $staging $entry
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $binary) | Out-Null
+        # 先测试再构建，与 Agent 侧 extension.plugin.build 的语义一致：能打包就必须
+        # 先通过测试，避免「本地制品是好的、发布制品是坏的」这种只在发布后才暴露的差异。
+        Push-Location $source
+        try { & go test ./... }
+        finally { Pop-Location }
+        if ($LASTEXITCODE -ne 0) { throw 'Plugin tests failed.' }
         Push-Location $repoRoot
         try { & go build -o $binary "./$($ExtensionPath.Replace('\', '/'))" }
         finally { Pop-Location }
         if ($LASTEXITCODE -ne 0) { throw 'Plugin build failed.' }
-        Copy-Item -LiteralPath $manifestPath -Destination (Join-Path $staging 'plugin.json') -Force
-        $ui = Join-Path $source 'ui'
-        if (Test-Path -LiteralPath $ui -PathType Container) { Copy-Item -LiteralPath $ui -Destination (Join-Path $staging 'ui') -Recurse -Force }
-        foreach ($supportFile in @('miniprogram-ci-runner.js')) {
-            $supportPath = Join-Path $source $supportFile
-            if (Test-Path -LiteralPath $supportPath -PathType Leaf) {
-                Copy-Item -LiteralPath $supportPath -Destination (Join-Path $staging $supportFile) -Force
-            }
-        }
+        # 随包文件按 pluginpack 的排除法整份摊平：这里曾经是「plugin.json + ui/ +
+        # miniprogram-ci-runner.js」三行白名单，作者新增的运行期文件会被静默丢掉。
+        Push-Location $repoRoot
+        try { & go run ./tools/cmd/himind-plugin-stage -path $source -output $staging -entry $entry }
+        finally { Pop-Location }
+        if ($LASTEXITCODE -ne 0) { throw 'Plugin staging failed.' }
         Push-Location $repoRoot
         try { & go run ./tools/cmd/himind-plugin-package -path $staging -output $artifact }
         finally { Pop-Location }

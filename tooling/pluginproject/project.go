@@ -165,7 +165,9 @@ func buildManifest(name, displayName, description, author string, categories []s
 	}
 	contributes := Contributions{Commands: []Command{{ID: capability.ID, Title: "运行" + displayName}}, Views: []View{}}
 	if template == "ui-tool" {
-		contributes.Views = []View{{ID: strings.ReplaceAll(name, "-", ".") + ".main", Title: displayName, Location: "tools", Entry: "ui/index.html"}}
+		// 插件的视图落点只有 plugin_navigation 与 host_panel 两种，Agent 安装时
+		// 会按这两值校验。脚手架曾经写 "tools"，产出物在 Agent 侧直接装不上。
+		contributes.Views = []View{{ID: strings.ReplaceAll(name, "-", ".") + ".main", Title: displayName, Location: "plugin_navigation", Entry: "ui/index.html"}}
 	}
 	return Manifest{ID: id, Name: displayName, Author: strings.TrimSpace(author), Categories: append([]string(nil), categories...), Description: strings.TrimSpace(description), ReleaseNotes: strings.TrimSpace(releaseNotes), Version: "0.1.0", Entry: "bin/" + name + ".exe", Runtime: "process-jsonrpc-stdio", Platforms: []string{"windows-x64"}, MinAgent: "0.3.0", Governance: "optional", Capabilities: []Capability{capability}, Permissions: []string{}, Contributes: contributes}
 }

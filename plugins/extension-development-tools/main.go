@@ -6,8 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/MrBaoquan/himind-extensions/sdk/jsonrpc"
 	"github.com/MrBaoquan/himind-extensions/tooling/metaguide"
@@ -301,20 +303,45 @@ func runGo(directory string, args ...string) (string, error) {
 	if err != nil {
 		return "未在 PATH 中找到 Go 工具链", err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	// 构建上限要小于 Agent 侧给本能力声明的 timeout_seconds，否则进程会先被
+	// Agent 杀掉，调用方拿到的是一句「超时」而不是能定位问题的编译输出。
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	command := exec.CommandContext(ctx, goPath, args...)
 	configureHiddenCommand(command)
 	command.Dir = directory
 	output, err := command.CombinedOutput()
-	text := string(output)
-	if len(text) > 16000 {
-		text = text[len(text)-16000:]
-	}
+	text := trimCommandOutput(string(output))
 	if ctx.Err() != nil {
 		return text + "\n命令超时", ctx.Err()
 	}
 	return text, err
+}
+
+// commandOutputLimit 是回传给 AI 的命令输出字节上限。
+const commandOutputLimit = 16000
+
+// trimCommandOutput 超限时保留首尾两段。
+//
+// 只留尾部的写法会把最该看的内容丢掉：go build 先报失败的包，末尾往往只剩
+// 一句 "exit status 1"。中间被省略的部分显式标出字节数，避免看起来像完整输出。
+func trimCommandOutput(text string) string {
+	if len(text) <= commandOutputLimit {
+		return text
+	}
+	head := commandOutputLimit / 2
+	for head > 0 && !utf8.RuneStart(text[head]) {
+		head--
+	}
+	tail := len(text) - (commandOutputLimit - commandOutputLimit/2)
+	for tail < len(text) && !utf8.RuneStart(text[tail]) {
+		tail++
+	}
+	// 按实际裁掉的中段报数：裁剪点回退到字符边界后会比预算多丢几个字节。
+	skipped := tail - head
+	return text[:head] +
+		"\n...（中间省略 " + strconv.Itoa(skipped) + " 字节，完整输出请在本机重新执行该命令）...\n" +
+		text[tail:]
 }
 
 func firstLine(value string) string {

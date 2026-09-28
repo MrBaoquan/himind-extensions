@@ -72,6 +72,9 @@ var (
 		"builtin_policy": true, "R1": true, "R2": true, "R3": true, "R4": true,
 	}
 	availability = map[string]bool{"local": true, "network_service": true, "control_plane": true}
+	// 视图落点必须与 Agent 的安装校验用同一份词表，否则会出现「仓里校验通过、
+	// 装到 Agent 上报 unsupported plugin view location」的发布后才发现的问题。
+	viewLocations = map[string]bool{"plugin_navigation": true, "host_panel": true}
 )
 
 func Main() {
@@ -296,8 +299,14 @@ func ParseManifest(data []byte) (manifest, error) {
 			return item, errors.New("view IDs must be non-empty and unique")
 		}
 		viewIDs[view.ID] = true
+		if view.Location != "" && !viewLocations[view.Location] {
+			return item, fmt.Errorf("unsupported view location: %s", view.Location)
+		}
 		if filepath.IsAbs(view.Entry) || invalidRelativePath(view.Entry) {
 			return item, fmt.Errorf("view entry must be relative: %s", view.Entry)
+		}
+		if strings.ToLower(filepath.Ext(view.Entry)) != ".html" {
+			return item, fmt.Errorf("view entry must be an HTML file: %s", view.Entry)
 		}
 		if err := metaguide.Check(metaguide.CommandTitle, view.Title); err != nil {
 			return item, err

@@ -377,7 +377,8 @@ func searchRepositories(query string, languages []string, limit int) ([]repoEntr
 	}
 	request.Header.Set("Accept", "application/vnd.github+json")
 	request.Header.Set("User-Agent", "HiMind-TechRadar")
-	// token 由 Agent 侧注入运行环境，插件不接收、不落盘、不输出。
+	// Agent 不向插件注入任何账号凭据，这里只认本机显式设置的令牌；没有令牌时
+	// 走 GitHub 匿名额度（10 次/分钟），插件据此放慢查询节奏。
 	if token := strings.TrimSpace(os.Getenv("HIMIND_TECH_RADAR_GITHUB_TOKEN")); token != "" {
 		request.Header.Set("Authorization", "Bearer "+token)
 	}
