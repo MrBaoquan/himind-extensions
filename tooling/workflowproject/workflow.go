@@ -178,6 +178,7 @@ type Manifest struct {
 	Version           string         `json:"version"`
 	Name              string         `json:"name"`
 	Description       string         `json:"description,omitempty"`
+	ReleaseNotes      string         `json:"release_notes,omitempty"`
 	MinAgentVersion   string         `json:"min_agent_version"`
 	LocalRequirements map[string]any `json:"local_requirements,omitempty"`
 	OptionalProviders []string       `json:"optional_providers,omitempty"`
@@ -541,6 +542,12 @@ func validateManifest(manifest Manifest, fileExists func(string) bool) error {
 		return err
 	}
 	if err := metaguide.Check(metaguide.Description, manifest.Description); err != nil {
+		return err
+	}
+	if strings.TrimSpace(manifest.ReleaseNotes) == "" {
+		return errors.New("release_notes is required")
+	}
+	if err := metaguide.Check(metaguide.ReleaseNotes, manifest.ReleaseNotes); err != nil {
 		return err
 	}
 	policy := strings.TrimSpace(manifest.ExecutionPolicy)
@@ -968,6 +975,7 @@ func buildManifest(config Config) Manifest {
 		Version:           config.Version,
 		Name:              config.Name,
 		Description:       config.Description,
+		ReleaseNotes:      config.ReleaseNotes,
 		MinAgentVersion:   config.MinAgentVersion,
 		LocalRequirements: map[string]any{},
 		Dependencies:      Dependencies{Skills: []DependencyRef{}, Plugins: []DependencyRef{}, Connectors: []string{}, Runtimes: []string{}},

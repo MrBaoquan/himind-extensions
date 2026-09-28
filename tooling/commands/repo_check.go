@@ -132,8 +132,13 @@ func RepoCheck(root string) error {
 			if err := skillproject.Validate(path); err != nil {
 				return err
 			}
-		} else if err := workflowproject.Validate(path); err != nil {
-			return err
+		} else {
+			if strings.TrimSpace(identity.ReleaseNotes) == "" {
+				return fmt.Errorf("%s must declare release_notes", extension.Path)
+			}
+			if err := workflowproject.Validate(path); err != nil {
+				return err
+			}
 		}
 	}
 	if err := ensureCatalogComplete(root, "plugins", "plugin.json", seenPaths); err != nil {
