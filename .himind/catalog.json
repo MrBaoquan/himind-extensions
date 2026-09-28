@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-655c49b51e208216",
+  "generation": "sync-e20df250d6b17845",
   "plugins": [
     {
       "allow_disable": true,
@@ -1364,7 +1364,7 @@
           "connectors": [],
           "runtimes": []
         },
-        "generated_at": "unix-ms:1790597743560",
+        "generated_at": "unix-ms:1790597985725",
         "root": {
           "id": "com.himind.workflow.software-release",
           "kind": "workflow",
@@ -1382,15 +1382,15 @@
       "name": "软件发布",
       "organization_reason": "",
       "plugin_dependencies": [],
-      "published_at": "2026-09-28T12:15:48Z",
+      "published_at": "2026-09-28T12:19:49Z",
       "release_notes": "依赖锁按依赖制品载荷重算，并把软件分发工具钉到 1.2.5；执行行为与 1.0.3 一致。",
       "release_tag": "workflow/com.himind.workflow.software-release@1.0.4",
       "sha256": "a6d0d76aa9a59587a6c9c29caf11ff40632c3af405464db5b9bd9154bbdec80a",
-      "signature": "xLoS8yudoYNp6L60cbIHXrMC/QYBBjTPT4oqRPTHXuCGgYp+yFX8yvE/+6dF9KBeS8QG/yzRJiEqTDtl8JaZrHsYaskYmYEocYJz+V9It3o7CENfrFQhj6NtB8AXCJumW6XboKUzfvbCrB9LLIor0eQgcmbBpXgse1VkOD/e6sZKP3JYZePSiIvrbDWJ0yncr7TW5TzvPGHtsHpQP9x8+fxfmFNNo33PM5kistZBOtrFo983Tx90ys4ZMuYWqDZMbskK2rBowAjzjaoghxHL/4OTZ+eMJCAnNdMPf72WgpZo0+SnCoOJveYalHPuahLfzv4xIiTZoeTs4jIFs7DRpA==",
+      "signature": "gBbvth5tthNMkxh9j9+vU57zsMQ9PoCaWQkCAid4xLCmMe5cepeBYJErmT3TuulEZEek8hsmR4eApBRzevLRBIy3RdAXTSJcu7oOD/JRfdsLAX0fAvITeBFzKSq8zXlgrWT/56fA7LI4Pn4C06c3CFqF4O6jR9zaiBT/40XtGhRU6Yla5x9SD/x5fIvrHNcJwCyCvkI8iFf+XRgR4rB2xwV8hNFl4ItejGhTeEFdY02ZsTTmRzmFmziNpibBY1cdgmRbo5pTZhjyM4zPVFKuQQ/GA1/5wvrcXkXj3OgDxGMbxIf0xEpJrInxQ+bFWu3AN08KlWhYTra82brvdQdvnx2cUJAhBpL/qHHFehWBByQraya7YPLY1alE5jhOU3ieFRPPs1G1FxI0BzfGxG7yuhydCEYy1cNScpSPR2pcVZ+fSwrD2FIyagwYGDZGUD4K9kIgnkncrPUM+MqBMlm5sbpzYp1rLtAV98LV4Tdk9hXTWuVGo+fUTokCyOM5dIIK",
       "signature_algorithm": "rsa-pss-sha256",
       "signature_key_id": "himind-production-2026",
       "source": "github",
-      "source_commit": "3d0f9c3544c28022fa34a3d905cdbdb1731be530",
+      "source_commit": "5da75732210d5e5081a2edf86a0a48a6e59568d0",
       "source_tree": "b4d1cd09255ad16aada761653ffbc9ea6bd0ac95",
       "version": "1.0.4",
       "workflow_id": "com.himind.workflow.software-release"
