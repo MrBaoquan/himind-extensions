@@ -575,20 +575,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "id": "com.himind.extension-development-tools",
           "kind": "plugin",
-          "min_version": "1.3.2",
-          "pinned": true,
+          "id": "com.himind.extension-development-tools",
           "required": true,
+          "min_version": "1.3.2",
+          "version": "1.4.2",
           "sha256": "0b9fdef89d128bb1a56d742dce1bf692d6c13aaaad6b302a7681362e9fe1c23e",
           "source": {
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg",
-            "id": "github:MrBaoquan/himind-extensions",
             "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
             "reference": "plugin/com.himind.extension-development-tools@1.4.2",
-            "repository": "MrBaoquan/himind-extensions"
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg"
           },
-          "version": "1.4.2"
+          "pinned": true
         }
       ],
       "description": "使用中文规范设计、构建、校验、调试并打包 HiMind Agent 插件。",
@@ -658,20 +658,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "id": "com.himind.extension-development-tools",
           "kind": "plugin",
-          "min_version": "1.3.2",
-          "pinned": true,
+          "id": "com.himind.extension-development-tools",
           "required": true,
+          "min_version": "1.3.2",
+          "version": "1.4.2",
           "sha256": "0b9fdef89d128bb1a56d742dce1bf692d6c13aaaad6b302a7681362e9fe1c23e",
           "source": {
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg",
-            "id": "github:MrBaoquan/himind-extensions",
             "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
             "reference": "plugin/com.himind.extension-development-tools@1.4.2",
-            "repository": "MrBaoquan/himind-extensions"
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg"
           },
-          "version": "1.4.2"
+          "pinned": true
         }
       ],
       "description": "使用中文规范设计、构建、校验、调试并打包 HiMind Agent 插件。",
@@ -740,20 +740,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "id": "com.himind.extension-development-tools",
           "kind": "plugin",
-          "min_version": "1.3.1",
-          "pinned": true,
+          "id": "com.himind.extension-development-tools",
           "required": true,
+          "min_version": "1.3.1",
+          "version": "1.4.2",
           "sha256": "0b9fdef89d128bb1a56d742dce1bf692d6c13aaaad6b302a7681362e9fe1c23e",
           "source": {
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg",
-            "id": "github:MrBaoquan/himind-extensions",
             "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
             "reference": "plugin/com.himind.extension-development-tools@1.4.2",
-            "repository": "MrBaoquan/himind-extensions"
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg"
           },
-          "version": "1.4.2"
+          "pinned": true
         }
       ],
       "description": "使用中文规范创建、校验、跨客户端测试、打包并受控提交 HiMind 技能。",
@@ -819,20 +819,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "id": "com.himind.extension-development-tools",
           "kind": "plugin",
-          "min_version": "1.3.1",
-          "pinned": true,
+          "id": "com.himind.extension-development-tools",
           "required": true,
+          "min_version": "1.3.1",
+          "version": "1.4.2",
           "sha256": "0b9fdef89d128bb1a56d742dce1bf692d6c13aaaad6b302a7681362e9fe1c23e",
           "source": {
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg",
-            "id": "github:MrBaoquan/himind-extensions",
             "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
             "reference": "plugin/com.himind.extension-development-tools@1.4.2",
-            "repository": "MrBaoquan/himind-extensions"
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg"
           },
-          "version": "1.4.2"
+          "pinned": true
         }
       ],
       "description": "使用中文规范创建、校验、跨客户端测试、打包并受控提交 HiMind 技能。",
@@ -902,20 +902,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "id": "com.himind.extension-development-tools",
           "kind": "plugin",
-          "min_version": "1.4.0",
-          "pinned": true,
+          "id": "com.himind.extension-development-tools",
           "required": true,
+          "min_version": "1.4.0",
+          "version": "1.4.2",
           "sha256": "0b9fdef89d128bb1a56d742dce1bf692d6c13aaaad6b302a7681362e9fe1c23e",
           "source": {
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg",
-            "id": "github:MrBaoquan/himind-extensions",
             "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
             "reference": "plugin/com.himind.extension-development-tools@1.4.2",
-            "repository": "MrBaoquan/himind-extensions"
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg"
           },
-          "version": "1.4.2"
+          "pinned": true
         }
       ],
       "description": "设计、创建、校验、契约测试、打包并受控提交 HiMind 工作流。",
@@ -985,20 +985,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "id": "com.himind.extension-development-tools",
           "kind": "plugin",
-          "min_version": "1.4.0",
-          "pinned": true,
+          "id": "com.himind.extension-development-tools",
           "required": true,
+          "min_version": "1.4.0",
+          "version": "1.4.2",
           "sha256": "0b9fdef89d128bb1a56d742dce1bf692d6c13aaaad6b302a7681362e9fe1c23e",
           "source": {
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg",
-            "id": "github:MrBaoquan/himind-extensions",
             "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
             "reference": "plugin/com.himind.extension-development-tools@1.4.2",
-            "repository": "MrBaoquan/himind-extensions"
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.extension-development-tools@1.4.2/com.himind.extension-development-tools-1.4.2.hmpkg"
           },
-          "version": "1.4.2"
+          "pinned": true
         }
       ],
       "description": "设计、创建、校验、契约测试、打包并受控提交 HiMind 工作流。",
@@ -1141,20 +1141,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "id": "com.himind.software-distribution",
           "kind": "plugin",
-          "min_version": "1.2.1",
-          "pinned": true,
+          "id": "com.himind.software-distribution",
           "required": true,
+          "min_version": "1.2.1",
+          "version": "1.2.4",
           "sha256": "9ead5149b025b088ad64aaeb709a275067710cab9593ec5a9358c2f1d19ef300",
           "source": {
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.software-distribution@1.2.4/com.himind.software-distribution-1.2.4.hmpkg",
-            "id": "github:MrBaoquan/himind-extensions",
             "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
             "reference": "plugin/com.himind.software-distribution@1.2.4",
-            "repository": "MrBaoquan/himind-extensions"
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.software-distribution@1.2.4/com.himind.software-distribution-1.2.4.hmpkg"
           },
-          "version": "1.2.4"
+          "pinned": true
         }
       ],
       "description": "为 WPF 与 Unity 项目做分发接入检查、制品校验和更新验证。",
@@ -1413,20 +1413,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "id": "com.himind.software-distribution",
           "kind": "plugin",
-          "min_version": "",
-          "pinned": true,
+          "id": "com.himind.software-distribution",
           "required": true,
+          "min_version": "",
+          "version": "1.2.5",
           "sha256": "4c6a58c3658d73232b59eb4a406dc392bf0bfec74b22267bfd676471d6d7779d",
           "source": {
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.software-distribution@1.2.5/com.himind.software-distribution-1.2.5.hmpkg",
-            "id": "github:MrBaoquan/himind-extensions",
             "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
             "reference": "plugin/com.himind.software-distribution@1.2.5",
-            "repository": "MrBaoquan/himind-extensions"
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.software-distribution@1.2.5/com.himind.software-distribution-1.2.5.hmpkg"
           },
-          "version": "1.2.5"
+          "pinned": true
         }
       ],
       "description": "对已构建制品完成接入检查、制品校验、渠道发布与更新验证，发布凭据不经过 AI。",
@@ -1527,20 +1527,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "id": "com.himind.software-distribution",
           "kind": "plugin",
-          "min_version": "",
-          "pinned": true,
+          "id": "com.himind.software-distribution",
           "required": true,
+          "min_version": "",
+          "version": "1.2.4",
           "sha256": "9ead5149b025b088ad64aaeb709a275067710cab9593ec5a9358c2f1d19ef300",
           "source": {
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.software-distribution@1.2.4/com.himind.software-distribution-1.2.4.hmpkg",
-            "id": "github:MrBaoquan/himind-extensions",
             "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
             "reference": "plugin/com.himind.software-distribution@1.2.4",
-            "repository": "MrBaoquan/himind-extensions"
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.software-distribution@1.2.4/com.himind.software-distribution-1.2.4.hmpkg"
           },
-          "version": "1.2.4"
+          "pinned": true
         }
       ],
       "description": "对已构建制品完成接入检查、制品校验、渠道发布与更新验证，发布凭据不经过 AI。",
@@ -1707,7 +1707,9 @@
       ],
       "skill_ids": [
         "com.himind.skill.develop-himind-plugins",
-        "com.himind.skill.develop-himind-skills"
+        "com.himind.skill.develop-himind-skills",
+        "com.himind.skill.develop-himind-workflows",
+        "com.himind.skill.develop-himind-conventions"
       ]
     }
   ]

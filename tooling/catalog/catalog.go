@@ -365,7 +365,15 @@ func DefaultFeaturePacks() []FeaturePack {
 	return []FeaturePack{{
 		ID: "com.himind.feature.extension-authoring", Name: "扩展创作",
 		PluginIDs: []string{"com.himind.extension-development-tools"},
-		SkillIDs:  []string{"com.himind.skill.develop-himind-plugins", "com.himind.skill.develop-himind-skills"},
+		// 能力包必须成套：插件负责脚手架与校验，四个技能分别覆盖插件、技能、
+		// 工作流的创作规范与三类扩展共用的通用约定。少一个，AI 就可能按自己
+		// 的理解去命名或分类，产出的扩展进不了分发链路。
+		SkillIDs: []string{
+			"com.himind.skill.develop-himind-plugins",
+			"com.himind.skill.develop-himind-skills",
+			"com.himind.skill.develop-himind-workflows",
+			"com.himind.skill.develop-himind-conventions",
+		},
 	}}
 }
 
