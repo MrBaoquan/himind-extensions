@@ -91,3 +91,63 @@ func TestDownloadURLEscapesTag(t *testing.T) {
 		t.Fatalf("download url = %q", got)
 	}
 }
+
+func TestBatchTagAndParseRoundTrip(t *testing.T) {
+	tag, err := BatchTag("2.2.3")
+	if err != nil {
+		t.Fatalf("BatchTag: %v", err)
+	}
+	if tag != "batch/2.2.3" {
+		t.Fatalf("tag = %q", tag)
+	}
+	version, err := ParseBatchTag(tag)
+	if err != nil {
+		t.Fatalf("ParseBatchTag: %v", err)
+	}
+	if version != "2.2.3" {
+		t.Fatalf("version = %q", version)
+	}
+	if !IsBatchTag(tag) {
+		t.Fatalf("%q 应被认成批次 tag", tag)
+	}
+	if BatchManifestName("2.2.3") != "batch@2.2.3.json" {
+		t.Fatalf("批次清单名 = %q", BatchManifestName("2.2.3"))
+	}
+}
+
+func TestBatchTagAndReleaseTagNeverOverlap(t *testing.T) {
+	// 两套命名共用同一个 tag 空间。任何一边能解析出另一边的东西，
+	// 「这条 Release 归谁」就有两种答案，回收与门禁都会跟着判错。
+	batchTag, err := BatchTag("2.2.3")
+	if err != nil {
+		t.Fatalf("BatchTag: %v", err)
+	}
+	if _, _, _, err := ParseReleaseTag(batchTag); err == nil {
+		t.Fatalf("批次 tag %q 不该被当成扩展 tag", batchTag)
+	}
+	releaseTag, err := ReleaseTag("skill", "com.himind.x", "2.2.3")
+	if err != nil {
+		t.Fatalf("ReleaseTag: %v", err)
+	}
+	if IsBatchTag(releaseTag) {
+		t.Fatalf("扩展 tag %q 不该被当成批次 tag", releaseTag)
+	}
+}
+
+func TestParseBatchTagRejectsMalformed(t *testing.T) {
+	for _, value := range []string{
+		"",
+		"2.2.3",
+		"batch/",
+		"batch/ ",
+		"batch/2.2.3/",
+		"batch/2.2.3..2",
+		"batch/ 2.2.3",
+		"batch/batch/2.2.3",
+		"batch/skill/com.himind.x@2.2.3",
+	} {
+		if _, err := ParseBatchTag(value); err == nil {
+			t.Fatalf("tag %q 应被拒绝", value)
+		}
+	}
+}

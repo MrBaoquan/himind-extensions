@@ -368,12 +368,17 @@ func validateCatalog(root string, kinds map[string]string) error {
 			if err != nil {
 				return fmt.Errorf("%s: %w", where, err)
 			}
-			tagKind, tagID, tagVersion, err := distribution.ParseReleaseTag(tag)
-			if err != nil {
-				return fmt.Errorf("%s: release_tag %q 不是规范形式: %w", where, tag, err)
-			}
-			if tagKind != kind || tagID != id || tagVersion != version {
-				return fmt.Errorf("%s: release_tag %q 与记录自身不一致", where, tag)
+			// 批次发布时多个成员共用一条 Release，tag 描述的是「这一批」而不是
+			// 某个成员：成员身份由记录自身的 kind/id/version 与规范制品名互相印证，
+			// 后面 file_name 那一步会把这层一致性查完。
+			if !distribution.IsBatchTag(tag) {
+				tagKind, tagID, tagVersion, err := distribution.ParseReleaseTag(tag)
+				if err != nil {
+					return fmt.Errorf("%s: release_tag %q 不是规范形式: %w", where, tag, err)
+				}
+				if tagKind != kind || tagID != id || tagVersion != version {
+					return fmt.Errorf("%s: release_tag %q 与记录自身不一致", where, tag)
+				}
 			}
 			wantArtifact, err := distribution.ArtifactName(kind, id, version)
 			if err != nil {

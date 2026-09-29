@@ -85,8 +85,9 @@ type Published struct {
 
 // Published 返回某扩展在索引里最新的规范发布。
 //
-// 只认 `release_tag` 是规范 tag 的条目：历史扁平 tag 的条目不能作为依赖 pin 的
-// 依据，否则会把「已重做分发」这件事重新绕回旧命名。
+// 只认两类条目：`release_tag` 是本扩展规范 tag 的，以及批次发布（成员与一批共用
+// tag）的。历史扁平 tag 的条目不能作为依赖 pin 的依据，否则会把「已重做分发」
+// 这件事重新绕回旧命名。
 func (c *Catalog) LatestPublished(kind, id string) (Published, bool) {
 	best := Published{}
 	found := false
@@ -98,8 +99,8 @@ func (c *Catalog) LatestPublished(kind, id string) (Published, bool) {
 		if err != nil {
 			continue
 		}
-		tagKind, tagID, version, err := distribution.ParseReleaseTag(tag)
-		if err != nil || tagKind != kind || tagID != id {
+		version, ok := publishedVersion(entry, kind, id, tag)
+		if !ok {
 			continue
 		}
 		if found && CompareVersions(version, best.Version) <= 0 {
@@ -113,6 +114,30 @@ func (c *Catalog) LatestPublished(kind, id string) (Published, bool) {
 		found = true
 	}
 	return best, found
+}
+
+// publishedVersion 推出索引条目对应的版本。
+//
+// 单件发布的 tag 自带 id 与版本，直接读 tag 即可；批次发布的 tag 描述的是整批，
+// 版本只能来自记录自身——此时要求它与规范制品名对得上，否则这条记录自相矛盾，
+// 拿它当依赖 pin 会 pin 到一个取不到的地址。
+func publishedVersion(entry map[string]interface{}, kind, id, tag string) (string, bool) {
+	if !distribution.IsBatchTag(tag) {
+		tagKind, tagID, version, err := distribution.ParseReleaseTag(tag)
+		if err != nil || tagKind != kind || tagID != id {
+			return "", false
+		}
+		return version, true
+	}
+	version, err := entryString(entry, "version")
+	if err != nil {
+		return "", false
+	}
+	expected, err := distribution.ArtifactName(kind, id, version)
+	if err != nil || textOf(entry, "file_name") != expected {
+		return "", false
+	}
+	return version, true
 }
 
 // RepositoryOfEntry 从索引条目的下载地址推出该扩展所在的分发仓。

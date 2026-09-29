@@ -80,16 +80,29 @@ type ReleaseDependency struct {
 
 // Validate 校验清单自洽：版本标识、规范 tag、规范制品名三者必须指向同一个版本。
 // 消费侧与门禁都用它，避免「清单能解析但装不上」。
+//
+// tag 允许两种形态。单件发布时是本扩展自己的 tag，此时三者互相印证；批次发布时
+// 是所在批次的 tag，它描述的是「这一批」而不是任何一个成员，成员身份改由
+// kind/id/version 与规范制品名互相印证——制品名本身就带 id 与版本。
 func (m ReleaseManifest) Validate() error {
 	if m.SchemaVersion != ReleaseManifestSchema {
 		return fmt.Errorf("发布清单版本不受支持: %s（需要 %s）", m.SchemaVersion, ReleaseManifestSchema)
 	}
-	kind, id, version, err := ParseReleaseTag(m.Tag)
-	if err != nil {
-		return err
-	}
-	if kind != strings.TrimSpace(m.Kind) || id != strings.TrimSpace(m.ID) || version != strings.TrimSpace(m.Version) {
-		return fmt.Errorf("发布清单 tag 与 kind/id/version 不一致: %s", m.Tag)
+	kind := strings.TrimSpace(m.Kind)
+	id := strings.TrimSpace(m.ID)
+	version := strings.TrimSpace(m.Version)
+	if IsBatchTag(m.Tag) {
+		if !KnownKind(kind) {
+			return fmt.Errorf("发布清单类型不受支持: %q", m.Kind)
+		}
+	} else {
+		tagKind, tagID, tagVersion, err := ParseReleaseTag(m.Tag)
+		if err != nil {
+			return err
+		}
+		if tagKind != kind || tagID != id || tagVersion != version {
+			return fmt.Errorf("发布清单 tag 与 kind/id/version 不一致: %s", m.Tag)
+		}
 	}
 	expected, err := ArtifactName(kind, id, version)
 	if err != nil {

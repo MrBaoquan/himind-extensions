@@ -118,6 +118,61 @@ func ManifestName(id, version string) string {
 	return fmt.Sprintf("%s@%s.json", strings.TrimSpace(id), strings.TrimSpace(version))
 }
 
+// BatchTagPrefix 是批次 Release 的 tag 前缀。
+//
+// 一个仓库里的扩展可以多到几百件（ECC 技能库就是 268 件技能）。每件单独占一条
+// Release 时，Release 列表会退化成版本流水账：翻不到「当前这一批是什么」，回收
+// 也只能逐条做，而逐条回收必然落后于逐条发布。
+//
+// 批次把「一次同步」收敛成一条 Release：tag 里只放这一批的版本号，成员身份仍然
+// 写在各自的制品名与发布清单里，命名规则一点没变。批次 tag 不带 `@`，与
+// `<kind>/<id>@<version>` 不可能撞名。
+const BatchTagPrefix = "batch/"
+
+// BatchTag 返回批次 Release 的 tag：`batch/<version>`。
+func BatchTag(version string) (string, error) {
+	if err := ensureTagPart("version", version); err != nil {
+		return "", err
+	}
+	trimmed := strings.TrimSpace(version)
+	// 批次 tag 只有两段。放行斜杠会让 `batch/batch/2.2.3` 也解析成合法版本，
+	// 「前缀就能认出归属」这条判断随之失效。
+	if strings.Contains(trimmed, "/") {
+		return "", fmt.Errorf("批次版本不能含 /: %q", version)
+	}
+	return BatchTagPrefix + trimmed, nil
+}
+
+// ParseBatchTag 解析批次 tag，返回这一批的版本号。
+// 非批次 tag 一律拒绝，调用方据此把「扩展自己的 tag」与「批次 tag」分流。
+func ParseBatchTag(tag string) (string, error) {
+	value := strings.TrimSpace(tag)
+	if !strings.HasPrefix(value, BatchTagPrefix) {
+		return "", fmt.Errorf("tag %q 不是 %s<version> 形式的批次 tag", tag, BatchTagPrefix)
+	}
+	version := strings.TrimPrefix(value, BatchTagPrefix)
+	expected, err := BatchTag(version)
+	if err != nil {
+		return "", err
+	}
+	if expected != value {
+		return "", fmt.Errorf("tag %q 不是规范形式，应为 %q", tag, expected)
+	}
+	return version, nil
+}
+
+// IsBatchTag 报告 tag 是否为批次 tag。
+func IsBatchTag(tag string) bool {
+	_, err := ParseBatchTag(tag)
+	return err == nil
+}
+
+// BatchManifestName 返回批次清单文件名：`batch@<version>.json`。
+// 批次清单记录这一批覆盖了什么，制品与发布清单本身不带批次信息。
+func BatchManifestName(version string) string {
+	return fmt.Sprintf("batch@%s.json", strings.TrimSpace(version))
+}
+
 // DownloadURL 返回制品在 GitHub Release 上的下载地址。
 func DownloadURL(repository, tag, fileName string) string {
 	return fmt.Sprintf("%s/releases/download/%s/%s", ReleaseBaseURL(repository), url.PathEscape(tag), url.PathEscape(fileName))

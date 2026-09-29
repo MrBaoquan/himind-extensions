@@ -169,3 +169,44 @@ func TestLoadMergedResolvesDependencyFromAnotherDistribution(t *testing.T) {
 		t.Fatalf("unexpected pin source: %+v", pins[0].Source)
 	}
 }
+
+// 批次发布时 tag 描述的是整批，不代表任何一个成员：版本只能从记录自身读，
+// 且必须与规范制品名对得上，否则 pin 会指向一条取不到的地址。
+func TestLatestPublishedAcceptsBatchTaggedEntry(t *testing.T) {
+	index := New("mrbaoquan/himind-extensions-ecc", "stable", "public")
+	index.FeaturePacks = []FeaturePack{}
+	batchURL := "https://github.com/MrBaoquan/himind-extensions-ecc/releases/download/" +
+		"batch%2F2.2.3/com.mrbaoquan.ecc-skill-sync-1.1.6.hmpkg"
+	index.SetEntries("plugin", []map[string]interface{}{{
+		"plugin_id":    "com.mrbaoquan.ecc-skill-sync",
+		"version":      "1.1.6",
+		"release_tag":  "batch/2.2.3",
+		"file_name":    "com.mrbaoquan.ecc-skill-sync-1.1.6.hmpkg",
+		"sha256":       strings.Repeat("b", 64),
+		"download_url": batchURL,
+		"artifact_id":  "github:batch/2.2.3:com.mrbaoquan.ecc-skill-sync-1.1.6.hmpkg",
+	}})
+	published, ok := index.LatestPublished("plugin", "com.mrbaoquan.ecc-skill-sync")
+	if !ok {
+		t.Fatal("批次发布的条目应当能被依赖 pin 定位")
+	}
+	if published.Version != "1.1.6" || published.Tag != "batch/2.2.3" || published.DownloadURL != batchURL {
+		t.Fatalf("unexpected published: %+v", published)
+	}
+}
+
+// 记录自身与制品名对不上时不能定位：这条记录自相矛盾，pin 出去也装不上。
+func TestLatestPublishedRejectsContradictoryBatchEntry(t *testing.T) {
+	index := New("mrbaoquan/himind-extensions-ecc", "stable", "public")
+	index.FeaturePacks = []FeaturePack{}
+	index.SetEntries("plugin", []map[string]interface{}{{
+		"plugin_id":   "com.mrbaoquan.ecc-skill-sync",
+		"version":     "1.1.6",
+		"release_tag": "batch/2.2.3",
+		"file_name":   "com.mrbaoquan.ecc-skill-sync-1.1.5.hmpkg",
+		"sha256":      strings.Repeat("b", 64),
+	}})
+	if _, ok := index.LatestPublished("plugin", "com.mrbaoquan.ecc-skill-sync"); ok {
+		t.Fatal("制品名与版本不一致的记录不该被定位")
+	}
+}
