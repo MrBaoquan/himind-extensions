@@ -22,7 +22,12 @@
     {"type": "skill", "id": "com.himind.skill.software-ui-spec", "path": "skills/software-ui-spec"},
     {"type": "skill", "id": "com.mrbaoquan.skill.unihper-unity-development", "path": "skills/unihper-unity-development"},
     {"type": "workflow", "id": "com.himind.workflow.software-release", "path": "workflows/software-release"},
-    {"type": "workflow", "id": "com.himind.workflow.tech-radar", "path": "workflows/tech-radar"}
+    {"type": "workflow", "id": "com.himind.workflow.tech-radar", "path": "workflows/tech-radar"},
+    {"type": "expert", "id": "com.himind.expert.software-engineer", "path": "experts/software-engineer"},
+    {"type": "expert", "id": "com.himind.expert.project-architect", "path": "experts/project-architect"},
+    {"type": "expert", "id": "com.himind.expert.senior-system-architect", "path": "experts/senior-system-architect"},
+    {"type": "expert", "id": "com.himind.expert.senior-ui-designer", "path": "experts/senior-ui-designer"},
+    {"type": "expert", "id": "com.himind.expert.senior-test-engineer", "path": "experts/senior-test-engineer"}
   ],
   "feature_packs": [
     {
