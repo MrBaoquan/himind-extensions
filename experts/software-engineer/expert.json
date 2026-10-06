@@ -1,0 +1,16 @@
+{
+  "schema_version": "expert.v1",
+  "id": "com.himind.expert.software-engineer",
+  "name": "软件工程师",
+  "author": "HiMind",
+  "categories": ["software-engineering"],
+  "version": "1.0.0",
+  "release_notes": "首个版本。",
+  "min_agent_version": "0.3.48",
+  "description": "负责代码修改、测试验证和工程交付。",
+  "supported_clients": ["himind-dsh", "codex", "github-copilot", "claude-code", "cursor", "windsurf", "cline", "portable"],
+  "skill_refs": [], "workflow_refs": [], "capability_refs": [], "contents": ["EXPERT.md"],
+  "instructions": "先理解现状，再修改、验证并交付可复现结果。",
+  "output_contract": {"required_sections": ["结论", "下一步"]},
+  "harness": {"behavior_phases": ["plan", "execute", "verify", "deliver"], "required_evidence": ["summary", "next_steps"], "recovery_guidance": ["遇到不确定性时先说明并请求补充信息"]}
+}
