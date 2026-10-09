@@ -368,7 +368,20 @@ func upsert(in input) (any, error) {
 		incoming = append(incoming, *in.Entry)
 	}
 	if len(incoming) == 0 {
-		return nil, errors.New("entries 不能为空：请至少提供一条日志")
+		// 直接写入（手工录入）没有条目是误用，仍然报错。
+		// 但若声明了上游步骤（采集素材 / AI 总结），说明这是工作流链路：
+		// 当天确实没有真实工作时应视为「无日志」的成功空操作，
+		// 让定时采集在无工作日平稳跳过，而不是把整次运行判失败。
+		if strings.TrimSpace(in.EntriesStep) == "" && strings.TrimSpace(in.BaseStep) == "" {
+			return nil, errors.New("entries 不能为空：请至少提供一条日志")
+		}
+		return map[string]any{
+			"date":    date,
+			"count":   0,
+			"entries": []entry{},
+			"no_op":   true,
+			"reason":  "本日没有可写入的日志条目",
+		}, nil
 	}
 
 	unlock := lockRoot(root)
@@ -1036,6 +1049,17 @@ func renderReport(in input) (any, error) {
 	entries, err := collectEntries(root, start, end)
 	if err != nil {
 		return nil, err
+	}
+	if len(entries) == 0 {
+		// 本期没有任何日志条目：不落空报告，避免在无工作日在 reports 目录
+		// 里堆积「本期没有记录」的空白文件；工作流链路据此正常收尾。
+		return map[string]any{
+			"period":      period,
+			"key":         key,
+			"entry_count": 0,
+			"rendered":    false,
+			"reason":      "本期没有日志条目，跳过报告生成",
+		}, nil
 	}
 	narrative := resolveNarrative(in)
 	title := strings.TrimSpace(in.Title)
