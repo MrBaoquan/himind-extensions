@@ -540,6 +540,29 @@ body {
   color: var(--teal);
 }
 
+.entry .exhibit {
+  font-size: 11px;
+  color: #0e7490;
+  background: #ecfeff;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.entry .proj.miss {
+  color: #b45309;
+  background: #fffbeb;
+  border-radius: 4px;
+  padding: 1px 6px;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.entry .proj.miss:hover {
+  background: #fef3c7;
+}
+
 .entry .feat {
   font-size: 11px;
   color: #7c3aed;
@@ -566,6 +589,95 @@ body {
 
 .entry ul.warn li {
   color: var(--warn);
+}
+
+/* 条目精简 / 展开：默认只显示一行摘要，展开后显示完整明细。 */
+.entry .entry-toggle {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 0;
+  margin-left: 8px;
+}
+
+.entry .entry-toggle::after {
+  content: '▾';
+  display: inline-block;
+  margin-left: 3px;
+  font-size: 10px;
+  transform: translateY(-1px);
+}
+
+.entry.expanded .entry-toggle::after {
+  transform: rotate(180deg) translateY(1px);
+}
+
+.entry.compact .summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entry .entry-detail {
+  margin-top: 2px;
+}
+
+.entry.compact .entry-detail {
+  display: none;
+}
+
+/* 按功能分组的头与小计 */
+.feature-group {
+  margin-bottom: 14px;
+}
+
+.feature-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 2px;
+  border-bottom: 1px dashed var(--line);
+  margin-bottom: 8px;
+}
+
+.feature-group-head .fg-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.feature-group-head .fg-tag {
+  font-size: 11px;
+  color: #7c3aed;
+  background: #f5f3ff;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.feature-group-head .fg-meta {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.feature-group-head .fg-note {
+  color: #475569;
+  font-size: 12px;
+  flex-basis: 100%;
+}
+
+.unassigned-banner {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+  border-radius: 8px;
+  font-size: 12px;
 }
 
 .entry .refs {

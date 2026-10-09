@@ -3,9 +3,9 @@
   "name": "工作日志工具",
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
-  "description": "以按日工作日志为核心，把每天的记录结构化归档并支持日历回看；条目带功能/模块与工时，报告按 项目 → 功能 聚合内容小结；项目是一份可管理的登记表（含别名归一与项目维度统计），周报等周期汇总仅作辅助。",
-  "release_notes": "0.5.3：日历与侧栏细节打磨——日期居中、事件数徽标改为紧凑角标不再压住日期，修复“打开目录”按钮换行，并补充交互过渡。\n0.5.2：无工作日不再报错——采集/总结没有条目时写入与报告按成功空操作跳过，便于定时采集平稳运行。",
-  "version": "0.5.3",
+  "description": "以按日工作日志为核心：条目带项目/展项、功能与工时，默认精简可展开，按功能分组；报告按 项目→功能 聚合，项目登记表支持别名归一与看板同步。",
+  "release_notes": "0.6.0：时间线按功能分组、条目默认精简可展开、新增展项维度并落到项目/展项，项目登记表支持从项目看板同步。",
+  "version": "0.6.0",
   "distribution_targets": ["workbench", "github"],
   "entry": "bin/work-log.exe",
   "runtime": "process-jsonrpc-stdio",
@@ -38,6 +38,7 @@
               "session_id": {"type": "string"},
               "project": {"type": "string"},
               "feature": {"type": "string", "description": "功能/模块名，用于按项目下的功能归类与小计"},
+              "exhibit": {"type": "string", "description": "展项名（项目下的具体展项），可留空"},
               "category": {"type": "string", "enum": ["开发", "修复", "设计", "调研", "文档", "评审", "会议", "运维", "其他"], "description": "受控工作类型（中文枚举），未知值会被视为「其他」"},
               "minutes": {"type": "integer", "minimum": 0, "maximum": 1440, "description": "工时（分钟）"},
               "minutes_source": {"type": "string", "enum": ["measured", "span", "estimated", "manual"]},
@@ -73,6 +74,7 @@
                 "session_id": {"type": "string"},
                 "project": {"type": "string"},
                 "feature": {"type": "string", "description": "功能/模块名，用于按项目下的功能归类与小计"},
+                "exhibit": {"type": "string", "description": "展项名（项目下的具体展项），可留空"},
                 "category": {"type": "string", "enum": ["开发", "修复", "设计", "调研", "文档", "评审", "会议", "运维", "其他"], "description": "受控工作类型（中文枚举），未知值会被视为「其他」"},
                 "minutes": {"type": "integer", "minimum": 0, "maximum": 1440, "description": "工时（分钟）"},
                 "minutes_source": {"type": "string", "enum": ["measured", "span", "estimated", "manual"]},
@@ -282,6 +284,22 @@
           "category": {"type": "string"},
           "tag": {"type": "string"},
           "session_id": {"type": "string"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.project.sync",
+      "description": "把工作台项目（含展项）并入本地项目登记表（项目看板同步入口）",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "projects": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+          "projects_step": {"type": "string"}
         },
         "required": [],
         "additionalProperties": false

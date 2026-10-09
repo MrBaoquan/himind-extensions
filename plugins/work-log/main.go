@@ -94,6 +94,10 @@ type input struct {
 	IncludeStats     *bool    `json:"include_stats"`
 	ResolveProjects  *bool    `json:"resolve_projects"`
 	RegisterProjects *bool    `json:"register_projects"`
+	// Projects / ProjectsStep 用于从工作台同步项目（含展项）到本地登记表：
+	// Projects 直接给数组，ProjectsStep 指向工作流里取工作台项目列表的上游步骤。
+	Projects     []map[string]any `json:"projects"`
+	ProjectsStep string           `json:"projects_step"`
 	// 来源配置（通用可配置来源）：sources 为声明式来源规格数组。
 	Sources  []map[string]any `json:"sources"`
 	SourceID string           `json:"source_id"`
@@ -113,6 +117,12 @@ type entry struct {
 	SessionID string `json:"session_id"`
 	Project   string `json:"project"`
 	Feature   string `json:"feature,omitempty"`
+	// Exhibit 是「展项」维度（工作台项目下的展项）。项目为主、展项可选：
+	// 条目至少应落到项目；能从工作台或素材判定展项时再落到展项。
+	Exhibit string `json:"exhibit,omitempty"`
+	// ProjectID / ExhibitID 是命中工作台登记后的稳定 ID（未命中留空，供用户确认后再补）。
+	ProjectID string `json:"project_id,omitempty"`
+	ExhibitID string `json:"exhibit_id,omitempty"`
 	Category  string `json:"category"`
 	StartedAt string `json:"started_at"`
 	EndedAt   string `json:"ended_at"`
@@ -185,6 +195,9 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 		return rpcResult(result, err)
 	case "work-log.project.assign":
 		result, err := projectAssignCap(in)
+		return rpcResult(result, err)
+	case "work-log.project.sync":
+		result, err := projectSyncCap(in)
 		return rpcResult(result, err)
 	case "work-log.source.list":
 		result, err := sourceListCap(in)
@@ -363,6 +376,11 @@ func upsert(in input) (any, error) {
 	if !validDate(date) {
 		return nil, errors.New("date 必须是 YYYY-MM-DD 格式")
 	}
+	// 若提供了工作台项目（含展项），先并入登记表；后续条目归一与项目/展项落点会用到。
+	// 同步失败不阻断写入：登记表已有内容仍可继续按名称归一。
+	if len(in.Projects) > 0 || strings.TrimSpace(in.ProjectsStep) != "" {
+		_, _ = projectSyncCap(in)
+	}
 	incoming := append([]entry{}, resolveEntries(in)...)
 	if in.Entry != nil {
 		incoming = append(incoming, *in.Entry)
@@ -424,6 +442,12 @@ func upsert(in input) (any, error) {
 	register := in.RegisterProjects == nil || *in.RegisterProjects
 	if _, err := applyProjectRegistry(root, day.Entries, resolve, register); err != nil {
 		return nil, err
+	}
+	// 用登记表补上稳定的项目/展项 ID（工作台同步进来的项目也会在这里被命中）。
+	if resolve || register {
+		if pf, err := readProjects(root); err == nil {
+			enrichEntryLinks(pf, day.Entries)
+		}
 	}
 	if err := writeDay(root, day); err != nil {
 		return nil, err
@@ -1583,6 +1607,9 @@ func timelineLines(entries []entry) string {
 		if item.Feature != "" {
 			meta = append(meta, "功能:"+item.Feature)
 		}
+		if item.Exhibit != "" {
+			meta = append(meta, "展项:"+item.Exhibit)
+		}
 		meta = append(meta, "["+categoryLabel(item.Category)+"]")
 		builder.WriteString("- " + strings.Join(meta, " · ") + " " + fallbackValue(item.Title, "(未命名)") + "\n")
 		if item.Summary != "" {
@@ -1684,6 +1711,9 @@ func featureBlocks(project string, items []entry, narratives map[string]string) 
 		}
 		for _, item := range group {
 			line := "- " + fallbackValue(item.Title, "(未命名)")
+			if item.Exhibit != "" {
+				line += "〔展项：" + item.Exhibit + "〕"
+			}
 			if item.Summary != "" {
 				line += "：" + item.Summary
 			}

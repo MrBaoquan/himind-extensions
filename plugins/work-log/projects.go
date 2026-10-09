@@ -27,8 +27,22 @@ type project struct {
 	Description string   `json:"description,omitempty"`
 	Status      string   `json:"status"`
 	Color       string   `json:"color,omitempty"`
-	CreatedAt   string   `json:"created_at"`
-	UpdatedAt   string   `json:"updated_at"`
+	// Source 标明项目来源：local（本地登记）或 workbench（从项目看板同步）。
+	Source string `json:"source,omitempty"`
+	// ExternalID 是工作台里的项目 ID（命中同步时填充），用于稳定关联。
+	ExternalID string `json:"external_id,omitempty"`
+	// Exhibits 是该项目下的展项（可选维度）。展项也支持别名。
+	Exhibits  []exhibit `json:"exhibits,omitempty"`
+	CreatedAt string    `json:"created_at"`
+	UpdatedAt string    `json:"updated_at"`
+}
+
+// exhibit 是项目下的展项（工作台维度）。
+type exhibit struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Aliases    []string `json:"aliases,omitempty"`
+	ExternalID string   `json:"external_id,omitempty"`
 }
 
 type projectsFile struct {
@@ -257,6 +271,9 @@ func projectListCap(in input) (any, error) {
 			"description": p.Description,
 			"status":      p.Status,
 			"color":       p.Color,
+			"source":      p.Source,
+			"external_id": p.ExternalID,
+			"exhibits":    exhibitsToMaps(p.Exhibits),
 			"created_at":  p.CreatedAt,
 			"updated_at":  p.UpdatedAt,
 		}
@@ -541,6 +558,252 @@ func assignSelectorMatches(item entry, in input) bool {
 		}
 	}
 	return true
+}
+
+// ---------- 工作台项目同步 ----------
+
+// workbenchProjectsFromStep 读取上游步骤输出里的项目数组（兼容 {items:[...]} 与直接数组）。
+func workbenchProjectsFromStep(in input, stepID string) []map[string]any {
+	stepID = strings.TrimSpace(stepID)
+	if stepID == "" {
+		return nil
+	}
+	out := upstreamStepOutput(in, stepID)
+	if out == nil {
+		return nil
+	}
+	for _, key := range []string{"items", "projects", "list", "data"} {
+		if arr, ok := out[key].([]any); ok {
+			return asMapList(arr)
+		}
+	}
+	return nil
+}
+
+func asMapList(arr []any) []map[string]any {
+	out := make([]map[string]any, 0, len(arr))
+	for _, node := range arr {
+		if m, ok := node.(map[string]any); ok {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func mapStr(m map[string]any, key string) string {
+	if m == nil {
+		return ""
+	}
+	if v, ok := m[key]; ok {
+		if s, ok := v.(string); ok {
+			return strings.TrimSpace(s)
+		}
+	}
+	return ""
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}
+
+// exhibitsFromWorkbench 从工作台项目对象里解析展项数组。
+func exhibitsFromWorkbench(item map[string]any) []exhibit {
+	raw, _ := item["exhibits"].([]any)
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make([]exhibit, 0, len(raw))
+	for _, node := range raw {
+		m, ok := node.(map[string]any)
+		if !ok {
+			continue
+		}
+		name := firstNonEmpty(mapStr(m, "name"), mapStr(m, "exhibit_name"), mapStr(m, "title"))
+		if name == "" {
+			continue
+		}
+		out = append(out, exhibit{
+			ID:         "ex-" + shortHash(normalizeProjectKey(name)),
+			Name:       name,
+			ExternalID: firstNonEmpty(mapStr(m, "id"), mapStr(m, "exhibit_id")),
+		})
+	}
+	return out
+}
+
+func mergeExhibits(current, incoming []exhibit) []exhibit {
+	if len(incoming) == 0 {
+		return current
+	}
+	seen := map[string]bool{}
+	out := make([]exhibit, 0, len(current)+len(incoming))
+	for _, ex := range append(append([]exhibit{}, current...), incoming...) {
+		key := normalizeProjectKey(ex.Name)
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, ex)
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+func exhibitsToMaps(items []exhibit) []map[string]any {
+	out := make([]map[string]any, 0, len(items))
+	for _, ex := range items {
+		out = append(out, map[string]any{
+			"id":          ex.ID,
+			"name":        ex.Name,
+			"aliases":     nonNilStrings(ex.Aliases),
+			"external_id": ex.ExternalID,
+		})
+	}
+	return out
+}
+
+// matchProjectIndex 按 external_id、规范名或别名找已登记项目的下标，找不到返回 -1。
+func matchProjectIndex(pf projectsFile, name, externalID string) int {
+	if externalID != "" {
+		for i := range pf.Projects {
+			if pf.Projects[i].ExternalID == externalID {
+				return i
+			}
+		}
+	}
+	key := normalizeProjectKey(name)
+	if canonical, ok := projectIndex(pf)[key]; ok {
+		key = normalizeProjectKey(canonical)
+	}
+	if key == "" {
+		return -1
+	}
+	for i := range pf.Projects {
+		if normalizeProjectKey(pf.Projects[i].Name) == key {
+			return i
+		}
+		for _, alias := range pf.Projects[i].Aliases {
+			if normalizeProjectKey(alias) == key {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+func aliasMatches(aliases []string, raw string) bool {
+	key := normalizeProjectKey(raw)
+	if key == "" {
+		return false
+	}
+	for _, a := range aliases {
+		if normalizeProjectKey(a) == key {
+			return true
+		}
+	}
+	return false
+}
+
+// enrichEntryLinks 用登记表给条目补上稳定的项目/展项 ID，并把展项名归一。
+func enrichEntryLinks(pf projectsFile, entries []entry) {
+	index := projectIndex(pf)
+	for i := range entries {
+		raw := strings.TrimSpace(entries[i].Project)
+		if raw == "" {
+			continue
+		}
+		canonical, ok := resolveProjectName(index, raw)
+		if !ok {
+			continue
+		}
+		entries[i].Project = canonical
+		for _, p := range pf.Projects {
+			if !strings.EqualFold(p.Name, canonical) {
+				continue
+			}
+			entries[i].ProjectID = p.ID
+			if ex := strings.TrimSpace(entries[i].Exhibit); ex != "" {
+				for _, item := range p.Exhibits {
+					if strings.EqualFold(item.Name, ex) || aliasMatches(item.Aliases, ex) {
+						entries[i].Exhibit = item.Name
+						entries[i].ExhibitID = item.ID
+						break
+					}
+				}
+			}
+			break
+		}
+	}
+}
+
+// projectSyncCap 把工作台项目（含展项）并入本地登记表；已存在则补齐 source/external_id/展项。
+func projectSyncCap(in input) (any, error) {
+	root, err := logRoot(in.LogRoot)
+	if err != nil {
+		return nil, err
+	}
+	items := in.Projects
+	if len(items) == 0 {
+		items = workbenchProjectsFromStep(in, in.ProjectsStep)
+	}
+	unlock := lockRoot(root)
+	defer unlock()
+	pf, err := readProjects(root)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now().Format(time.RFC3339)
+	created, updated := 0, 0
+	for _, raw := range items {
+		name := firstNonEmpty(mapStr(raw, "project_name"), mapStr(raw, "name"))
+		if name == "" {
+			continue
+		}
+		externalID := firstNonEmpty(mapStr(raw, "id"), mapStr(raw, "project_id"))
+		exhibits := exhibitsFromWorkbench(raw)
+
+		at := matchProjectIndex(pf, name, externalID)
+		if at < 0 {
+			pf.Projects = append(pf.Projects, project{
+				ID:         makeProjectID(name),
+				Name:       name,
+				Aliases:    []string{},
+				Status:     "active",
+				Source:     "workbench",
+				ExternalID: externalID,
+				Exhibits:   exhibits,
+				CreatedAt:  now,
+				UpdatedAt:  now,
+			})
+			created++
+			continue
+		}
+		p := pf.Projects[at]
+		if externalID != "" {
+			p.ExternalID = externalID
+		}
+		p.Source = "workbench"
+		p.Exhibits = mergeExhibits(p.Exhibits, exhibits)
+		p.UpdatedAt = now
+		pf.Projects[at] = p
+		updated++
+	}
+	if created > 0 || updated > 0 {
+		if err := writeProjects(root, pf); err != nil {
+			return nil, err
+		}
+	}
+	return map[string]any{
+		"log_root": root,
+		"total":    len(items),
+		"created":  created,
+		"updated":  updated,
+	}, nil
 }
 
 func mapInt(value any) int {

@@ -57,6 +57,7 @@
     editingEntry: null,
     query: '',
     searchResults: null,
+    expanded: {},
   };
 
   const REPORT_TABS = ['daily', 'weekly', 'quarterly', 'yearly'];
@@ -304,17 +305,36 @@
     el('detail-badges').innerHTML = badges.join('');
   }
 
-  function entryCard(item) {
+  // entryCard 渲染一条日志。默认精简（一行摘要），点「展开」看完整明细。
+  // opts.groupBy === 'feature' 时省略功能标签（已由分组头承载）。
+  function entryCard(item, opts) {
     const entryID = text(item.entry_id);
-    const head = ['<div class="entry" data-entry-id="' + escapeHTML(entryID) + '"><div class="entry-head">'];
+    const grouped = !!(opts && opts.groupBy === 'feature');
+    const expanded = !!state.expanded[entryID];
+    const head = [
+      '<div class="entry ' +
+        (expanded ? 'expanded' : 'compact') +
+        '" data-entry-id="' +
+        escapeHTML(entryID) +
+        '"><div class="entry-head">',
+    ];
     const span = formatSpan(item);
     if (span) {
       head.push('<span class="time">' + escapeHTML(span) + '</span>');
     }
     head.push('<strong>' + escapeHTML(text(item.title, '(未命名)')) + '</strong>');
     head.push('<span class="cat">' + escapeHTML(catLabel(item.category)) + '</span>');
-    if (text(item.project)) head.push('<span class="proj">' + escapeHTML(item.project) + '</span>');
-    if (text(item.feature)) head.push('<span class="feat">' + escapeHTML(item.feature) + '</span>');
+    if (text(item.project)) {
+      head.push('<span class="proj" title="项目">' + escapeHTML(item.project) + '</span>');
+    } else if (entryID) {
+      head.push(
+        '<button type="button" class="proj miss" data-action="assign" data-entry-id="' +
+          escapeHTML(entryID) +
+          '" title="还没落到项目，点击补全">未落项目</button>',
+      );
+    }
+    if (!grouped && text(item.feature)) head.push('<span class="feat">' + escapeHTML(item.feature) + '</span>');
+    if (text(item.exhibit)) head.push('<span class="exhibit" title="展项">' + escapeHTML(item.exhibit) + '</span>');
     if (Number(item.minutes) > 0) {
       const source = MINUTES_SOURCE_LABELS[item.minutes_source] || text(item.minutes_source, '工时');
       head.push('<span class="mins">' + escapeHTML(minutesLabel(item.minutes)) + ' · ' + escapeHTML(source) + '</span>');
@@ -331,16 +351,31 @@
           '</span>',
       );
     }
+    head.push(
+      '<button type="button" class="entry-toggle" data-action="toggle" data-entry-id="' +
+        escapeHTML(entryID) +
+        '">' +
+        (expanded ? '收起' : '展开') +
+        '</button>',
+    );
     head.push('</div>');
-    if (text(item.summary)) head.push('<p class="summary">' + escapeHTML(item.summary) + '</p>');
-    head.push(listBlock('交付', item.outcomes));
-    head.push(listBlock('决策', item.decisions));
-    head.push(listBlock('经验', item.learnings));
-    head.push(listBlock('阻塞', item.blockers, true));
-    head.push(listBlock('后续', item.next));
+
+    // 精简态的一行预览：优先摘要，其次第一条交付/决策。
+    const preview = text(item.summary) || firstBullet(item);
+    if (preview) head.push('<p class="summary" title="' + escapeHTML(preview) + '">' + escapeHTML(preview) + '</p>');
+
+    const detail = [];
+    if (text(item.summary) && firstBullet(item)) {
+      // 摘要已在预览显示，展开时补充余下要点即可。
+    }
+    detail.push(listBlock('交付', item.outcomes));
+    detail.push(listBlock('决策', item.decisions));
+    detail.push(listBlock('经验', item.learnings));
+    detail.push(listBlock('阻塞', item.blockers, true));
+    detail.push(listBlock('后续', item.next));
     const refs = (item.refs || []).filter((ref) => text(ref && ref.value));
     if (refs.length) {
-      head.push(
+      detail.push(
         '<div class="refs">' +
           refs
             .map((ref) => {
@@ -357,8 +392,20 @@
           '</div>',
       );
     }
+    head.push('<div class="entry-detail">' + detail.join('') + '</div>');
     head.push('</div>');
     return head.join('');
+  }
+
+  // firstBullet 取条目里第一条可读要点，用于精简态预览。
+  function firstBullet(item) {
+    for (const key of ['outcomes', 'decisions', 'blockers', 'next']) {
+      const values = item[key] || [];
+      for (const value of values) {
+        if (text(value)) return text(value);
+      }
+    }
+    return '';
   }
 
   function listBlock(label, values, warn) {
@@ -412,7 +459,75 @@
         '清空搜索框可回到完整时间线。',
       ]);
     }
-    return entries.map(entryCard).join('');
+    return renderFeatureGroups(entries);
+  }
+
+  // renderFeatureGroups 把一天的条目按「功能」分组，逐组给确定性小计。
+  // 条目的项目/展项落点直接显示在每张卡片上；未落项目的在顶部提示补全。
+  function renderFeatureGroups(entries) {
+    const groups = {};
+    const order = [];
+    entries.forEach((item) => {
+      const key = text(item.feature, '未分类功能');
+      if (!groups[key]) {
+        groups[key] = [];
+        order.push(key);
+      }
+      groups[key].push(item);
+    });
+    order.sort((a, b) => {
+      if (groups[a].length !== groups[b].length) return groups[b].length - groups[a].length;
+      return a < b ? -1 : 1;
+    });
+
+    const unassigned = entries.filter((item) => !text(item.project));
+    let html = '';
+    if (unassigned.length) {
+      html +=
+        '<div class="unassigned-banner" role="note">有 ' +
+        escapeHTML(unassigned.length) +
+        ' 条还没落到项目：点卡片上的「未落项目」即可补全（可留空，稍后确认）。</div>';
+    }
+    html += order
+      .map((key) => {
+        const items = groups[key];
+        const minutes = items.reduce((sum, item) => sum + (Number(item.minutes) || 0), 0);
+        const note = featureNote(items);
+        return (
+          '<section class="feature-group">' +
+          '<div class="feature-group-head">' +
+          '<span class="fg-tag">功能</span>' +
+          '<span class="fg-name">' +
+          escapeHTML(key) +
+          '</span>' +
+          '<span class="fg-meta">' +
+          escapeHTML(items.length) +
+          ' 条' +
+          (minutes > 0 ? ' · 约 ' + escapeHTML(hoursLabel(minutes)) : '') +
+          '</span>' +
+          (note ? '<span class="fg-note">' + escapeHTML(note) + '</span>' : '') +
+          '</div>' +
+          items.map((item) => entryCard(item, { groupBy: 'feature' })).join('') +
+          '</section>'
+        );
+      })
+      .join('');
+    return html;
+  }
+
+  // featureNote 生成该功能组的确定性小计：优先组内首条摘要，否则拼前两条交付。
+  function featureNote(items) {
+    for (const item of items) {
+      if (text(item.summary)) return item.summary;
+    }
+    const outcomes = [];
+    items.forEach((item) => {
+      (item.outcomes || []).forEach((value) => {
+        const line = text(value);
+        if (line && outcomes.indexOf(line) < 0) outcomes.push(line);
+      });
+    });
+    return outcomes.slice(0, 2).join('；');
   }
 
   function markdownToHTML(markdown) {
@@ -529,6 +644,21 @@
       panel.querySelectorAll('[data-action="edit"]').forEach((node) => {
         node.addEventListener('click', () => startEdit(node.getAttribute('data-entry-id')));
       });
+      panel.querySelectorAll('[data-action="assign"]').forEach((node) => {
+        node.addEventListener('click', () => startEdit(node.getAttribute('data-entry-id')));
+      });
+      panel.querySelectorAll('[data-action="toggle"]').forEach((node) => {
+        node.addEventListener('click', () => {
+          const id = node.getAttribute('data-entry-id');
+          state.expanded[id] = !state.expanded[id];
+          const card = node.closest('.entry');
+          if (card) {
+            card.classList.toggle('expanded', !!state.expanded[id]);
+            card.classList.toggle('compact', !state.expanded[id]);
+            node.textContent = state.expanded[id] ? '收起' : '展开';
+          }
+        });
+      });
       panel.querySelectorAll('[data-action="delete"]').forEach((node) => {
         node.addEventListener('click', () => armDelete(node));
       });
@@ -617,6 +747,21 @@
         .map((name) => '<option value="' + escapeHTML(name) + '"></option>')
         .join('');
     }
+
+    // 展项候选：汇总所有项目下的展项名，供录入时联想。
+    const exhibits = [];
+    state.projects.forEach((item) => {
+      (item.exhibits || []).forEach((ex) => {
+        const name = text(ex && ex.name);
+        if (name && exhibits.indexOf(name) < 0) exhibits.push(name);
+      });
+    });
+    const exList = el('exhibit-options');
+    if (exList) {
+      exList.innerHTML = exhibits
+        .map((name) => '<option value="' + escapeHTML(name) + '"></option>')
+        .join('');
+    }
   }
 
   function renderProjectsPanel() {
@@ -639,6 +784,11 @@
         const range = text(item.first_date)
           ? escapeHTML(item.first_date) + ' ~ ' + escapeHTML(text(item.last_date))
           : '暂无记录';
+        const exhibits = (item.exhibits || []).map((ex) => text(ex && ex.name)).filter(Boolean);
+        const src = text(item.source) === 'workbench' ? '<span class="badge new">看板</span>' : '';
+        const exhibitTag = exhibits.length
+          ? ' · 展项 ' + escapeHTML(exhibits.length)
+          : '';
         return (
           '<div class="proj-row" data-id="' +
           escapeHTML(item.id) +
@@ -646,6 +796,7 @@
           escapeHTML(item.name) +
           '">' +
           '<div class="proj-main"><strong>' +
+          src +
           escapeHTML(item.name) +
           '</strong><span class="proj-meta">' +
           escapeHTML(item.entry_count || 0) +
@@ -653,6 +804,8 @@
           escapeHTML(item.active_days || 0) +
           ' 天 · ' +
           range +
+          exhibitTag +
+          (exhibits.length ? '（' + escapeHTML(exhibits.slice(0, 4).join('、')) + (exhibits.length > 4 ? ' 等' : '') + '）' : '') +
           '</span></div>' +
           '<div class="proj-edit">' +
           '<input class="proj-alias-input" type="text" value="' +
@@ -850,6 +1003,7 @@
     el('m-title').value = entry ? text(entry.title) : '';
     el('m-project').value = entry ? text(entry.project) : '';
     el('m-feature').value = entry ? text(entry.feature) : '';
+    el('m-exhibit').value = entry ? text(entry.exhibit) : '';
     el('m-minutes').value = entry && Number(entry.minutes) > 0 ? String(entry.minutes) : '';
     el('m-category').value = (() => {
       const label = entry ? catLabel(entry.category) : '';
@@ -932,7 +1086,8 @@
   // 原样回传（含 created_at），保存会被直接拒绝。这正是「编辑保存失败：unknown
   // property: created_at」的根因，所以编辑时按白名单挑选字段而不是整条克隆。
   const ENTRY_FIELDS = [
-    'entry_id', 'date', 'source', 'session_id', 'project', 'feature', 'category',
+    'entry_id', 'date', 'source', 'session_id', 'project', 'feature', 'exhibit',
+    'project_id', 'exhibit_id', 'category',
     'minutes', 'minutes_source', 'started_at', 'ended_at', 'title', 'summary',
     'outcomes', 'decisions', 'learnings', 'blockers', 'next', 'tags', 'refs',
   ];
@@ -963,6 +1118,10 @@
     entry.title = title;
     entry.project = text(el('m-project').value);
     entry.feature = text(el('m-feature').value);
+    entry.exhibit = text(el('m-exhibit').value);
+    // 项目/展项 ID 由后端按登记表重新推导，避免改项目后残留旧 ID。
+    delete entry.project_id;
+    delete entry.exhibit_id;
     entry.category = text(el('m-category').value, '其他');
     entry.summary = text(el('m-summary').value);
     entry.outcomes = splitList(el('m-outcomes').value);
