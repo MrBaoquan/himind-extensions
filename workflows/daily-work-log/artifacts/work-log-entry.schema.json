@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "工作日志条目写入结果",
+  "type": "object",
+  "required": ["date", "count"],
+  "properties": {
+    "date": {"type": "string"},
+    "count": {"type": "integer"},
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "entry_id": {"type": "string"},
+          "date": {"type": "string"},
+          "source": {"type": "string"},
+          "session_id": {"type": "string"},
+          "project": {"type": "string"},
+          "category": {"type": "string"},
+          "started_at": {"type": "string"},
+          "ended_at": {"type": "string"},
+          "title": {"type": "string"},
+          "summary": {"type": "string"},
+          "outcomes": {"type": "array", "items": {"type": "string"}},
+          "decisions": {"type": "array", "items": {"type": "string"}},
+          "learnings": {"type": "array", "items": {"type": "string"}},
+          "blockers": {"type": "array", "items": {"type": "string"}},
+          "next": {"type": "array", "items": {"type": "string"}},
+          "tags": {"type": "array", "items": {"type": "string"}},
+          "created_at": {"type": "string"},
+          "updated_at": {"type": "string"}
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {"type": "object"}
+    }
+  }
+}

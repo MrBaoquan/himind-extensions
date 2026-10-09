@@ -1711,6 +1711,17 @@
         "com.himind.skill.develop-himind-workflows",
         "com.himind.skill.develop-himind-conventions"
       ]
+    },
+    {
+      "id": "com.himind.feature.work-log",
+      "name": "工作日志",
+      "plugin_ids": [
+        "com.himind.work-log",
+        "com.himind.work-log-collector"
+      ],
+      "skill_ids": [
+        "com.himind.skill.work-log"
+      ]
     }
   ]
 }

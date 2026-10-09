@@ -1,0 +1,88 @@
+{
+  "id": "com.himind.work-log-collector",
+  "name": "工作日志采集器",
+  "author": "马宝全",
+  "categories": ["collaboration-delivery", "docs-knowledge"],
+  "description": "探测本机 AI 客户端的会话存储，把指定日期的会话整理成日志素材；内置 Codex、Claude、OpenCode、Copilot，并支持声明式通用来源接入更多客户端。",
+  "release_notes": "0.2.1：采集能力声明更长超时（扫描 600 秒、来源探测 120 秒），避免来源较多时被默认 30 秒超时中断。",
+  "version": "0.2.1",
+  "distribution_targets": ["workbench", "github"],
+  "entry": "bin/work-log-collector.exe",
+  "runtime": "process-jsonrpc-stdio",
+  "platforms": ["windows-x64"],
+  "min_agent_version": "0.3.0",
+  "governance": "optional",
+  "capabilities": [
+    {
+      "id": "work-log.session.sources",
+      "description": "探测本机 AI 客户端会话来源并汇报可用性（含原生与通用可配置来源）",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "home": {"type": "string"},
+          "roots": {
+            "type": "object",
+            "additionalProperties": {"type": "string"}
+          },
+          "sqlite3_path": {"type": "string"},
+          "log_root": {"type": "string", "description": "工作日志根目录，用于定位 <根>/config/sources.json"},
+          "sources_config_path": {"type": "string", "description": "通用来源配置文件路径，覆盖默认的 <log_root>/config/sources.json"},
+          "sources_config": {
+            "type": "array",
+            "description": "内联通用来源规格，优先级最高",
+            "items": {"type": "object"}
+          },
+          "include_presets": {"type": "boolean", "description": "是否启用内置通用来源预设，默认 true"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only",
+      "timeout_seconds": 120
+    },
+    {
+      "id": "work-log.session.scan",
+      "description": "把指定日期区间的会话整理成日志素材摘要",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "source": {"type": "string", "description": "来源 ID（如 codex、claude、cursor…）或 all"},
+          "from": {"type": "string"},
+          "to": {"type": "string"},
+          "date": {"type": "string"},
+          "session_id": {"type": "string"},
+          "home": {"type": "string"},
+          "roots": {
+            "type": "object",
+            "additionalProperties": {"type": "string"}
+          },
+          "sqlite3_path": {"type": "string"},
+          "limit": {"type": "integer", "minimum": 1, "maximum": 500},
+          "max_prompts": {"type": "integer", "minimum": 1, "maximum": 50},
+          "max_chars": {"type": "integer", "minimum": 200, "maximum": 20000},
+          "log_root": {"type": "string", "description": "工作日志根目录，用于定位 <根>/config/sources.json"},
+          "sources_config_path": {"type": "string", "description": "通用来源配置文件路径"},
+          "sources_config": {
+            "type": "array",
+            "description": "内联通用来源规格，优先级最高",
+            "items": {"type": "object"}
+          },
+          "include_presets": {"type": "boolean", "description": "是否启用内置通用来源预设，默认 true"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only",
+      "timeout_seconds": 600
+    }
+  ],
+  "permissions": ["filesystem.workspace.read"],
+  "contributes": {
+    "commands": [
+      {"id": "work-log.session.scan", "title": "采集会话日志素材"},
+      {"id": "work-log.session.sources", "title": "查看会话来源"}
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "工作日志日报渲染结果",
+  "type": "object",
+  "required": ["report"],
+  "properties": {
+    "report": {
+      "type": "object",
+      "required": ["period", "key", "markdown"],
+      "properties": {
+        "period": {"type": "string"},
+        "key": {"type": "string"},
+        "title": {"type": "string"},
+        "date_from": {"type": "string"},
+        "date_to": {"type": "string"},
+        "entry_count": {"type": "integer"},
+        "narrative_used": {"type": "boolean"},
+        "md_path": {"type": "string"},
+        "html_path": {"type": "string"},
+        "markdown": {"type": "string"}
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {"type": "object"}
+    }
+  }
+}

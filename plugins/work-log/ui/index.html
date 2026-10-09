@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>工作日志 · 日历回看</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">🗒️</span>
+        <div class="brand-text">
+          <strong>工作日志</strong>
+          <small>以按日日志为核心 · 按日历回看</small>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button id="record" class="btn primary" type="button">记录一条</button>
+        <button id="refresh" class="btn" type="button">刷新</button>
+      </div>
+    </header>
+
+    <p class="notice" id="notice" hidden></p>
+
+    <section id="manual-form" class="manual" hidden>
+      <div class="manual-head">
+        <strong>手动记录一条工作日志</strong>
+        <span class="meta">纯手工入口，不依赖任何会话采集。</span>
+      </div>
+      <div class="manual-grid">
+        <label class="field"><span>日期</span><input id="m-date" type="date" /></label>
+        <label class="field"><span>标题</span><input id="m-title" type="text" placeholder="今天主要做了什么" /></label>
+        <label class="field"><span>项目</span><input id="m-project" type="text" list="project-options" placeholder="从项目列表选择或输入，可留空" /></label>
+        <datalist id="project-options"></datalist>
+        <label class="field"><span>类型</span>
+          <select id="m-category">
+            <option value="development">开发</option>
+            <option value="meeting">会议</option>
+            <option value="review">评审</option>
+            <option value="docs">文档</option>
+            <option value="research">调研</option>
+            <option value="ops">运维</option>
+            <option value="other">其他</option>
+          </select>
+        </label>
+      </div>
+      <label class="field block"><span>摘要</span><textarea id="m-summary" rows="2" placeholder="一句话说明成果与要点"></textarea></label>
+      <div class="manual-grid">
+        <label class="field"><span>交付（逗号分隔）</span><input id="m-outcomes" type="text" placeholder="完成 A，上线 B" /></label>
+        <label class="field"><span>后续（逗号分隔）</span><input id="m-next" type="text" placeholder="明天继续 C" /></label>
+      </div>
+      <div class="manual-actions">
+        <button id="m-save" class="btn primary" type="button">保存到日志</button>
+        <button id="m-cancel" class="btn" type="button">取消</button>
+      </div>
+    </section>
+
+    <main class="layout">
+      <aside class="rail">
+        <div class="cal-head">
+          <button id="cal-prev" class="cal-nav" type="button" aria-label="上个月">‹</button>
+          <strong id="cal-title">—</strong>
+          <button id="cal-next" class="cal-nav" type="button" aria-label="下个月">›</button>
+        </div>
+        <div class="cal-weekdays" id="cal-weekdays" aria-hidden="true"></div>
+        <div class="cal-grid" id="cal-grid" role="grid" aria-label="工作日志月历"></div>
+        <label class="cal-filter"><span>按项目</span>
+          <select id="cal-project" aria-label="按项目筛选日历">
+            <option value="">全部项目</option>
+          </select>
+        </label>
+        <div class="cal-stats" id="cal-stats"></div>
+        <p class="rail-foot" id="log-root" title=""></p>
+      </aside>
+
+      <section class="detail">
+        <div class="detail-head">
+          <div>
+            <h1 id="detail-title">选择一个日期</h1>
+            <p id="detail-subtitle">左侧月历按天统计；点一天查看当天时间线。</p>
+          </div>
+          <div class="detail-tools">
+            <span id="detail-badges" class="badges"></span>
+          </div>
+        </div>
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="timeline" role="tab" type="button">时间线</button>
+          <button class="tab" data-tab="daily" role="tab" type="button">日报</button>
+          <button class="tab" data-tab="projects" role="tab" type="button">项目</button>
+        </div>
+        <details class="more">
+          <summary>周期汇总（周 / 季度 / 年度，辅助视图）</summary>
+          <div class="tabs sub" role="tablist">
+            <button class="tab" data-tab="weekly" role="tab" type="button">周报</button>
+            <button class="tab" data-tab="quarterly" role="tab" type="button">季度</button>
+            <button class="tab" data-tab="yearly" role="tab" type="button">年度</button>
+          </div>
+        </details>
+        <div class="panel">
+          <section id="panel" class="panel-body"></section>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

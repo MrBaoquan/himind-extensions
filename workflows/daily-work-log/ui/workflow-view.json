@@ -1,0 +1,60 @@
+{
+  "schema_version": "workflow_view.v1",
+  "title": "每日工作日志",
+  "sections": [
+    {
+      "id": "scope",
+      "title": "采集范围",
+      "fields": [
+        {
+          "id": "date",
+          "label": "目标日期",
+          "type": "text",
+          "required": false,
+          "placeholder": "YYYY-MM-DD，留空表示今天"
+        },
+        {
+          "id": "source",
+          "label": "会话来源",
+          "type": "select",
+          "required": false,
+          "default": "all",
+          "options": ["all", "codex", "claude", "opencode", "copilot"]
+        },
+        {
+          "id": "sqlite3_path",
+          "label": "sqlite3 路径",
+          "type": "text",
+          "required": false,
+          "placeholder": "读取 OpenCode/Copilot 会话库需要，例如 ...\\platform-tools\\sqlite3.exe"
+        }
+      ]
+    },
+    {
+      "id": "archive",
+      "title": "归档位置",
+      "fields": [
+        {
+          "id": "log_root",
+          "label": "工作日志根目录",
+          "type": "text",
+          "required": false,
+          "placeholder": "留空使用默认目录（文档\\HiMind\\工作日志）"
+        },
+        {
+          "id": "period",
+          "label": "报告周期（默认日报，周/季度/年度为辅助）",
+          "type": "select",
+          "required": false,
+          "default": "daily",
+          "options": ["daily", "weekly", "quarterly", "yearly"]
+        }
+      ]
+    }
+  ],
+  "actions": [
+    "collect",
+    "write",
+    "report"
+  ]
+}

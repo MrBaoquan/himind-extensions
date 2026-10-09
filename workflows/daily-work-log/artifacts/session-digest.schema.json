@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "会话素材摘要",
+  "type": "object",
+  "required": ["sessions", "total"],
+  "properties": {
+    "home": {"type": "string"},
+    "from": {"type": "string"},
+    "to": {"type": "string"},
+    "total": {"type": "integer"},
+    "truncated": {"type": "boolean"},
+    "sessions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source", "session_id", "date"],
+        "properties": {
+          "source": {"type": "string"},
+          "session_id": {"type": "string"},
+          "project": {"type": "string"},
+          "directory": {"type": "string"},
+          "title": {"type": "string"},
+          "date": {"type": "string"},
+          "started_at": {"type": "string"},
+          "ended_at": {"type": "string"},
+          "turn_count": {"type": "integer"},
+          "user_prompts": {"type": "array", "items": {"type": "string"}},
+          "assistant_excerpts": {"type": "array", "items": {"type": "string"}},
+          "cost": {"type": "number"},
+          "tokens_input": {"type": "integer"},
+          "tokens_output": {"type": "integer"},
+          "ref": {"type": "string"},
+          "truncated": {"type": "boolean"}
+        }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "skipped": {
+      "type": "array",
+      "items": {"type": "object"}
+    }
+  }
+}

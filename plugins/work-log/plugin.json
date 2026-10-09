@@ -1,0 +1,364 @@
+{
+  "id": "com.himind.work-log",
+  "name": "工作日志工具",
+  "author": "马宝全",
+  "categories": ["collaboration-delivery", "docs-knowledge"],
+  "description": "以按日工作日志为核心，把每天的记录结构化归档并支持日历回看；项目是一份可管理的登记表（含别名归一与项目维度统计），周报等周期汇总仅作辅助。",
+  "release_notes": "0.2.1：工作流 Artifact 改为落盘合规 JSON（日报 JSON 侧车、条目文件带 count），修复 exitpoint 校验失败。",
+  "version": "0.2.1",
+  "distribution_targets": ["workbench", "github"],
+  "entry": "bin/work-log.exe",
+  "runtime": "process-jsonrpc-stdio",
+  "platforms": ["windows-x64"],
+  "min_agent_version": "0.3.0",
+  "governance": "optional",
+  "capabilities": [
+    {
+      "id": "work-log.entry.upsert",
+      "description": "写入或合并某天的日志条目，按稳定 ID 幂等去重",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "date": {"type": "string"},
+          "mode": {"type": "string", "enum": ["merge", "replace"]},
+          "resolve_projects": {"type": "boolean", "description": "按项目登记表归一项目名，默认 true"},
+          "register_projects": {"type": "boolean", "description": "自动登记未知名项目，默认 true"},
+          "entries_step": {"type": "string"},
+          "workflow_context": {"type": "object", "additionalProperties": true},
+          "entry": {
+            "type": "object",
+            "properties": {
+              "entry_id": {"type": "string"},
+              "date": {"type": "string"},
+              "source": {"type": "string"},
+              "session_id": {"type": "string"},
+              "project": {"type": "string"},
+              "category": {"type": "string"},
+              "started_at": {"type": "string"},
+              "ended_at": {"type": "string"},
+              "title": {"type": "string"},
+              "summary": {"type": "string"},
+              "outcomes": {"type": "array", "items": {"type": "string"}},
+              "decisions": {"type": "array", "items": {"type": "string"}},
+              "learnings": {"type": "array", "items": {"type": "string"}},
+              "blockers": {"type": "array", "items": {"type": "string"}},
+              "next": {"type": "array", "items": {"type": "string"}},
+              "tags": {"type": "array", "items": {"type": "string"}},
+              "refs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {"type": {"type": "string"}, "value": {"type": "string"}},
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "entry_id": {"type": "string"},
+                "date": {"type": "string"},
+                "source": {"type": "string"},
+                "session_id": {"type": "string"},
+                "project": {"type": "string"},
+                "category": {"type": "string"},
+                "started_at": {"type": "string"},
+                "ended_at": {"type": "string"},
+                "title": {"type": "string"},
+                "summary": {"type": "string"},
+                "outcomes": {"type": "array", "items": {"type": "string"}},
+                "decisions": {"type": "array", "items": {"type": "string"}},
+                "learnings": {"type": "array", "items": {"type": "string"}},
+                "blockers": {"type": "array", "items": {"type": "string"}},
+                "next": {"type": "array", "items": {"type": "string"}},
+                "tags": {"type": "array", "items": {"type": "string"}},
+                "refs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {"type": {"type": "string"}, "value": {"type": "string"}},
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.entry.list",
+      "description": "按日期区间、项目、分类、来源或标签查询日志",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "date": {"type": "string"},
+          "from": {"type": "string"},
+          "to": {"type": "string"},
+          "project": {"type": "string"},
+          "category": {"type": "string"},
+          "source": {"type": "string"},
+          "tag": {"type": "string"},
+          "limit": {"type": "integer", "minimum": 1, "maximum": 5000}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.entry.read",
+      "description": "读取某一天的日志条目",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "date": {"type": "string"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.archive.list",
+      "description": "列出有日志的日期与已生成的报告，供视图浏览",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "date": {"type": "string"},
+          "from": {"type": "string"},
+          "to": {"type": "string"},
+          "limit": {"type": "integer", "minimum": 1, "maximum": 2000}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.archive.calendar",
+      "description": "按月生成日历统计，标注每天日志数量与项目",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "date": {"type": "string"},
+          "year": {"type": "integer"},
+          "month": {"type": "integer"},
+          "week_start": {"type": "string", "enum": ["monday", "sunday"]},
+          "project": {"type": "string", "description": "只统计命中该项目的条目"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.project.list",
+      "description": "列出项目登记表与每个项目的条目统计，并给出未归类的原始项目名",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "status": {"type": "string", "enum": ["active", "archived"]},
+          "include_stats": {"type": "boolean"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.project.upsert",
+      "description": "新增或更新项目登记（名称、别名、描述、状态、颜色）",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "project_id": {"type": "string"},
+          "project_name": {"type": "string"},
+          "aliases": {"type": "array", "items": {"type": "string"}},
+          "description": {"type": "string"},
+          "status": {"type": "string", "enum": ["active", "archived"]},
+          "color": {"type": "string"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.project.delete",
+      "description": "按 ID 或名称删除项目登记（不影响既有条目）",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "project_id": {"type": "string"},
+          "project_name": {"type": "string"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.project.resolve",
+      "description": "把一个原始项目名按登记表归一为规范项目名",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "project": {"type": "string"},
+          "project_name": {"type": "string"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.project.assign",
+      "description": "把一批已有条目重新归到目标项目，用于清理历史归类",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "project": {"type": "string"},
+          "project_name": {"type": "string"},
+          "from": {"type": "string"},
+          "to": {"type": "string"},
+          "date": {"type": "string"},
+          "current_project": {"type": "string"},
+          "source": {"type": "string"},
+          "category": {"type": "string"},
+          "tag": {"type": "string"},
+          "session_id": {"type": "string"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.source.list",
+      "description": "读取通用可配置来源（<日志根>/config/sources.json）",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {"log_root": {"type": "string"}},
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.source.save",
+      "description": "保存通用可配置来源规格，供采集器读取",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "mode": {"type": "string", "enum": ["merge", "replace"]},
+          "sources": {"type": "array", "items": {"type": "object", "additionalProperties": true}}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.report.render",
+      "description": "把区间日志聚合渲染为日、周、季度或年度报告并归档",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "period": {"type": "string", "enum": ["daily", "weekly", "quarterly", "yearly"]},
+          "date": {"type": "string"},
+          "narrative": {"type": "string"},
+          "title": {"type": "string"},
+          "narrative_step": {"type": "string"},
+          "workflow_context": {"type": "object", "additionalProperties": true}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.report.read",
+      "description": "读取已生成的某周期报告 Markdown 与网页",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "period": {"type": "string", "enum": ["daily", "weekly", "quarterly", "yearly"]},
+          "date": {"type": "string"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.link.open",
+      "description": "用系统默认程序打开引用链接",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {"url": {"type": "string"}},
+        "required": ["url"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_action"
+    }
+  ],
+  "permissions": ["filesystem.workspace.read", "filesystem.workspace.write"],
+  "contributes": {
+    "views": [
+      {
+        "id": "work-log.timeline",
+        "title": "工作日志 · 日历回看",
+        "short_title": "工作日志",
+        "icon": "calendar",
+        "quick_access": true,
+        "order": 45,
+        "location": "plugin_navigation",
+        "entry": "ui/index.html"
+      }
+    ],
+    "commands": [
+      {"id": "work-log.entry.upsert", "title": "记录今日工作日志"},
+      {"id": "work-log.archive.calendar", "title": "按日历回看工作日志"},
+      {"id": "work-log.report.render", "title": "生成当日工作简报"},
+      {"id": "work-log.archive.list", "title": "浏览工作日志归档"},
+      {"id": "work-log.project.list", "title": "查看项目归类"}
+    ]
+  }
+}

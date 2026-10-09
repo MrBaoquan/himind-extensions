@@ -1,0 +1,141 @@
+{
+  "schema_version": "workflow_package.v1",
+  "id": "com.himind.workflow.daily-work-log",
+  "version": "0.2.0",
+  "distribution_targets": ["workbench", "github"],
+  "name": "每日工作日志",
+  "description": "采集本机 AI 会话素材，按会话整理成结构化条目写入全局工作日志，并生成日报归档。",
+  "release_notes": "0.2.0：采集支持通用可配置来源与更多客户端；写入时按项目登记表自动归类项目。",
+  "min_agent_version": "0.3.47",
+  "local_requirements": {
+    "platform": "windows",
+    "workspace": "directory",
+    "required_tools": [],
+    "recommended_tools": []
+  },
+  "execution_policy": "segmented",
+  "entrypoints": [
+    {
+      "id": "collect",
+      "at_step": "WL-COLLECT",
+      "label": "只采集会话素材",
+      "requires": []
+    },
+    {
+      "id": "write",
+      "at_step": "WL-WRITE",
+      "label": "只写入工作日志",
+      "requires": []
+    },
+    {
+      "id": "report",
+      "at_step": "WL-REPORT",
+      "label": "只生成日报",
+      "requires": []
+    }
+  ],
+  "exits": [
+    {
+      "id": "collected",
+      "at_step": "WL-COLLECT",
+      "label": "会话素材已就绪",
+      "produces": ["session_digest"]
+    },
+    {
+      "id": "recorded",
+      "at_step": "WL-WRITE",
+      "label": "工作日志已写入",
+      "produces": ["work_log_entry"]
+    },
+    {
+      "id": "reported",
+      "at_step": "WL-REPORT",
+      "label": "日报已归档",
+      "produces": ["work_log_report"]
+    }
+  ],
+  "capabilities": [
+    "work-log.session.scan",
+    "work-log.entry.upsert",
+    "work-log.report.render"
+  ],
+  "dependencies": {
+    "skills": [],
+    "plugins": [
+      "com.himind.work-log",
+      "com.himind.work-log-collector"
+    ],
+    "connectors": [],
+    "runtimes": []
+  },
+  "steps": [
+    {
+      "id": "WL-COLLECT",
+      "title": "采集会话素材",
+      "kind": "capability",
+      "capability_id": "work-log.session.scan",
+      "execution_mode": "long_running",
+      "risk_level": "read_only",
+      "input": {
+        "timeout_seconds": 300
+      }
+    },
+    {
+      "id": "WL-WRITE",
+      "title": "写入工作日志",
+      "kind": "capability",
+      "capability_id": "work-log.entry.upsert",
+      "execution_mode": "sync",
+      "risk_level": "local_write",
+      "input": {
+        "entries_step": "WL-COLLECT"
+      },
+      "depends_on": ["WL-COLLECT"]
+    },
+    {
+      "id": "WL-REPORT",
+      "title": "生成日报",
+      "kind": "capability",
+      "capability_id": "work-log.report.render",
+      "execution_mode": "sync",
+      "risk_level": "local_write",
+      "depends_on": ["WL-WRITE"]
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "session-digest",
+      "artifact_type": "session_digest",
+      "name": "会话素材摘要",
+      "schema": "artifacts/session-digest.schema.json",
+      "required": false,
+      "validation": "advisory",
+      "max_bytes": 4194304
+    },
+    {
+      "id": "work-log-entry",
+      "artifact_type": "work_log_entry",
+      "name": "工作日志条目",
+      "schema": "artifacts/work-log-entry.schema.json",
+      "required": false,
+      "validation": "advisory",
+      "max_bytes": 2097152
+    },
+    {
+      "id": "work-log-report",
+      "artifact_type": "work_log_report",
+      "name": "工作日志日报",
+      "schema": "artifacts/work-log-report.schema.json",
+      "required": false,
+      "validation": "advisory",
+      "max_bytes": 2097152
+    }
+  ],
+  "ui": {
+    "mode": "declarative",
+    "surfaces": ["agent"],
+    "entry": "ui/workflow-view.json"
+  },
+  "supported_runtimes": [],
+  "created_at": "2026-10-09T08:52:32Z"
+}
