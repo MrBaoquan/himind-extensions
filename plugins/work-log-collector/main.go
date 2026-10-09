@@ -331,11 +331,17 @@ func scanCap(in input) (any, error) {
 		digests = append(digests, found...)
 	}
 
-	// 按会话标识过滤与去重。
+	// 按会话标识过滤与去重，并丢弃没有任何用户内容的空会话（例如被误识别的客户端
+	// 状态文件，workbuddy 的 window-state 之类），避免空壳污染素材与 AI 上下文。
 	filtered := make([]sessionDigest, 0, len(digests))
 	seen := map[string]bool{}
+	empty := 0
 	for _, d := range digests {
 		if id := strings.TrimSpace(in.SessionID); id != "" && d.SessionID != id {
+			continue
+		}
+		if len(d.UserPrompts) == 0 && len(d.AssistantExcerpts) == 0 {
+			empty++
 			continue
 		}
 		key := d.Source + "|" + d.SessionID
@@ -345,6 +351,9 @@ func scanCap(in input) (any, error) {
 		seen[key] = true
 		trimDigest(&d, maxPrompts, maxChars)
 		filtered = append(filtered, d)
+	}
+	if empty > 0 {
+		skipped = append(skipped, map[string]any{"source": "all", "reason": "跳过无用户内容的空会话", "count": empty})
 	}
 	sort.Slice(filtered, func(i, j int) bool { return filtered[i].StartedAt > filtered[j].StartedAt })
 	truncated := false

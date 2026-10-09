@@ -239,12 +239,9 @@
             const projects = (cell.projects || []).join('、');
             const hours = hoursLabel(cell.total_minutes);
             const titleAttr =
-              text(cell.date) +
-              (projects ? ' · ' + projects : '') +
-              (hours ? ' · 约 ' + hours : '');
+              text(cell.date) + (projects ? ' · ' + projects : '') + (hours ? ' · 约 ' + hours : '');
             const marker =
               cell.entry_count > 0 ? '<span class="cal-count">' + escapeHTML(cell.entry_count) + '</span>' : '';
-            const hoursMark = hours ? '<span class="cal-hours">' + escapeHTML(hours) + '</span>' : '';
             return (
               '<button type="button" role="gridcell" class="' +
               classes.join(' ') +
@@ -256,7 +253,6 @@
               escapeHTML(cell.day) +
               '</span>' +
               marker +
-              hoursMark +
               '</button>'
             );
           })
