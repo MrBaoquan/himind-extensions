@@ -46,10 +46,12 @@ description: 把当前 AI 会话整理成结构化工作日志并写入全局日
 
 - `title`：动词开头的一句话，说明具体结果。
 - `project`：项目或主题名，尽量稳定可检索。写入时插件会按项目登记表归一：命中登记名或别名就归到规范项目，未知名称自动登记。可用 `work-log.project.list` 查看已有项目，优先复用已有名字。
+- `feature`：这条工作所属的功能 / 模块（如“日历视图”“项目登记表”），用于在项目下按功能归类与小计。能从会话里的目录、模块名判断就填；判断不了就留空，报告会归入“未分类功能”。
 - `category`：`development` / `meeting` / `review` / `docs` / `research` / `ops` / `other`。
 - `source`：当前客户端标识，如 `codex`、`opencode`、`copilot`、`himind-ai`。
 - `session_id`：能拿到会话标识时填写，用于同日重复整理时幂等合并。
-- `started_at` / `ended_at`：只有明确时间才填。
+- `started_at` / `ended_at`：只有明确时间才填，填 RFC3339 或能解析的时间。
+- `minutes` / `minutes_source`：这条工作的工时（分钟）与来源。能用会话时间戳估算就用 `measured`（按消息间隔算活跃时长）；只有起止时间用 `span`；只能按轮次估用 `estimated`；人工填写用 `manual`。不确定工时就留空，不要编造。
 - `summary`：一两句话说明成果与要点。
 - `outcomes` / `decisions` / `learnings` / `blockers` / `next`：字符串数组，没有就留空。
 - `tags`：可检索标签。
@@ -71,9 +73,12 @@ description: 把当前 AI 会话整理成结构化工作日志并写入全局日
         "source": "codex",
         "session_id": "<可选>",
         "project": "<项目>",
+        "feature": "<功能/模块，可选>",
         "category": "development",
         "title": "<一句话结果>",
         "summary": "<要点>",
+        "minutes": 60,
+        "minutes_source": "measured",
         "outcomes": ["<产出>"],
         "next": ["<后续>"]
       }
@@ -96,7 +101,11 @@ description: 把当前 AI 会话整理成结构化工作日志并写入全局日
   "arguments": {
     "period": "daily",
     "date": "<YYYY-MM-DD>",
-    "narrative": "<由你提炼的一段主线叙述>"
+    "narrative": "<由你提炼的一段主线叙述>",
+    "narratives": {
+      "<项目>": "<该项目的整体小结>",
+      "<项目>/<功能>": "<该功能的小结>"
+    }
   }
 }
 ```
@@ -104,6 +113,7 @@ description: 把当前 AI 会话整理成结构化工作日志并写入全局日
 - `period` 默认 `daily`；`weekly` / `quarterly` / `yearly` 是弱化的辅助视图，只在用户点名时使用，日常回看走“工作日志 · 日历回看”的月历。
 - `date` 用目标周期内的任意一天。
 - `narrative` 是你基于真实条目提炼的主线，不要写成空泛套话；不确定就省略，插件会退回确定性聚合。
+- `narratives` 是分项目 / 分功能的模型小结：键用项目名，或 `项目/功能` 精确到功能。报告会先给确定性的“按项目 · 按功能”内容小结，再在此基础上叠加你的叙述；没有就不写，不要编造。
 - 报告会同时生成 Markdown 与自包含网页，落在全局日志库的 `reports/` 下。
 
 ### 6. 汇报
@@ -111,10 +121,10 @@ description: 把当前 AI 会话整理成结构化工作日志并写入全局日
 按顺序返回：
 
 1. `日期`：本次整理的日期与范围。
-2. `写入条目`：标题列表与 `project` / `category`。
+2. `写入条目`：按项目 → 功能分组列出标题，并标出 `category` 与工时（标明实测 / 区间 / 估算）。
 3. `日志库`：写入的全局目录或报告路径。
 4. `报告`：是否生成日报（默认），以及键名（如 `2026-10-09`）。
-5. `待确认`：跳过或无法确认的内容。
+5. `待确认`：跳过或无法确认的内容，以及工时无法判断的部分。
 
 不要输出会话原文、凭据、完整本机路径清单或与日志无关的细节。
 

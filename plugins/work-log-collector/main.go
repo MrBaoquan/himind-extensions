@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -214,11 +215,14 @@ type sessionDigest struct {
 	Source            string   `json:"source"`
 	SessionID         string   `json:"session_id"`
 	Project           string   `json:"project,omitempty"`
+	Feature           string   `json:"feature,omitempty"`
 	Directory         string   `json:"directory,omitempty"`
 	Title             string   `json:"title,omitempty"`
 	Date              string   `json:"date"`
 	StartedAt         string   `json:"started_at,omitempty"`
 	EndedAt           string   `json:"ended_at,omitempty"`
+	Minutes           int      `json:"minutes,omitempty"`
+	MinutesSource     string   `json:"minutes_source,omitempty"`
 	TurnCount         int      `json:"turn_count"`
 	UserPrompts       []string `json:"user_prompts"`
 	AssistantExcerpts []string `json:"assistant_excerpts,omitempty"`
@@ -355,6 +359,103 @@ func scanCap(in input) (any, error) {
 	}, nil
 }
 
+// ---- 工时与功能推断 ----
+
+const (
+	// idleGapMinutes 是相邻消息可计入工时的最大间隔；超过则视为离开/挂机，不计入。
+	idleGapMinutes = 20
+	// maxEntryMinutes 是单条日志工时的上限（8 小时），避免异常长会话把统计拉爆。
+	maxEntryMinutes = 480
+)
+
+// activeMinutes 用相邻消息的时间间隔估算「活跃工时」：只累计不超过 idleGapMinutes
+// 的间隔，从而尽量剔除离开、挂机时间。至少两条消息才有意义。
+func activeMinutes(times []time.Time) int {
+	if len(times) < 2 {
+		return 0
+	}
+	ordered := append([]time.Time(nil), times...)
+	sort.Slice(ordered, func(i, j int) bool { return ordered[i].Before(ordered[j]) })
+	total := 0.0
+	for index := 1; index < len(ordered); index++ {
+		gap := ordered[index].Sub(ordered[index-1]).Minutes()
+		if gap <= 0 {
+			continue
+		}
+		if gap > idleGapMinutes {
+			gap = idleGapMinutes
+		}
+		total += gap
+	}
+	return clampMinutes(int(math.Round(total)))
+}
+
+// spanMinutes 用起止时间给出粗粒度工时（精度低于 activeMinutes，仅在没有逐条时间时使用）。
+func spanMinutes(started, ended time.Time) int {
+	if started.IsZero() || ended.IsZero() || !ended.After(started) {
+		return 0
+	}
+	return clampMinutes(int(math.Round(ended.Sub(started).Minutes())))
+}
+
+// estimateMinutes 在完全没有时间信息时，按轮次给出保守估算。
+func estimateMinutes(turns int) int {
+	if turns <= 0 {
+		return 0
+	}
+	return clampMinutes(turns * 3)
+}
+
+func clampMinutes(minutes int) int {
+	if minutes < 0 {
+		return 0
+	}
+	if minutes > maxEntryMinutes {
+		return maxEntryMinutes
+	}
+	return minutes
+}
+
+// featureFromDirectory 尽力从会话工作目录推断「功能/模块」：优先取 git 仓库内、
+// 相对仓库根的末级目录；没有仓库信息时，若目录名与项目名不同则取目录名。
+func featureFromDirectory(directory, project string) string {
+	directory = strings.TrimSpace(directory)
+	if directory == "" {
+		return ""
+	}
+	clean := filepath.Clean(directory)
+	if root := gitRoot(clean); root != "" {
+		relative, err := filepath.Rel(root, clean)
+		if err == nil && relative != "." && relative != "" && !strings.HasPrefix(relative, "..") {
+			parts := strings.Split(filepath.ToSlash(relative), "/")
+			last := strings.TrimSpace(parts[len(parts)-1])
+			if last != "" && last != "." {
+				return last
+			}
+		}
+		return ""
+	}
+	base := filepath.Base(clean)
+	if base != "" && base != "." && base != string(filepath.Separator) && !strings.EqualFold(base, strings.TrimSpace(project)) {
+		return base
+	}
+	return ""
+}
+
+// gitRoot 向上查找最近的 git 仓库根（.git 目录或 .git 文件），找不到返回空。
+func gitRoot(dir string) string {
+	for {
+		if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
+}
+
 // candidateEntries 把会话素材映射成工作日志条目草稿，字段与 com.himind.work-log
 // 的写入契约对齐，便于工作流把采集结果直接交给写入能力（确定性、无需人工）。
 func candidateEntries(digests []sessionDigest) []map[string]any {
@@ -364,17 +465,37 @@ func candidateEntries(digests []sessionDigest) []map[string]any {
 		if summary == "" {
 			summary = strings.TrimSpace(strings.Join(digest.UserPrompts, "\n"))
 		}
-		entries = append(entries, map[string]any{
+		feature := strings.TrimSpace(digest.Feature)
+		if feature == "" {
+			feature = featureFromDirectory(digest.Directory, digest.Project)
+		}
+		minutes := digest.Minutes
+		minutesSource := digest.MinutesSource
+		if minutes == 0 {
+			if estimated := estimateMinutes(digest.TurnCount); estimated > 0 {
+				minutes = estimated
+				minutesSource = "estimated"
+			}
+		}
+		item := map[string]any{
 			"source":     digest.Source,
 			"session_id": digest.SessionID,
 			"project":    digest.Project,
 			"category":   "other",
-			"started_at": digest.Date,
-			"ended_at":   digest.Date,
+			"started_at": digest.StartedAt,
+			"ended_at":   digest.EndedAt,
 			"title":      digest.Title,
 			"summary":    summary,
 			"tags":       []string{"自动采集"},
-		})
+		}
+		if feature != "" {
+			item["feature"] = feature
+		}
+		if minutes > 0 {
+			item["minutes"] = minutes
+			item["minutes_source"] = minutesSource
+		}
+		entries = append(entries, item)
 	}
 	return entries
 }
@@ -535,6 +656,7 @@ func parseCodexFile(file string) (sessionDigest, bool, error) {
 
 	digest := sessionDigest{Source: "codex", Ref: file}
 	var started, ended time.Time
+	var times []time.Time
 	var userPrompts, assistantExcerpts []string
 	decoder := json.NewDecoder(handle)
 	for {
@@ -549,6 +671,7 @@ func parseCodexFile(file string) (sessionDigest, bool, error) {
 			if ts.After(ended) {
 				ended = ts
 			}
+			times = append(times, ts)
 		}
 		switch record.Type {
 		case "session_meta":
@@ -612,7 +735,22 @@ func parseCodexFile(file string) (sessionDigest, bool, error) {
 	if digest.Directory != "" {
 		digest.Project = filepath.Base(digest.Directory)
 	}
+	digest.Minutes, digest.MinutesSource = resolveMinutes(times, started, ended, digest.TurnCount)
 	return digest, true, nil
+}
+
+// resolveMinutes 优先用逐条消息间隔实测工时，其次用起止区间，最后按轮次估算。
+func resolveMinutes(times []time.Time, started, ended time.Time, turns int) (int, string) {
+	if measured := activeMinutes(times); measured > 0 {
+		return measured, "measured"
+	}
+	if span := spanMinutes(started, ended); span > 0 {
+		return span, "span"
+	}
+	if estimated := estimateMinutes(turns); estimated > 0 {
+		return estimated, "estimated"
+	}
+	return 0, ""
 }
 
 // ---- Claude Code 索引 ----
@@ -670,6 +808,7 @@ func scanClaude(root string, start, end time.Time) ([]sessionDigest, error) {
 			if !modified.IsZero() {
 				digest.EndedAt = modified.Format(time.RFC3339)
 			}
+			digest.Minutes, digest.MinutesSource = resolveMinutes(nil, created, modified, digest.TurnCount)
 			if digest.SessionID == "" {
 				continue
 			}
@@ -712,6 +851,7 @@ func scanOpenCode(sqlite3Path, db string, start, end time.Time) ([]sessionDigest
 	}
 	prompts := map[string][]string{}
 	excerpts := map[string][]string{}
+	msgTimes := map[string][]time.Time{}
 	for _, row := range messages {
 		text := extractText(asString(row, "data"))
 		if strings.TrimSpace(text) == "" {
@@ -723,6 +863,9 @@ func scanOpenCode(sqlite3Path, db string, start, end time.Time) ([]sessionDigest
 			prompts[id] = append(prompts[id], text)
 		case "assistant":
 			excerpts[id] = append(excerpts[id], firstLine(text, 240))
+		}
+		if created := asInt64(row, "time_created"); created > 0 {
+			msgTimes[id] = append(msgTimes[id], time.UnixMilli(created))
 		}
 	}
 	var digests []sessionDigest
@@ -749,6 +892,7 @@ func scanOpenCode(sqlite3Path, db string, start, end time.Time) ([]sessionDigest
 			digest.EndedAt = updated.Format(time.RFC3339)
 		}
 		digest.TurnCount = len(digest.UserPrompts)
+		digest.Minutes, digest.MinutesSource = resolveMinutes(msgTimes[id], created, updated, digest.TurnCount)
 		digests = append(digests, digest)
 	}
 	return digests, nil
@@ -773,6 +917,7 @@ func scanCopilot(sqlite3Path, db string, start, end time.Time) ([]sessionDigest,
 	}
 	prompts := map[string][]string{}
 	excerpts := map[string][]string{}
+	turnTimes := map[string][]time.Time{}
 	for _, row := range turns {
 		id := asString(row, "session_id")
 		if text := strings.TrimSpace(asString(row, "user_message")); text != "" {
@@ -780,6 +925,9 @@ func scanCopilot(sqlite3Path, db string, start, end time.Time) ([]sessionDigest,
 		}
 		if text := strings.TrimSpace(asString(row, "assistant_response")); text != "" {
 			excerpts[id] = append(excerpts[id], firstLine(text, 240))
+		}
+		if ts := parseSQLiteTime(asString(row, "timestamp")); !ts.IsZero() {
+			turnTimes[id] = append(turnTimes[id], ts)
 		}
 	}
 	var digests []sessionDigest
@@ -807,6 +955,7 @@ func scanCopilot(sqlite3Path, db string, start, end time.Time) ([]sessionDigest,
 			digest.EndedAt = updated.Format(time.RFC3339)
 		}
 		digest.TurnCount = len(digest.UserPrompts)
+		digest.Minutes, digest.MinutesSource = resolveMinutes(turnTimes[id], created, updated, digest.TurnCount)
 		digests = append(digests, digest)
 	}
 	return digests, nil

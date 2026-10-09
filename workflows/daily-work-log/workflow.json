@@ -1,11 +1,11 @@
 {
   "schema_version": "workflow_package.v1",
   "id": "com.himind.workflow.daily-work-log",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "distribution_targets": ["workbench", "github"],
   "name": "每日工作日志",
-  "description": "采集本机 AI 会话素材，按会话整理成结构化条目写入全局工作日志，并生成日报归档。",
-  "release_notes": "0.2.0：采集支持通用可配置来源与更多客户端；写入时按项目登记表自动归类项目。",
+  "description": "采集本机 AI 会话素材，按会话整理成带功能与工时的结构化条目写入全局工作日志，并生成按项目→功能聚合的日报归档。",
+  "release_notes": "0.3.0：条目带功能/模块与工时，日报按项目→功能聚合内容小结并统计工时。",
   "min_agent_version": "0.3.47",
   "local_requirements": {
     "platform": "windows",

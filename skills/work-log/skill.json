@@ -3,11 +3,11 @@
   "name": "工作日志助手",
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
-  "version": "0.2.0",
+  "version": "0.3.0",
   "distribution_targets": ["workbench", "github"],
   "scope": "organization",
-  "description": "把当前 AI 会话整理成结构化工作日志并写入全局日志库，以按日日志为核心、可按日历回看。",
-  "release_notes": "0.2.0：写入时按项目登记表自动归类项目，并支持用项目列表管理归类与别名。",
+  "description": "把当前 AI 会话整理成结构化工作日志并写入全局日志库：条目带功能/模块与工时，报告按项目→功能聚合内容小结，以按日日志为核心、可按日历回看。",
+  "release_notes": "0.3.0：新增功能/模块与工时（含来源标注）的整理口径，报告支持按项目/功能的模型小结（narratives）。",
   "min_agent_version": "0.3.0",
   "supported_clients": ["himind-ai", "codex", "github-copilot", "workbuddy"],
   "capabilities": [
@@ -21,7 +21,7 @@
     {"id": "work-log.source.list", "required": false, "min_version": "0.2.0", "provider": "com.himind.work-log"}
   ],
   "plugin_dependencies": [
-    {"plugin_id": "com.himind.work-log", "required": true, "min_version": "0.2.0"}
+    {"plugin_id": "com.himind.work-log", "required": true, "min_version": "0.3.0"}
   ],
   "risk_summary": "read_only_by_default; writing_logs_requires_user_confirmation",
   "contents": ["skill.json", "SKILL.md", "agents/openai.yaml"]

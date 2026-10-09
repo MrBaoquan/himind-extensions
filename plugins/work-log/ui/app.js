@@ -49,6 +49,46 @@
 
   const el = (id) => document.getElementById(id);
 
+  const MINUTES_SOURCE_LABELS = {
+    measured: '实测',
+    span: '区间',
+    estimated: '估算',
+    manual: '人工',
+  };
+
+  // formatTime 把 RFC3339 时间戳渲染成 HH:MM；无法解析时原样返回。
+  function formatTime(value) {
+    const raw = text(value);
+    if (!raw) return '';
+    const match = raw.match(/^\d{4}-\d{2}-\d{2}[T ](\d{2}):(\d{2})/);
+    if (match) return match[1] + ':' + match[2];
+    return raw;
+  }
+
+  // formatSpan 把起止时间渲染成区间。
+  function formatSpan(item) {
+    const start = formatTime(item.started_at);
+    const end = formatTime(item.ended_at);
+    if (!start && !end) return '';
+    if (start && end) return start === end ? start : start + '–' + end;
+    return start || end;
+  }
+
+  function minutesLabel(minutes) {
+    const value = Number(minutes) || 0;
+    if (value <= 0) return '';
+    if (value < 60) return value + ' 分钟';
+    const hours = Math.floor(value / 60);
+    const rest = value % 60;
+    return rest ? hours + ' 小时 ' + rest + ' 分' : hours + ' 小时';
+  }
+
+  function hoursLabel(minutes) {
+    const value = Number(minutes) || 0;
+    if (value <= 0) return '';
+    return (value / 60).toFixed(1) + ' 小时';
+  }
+
   function bridgeInvoke(capabilityId, input) {
     const internals = window.__TAURI_INTERNALS__ || {};
     if (typeof internals.invoke !== 'function') {
@@ -169,9 +209,14 @@
             if (cell.date === state.selected) classes.push('active');
             if (cell.entry_count > 0) classes.push('has');
             const projects = (cell.projects || []).join('、');
-            const titleAttr = text(cell.date) + (projects ? ' · ' + projects : '');
+            const hours = hoursLabel(cell.total_minutes);
+            const titleAttr =
+              text(cell.date) +
+              (projects ? ' · ' + projects : '') +
+              (hours ? ' · 约 ' + hours : '');
             const marker =
               cell.entry_count > 0 ? '<span class="cal-count">' + escapeHTML(cell.entry_count) + '</span>' : '';
+            const hoursMark = hours ? '<span class="cal-hours">' + escapeHTML(hours) + '</span>' : '';
             return (
               '<button type="button" role="gridcell" class="' +
               classes.join(' ') +
@@ -183,6 +228,7 @@
               escapeHTML(cell.day) +
               '</span>' +
               marker +
+              hoursMark +
               '</button>'
             );
           })
@@ -198,7 +244,10 @@
     const pills = [
       '<span class="pill">' + escapeHTML(calendar.active_days || 0) + ' 天有记录</span>',
       '<span class="pill">' + escapeHTML(calendar.total_entries || 0) + ' 条日志</span>',
-    ];
+      calendar.total_minutes
+        ? '<span class="pill">约 ' + escapeHTML(hoursLabel(calendar.total_minutes)) + '</span>'
+        : '',
+    ].filter(Boolean);
     if (projects.length) {
       pills.push(
         '<span class="pill">' + escapeHTML(projects.slice(0, 3).join('、')) + (projects.length > 3 ? ' 等' : '') + '</span>',
@@ -226,18 +275,25 @@
     const badges = [];
     badges.push('<span class="badge">' + escapeHTML(state.entries.length) + ' 条</span>');
     if (projects.length) badges.push('<span class="badge new">' + escapeHTML(projects.length) + ' 个项目</span>');
+    const totalMinutes = state.entries.reduce((sum, item) => sum + (Number(item.minutes) || 0), 0);
+    if (totalMinutes > 0) badges.push('<span class="badge">约 ' + escapeHTML(hoursLabel(totalMinutes)) + '</span>');
     el('detail-badges').innerHTML = badges.join('');
   }
 
   function entryCard(item) {
     const head = ['<div class="entry"><div class="entry-head">'];
-    if (text(item.started_at) || text(item.ended_at)) {
-      const span = text(item.started_at) + '–' + text(item.ended_at);
+    const span = formatSpan(item);
+    if (span) {
       head.push('<span class="time">' + escapeHTML(span) + '</span>');
     }
     head.push('<strong>' + escapeHTML(text(item.title, '(未命名)')) + '</strong>');
     head.push('<span class="cat">' + escapeHTML(CATEGORY_LABELS[item.category] || text(item.category, '其他')) + '</span>');
     if (text(item.project)) head.push('<span class="proj">' + escapeHTML(item.project) + '</span>');
+    if (text(item.feature)) head.push('<span class="feat">' + escapeHTML(item.feature) + '</span>');
+    if (Number(item.minutes) > 0) {
+      const source = MINUTES_SOURCE_LABELS[item.minutes_source] || text(item.minutes_source, '工时');
+      head.push('<span class="mins">' + escapeHTML(minutesLabel(item.minutes)) + ' · ' + escapeHTML(source) + '</span>');
+    }
     head.push('</div>');
     if (text(item.summary)) head.push('<p class="summary">' + escapeHTML(item.summary) + '</p>');
     head.push(listBlock('交付', item.outcomes));
@@ -307,7 +363,10 @@
         closeList();
         continue;
       }
-      if (line.startsWith('### ')) {
+      if (line.startsWith('#### ')) {
+        closeList();
+        out.push('<h4>' + escapeHTML(line.slice(5)) + '</h4>');
+      } else if (line.startsWith('### ')) {
         closeList();
         out.push('<h3>' + escapeHTML(line.slice(4)) + '</h3>');
       } else if (line.startsWith('## ')) {
@@ -710,6 +769,8 @@
     el('m-date').value = state.selected || today();
     el('m-title').value = '';
     el('m-project').value = '';
+    el('m-feature').value = '';
+    el('m-minutes').value = '';
     el('m-category').value = 'development';
     el('m-summary').value = '';
     el('m-outcomes').value = '';
@@ -741,11 +802,17 @@
       source: 'manual',
       title: title,
       project: text(el('m-project').value),
+      feature: text(el('m-feature').value),
       category: text(el('m-category').value, 'other'),
       summary: text(el('m-summary').value),
       outcomes: splitList(el('m-outcomes').value),
       next: splitList(el('m-next').value),
     };
+    const minutes = Number(el('m-minutes').value);
+    if (minutes > 0) {
+      entry.minutes = Math.round(minutes);
+      entry.minutes_source = 'manual';
+    }
     setBusy(true, '保存中…');
     try {
       await bridgeInvoke('work-log.entry.upsert', { date: date, entry: entry });

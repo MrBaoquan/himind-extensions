@@ -10,9 +10,9 @@
 
 | 步骤 | 类型 | 风险 | 说明 |
 | --- | --- | --- | --- |
-| WL-COLLECT | capability `work-log.session.scan` | 只读 | 探测本机会话来源，按目标日期提取会话摘要，并映射成日志条目草稿（`entries`） |
+| WL-COLLECT | capability `work-log.session.scan` | 只读 | 探测本机会话来源，按目标日期提取会话摘要，并映射成带功能与工时的日志条目草稿（`entries`） |
 | WL-WRITE | capability `work-log.entry.upsert` | 本地写 | 取上游 `entries` 写入全局日志库；同会话重复运行会按稳定指纹合并 |
-| WL-REPORT | capability `work-log.report.render` | 本地写 | 汇总当天条目产出 Markdown + 自包含 HTML 日报 |
+| WL-REPORT | capability `work-log.report.render` | 本地写 | 汇总当天条目产出 Markdown + 自包含 HTML 日报，按 项目 → 功能 聚合内容小结并统计工时 |
 
 入口分三段（`collect` / `write` / `report`），任一段坏了可按段重跑，不必重新采集。
 `date`、`source`、`sqlite3_path`、`log_root`、`period` 作为 run 输入原样传给能力；**不写进 step input**，避免覆盖启动表单字段。`date` 缺省为今天，`log_root` 缺省为文档目录下的全局日志库。
@@ -31,6 +31,12 @@
 ## 项目归类
 
 写入时按 `com.himind.work-log` 的项目登记表（`<日志根>/projects.json`）自动归类：命中登记名或别名就归一到规范项目，未知项目名自动登记。采集侧优先用会话所在 Git 仓库根目录名推断项目，把同一仓库的不同子目录合并到同一个项目。
+
+## 功能与工时
+
+- **功能 / 模块**：采集侧尽力从会话工作目录推断——取 Git 仓库内相对仓库根的末级目录；非仓库场景下目录名不同于项目名时取目录名。判断不了就留空，日报归入“未分类功能”。技能精修时可显式填写 `feature`。
+- **工时**：优先按会话逐条消息的间隔实测“活跃时长”（超过 20 分钟的间隔视为离开，不计入），标为 `measured`；只有起止时间时用区间，标为 `span`；完全无时间信息时按轮次估算，标为 `estimated`；人工填写标为 `manual`。单条工时上限 8 小时（480 分钟），避免异常长会话或区间把统计拉爆。
+- 日报按 **项目 → 功能** 两级聚合，每组给出确定性内容小结（标题 + 摘要 + 完成 / 决策 / 经验 / 后续）与本组工时；概览给出总工时与实测 / 估算拆分。技能可通过 `narratives` 传入按项目或 `项目/功能` 的模型小结叠加在确定性小结之上。
 
 ## 边界
 

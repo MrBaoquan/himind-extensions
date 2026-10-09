@@ -557,6 +557,7 @@ func scanGeneric(spec genericSource, home string, start, end time.Time) ([]sessi
 		asstTexts []string
 		started   time.Time
 		ended     time.Time
+		times     []time.Time
 	}
 	groups := map[string]*group{}
 	order := make([]string, 0)
@@ -594,6 +595,7 @@ func scanGeneric(spec genericSource, home string, start, end time.Time) ([]sessi
 				if when.After(g.ended) {
 					g.ended = when
 				}
+				g.times = append(g.times, when)
 			}
 			role := strings.ToLower(firstText(record, spec.RoleField))
 			text := genericRecordText(spec, record)
@@ -643,6 +645,7 @@ func scanGeneric(spec genericSource, home string, start, end time.Time) ([]sessi
 		if g.digest.Project == "" {
 			g.digest.Project = genericProject(spec, g.digest.Directory, firstDir, root)
 		}
+		g.digest.Minutes, g.digest.MinutesSource = resolveMinutes(g.times, g.started, g.ended, g.digest.TurnCount)
 		digests = append(digests, g.digest)
 	}
 	return digests, nil

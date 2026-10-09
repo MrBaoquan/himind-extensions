@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/MrBaoquan/himind-extensions/sdk/jsonrpc"
 )
@@ -279,5 +280,101 @@ func TestSourcesCapIncludesConfigured(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("来源列表应包含已配置来源: %#v", sources)
+	}
+}
+
+func TestActiveMinutesClipsIdleGaps(t *testing.T) {
+	base := time.Date(2026, 10, 9, 9, 0, 0, 0, time.Local)
+	times := []time.Time{
+		base,
+		base.Add(5 * time.Minute),
+		base.Add(10 * time.Minute),
+		base.Add(200 * time.Minute), // 长时间离开应被截断为 idleGapMinutes。
+	}
+	if got := activeMinutes(times); got != 30 {
+		t.Fatalf("活跃工时应为 5+5+20=30 分钟，实际 %d", got)
+	}
+	if got := activeMinutes([]time.Time{base}); got != 0 {
+		t.Fatalf("单条消息不应产生工时，实际 %d", got)
+	}
+}
+
+func TestResolveMinutesPrefersMeasured(t *testing.T) {
+	base := time.Date(2026, 10, 9, 9, 0, 0, 0, time.Local)
+	times := []time.Time{base, base.Add(10 * time.Minute)}
+	if minutes, source := resolveMinutes(times, base, base.Add(2*time.Hour), 3); source != "measured" || minutes != 10 {
+		t.Fatalf("应优先实测，实际 %d/%s", minutes, source)
+	}
+	if minutes, source := resolveMinutes(nil, base, base.Add(45*time.Minute), 3); source != "span" || minutes != 45 {
+		t.Fatalf("无逐条时间时应用区间，实际 %d/%s", minutes, source)
+	}
+	if minutes, source := resolveMinutes(nil, time.Time{}, time.Time{}, 4); source != "estimated" || minutes != 12 {
+		t.Fatalf("完全无时间时应按轮次估算，实际 %d/%s", minutes, source)
+	}
+}
+
+func TestFeatureFromDirectory(t *testing.T) {
+	home := t.TempDir()
+	repo := filepath.Join(home, "workspace", "my-repo")
+	sub := filepath.Join(repo, "src", "calendar")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := featureFromDirectory(sub, "my-repo"); got != "calendar" {
+		t.Fatalf("git 仓库内应取相对根的末级目录，实际 %q", got)
+	}
+	if got := featureFromDirectory(repo, "my-repo"); got != "" {
+		t.Fatalf("仓库根不应推断出功能，实际 %q", got)
+	}
+	loose := filepath.Join(home, "loose", "billing")
+	if err := os.MkdirAll(loose, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := featureFromDirectory(loose, "loose"); got != "billing" {
+		t.Fatalf("非仓库且目录名不等于项目时应取目录名，实际 %q", got)
+	}
+}
+
+func TestCandidateEntriesCarryFeatureAndMinutes(t *testing.T) {
+	digests := []sessionDigest{{
+		Source: "codex", SessionID: "s1", Project: "proj", Directory: "F:\\proj\\mod",
+		Title: "T", StartedAt: "2026-10-09T09:00:00+08:00", EndedAt: "2026-10-09T10:00:00+08:00",
+		Minutes: 42, MinutesSource: "measured", TurnCount: 3,
+	}}
+	entries := candidateEntries(digests)
+	if len(entries) != 1 {
+		t.Fatalf("应产出 1 条，实际 %d", len(entries))
+	}
+	item := entries[0]
+	if item["minutes"].(int) != 42 || item["minutes_source"] != "measured" {
+		t.Fatalf("候选条目应携带实测工时: %#v", item)
+	}
+	if item["started_at"] != "2026-10-09T09:00:00+08:00" {
+		t.Fatalf("候选条目应保留真实开始时间: %#v", item)
+	}
+	if item["feature"] != "mod" {
+		t.Fatalf("候选条目应推断出功能模块，实际 %#v", item["feature"])
+	}
+}
+
+func TestScanCandidateEntriesMeasureMinutes(t *testing.T) {
+	home := writeFixture(t)
+	out := call(t, "work-log.session.scan", `{"home":`+quote(home)+`,"date":"2026-10-09","limit":10}`)
+	entries := out["entries"].([]any)
+	bySession := map[string]map[string]any{}
+	for _, raw := range entries {
+		item := raw.(map[string]any)
+		bySession[item["session_id"].(string)] = item
+	}
+	codex := bySession["codex-1"]
+	if codex == nil || codex["minutes_source"] != "measured" {
+		t.Fatalf("Codex 会话应按消息间隔实测工时: %#v", codex)
+	}
+	claude := bySession["claude-1"]
+	if claude == nil || claude["minutes_source"] != "span" || claude["minutes"].(float64) != 30 {
+		t.Fatalf("Claude 会话应按起止区间给出工时: %#v", claude)
 	}
 }

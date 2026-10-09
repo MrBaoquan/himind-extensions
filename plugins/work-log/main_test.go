@@ -402,6 +402,98 @@ func TestSourceConfigSaveAndList(t *testing.T) {
 	}
 }
 
+func TestReportGroupsByProjectAndFeatureWithMinutes(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[
+		{"source":"codex","session_id":"s1","project":"项目看板","feature":"日历视图","category":"development","title":"实现月历","summary":"完成月历栅格","minutes":90,"minutes_source":"measured","outcomes":["月历可用"]},
+		{"source":"codex","session_id":"s2","project":"项目看板","feature":"项目登记表","category":"development","title":"项目归一","minutes":30,"minutes_source":"estimated"}
+	]}`)
+	narratives := `,"narratives":{"项目看板":"看板项目整体推进顺利","项目看板/日历视图":"日历视图今天落地"}`
+	rendered := call(t, "work-log.report.render", `{"log_root":`+quote(root)+`,"period":"daily","date":"2026-10-09"`+narratives+`}`)
+	report := rendered["report"].(map[string]any)
+	markdown := report["markdown"].(string)
+	for _, want := range []string{
+		"## 按项目 · 按功能",
+		"### 项目看板（2 条 · 约 2.0 小时）",
+		"看板项目整体推进顺利",
+		"#### 功能：日历视图（1 条 · 约 1.5 小时）",
+		"日历视图今天落地",
+		"完成月历",
+		"完成：月历可用",
+		"记录工时：约 2.0 小时（实测 1.5 小时 / 估算 0.5 小时）",
+	} {
+		if !contains(markdown, want) {
+			t.Fatalf("日报 Markdown 缺少 %q:\n%s", want, markdown)
+		}
+	}
+	if report["total_minutes"].(float64) != 120 {
+		t.Fatalf("报告总工时应为 120 分钟，实际 %v", report["total_minutes"])
+	}
+	if report["narrative_used"] != true {
+		t.Fatalf("提供 narratives 时应标记使用了叙述")
+	}
+}
+
+func TestMergePreservesFeatureAndMinutes(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[
+		{"source":"codex","session_id":"m1","project":"P","feature":"F","minutes":45,"minutes_source":"measured","title":"T"}
+	]}`)
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[
+		{"source":"codex","session_id":"m1","title":"T2"}
+	]}`)
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-09"}`)
+	item := read["entries"].([]any)[0].(map[string]any)
+	if item["title"] != "T2" {
+		t.Fatalf("合并应更新标题，实际 %v", item["title"])
+	}
+	if item["feature"] != "F" {
+		t.Fatalf("合并不应冲掉 feature，实际 %v", item["feature"])
+	}
+	if item["minutes"].(float64) != 45 || item["minutes_source"] != "measured" {
+		t.Fatalf("合并不应冲掉工时，实际 %v / %v", item["minutes"], item["minutes_source"])
+	}
+}
+
+func TestCalendarTotalsMinutes(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[
+		{"project":"项目看板","title":"A","minutes":60,"minutes_source":"measured"},
+		{"project":"项目看板","title":"B","minutes":30,"minutes_source":"estimated"}
+	]}`)
+	cal := call(t, "work-log.archive.calendar", `{"log_root":`+quote(root)+`,"year":2026,"month":10}`)
+	if cal["total_minutes"].(float64) != 90 {
+		t.Fatalf("月历总工时应为 90 分钟，实际 %v", cal["total_minutes"])
+	}
+	for _, raw := range cal["days"].([]any) {
+		day := raw.(map[string]any)
+		if day["date"] == "2026-10-09" && day["total_minutes"].(float64) != 90 {
+			t.Fatalf("当日工时应为 90 分钟，实际 %v", day["total_minutes"])
+		}
+	}
+	// 按项目过滤时工时应同步收窄。
+	filtered := call(t, "work-log.archive.calendar", `{"log_root":`+quote(root)+`,"year":2026,"month":10,"project":"项目看板"}`)
+	if filtered["total_minutes"].(float64) != 90 {
+		t.Fatalf("按项目过滤工时异常: %v", filtered["total_minutes"])
+	}
+}
+
+func TestTimeSpanFormatsTimestamps(t *testing.T) {
+	item := entry{StartedAt: "2026-10-09T09:30:00+08:00", EndedAt: "2026-10-09T11:00:00+08:00"}
+	if got := timeSpan(item); got != "09:30–11:00" {
+		t.Fatalf("同天的时间戳应渲染为 HH:MM 区间，实际 %q", got)
+	}
+	if got := minutesText(90); got != "1 小时 30 分" {
+		t.Fatalf("工时文本异常: %q", got)
+	}
+	if got := hoursText(90); got != "1.5 小时" {
+		t.Fatalf("小时文本异常: %q", got)
+	}
+}
+
 func contains(haystack, needle string) bool {
 	return strings.Contains(haystack, needle)
 }

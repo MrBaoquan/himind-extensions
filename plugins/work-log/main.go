@@ -57,7 +57,9 @@ type input struct {
 	SessionID string `json:"session_id"`
 	// Narrative / Title 供报告渲染使用：narrative 是 AI 提炼的主线叙述。
 	Narrative string `json:"narrative"`
-	Title     string `json:"title"`
+	// Narratives 是按项目 / 功能的模型叙述：键为项目名或 "项目/功能"，值为该组小结。
+	Narratives map[string]string `json:"narratives"`
+	Title      string            `json:"title"`
 	// URL 用于 work-log.link.open。
 	URL string `json:"url"`
 	// WorkflowContext 是工作流注入的上下文：上游步骤输出在 workflow_context.steps 里。
@@ -91,25 +93,30 @@ type ref struct {
 
 // entry 是一条工作日志。字段设计目标是同时支撑"采集草稿"与"汇总报告"。
 type entry struct {
-	EntryID   string   `json:"entry_id"`
-	Date      string   `json:"date"`
-	Source    string   `json:"source"`
-	SessionID string   `json:"session_id"`
-	Project   string   `json:"project"`
-	Category  string   `json:"category"`
-	StartedAt string   `json:"started_at"`
-	EndedAt   string   `json:"ended_at"`
-	Title     string   `json:"title"`
-	Summary   string   `json:"summary"`
-	Outcomes  []string `json:"outcomes"`
-	Decisions []string `json:"decisions"`
-	Learnings []string `json:"learnings"`
-	Blockers  []string `json:"blockers"`
-	Next      []string `json:"next"`
-	Tags      []string `json:"tags"`
-	Refs      []ref    `json:"refs"`
-	CreatedAt string   `json:"created_at"`
-	UpdatedAt string   `json:"updated_at"`
+	EntryID   string `json:"entry_id"`
+	Date      string `json:"date"`
+	Source    string `json:"source"`
+	SessionID string `json:"session_id"`
+	Project   string `json:"project"`
+	Feature   string `json:"feature,omitempty"`
+	Category  string `json:"category"`
+	StartedAt string `json:"started_at"`
+	EndedAt   string `json:"ended_at"`
+	// Minutes 是该条目的工时（分钟）。MinutesSource 标明来源：measured（按消息间隔实测的活跃时长）
+	// / span（仅有起止时间的粗粒度区间）/ estimated（按轮次估算）/ manual（人工填写）。
+	Minutes       int      `json:"minutes,omitempty"`
+	MinutesSource string   `json:"minutes_source,omitempty"`
+	Title         string   `json:"title"`
+	Summary       string   `json:"summary"`
+	Outcomes      []string `json:"outcomes"`
+	Decisions     []string `json:"decisions"`
+	Learnings     []string `json:"learnings"`
+	Blockers      []string `json:"blockers"`
+	Next          []string `json:"next"`
+	Tags          []string `json:"tags"`
+	Refs          []ref    `json:"refs"`
+	CreatedAt     string   `json:"created_at"`
+	UpdatedAt     string   `json:"updated_at"`
 }
 
 // dayFile 是一天的日志文件，按天分片便于人读、diff 和迁移。
@@ -326,8 +333,17 @@ func mergeEntry(current, incoming entry) entry {
 	if merged.Project == "" {
 		merged.Project = current.Project
 	}
+	if merged.Feature == "" {
+		merged.Feature = current.Feature
+	}
 	if merged.Category == "" {
 		merged.Category = current.Category
+	}
+	if merged.Minutes == 0 {
+		merged.Minutes = current.Minutes
+	}
+	if merged.MinutesSource == "" {
+		merged.MinutesSource = current.MinutesSource
 	}
 	if merged.Source == "" {
 		merged.Source = current.Source
@@ -499,10 +515,11 @@ func matches(item entry, in input) bool {
 }
 
 type daySummary struct {
-	Date       string   `json:"date"`
-	EntryCount int      `json:"entry_count"`
-	Projects   []string `json:"projects"`
-	Categories []string `json:"categories"`
+	Date         string   `json:"date"`
+	EntryCount   int      `json:"entry_count"`
+	TotalMinutes int      `json:"total_minutes,omitempty"`
+	Projects     []string `json:"projects"`
+	Categories   []string `json:"categories"`
 }
 
 func archiveList(in input) (any, error) {
@@ -577,10 +594,11 @@ func summarizeDay(date string, entries []entry) daySummary {
 		}
 	}
 	return daySummary{
-		Date:       date,
-		EntryCount: len(entries),
-		Projects:   sortedKeys(projects),
-		Categories: sortedKeys(categories),
+		Date:         date,
+		EntryCount:   len(entries),
+		TotalMinutes: groupMinutes(entries),
+		Projects:     sortedKeys(projects),
+		Categories:   sortedKeys(categories),
 	}
 }
 
@@ -590,11 +608,13 @@ func summarizeDayFiltered(date string, entries []entry, project string) daySumma
 	projects := map[string]struct{}{}
 	categories := map[string]struct{}{}
 	count := 0
+	minutes := 0
 	for _, item := range entries {
 		if !strings.Contains(strings.ToLower(item.Project), keyword) {
 			continue
 		}
 		count++
+		minutes += entryMinutes(item)
 		if item.Project != "" {
 			projects[item.Project] = struct{}{}
 		}
@@ -603,22 +623,24 @@ func summarizeDayFiltered(date string, entries []entry, project string) daySumma
 		}
 	}
 	return daySummary{
-		Date:       date,
-		EntryCount: count,
-		Projects:   sortedKeys(projects),
-		Categories: sortedKeys(categories),
+		Date:         date,
+		EntryCount:   count,
+		TotalMinutes: minutes,
+		Projects:     sortedKeys(projects),
+		Categories:   sortedKeys(categories),
 	}
 }
 
 // calendarCell 是月历里的一天：既承载当天的计数，也承载宿主渲染所需的星期信息。
 type calendarCell struct {
-	Date       string   `json:"date"`
-	Day        int      `json:"day"`
-	InMonth    bool     `json:"in_month"`
-	IsToday    bool     `json:"is_today"`
-	EntryCount int      `json:"entry_count"`
-	Projects   []string `json:"projects"`
-	Categories []string `json:"categories"`
+	Date         string   `json:"date"`
+	Day          int      `json:"day"`
+	InMonth      bool     `json:"in_month"`
+	IsToday      bool     `json:"is_today"`
+	EntryCount   int      `json:"entry_count"`
+	TotalMinutes int      `json:"total_minutes,omitempty"`
+	Projects     []string `json:"projects"`
+	Categories   []string `json:"categories"`
 }
 
 // archiveCalendar 按月构建可日历查看的日志统计。
@@ -667,6 +689,7 @@ func archiveCalendar(in input) (any, error) {
 	days := make([]calendarCell, 0, 31)
 	activeDays := 0
 	totalEntries := 0
+	totalMinutes := 0
 	for cursor := first.AddDate(0, 0, -lead); !cursor.After(last.AddDate(0, 0, trail)); cursor = cursor.AddDate(0, 0, 1) {
 		date := cursor.Format("2006-01-02")
 		day, err := readDay(root, date)
@@ -679,13 +702,14 @@ func archiveCalendar(in input) (any, error) {
 		}
 		inMonth := cursor.Year() == year && int(cursor.Month()) == month
 		cell := calendarCell{
-			Date:       date,
-			Day:        cursor.Day(),
-			InMonth:    inMonth,
-			IsToday:    date == today,
-			EntryCount: summary.EntryCount,
-			Projects:   summary.Projects,
-			Categories: summary.Categories,
+			Date:         date,
+			Day:          cursor.Day(),
+			InMonth:      inMonth,
+			IsToday:      date == today,
+			EntryCount:   summary.EntryCount,
+			TotalMinutes: summary.TotalMinutes,
+			Projects:     summary.Projects,
+			Categories:   summary.Categories,
 		}
 		if inMonth {
 			days = append(days, cell)
@@ -693,6 +717,7 @@ func archiveCalendar(in input) (any, error) {
 				activeDays++
 			}
 			totalEntries += summary.EntryCount
+			totalMinutes += summary.TotalMinutes
 		}
 		week = append(week, cell)
 		if len(week) == 7 {
@@ -715,6 +740,7 @@ func archiveCalendar(in input) (any, error) {
 		"today":         today,
 		"active_days":   activeDays,
 		"total_entries": totalEntries,
+		"total_minutes": totalMinutes,
 		"days":          days,
 		"weeks":         weeks,
 	}, nil
@@ -816,8 +842,8 @@ func renderReport(in input) (any, error) {
 	if title == "" {
 		title = periodLabel(period) + " · " + key
 	}
-	markdown := renderMarkdown(title, period, key, start, end, entries, narrative)
-	htmlBody := renderHTML(title, period, key, start, end, entries, narrative)
+	markdown := renderMarkdown(title, period, key, start, end, entries, narrative, in.Narratives)
+	htmlBody := renderHTML(title, period, key, start, end, entries, narrative, in.Narratives)
 
 	dir := filepath.Join(root, "reports", period)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -838,11 +864,15 @@ func renderReport(in input) (any, error) {
 		"date_from":      start,
 		"date_to":        end,
 		"entry_count":    len(entries),
-		"narrative_used": narrative != "",
+		"total_minutes":  groupMinutes(entries),
+		"narrative_used": narrative != "" || len(in.Narratives) > 0,
 		"md_path":        mdPath,
 		"html_path":      htmlPath,
 		"markdown":       markdown,
 	}
+	measuredMinutes, estimatedMinutes := splitMinutes(entries)
+	report["measured_minutes"] = measuredMinutes
+	report["estimated_minutes"] = estimatedMinutes
 	jsonPath := filepath.Join(dir, key+".json")
 	jsonBody, err := json.MarshalIndent(map[string]any{"report": report}, "", "  ")
 	if err != nil {
@@ -1185,7 +1215,7 @@ func periodLabel(period string) string {
 
 // ---------- 渲染 ----------
 
-func renderMarkdown(title, period, key, from, to string, entries []entry, narrative string) string {
+func renderMarkdown(title, period, key, from, to string, entries []entry, narrative string, narratives map[string]string) string {
 	var builder strings.Builder
 	builder.WriteString("# " + title + "\n\n")
 	builder.WriteString(fmt.Sprintf("周期：%s · 覆盖 %s ~ %s · 共 %d 条记录\n\n", key, from, to, len(entries)))
@@ -1204,8 +1234,8 @@ func renderMarkdown(title, period, key, from, to string, entries []entry, narrat
 		builder.WriteString(byDateLines(entries))
 		builder.WriteString("\n")
 	}
-	builder.WriteString("## 按项目\n\n")
-	builder.WriteString(byProjectLines(entries))
+	builder.WriteString("## 按项目 · 按功能\n\n")
+	builder.WriteString(byProjectFeatureLines(entries, narratives))
 	builder.WriteString("\n")
 	if lines := collectLines(entries, func(item entry) []string { return item.Next }); len(lines) > 0 {
 		builder.WriteString("## 后续事项\n\n")
@@ -1224,6 +1254,75 @@ func renderMarkdown(title, period, key, from, to string, entries []entry, narrat
 	return builder.String()
 }
 
+// ---- 工时 ----
+
+// entryMinutes 取条目工时（分钟），无有效值返回 0。
+func entryMinutes(item entry) int {
+	if item.Minutes > 0 {
+		return item.Minutes
+	}
+	return 0
+}
+
+func groupMinutes(items []entry) int {
+	total := 0
+	for _, item := range items {
+		total += entryMinutes(item)
+	}
+	return total
+}
+
+// splitMinutes 把工时拆成"实测/区间"与"估算"两类，便于报告透明标注。
+func splitMinutes(items []entry) (measured, estimated int) {
+	for _, item := range items {
+		if item.Minutes <= 0 {
+			continue
+		}
+		if item.MinutesSource == "estimated" {
+			estimated += item.Minutes
+		} else {
+			measured += item.Minutes
+		}
+	}
+	return measured, estimated
+}
+
+// minutesText 把分钟数渲染成人读文本。
+func minutesText(m int) string {
+	if m <= 0 {
+		return "—"
+	}
+	if m < 60 {
+		return fmt.Sprintf("%d 分钟", m)
+	}
+	hours := m / 60
+	rest := m % 60
+	if rest == 0 {
+		return fmt.Sprintf("%d 小时", hours)
+	}
+	return fmt.Sprintf("%d 小时 %d 分", hours, rest)
+}
+
+func hoursText(m int) string {
+	return fmt.Sprintf("%.1f 小时", float64(m)/60.0)
+}
+
+// minutesSourceLabel 把来源标识翻译成人读标签。
+func minutesSourceLabel(source string) string {
+	switch source {
+	case "measured":
+		return "实测"
+	case "span":
+		return "区间"
+	case "estimated":
+		return "估算"
+	case "manual":
+		return "人工"
+	default:
+		return "工时"
+	}
+}
+
 func overviewLines(entries []entry) string {
 	projects := map[string]int{}
 	categories := map[string]int{}
@@ -1238,6 +1337,11 @@ func overviewLines(entries []entry) string {
 	builder.WriteString("- 涉及项目：" + countText(projects) + "\n")
 	builder.WriteString("- 工作类型：" + countText(categories) + "\n")
 	builder.WriteString("- 素材来源：" + countText(sources) + "\n")
+	measured, estimated := splitMinutes(entries)
+	total := measured + estimated
+	if total > 0 {
+		builder.WriteString(fmt.Sprintf("- 记录工时：约 %s（实测 %s / 估算 %s）\n", hoursText(total), hoursText(measured), hoursText(estimated)))
+	}
 	return builder.String()
 }
 
@@ -1247,17 +1351,23 @@ func timelineLines(entries []entry) string {
 	}
 	var builder strings.Builder
 	for _, item := range entries {
-		meta := make([]string, 0, 3)
+		meta := make([]string, 0, 4)
 		if span := timeSpan(item); span != "" {
 			meta = append(meta, span)
 		}
 		if item.Project != "" {
 			meta = append(meta, item.Project)
 		}
+		if item.Feature != "" {
+			meta = append(meta, "功能:"+item.Feature)
+		}
 		meta = append(meta, "["+fallbackValue(item.Category, "other")+"]")
 		builder.WriteString("- " + strings.Join(meta, " · ") + " " + fallbackValue(item.Title, "(未命名)") + "\n")
 		if item.Summary != "" {
 			builder.WriteString("  " + item.Summary + "\n")
+		}
+		if item.Minutes > 0 {
+			builder.WriteString("  - 工时：" + minutesText(item.Minutes) + "（" + minutesSourceLabel(item.MinutesSource) + "）\n")
 		}
 		appendBullet(&builder, "交付", item.Outcomes)
 		appendBullet(&builder, "决策", item.Decisions)
@@ -1295,13 +1405,14 @@ func byDateLines(entries []entry) string {
 	return builder.String()
 }
 
-func byProjectLines(entries []entry) string {
+func byProjectFeatureLines(entries []entry, narratives map[string]string) string {
+	if len(entries) == 0 {
+		return "本期没有记录。\n"
+	}
 	byProject := map[string][]entry{}
 	for _, item := range entries {
-		byProject[fallbackValue(item.Project, "未归类")] = append(byProject[fallbackValue(item.Project, "未归类")], item)
-	}
-	if len(byProject) == 0 {
-		return "本期没有记录。\n"
+		key := fallbackValue(item.Project, "未归类")
+		byProject[key] = append(byProject[key], item)
 	}
 	names := make([]string, 0, len(byProject))
 	for name := range byProject {
@@ -1315,16 +1426,79 @@ func byProjectLines(entries []entry) string {
 	})
 	var builder strings.Builder
 	for _, name := range names {
-		builder.WriteString(fmt.Sprintf("### %s（%d 条）\n\n", name, len(byProject[name])))
-		for _, item := range byProject[name] {
-			builder.WriteString("- " + fallbackValue(item.Title, "(未命名)") + "\n")
+		items := byProject[name]
+		builder.WriteString(fmt.Sprintf("### %s（%d 条 · 约 %s）\n\n", name, len(items), hoursText(groupMinutes(items))))
+		if note := lookupNarrative(narratives, name); note != "" {
+			builder.WriteString(note + "\n\n")
 		}
+		builder.WriteString(featureBlocks(name, items, narratives))
+	}
+	return builder.String()
+}
+
+// featureBlocks 把同一项目下的条目按功能分组，逐组给出确定性的内容小结。
+func featureBlocks(project string, items []entry, narratives map[string]string) string {
+	byFeature := map[string][]entry{}
+	for _, item := range items {
+		key := fallbackValue(item.Feature, "未分类功能")
+		byFeature[key] = append(byFeature[key], item)
+	}
+	features := make([]string, 0, len(byFeature))
+	for name := range byFeature {
+		features = append(features, name)
+	}
+	sort.SliceStable(features, func(left, right int) bool {
+		if len(byFeature[features[left]]) != len(byFeature[features[right]]) {
+			return len(byFeature[features[left]]) > len(byFeature[features[right]])
+		}
+		return features[left] < features[right]
+	})
+	var builder strings.Builder
+	for _, feature := range features {
+		group := byFeature[feature]
+		builder.WriteString(fmt.Sprintf("#### 功能：%s（%d 条 · 约 %s）\n\n", feature, len(group), hoursText(groupMinutes(group))))
+		if note := lookupNarrative(narratives, project+"/"+feature); note != "" {
+			builder.WriteString(note + "\n\n")
+		}
+		for _, item := range group {
+			line := "- " + fallbackValue(item.Title, "(未命名)")
+			if item.Summary != "" {
+				line += "：" + item.Summary
+			}
+			if item.Minutes > 0 {
+				line += fmt.Sprintf("（%s·%s）", minutesText(item.Minutes), minutesSourceLabel(item.MinutesSource))
+			}
+			builder.WriteString(line + "\n")
+		}
+		writeAggregate(&builder, "完成", collectLines(group, func(item entry) []string { return item.Outcomes }))
+		writeAggregate(&builder, "决策", collectLines(group, func(item entry) []string { return item.Decisions }))
+		writeAggregate(&builder, "经验", collectLines(group, func(item entry) []string { return item.Learnings }))
+		writeAggregate(&builder, "后续", collectLines(group, func(item entry) []string { return item.Next }))
 		builder.WriteString("\n")
 	}
 	return builder.String()
 }
 
-func renderHTML(title, period, key, from, to string, entries []entry, narrative string) string {
+func writeAggregate(builder *strings.Builder, label string, lines []string) {
+	if len(lines) == 0 {
+		return
+	}
+	builder.WriteString("  - " + label + "：" + strings.Join(lines, " / ") + "\n")
+}
+
+func lookupNarrative(narratives map[string]string, key string) string {
+	if len(narratives) == 0 {
+		return ""
+	}
+	for _, candidate := range []string{key, strings.TrimSpace(key)} {
+		if text := strings.TrimSpace(narratives[candidate]); text != "" {
+			return text
+		}
+	}
+	return ""
+}
+
+func renderHTML(title, period, key, from, to string, entries []entry, narrative string, narratives map[string]string) string {
 	sections := make([]string, 0, 6)
 	narrativeHTML := ""
 	if narrative != "" {
@@ -1336,7 +1510,7 @@ func renderHTML(title, period, key, from, to string, entries []entry, narrative 
 	} else {
 		sections = append(sections, `<section><h2>按日期</h2>`+mdListToHTML(byDateLines(entries))+`</section>`)
 	}
-	sections = append(sections, `<section><h2>按项目</h2>`+mdListToHTML(byProjectLines(entries))+`</section>`)
+	sections = append(sections, `<section><h2>按项目 · 按功能</h2>`+mdListToHTML(byProjectFeatureLines(entries, narratives))+`</section>`)
 	if lines := collectLines(entries, func(item entry) []string { return item.Next }); len(lines) > 0 {
 		sections = append(sections, `<section><h2>后续事项</h2><ul>`+stringListHTML(lines)+`</ul></section>`)
 	}
@@ -1360,6 +1534,10 @@ li{margin:2px 0}
 .time{color:#94a3b8;font-variant-numeric:tabular-nums}
 .cat{padding:1px 6px;border-radius:4px;font-size:11px;background:#eef2ff;color:#4338ca}
 .proj{color:#0f766e;font-size:12px}
+.feat{color:#7c3aed;font-size:12px}
+.mins{color:#0369a1;font-size:12px;font-variant-numeric:tabular-nums}
+h3{margin:18px 0 6px;font-size:14px}
+h4{margin:14px 0 4px;font-size:13px;color:#4b5563}
 .summary{margin:4px 0 0;color:#374151}
 footer{margin-top:18px;color:#94a3b8;font-size:11px}
 </style></head><body><main>
@@ -1385,6 +1563,12 @@ func timelineHTML(entries []entry) string {
 		if item.Project != "" {
 			builder.WriteString(`<span class="proj">` + html.EscapeString(item.Project) + `</span>`)
 		}
+		if item.Feature != "" {
+			builder.WriteString(`<span class="feat">` + html.EscapeString(item.Feature) + `</span>`)
+		}
+		if item.Minutes > 0 {
+			builder.WriteString(`<span class="mins">` + html.EscapeString(minutesText(item.Minutes)) + ` · ` + html.EscapeString(minutesSourceLabel(item.MinutesSource)) + `</span>`)
+		}
 		builder.WriteString(`</div>`)
 		if item.Summary != "" {
 			builder.WriteString(`<p class="summary">` + html.EscapeString(item.Summary) + `</p>`)
@@ -1399,6 +1583,10 @@ func mdListToHTML(markdown string) string {
 	for _, line := range strings.Split(markdown, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "#### ") {
+			builder.WriteString(`<h4>` + html.EscapeString(strings.TrimPrefix(trimmed, "#### ")) + `</h4>`)
 			continue
 		}
 		if strings.HasPrefix(trimmed, "### ") {
@@ -1448,13 +1636,43 @@ func collectLines(entries []entry, pick func(entry) []string) []string {
 }
 
 func timeSpan(item entry) string {
-	if item.StartedAt == "" && item.EndedAt == "" {
+	start := strings.TrimSpace(item.StartedAt)
+	end := strings.TrimSpace(item.EndedAt)
+	if start == "" && end == "" {
 		return ""
 	}
-	if item.StartedAt != "" && item.EndedAt != "" {
-		return item.StartedAt + "–" + item.EndedAt
+	if start == "" {
+		return shortTime(end)
 	}
-	return fallbackValue(item.StartedAt, item.EndedAt)
+	if end == "" {
+		return shortTime(start)
+	}
+	startTime, startErr := time.Parse(time.RFC3339, start)
+	endTime, endErr := time.Parse(time.RFC3339, end)
+	if startErr == nil && endErr == nil {
+		startLocal := startTime.Local()
+		endLocal := endTime.Local()
+		if startLocal.Format("2006-01-02") == endLocal.Format("2006-01-02") {
+			return startLocal.Format("15:04") + "–" + endLocal.Format("15:04")
+		}
+		return startLocal.Format("01-02 15:04") + "–" + endLocal.Format("01-02 15:04")
+	}
+	if start == end {
+		return shortTime(start)
+	}
+	return shortTime(start) + "–" + shortTime(end)
+}
+
+// shortTime 把 RFC3339 时间戳渲染成 HH:MM；无法解析时原样返回。
+func shortTime(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if parsed, err := time.Parse(time.RFC3339, value); err == nil {
+		return parsed.Local().Format("15:04")
+	}
+	return value
 }
 
 func countText(counts map[string]int) string {
