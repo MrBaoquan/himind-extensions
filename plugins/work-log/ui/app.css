@@ -604,15 +604,22 @@ body {
 }
 
 .entry .entry-toggle::after {
-  content: '▾';
+  content: '';
   display: inline-block;
-  margin-left: 3px;
-  font-size: 10px;
+  margin-left: 4px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
   transform: translateY(-1px);
+  vertical-align: middle;
 }
 
 .entry.expanded .entry-toggle::after {
-  transform: rotate(180deg) translateY(1px);
+  border-top: none;
+  border-bottom: 5px solid currentColor;
+  transform: translateY(1px);
 }
 
 .entry.compact .summary {
