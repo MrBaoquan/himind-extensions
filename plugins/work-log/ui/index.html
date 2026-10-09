@@ -12,98 +12,130 @@
         <span class="logo" aria-hidden="true">🗒️</span>
         <div class="brand-text">
           <strong>工作日志</strong>
-          <small>以按日日志为核心 · 按日历回看</small>
+          <small>按天记录 · 日历回看 · 项目归档</small>
         </div>
       </div>
       <div class="toolbar">
+        <div class="view-switch" role="tablist" aria-label="主导航">
+          <button id="view-calendar" class="switch active" type="button" role="tab" aria-selected="true" data-view="calendar">日历回看</button>
+          <button id="view-projects" class="switch" type="button" role="tab" aria-selected="false" data-view="projects">项目管理</button>
+        </div>
+        <label class="search-box" title="在当月日志里搜索标题、摘要、功能、项目、标签">
+          <span class="search-icon" aria-hidden="true">🔍</span>
+          <input id="search" type="search" placeholder="搜索日志…" aria-label="搜索工作日志" autocomplete="off" />
+        </label>
         <button id="record" class="btn primary" type="button">记录一条</button>
         <button id="refresh" class="btn" type="button">刷新</button>
       </div>
     </header>
 
-    <p class="notice" id="notice" hidden></p>
+    <p class="notice" id="notice" hidden role="status" aria-live="polite"></p>
 
-    <section id="manual-form" class="manual" hidden>
+    <section id="manual-form" class="manual" hidden aria-label="工作日志录入">
       <div class="manual-head">
-        <strong>手动记录一条工作日志</strong>
-        <span class="meta">纯手工入口，不依赖任何会话采集。</span>
+        <strong id="manual-title">手动记录一条工作日志</strong>
+        <span class="meta" id="manual-hint">纯手工入口，不依赖任何会话采集。</span>
       </div>
-      <div class="manual-grid">
-        <label class="field"><span>日期</span><input id="m-date" type="date" /></label>
-        <label class="field"><span>标题</span><input id="m-title" type="text" placeholder="今天主要做了什么" /></label>
-        <label class="field"><span>项目</span><input id="m-project" type="text" list="project-options" placeholder="从项目列表选择或输入，可留空" /></label>
-        <datalist id="project-options"></datalist>
-        <label class="field"><span>类型</span>
-          <select id="m-category">
-            <option value="development">开发</option>
-            <option value="meeting">会议</option>
-            <option value="review">评审</option>
-            <option value="docs">文档</option>
-            <option value="research">调研</option>
-            <option value="ops">运维</option>
-            <option value="other">其他</option>
-          </select>
-        </label>
-        <label class="field"><span>功能</span><input id="m-feature" type="text" placeholder="如：日历视图，可留空" /></label>
-        <label class="field"><span>工时（分钟）</span><input id="m-minutes" type="number" min="0" max="1440" step="5" placeholder="如：60，可留空" /></label>
-      </div>
-      <label class="field block"><span>摘要</span><textarea id="m-summary" rows="2" placeholder="一句话说明成果与要点"></textarea></label>
-      <div class="manual-grid">
-        <label class="field"><span>交付（逗号分隔）</span><input id="m-outcomes" type="text" placeholder="完成 A，上线 B" /></label>
-        <label class="field"><span>后续（逗号分隔）</span><input id="m-next" type="text" placeholder="明天继续 C" /></label>
-      </div>
-      <div class="manual-actions">
-        <button id="m-save" class="btn primary" type="button">保存到日志</button>
-        <button id="m-cancel" class="btn" type="button">取消</button>
-      </div>
-    </section>
-
-    <main class="layout">
-      <aside class="rail">
-        <div class="cal-head">
-          <button id="cal-prev" class="cal-nav" type="button" aria-label="上个月">‹</button>
-          <strong id="cal-title">—</strong>
-          <button id="cal-next" class="cal-nav" type="button" aria-label="下个月">›</button>
+      <form id="manual-fields">
+        <input type="hidden" id="m-entry-id" />
+        <div class="manual-grid">
+          <label class="field"><span>日期</span><input id="m-date" type="date" /></label>
+          <label class="field"><span>标题</span><input id="m-title" type="text" placeholder="今天主要做了什么" /></label>
+          <label class="field"><span>项目</span><input id="m-project" type="text" list="project-options" placeholder="从项目列表选择或输入，可留空" /></label>
+          <datalist id="project-options"></datalist>
+          <label class="field"><span>类型</span>
+            <select id="m-category">
+              <option value="开发">开发</option>
+              <option value="修复">修复</option>
+              <option value="设计">设计</option>
+              <option value="调研">调研</option>
+              <option value="文档">文档</option>
+              <option value="评审">评审</option>
+              <option value="会议">会议</option>
+              <option value="运维">运维</option>
+              <option value="其他">其他</option>
+            </select>
+          </label>
+          <label class="field"><span>功能</span><input id="m-feature" type="text" placeholder="如：日历视图，可留空" /></label>
+          <label class="field"><span>工时（分钟）</span><input id="m-minutes" type="number" min="0" max="1440" step="5" placeholder="如：60，可留空" /></label>
         </div>
-        <div class="cal-weekdays" id="cal-weekdays" aria-hidden="true"></div>
-        <div class="cal-grid" id="cal-grid" role="grid" aria-label="工作日志月历"></div>
-        <label class="cal-filter"><span>按项目</span>
-          <select id="cal-project" aria-label="按项目筛选日历">
-            <option value="">全部项目</option>
-          </select>
-        </label>
-        <div class="cal-stats" id="cal-stats"></div>
-        <p class="rail-foot" id="log-root" title=""></p>
-      </aside>
-
-      <section class="detail">
-        <div class="detail-head">
-          <div>
-            <h1 id="detail-title">选择一个日期</h1>
-            <p id="detail-subtitle">左侧月历按天统计；点一天查看当天时间线。</p>
-          </div>
-          <div class="detail-tools">
-            <span id="detail-badges" class="badges"></span>
-          </div>
-        </div>
-        <div class="tabs" role="tablist">
-          <button class="tab active" data-tab="timeline" role="tab" type="button">时间线</button>
-          <button class="tab" data-tab="daily" role="tab" type="button">日报</button>
-          <button class="tab" data-tab="projects" role="tab" type="button">项目</button>
-        </div>
-        <details class="more">
-          <summary>周期汇总（周 / 季度 / 年度，辅助视图）</summary>
-          <div class="tabs sub" role="tablist">
-            <button class="tab" data-tab="weekly" role="tab" type="button">周报</button>
-            <button class="tab" data-tab="quarterly" role="tab" type="button">季度</button>
-            <button class="tab" data-tab="yearly" role="tab" type="button">年度</button>
+        <label class="field block"><span>摘要</span><textarea id="m-summary" rows="2" placeholder="一句话说明成果与要点"></textarea></label>
+        <details class="manual-more">
+          <summary>补充信息（交付 / 后续，可留空）</summary>
+          <div class="manual-grid">
+            <label class="field"><span>交付（逗号分隔）</span><input id="m-outcomes" type="text" placeholder="完成 A，上线 B" /></label>
+            <label class="field"><span>后续（逗号分隔）</span><input id="m-next" type="text" placeholder="明天继续 C" /></label>
           </div>
         </details>
-        <div class="panel">
-          <section id="panel" class="panel-body"></section>
+        <div class="manual-actions">
+          <button id="m-save" class="btn primary" type="submit">保存到日志</button>
+          <button id="m-cancel" class="btn" type="button">取消</button>
         </div>
+      </form>
+    </section>
+
+    <div id="calendar-view">
+      <main class="layout">
+        <aside class="rail">
+          <div class="cal-head">
+            <button id="cal-prev" class="cal-nav" type="button" aria-label="上个月">‹</button>
+            <strong id="cal-title" aria-live="polite">—</strong>
+            <button id="cal-next" class="cal-nav" type="button" aria-label="下个月">›</button>
+          </div>
+          <div class="cal-weekdays" id="cal-weekdays" aria-hidden="true"></div>
+          <div class="cal-grid" id="cal-grid" role="group" aria-label="工作日志月历"></div>
+          <label class="cal-filter"><span>按项目</span>
+            <select id="cal-project" aria-label="按项目筛选日历">
+              <option value="">全部项目</option>
+            </select>
+          </label>
+          <div class="cal-stats" id="cal-stats"></div>
+          <div class="rail-foot">
+            <button type="button" class="log-root-path" id="log-root" title="" aria-label="复制日志目录路径"></button>
+            <button type="button" class="btn subtle" id="reveal-root" title="在文件管理器中打开日志目录">打开目录</button>
+          </div>
+        </aside>
+
+        <section class="detail">
+          <div class="detail-head">
+            <div>
+              <h1 id="detail-title">选择一个日期</h1>
+              <p id="detail-subtitle">左侧月历按天统计；点一天查看当天时间线。</p>
+            </div>
+            <div class="detail-tools">
+              <span id="detail-badges" class="badges"></span>
+            </div>
+          </div>
+          <div class="tabs" role="tablist" aria-label="按日视图">
+            <button class="tab active" id="tab-timeline" data-tab="timeline" role="tab" aria-selected="true" aria-controls="panel" type="button">时间线</button>
+            <button class="tab" id="tab-daily" data-tab="daily" role="tab" aria-selected="false" aria-controls="panel" type="button">日报</button>
+          </div>
+          <details class="more">
+            <summary>周期汇总（周 / 季度 / 年度，辅助视图）</summary>
+            <div class="tabs sub" role="tablist" aria-label="周期汇总">
+              <button class="tab" id="tab-weekly" data-tab="weekly" role="tab" aria-selected="false" aria-controls="panel" type="button">周报</button>
+              <button class="tab" id="tab-quarterly" data-tab="quarterly" role="tab" aria-selected="false" aria-controls="panel" type="button">季度</button>
+              <button class="tab" id="tab-yearly" data-tab="yearly" role="tab" aria-selected="false" aria-controls="panel" type="button">年度</button>
+            </div>
+          </details>
+          <div class="panel">
+            <section id="panel" class="panel-body" role="tabpanel" aria-labelledby="tab-timeline" tabindex="0"></section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="projects-view" hidden>
+      <section class="detail projects-plane">
+        <div class="detail-head">
+          <div>
+            <h1>项目管理</h1>
+            <p>全局项目登记表：规范名称与别名，历史条目按别名归并到同一项目。</p>
+          </div>
+        </div>
+        <div id="projects-panel" class="panel-body"></div>
       </section>
-    </main>
+    </div>
 
     <script src="app.js"></script>
   </body>

@@ -56,11 +56,10 @@ func writeSourcesConfig(root string, cfg sourcesConfigFile) error {
 	if err != nil {
 		return errors.New("来源配置序列化失败")
 	}
-	dir := filepath.Dir(sourcesConfigPath(root))
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return errors.New("来源配置目录创建失败")
+	if err := writeFileAtomic(sourcesConfigPath(root), append(payload, '\n')); err != nil {
+		return errors.New("来源配置写入失败")
 	}
-	return os.WriteFile(sourcesConfigPath(root), append(payload, '\n'), 0o644)
+	return nil
 }
 
 func sourceListCap(in input) (any, error) {
@@ -88,6 +87,8 @@ func sourceSaveCap(in input) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	unlock := lockRoot(root)
+	defer unlock()
 	cfg, err := readSourcesConfig(root)
 	if err != nil {
 		return nil, err

@@ -47,12 +47,20 @@ type input struct {
 	Entry   *entry  `json:"entry"`
 	// Mode 决定合并还是覆盖：merge（默认）/ replace。
 	Mode string `json:"mode"`
+	// Overwrite 为 true 时，命中同一 entry_id 的写入整条替换而非字段级合并，
+	// 让视图编辑可以真正清空某个字段（undefined 字段不参与合并）。
+	Overwrite bool `json:"overwrite"`
+	// EntryID / EntryIDs 定位要删除的条目（work-log.entry.delete）。
+	EntryID  string   `json:"entry_id"`
+	EntryIDs []string `json:"entry_ids"`
 	// 过滤条件。
 	Project  string `json:"project"`
 	Category string `json:"category"`
 	Source   string `json:"source"`
 	Tag      string `json:"tag"`
-	Limit    int    `json:"limit"`
+	// Query 是自由文本检索：在标题、摘要、功能、项目与标签里做不区分大小写的子串匹配。
+	Query string `json:"query"`
+	Limit int    `json:"limit"`
 	// SessionID 用于按会话重归类（work-log.project.assign）。
 	SessionID string `json:"session_id"`
 	// Narrative / Title 供报告渲染使用：narrative 是 AI 提炼的主线叙述。
@@ -62,12 +70,18 @@ type input struct {
 	Title      string            `json:"title"`
 	// URL 用于 work-log.link.open。
 	URL string `json:"url"`
+	// Path 用于 work-log.link.reveal：在系统文件管理器中定位一个目录或文件。
+	Path string `json:"path"`
 	// WorkflowContext 是工作流注入的上下文：上游步骤输出在 workflow_context.steps 里。
 	// 具体步骤 id 由工作流在 step.input 里声明，插件不猜工作流结构。
 	WorkflowContext map[string]any `json:"workflow_context"`
 	// EntriesStep / NarrativeStep 指向上游步骤，用于从工作流取结构化结果。
 	EntriesStep   string `json:"entries_step"`
 	NarrativeStep string `json:"narrative_step"`
+	// BaseStep 指向上游的「确定性素材」步骤（采集器候选条目）。与 EntriesStep（通常是
+	// AI 总结结果）配合时，用工时/起止时间/来源/会话等确定性字段兜底，AI 只覆盖人类可读内容，
+	// 避免模型把工时时长、时间戳写歪。
+	BaseStep string `json:"base_step"`
 	// 项目登记：ProjectID/ProjectName 等用于项目管理能力；ResolveProjects/RegisterProjects
 	// 控制写入时是否按登记表归一项目名、是否自动登记未知项目。
 	ProjectID        string   `json:"project_id"`
@@ -148,6 +162,9 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 	case "work-log.entry.read":
 		result, err := readEntries(in)
 		return rpcResult(result, err)
+	case "work-log.entry.delete":
+		result, err := deleteEntry(in)
+		return rpcResult(result, err)
 	case "work-log.archive.list":
 		result, err := archiveList(in)
 		return rpcResult(result, err)
@@ -184,6 +201,9 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 	case "work-log.link.open":
 		result, err := openLink(in)
 		return rpcResult(result, err)
+	case "work-log.link.reveal":
+		result, err := revealPath(in)
+		return rpcResult(result, err)
 	default:
 		return nil, &jsonrpc.Error{Code: -32602, Message: "不支持的工作日志能力"}
 	}
@@ -216,12 +236,43 @@ func upstreamStepOutput(in input, stepID string) map[string]any {
 	return output
 }
 
-// resolveEntries 在显式 entries/entry 为空时，从上游步骤输出里取 entries。
+// resolveEntries 取待写入的条目：显式 entries/entry 优先，否则取 EntriesStep 的上游输出。
+// 若同时声明了 BaseStep（确定性素材），则按「来源+会话」把 AI 总结的人类可读字段叠加到
+// 素材的确定性字段上，工时/起止时间等一律以素材为准。
 func resolveEntries(in input) []entry {
-	if len(in.Entries) > 0 || in.Entry != nil {
-		return in.Entries
+	overrides := in.Entries
+	if len(overrides) == 0 {
+		overrides = entriesFromStep(in, in.EntriesStep)
 	}
-	output := upstreamStepOutput(in, in.EntriesStep)
+	base := entriesFromStep(in, in.BaseStep)
+	if len(base) == 0 || len(overrides) == 0 {
+		return overrides
+	}
+	index := make(map[string]entry, len(base))
+	for _, item := range base {
+		if key := sessionEntryKey(item); key != "" {
+			index[key] = item
+		}
+	}
+	merged := make([]entry, 0, len(overrides))
+	for _, item := range overrides {
+		if key := sessionEntryKey(item); key != "" {
+			if baseItem, ok := index[key]; ok {
+				merged = append(merged, mergeBaseEntry(baseItem, item))
+				continue
+			}
+		}
+		merged = append(merged, item)
+	}
+	return merged
+}
+
+// entriesFromStep 读取某个上游步骤输出里的 entries 数组。
+func entriesFromStep(in input, stepID string) []entry {
+	if strings.TrimSpace(stepID) == "" {
+		return nil
+	}
+	output := upstreamStepOutput(in, stepID)
 	if output == nil {
 		return nil
 	}
@@ -238,6 +289,54 @@ func resolveEntries(in input) []entry {
 		return nil
 	}
 	return entries
+}
+
+// sessionEntryKey 用「来源+会话」作为同一次会话的稳定键；没有会话 id 时不参与合并。
+func sessionEntryKey(item entry) string {
+	session := strings.TrimSpace(item.SessionID)
+	if session == "" {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(item.Source)) + "|" + session
+}
+
+// mergeBaseEntry 以素材条目为底，叠加 AI 总结的人类可读字段；确定性字段（工时、起止时间、
+// 来源、会话、日期）不被 AI 覆盖。
+func mergeBaseEntry(base, ai entry) entry {
+	merged := base
+	if value := strings.TrimSpace(ai.Title); value != "" {
+		merged.Title = value
+	}
+	if value := strings.TrimSpace(ai.Summary); value != "" {
+		merged.Summary = value
+	}
+	if value := strings.TrimSpace(ai.Category); value != "" {
+		merged.Category = value
+	}
+	if value := strings.TrimSpace(ai.Project); value != "" {
+		merged.Project = value
+	}
+	if value := strings.TrimSpace(ai.Feature); value != "" {
+		merged.Feature = value
+	}
+	if len(ai.Outcomes) > 0 {
+		merged.Outcomes = ai.Outcomes
+	}
+	if len(ai.Decisions) > 0 {
+		merged.Decisions = ai.Decisions
+	}
+	if len(ai.Learnings) > 0 {
+		merged.Learnings = ai.Learnings
+	}
+	if len(ai.Blockers) > 0 {
+		merged.Blockers = ai.Blockers
+	}
+	if len(ai.Next) > 0 {
+		merged.Next = ai.Next
+	}
+	merged.Tags = appendUniqueStrings(base.Tags, ai.Tags...)
+	merged.Tags = appendUniqueStrings(merged.Tags, "AI总结")
+	return merged
 }
 
 // resolveNarrative 优先用显式 narrative，否则取上游步骤提炼的主线叙述。
@@ -272,6 +371,9 @@ func upsert(in input) (any, error) {
 		return nil, errors.New("entries 不能为空：请至少提供一条日志")
 	}
 
+	unlock := lockRoot(root)
+	defer unlock()
+
 	day, err := readDay(root, date)
 	if err != nil {
 		return nil, err
@@ -291,8 +393,13 @@ func upsert(in input) (any, error) {
 		}
 		if existing >= 0 {
 			// 合并语义：保留首次创建时间，逐字段以新值覆盖，空字段不冲掉旧值。
+			// overwrite=true 时改为整条替换，让编辑可以真正清空字段。
 			item.CreatedAt = day.Entries[existing].CreatedAt
-			day.Entries[existing] = mergeEntry(day.Entries[existing], item)
+			if in.Overwrite {
+				day.Entries[existing] = item
+			} else {
+				day.Entries[existing] = mergeEntry(day.Entries[existing], item)
+			}
 		} else {
 			day.Entries = append(day.Entries, item)
 		}
@@ -393,7 +500,7 @@ func normalizeEntry(item entry, date, now string) entry {
 	item.Source = fallbackValue(strings.TrimSpace(item.Source), "manual")
 	item.EntryID = strings.TrimSpace(item.EntryID)
 	item.Project = strings.TrimSpace(item.Project)
-	item.Category = fallbackValue(strings.TrimSpace(item.Category), "other")
+	item.Category = fallbackValue(strings.TrimSpace(item.Category), defaultCategory)
 	item.SessionID = strings.TrimSpace(item.SessionID)
 	item.StartedAt = strings.TrimSpace(item.StartedAt)
 	item.EndedAt = strings.TrimSpace(item.EndedAt)
@@ -489,6 +596,80 @@ func readEntries(in input) (any, error) {
 	}, nil
 }
 
+// deleteEntry 从某天的日志里移除指定 entry_id 的条目。
+//
+// 删除到当天无剩余条目时，连同当天的日志文件一并移除，避免日历上残留
+// 「有文件但 0 条」的空白日期。删除是显式动作，不做采集侧的幂等合并。
+func deleteEntry(in input) (any, error) {
+	root, err := logRoot(in.LogRoot)
+	if err != nil {
+		return nil, err
+	}
+	date := normalizeDate(in.Date)
+	if !validDate(date) {
+		return nil, errors.New("date 必须是 YYYY-MM-DD 格式")
+	}
+	targets := map[string]struct{}{}
+	if id := strings.TrimSpace(in.EntryID); id != "" {
+		targets[id] = struct{}{}
+	}
+	for _, id := range in.EntryIDs {
+		if trimmed := strings.TrimSpace(id); trimmed != "" {
+			targets[trimmed] = struct{}{}
+		}
+	}
+	if len(targets) == 0 {
+		return nil, errors.New("需要 entry_id 或 entry_ids")
+	}
+
+	unlock := lockRoot(root)
+	defer unlock()
+
+	day, err := readDay(root, date)
+	if err != nil {
+		return nil, err
+	}
+	kept := make([]entry, 0, len(day.Entries))
+	removed := 0
+	for _, item := range day.Entries {
+		if _, hit := targets[item.EntryID]; hit {
+			removed++
+			continue
+		}
+		kept = append(kept, item)
+	}
+	if removed == 0 {
+		return map[string]any{
+			"log_root": root,
+			"date":     date,
+			"removed":  0,
+			"count":    len(day.Entries),
+		}, nil
+	}
+	if len(kept) == 0 {
+		if err := os.Remove(dayPath(root, date)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, errors.New("日志文件删除失败")
+		}
+		return map[string]any{
+			"log_root":    root,
+			"date":        date,
+			"removed":     removed,
+			"count":       0,
+			"deleted_day": true,
+		}, nil
+	}
+	day.Entries = kept
+	if err := writeDay(root, day); err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"log_root": root,
+		"date":     date,
+		"removed":  removed,
+		"count":    len(kept),
+	}, nil
+}
+
 func matches(item entry, in input) bool {
 	if p := strings.TrimSpace(in.Project); p != "" && !strings.Contains(strings.ToLower(item.Project), strings.ToLower(p)) {
 		return false
@@ -511,7 +692,26 @@ func matches(item entry, in input) bool {
 			return false
 		}
 	}
+	if q := strings.TrimSpace(in.Query); q != "" && !entryMatchText(item, q) {
+		return false
+	}
 	return true
+}
+
+// entryMatchText 在标题、摘要、功能、项目与标签里做不区分大小写的子串匹配。
+func entryMatchText(item entry, query string) bool {
+	needle := strings.ToLower(strings.TrimSpace(query))
+	if needle == "" {
+		return true
+	}
+	haystack := []string{item.Title, item.Summary, item.Feature, item.Project, categoryLabel(item.Category)}
+	haystack = append(haystack, item.Tags...)
+	for _, value := range haystack {
+		if strings.Contains(strings.ToLower(value), needle) {
+			return true
+		}
+	}
+	return false
 }
 
 type daySummary struct {
@@ -846,15 +1046,12 @@ func renderReport(in input) (any, error) {
 	htmlBody := renderHTML(title, period, key, start, end, entries, narrative, in.Narratives)
 
 	dir := filepath.Join(root, "reports", period)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, errors.New("报告目录创建失败")
-	}
 	mdPath := filepath.Join(dir, key+".md")
 	htmlPath := filepath.Join(dir, key+".html")
-	if err := os.WriteFile(mdPath, []byte(markdown), 0o644); err != nil {
+	if err := writeFileAtomic(mdPath, []byte(markdown)); err != nil {
 		return nil, errors.New("报告 Markdown 写入失败")
 	}
-	if err := os.WriteFile(htmlPath, []byte(htmlBody), 0o644); err != nil {
+	if err := writeFileAtomic(htmlPath, []byte(htmlBody)); err != nil {
 		return nil, errors.New("报告 HTML 写入失败")
 	}
 	report := map[string]any{
@@ -878,7 +1075,7 @@ func renderReport(in input) (any, error) {
 	if err != nil {
 		return nil, errors.New("报告 JSON 序列化失败")
 	}
-	if err := os.WriteFile(jsonPath, append(jsonBody, '\n'), 0o644); err != nil {
+	if err := writeFileAtomic(jsonPath, append(jsonBody, '\n')); err != nil {
 		return nil, errors.New("报告 JSON 写入失败")
 	}
 	report["json_path"] = jsonPath
@@ -914,7 +1111,7 @@ func readReport(in input) (any, error) {
 	if !validDate(anchor) {
 		return nil, errors.New("date 必须是 YYYY-MM-DD 格式")
 	}
-	_, _, key, err := periodRange(period, anchor)
+	start, end, key, err := periodRange(period, anchor)
 	if err != nil {
 		return nil, err
 	}
@@ -932,6 +1129,8 @@ func readReport(in input) (any, error) {
 		"log_root":  root,
 		"period":    period,
 		"key":       key,
+		"date_from": start,
+		"date_to":   end,
 		"markdown":  string(mdBody),
 		"html":      string(htmlBody),
 		"md_path":   mdPath,
@@ -1023,7 +1222,7 @@ func rememberRoot(root string) {
 		return
 	}
 	if payload, err := json.MarshalIndent(state, "", "  "); err == nil {
-		_ = os.WriteFile(path, payload, 0o644)
+		_ = writeFileAtomic(path, append(payload, '\n'))
 	}
 }
 
@@ -1056,15 +1255,14 @@ func readDay(root, date string) (dayFile, error) {
 
 func writeDay(root string, day dayFile) error {
 	day.Count = len(day.Entries)
-	path := dayPath(root, day.Date)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return errors.New("日志目录创建失败")
-	}
 	payload, err := json.MarshalIndent(day, "", "  ")
 	if err != nil {
 		return errors.New("日志序列化失败")
 	}
-	return os.WriteFile(path, append(payload, '\n'), 0o644)
+	if err := writeFileAtomic(dayPath(root, day.Date), append(payload, '\n')); err != nil {
+		return errors.New("日志写入失败")
+	}
+	return nil
 }
 
 func listDates(root string) ([]string, error) {
@@ -1329,7 +1527,7 @@ func overviewLines(entries []entry) string {
 	sources := map[string]int{}
 	for _, item := range entries {
 		projects[fallbackValue(item.Project, "未归类")]++
-		categories[fallbackValue(item.Category, "other")]++
+		categories[categoryLabel(item.Category)]++
 		sources[fallbackValue(item.Source, "manual")]++
 	}
 	var builder strings.Builder
@@ -1361,7 +1559,7 @@ func timelineLines(entries []entry) string {
 		if item.Feature != "" {
 			meta = append(meta, "功能:"+item.Feature)
 		}
-		meta = append(meta, "["+fallbackValue(item.Category, "other")+"]")
+		meta = append(meta, "["+categoryLabel(item.Category)+"]")
 		builder.WriteString("- " + strings.Join(meta, " · ") + " " + fallbackValue(item.Title, "(未命名)") + "\n")
 		if item.Summary != "" {
 			builder.WriteString("  " + item.Summary + "\n")
@@ -1559,7 +1757,7 @@ func timelineHTML(entries []entry) string {
 			builder.WriteString(`<span class="time">` + html.EscapeString(span) + `</span>`)
 		}
 		builder.WriteString(`<strong>` + html.EscapeString(fallbackValue(item.Title, "(未命名)")) + `</strong>`)
-		builder.WriteString(`<span class="cat">` + html.EscapeString(fallbackValue(item.Category, "other")) + `</span>`)
+		builder.WriteString(`<span class="cat">` + html.EscapeString(categoryLabel(item.Category)) + `</span>`)
 		if item.Project != "" {
 			builder.WriteString(`<span class="proj">` + html.EscapeString(item.Project) + `</span>`)
 		}
@@ -1723,7 +1921,81 @@ func openLink(in input) (any, error) {
 	return map[string]any{"opened": true, "url": target}, nil
 }
 
+// revealPath 在系统文件管理器里定位日志目录（或指定目录/文件）。
+//
+// 未显式传 path 时用日志根目录；目录不存在则先创建，避免「打开一个不存在的路径」
+// 让资源管理器弹错误框。风险等级是 local_action（只打开窗口，不改内容）。
+func revealPath(in input) (any, error) {
+	if runtime.GOOS != "windows" {
+		return nil, errors.New("当前平台暂不支持打开文件管理器：" + runtime.GOOS)
+	}
+	target := strings.TrimSpace(in.Path)
+	if target == "" {
+		root, err := logRoot(in.LogRoot)
+		if err != nil {
+			return nil, err
+		}
+		target = root
+	}
+	info, err := os.Stat(target)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			if mkErr := os.MkdirAll(target, 0o755); mkErr != nil {
+				return nil, errors.New("目标路径不存在且无法创建")
+			}
+			info = nil
+		} else {
+			return nil, errors.New("读取目标路径失败：" + err.Error())
+		}
+	}
+	command := exec.Command("explorer.exe", target)
+	if info != nil && !info.IsDir() {
+		command = exec.Command("explorer.exe", "/select,"+target)
+	}
+	if err := command.Start(); err != nil {
+		return nil, errors.New("打开文件管理器失败：" + err.Error())
+	}
+	_ = command.Process.Release()
+	return map[string]any{"opened": true, "path": target}, nil
+}
+
 // ---------- 工具函数 ----------
+
+// 日志条目的受控类型（category）。这里是唯一的规范值集合：UI 选择、AI 结果 schema、
+// 报告显示与旧数据归一都以它为准，写入 schema 也用同一枚举。
+const defaultCategory = "其他"
+
+// legacyCategoryLabels 把历史遗留的英文类型键映射到规范中文值，保证旧条目在报告与
+// 视图里也显示为中文。新写入只能使用规范值（见 plugin.json 的 category 枚举）。
+var legacyCategoryLabels = map[string]string{
+	"development": "开发",
+	"feature":     "开发",
+	"fix":         "修复",
+	"bugfix":      "修复",
+	"design":      "设计",
+	"research":    "调研",
+	"docs":        "文档",
+	"document":    "文档",
+	"review":      "评审",
+	"meeting":     "会议",
+	"ops":         "运维",
+	"operation":   "运维",
+	"other":       "其他",
+	"misc":        "其他",
+}
+
+// categoryLabel 返回条目的展示用类型：规范值原样返回，已知旧英文键归一为中文，
+// 未知值回退为原值（空值回退为「其他」）。
+func categoryLabel(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return defaultCategory
+	}
+	if label, ok := legacyCategoryLabels[strings.ToLower(trimmed)]; ok {
+		return label
+	}
+	return trimmed
+}
 
 func fallbackValue(value, when string) string {
 	trimmed := strings.TrimSpace(value)
@@ -1749,6 +2021,21 @@ func nonNilStrings(values []string) []string {
 		return []string{}
 	}
 	return values
+}
+
+// appendUniqueStrings 依次追加非空且未出现过的字符串，保持首次出现顺序。
+func appendUniqueStrings(base []string, values ...string) []string {
+	seen := make(map[string]bool, len(base)+len(values))
+	out := make([]string, 0, len(base)+len(values))
+	for _, value := range append(append([]string{}, base...), values...) {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" || seen[trimmed] {
+			continue
+		}
+		seen[trimmed] = true
+		out = append(out, trimmed)
+	}
+	return out
 }
 
 func nonNilRefs(values []ref) []ref {

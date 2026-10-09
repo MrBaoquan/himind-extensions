@@ -3,15 +3,18 @@
  *
  * 导航以自然月日历为主：左侧月历每天标注日志数量，点一天看当天时间线。
  * 日报是一等视图；周 / 季度 / 年度汇总收进「辅助视图」，不占主干。
+ * 「项目管理」是全局视图（项目登记表），与按日的「日历回看」并列，不混进按日页签。
  *
- * 视图只消费本插件 Manifest 已声明的能力：月历统计、条目录入/读取、报告渲染/读取、
+ * 视图只消费本插件 Manifest 已声明的能力：月历统计、条目录入/读取/删除、报告渲染/读取、
  * 打开链接。它不直接读文件系统，也不依赖宿主页面，因此单独打开或嵌入宿主时行为一致。
  */
 (function () {
   'use strict';
 
   const PLUGIN_ID = 'com.himind.work-log';
-  const CATEGORY_LABELS = {
+  // 受控工作类型现在统一存中文枚举；这里仅保留旧英文键到中文的兜底映射，
+  // 让历史条目也能正确显示。展示一律走 catLabel()。
+  const LEGACY_CATEGORY_LABELS = {
     development: '开发',
     meeting: '会议',
     review: '评审',
@@ -20,6 +23,13 @@
     ops: '运维',
     other: '其他',
   };
+  const CATEGORY_OPTIONS = ['开发', '修复', '设计', '调研', '文档', '评审', '会议', '运维', '其他'];
+
+  function catLabel(value) {
+    const raw = text(value);
+    if (!raw) return '其他';
+    return LEGACY_CATEGORY_LABELS[raw] || raw;
+  }
   const PERIOD_LABELS = {
     daily: '日报',
     weekly: '周报',
@@ -36,6 +46,7 @@
     selected: '',
     entries: [],
     tab: 'timeline',
+    view: 'calendar',
     logRoot: '',
     report: null,
     loadingReport: false,
@@ -43,6 +54,9 @@
     projectFilter: '',
     projects: [],
     projectsData: null,
+    editingEntry: null,
+    query: '',
+    searchResults: null,
   };
 
   const REPORT_TABS = ['daily', 'weekly', 'quarterly', 'yearly'];
@@ -109,8 +123,16 @@
     );
   }
 
+  let noticeTimer = null;
+
+  // notify 显示一条提示并自动消失：成功/信息短，警告与错误留久一点。
+  // 传空消息表示立即清除。refresh() 不再清提示，否则「已保存/已删除」会被刷新冲掉。
   function notify(message, tone) {
     const node = el('notice');
+    if (noticeTimer) {
+      clearTimeout(noticeTimer);
+      noticeTimer = null;
+    }
     if (!message) {
       node.hidden = true;
       node.textContent = '';
@@ -120,6 +142,12 @@
     node.hidden = false;
     node.className = 'notice' + (tone ? ' ' + tone : '');
     node.textContent = message;
+    const ttl = tone === 'error' ? 9000 : tone === 'warn' ? 7000 : 4500;
+    noticeTimer = setTimeout(() => {
+      node.hidden = true;
+      node.textContent = '';
+      node.className = 'notice';
+    }, ttl);
   }
 
   function text(value, fallback) {
@@ -281,18 +309,31 @@
   }
 
   function entryCard(item) {
-    const head = ['<div class="entry"><div class="entry-head">'];
+    const entryID = text(item.entry_id);
+    const head = ['<div class="entry" data-entry-id="' + escapeHTML(entryID) + '"><div class="entry-head">'];
     const span = formatSpan(item);
     if (span) {
       head.push('<span class="time">' + escapeHTML(span) + '</span>');
     }
     head.push('<strong>' + escapeHTML(text(item.title, '(未命名)')) + '</strong>');
-    head.push('<span class="cat">' + escapeHTML(CATEGORY_LABELS[item.category] || text(item.category, '其他')) + '</span>');
+    head.push('<span class="cat">' + escapeHTML(catLabel(item.category)) + '</span>');
     if (text(item.project)) head.push('<span class="proj">' + escapeHTML(item.project) + '</span>');
     if (text(item.feature)) head.push('<span class="feat">' + escapeHTML(item.feature) + '</span>');
     if (Number(item.minutes) > 0) {
       const source = MINUTES_SOURCE_LABELS[item.minutes_source] || text(item.minutes_source, '工时');
       head.push('<span class="mins">' + escapeHTML(minutesLabel(item.minutes)) + ' · ' + escapeHTML(source) + '</span>');
+    }
+    if (entryID) {
+      head.push(
+        '<span class="entry-actions">' +
+          '<button type="button" class="link-btn" data-action="edit" data-entry-id="' +
+          escapeHTML(entryID) +
+          '">编辑</button>' +
+          '<button type="button" class="link-btn danger" data-action="delete" data-entry-id="' +
+          escapeHTML(entryID) +
+          '">删除</button>' +
+          '</span>',
+      );
     }
     head.push('</div>');
     if (text(item.summary)) head.push('<p class="summary">' + escapeHTML(item.summary) + '</p>');
@@ -336,7 +377,30 @@
     );
   }
 
+  function filterEntries(entries, query) {
+    const needle = text(query).toLowerCase();
+    if (!needle) return entries;
+    return entries.filter((item) => {
+      const hay = [item.title, item.summary, item.feature, item.project, catLabel(item.category)].concat(item.tags || []);
+      return hay.some((value) => text(value).toLowerCase().indexOf(needle) >= 0);
+    });
+  }
+
   function renderTimeline() {
+    if (state.searchResults) {
+      const results = state.searchResults.entries || [];
+      if (!results.length) {
+        return emptyBlock('没有匹配的日志', ['换个关键词，或清空搜索框回到日历回看。']);
+      }
+      return (
+        '<div class="search-summary">在当月匹配到 ' +
+        escapeHTML(results.length) +
+        ' 条 · 关键词「' +
+        escapeHTML(state.query) +
+        '」</div>' +
+        results.map(entryCard).join('')
+      );
+    }
     if (!state.entries.length) {
       return emptyBlock('这一天还没有记录', [
         '可以用右上角“记录一条”手工补记。',
@@ -344,7 +408,15 @@
         '需要批量补记时，运行“每日工作日志”工作流。',
       ]);
     }
-    return state.entries.map(entryCard).join('');
+    const entries = filterEntries(state.entries, state.query);
+    if (!entries.length) {
+      return emptyBlock('这一天没有匹配的日志', [
+        '关键词「' + text(state.query) + '」在本日无命中。',
+        '按回车可在当月日志里全局搜索。',
+        '清空搜索框可回到完整时间线。',
+      ]);
+    }
+    return entries.map(entryCard).join('');
   }
 
   function markdownToHTML(markdown) {
@@ -409,6 +481,9 @@
     }
     const data = state.report.data || {};
     const markdown = text(data.markdown);
+    const range = data.date_from && data.date_to && data.date_from !== data.date_to
+      ? '<span class="badge">' + escapeHTML(data.date_from) + ' ~ ' + escapeHTML(data.date_to) + '</span>'
+      : '';
     panel.innerHTML =
       '<div class="row-actions">' +
       '<button type="button" class="btn" data-action="regen">重新生成</button>' +
@@ -417,9 +492,9 @@
       '<span class="badge">' +
       escapeHTML(text(data.key, period)) +
       '</span>' +
-      '<span class="badge">' +
-      escapeHTML(markdown.length) +
-      ' 字符</span></div>' +
+      range +
+      '</div>' +
+      '<p class="redact-hint" role="note">导出 / 分享前请先脱敏：报告可能包含项目名、内网地址、密钥或客户信息。</p>' +
       markdownToHTML(markdown);
     panel.querySelector('[data-action="regen"]').addEventListener('click', () => generateReport(period));
     panel.querySelector('[data-action="open"]').addEventListener('click', () => {
@@ -428,11 +503,14 @@
         notify('报告尚未落盘。', 'warn');
         return;
       }
+      notify('提示：分享或导出前请先脱敏。', 'warn');
       openLink(uri).then((opened) => {
         if (!opened) copyText(uri, '宿主未能打开，已复制报告路径');
       });
     });
-    panel.querySelector('[data-action="copy"]').addEventListener('click', () => copyText(markdown, '已复制报告 Markdown'));
+    panel.querySelector('[data-action="copy"]').addEventListener('click', () =>
+      copyText(markdown, '已复制报告 Markdown（分享前请脱敏）'),
+    );
   }
 
   function bindGenerate(panel, period) {
@@ -452,10 +530,12 @@
           });
         });
       });
-      return;
-    }
-    if (state.tab === 'projects') {
-      renderProjectsPanel();
+      panel.querySelectorAll('[data-action="edit"]').forEach((node) => {
+        node.addEventListener('click', () => startEdit(node.getAttribute('data-entry-id')));
+      });
+      panel.querySelectorAll('[data-action="delete"]').forEach((node) => {
+        node.addEventListener('click', () => armDelete(node));
+      });
       return;
     }
     renderReportPanel();
@@ -544,7 +624,8 @@
   }
 
   function renderProjectsPanel() {
-    const panel = el('panel');
+    const panel = el('projects-panel');
+    if (!panel) return;
     const data = state.projectsData || {};
     const projects = data.projects || [];
     const unmatched = data.unmatched || [];
@@ -698,6 +779,7 @@
   async function selectDate(date) {
     state.selected = date || '';
     state.report = null;
+    state.searchResults = null;
     state.entries = [];
     renderCalendar();
     if (state.selected) {
@@ -762,25 +844,84 @@
     el('record').disabled = busy;
     el('refresh').disabled = busy;
     el('m-save').disabled = busy;
-    el('m-save').textContent = busy && label ? label : '保存到日志';
+    el('m-save').textContent = busy && label ? label : saveLabel();
   }
 
-  function openManualForm() {
-    el('m-date').value = state.selected || today();
-    el('m-title').value = '';
-    el('m-project').value = '';
-    el('m-feature').value = '';
-    el('m-minutes').value = '';
-    el('m-category').value = 'development';
-    el('m-summary').value = '';
-    el('m-outcomes').value = '';
-    el('m-next').value = '';
+  function openManualForm(entry) {
+    state.editingEntry = entry || null;
+    el('m-entry-id').value = entry ? text(entry.entry_id) : '';
+    el('m-date').value = (entry && text(entry.date)) || state.selected || today();
+    el('m-title').value = entry ? text(entry.title) : '';
+    el('m-project').value = entry ? text(entry.project) : '';
+    el('m-feature').value = entry ? text(entry.feature) : '';
+    el('m-minutes').value = entry && Number(entry.minutes) > 0 ? String(entry.minutes) : '';
+    el('m-category').value = (() => {
+      const label = entry ? catLabel(entry.category) : '';
+      return CATEGORY_OPTIONS.indexOf(label) >= 0 ? label : '开发';
+    })();
+    el('m-summary').value = entry ? text(entry.summary) : '';
+    el('m-outcomes').value = entry ? (entry.outcomes || []).join('，') : '';
+    el('m-next').value = entry ? (entry.next || []).join('，') : '';
+    el('manual-title').textContent = entry ? '编辑一条工作日志' : '手动记录一条工作日志';
+    el('manual-hint').textContent = entry
+      ? '保存后按 entry_id 整条替换，可清空字段；日期不可改。'
+      : '纯手工入口，不依赖任何会话采集。';
+    el('m-save').textContent = saveLabel();
+    // 编辑时锁定日期：条目按天分片存储，改日期会变成「在新的一天新增」，需要另做移动语义。
+    el('m-date').disabled = !!entry;
     el('manual-form').hidden = false;
     el('m-title').focus();
   }
 
+  function saveLabel() {
+    return state.editingEntry ? '保存修改' : '保存到日志';
+  }
+
   function closeManualForm() {
+    state.editingEntry = null;
+    el('m-date').disabled = false;
     el('manual-form').hidden = true;
+    el('m-save').textContent = saveLabel();
+  }
+
+  function startEdit(entryID) {
+    const entry = state.entries.find((item) => text(item.entry_id) === entryID);
+    if (!entry) {
+      notify('未找到要编辑的条目，请刷新后重试。', 'warn');
+      return;
+    }
+    if (!el('manual-form').hidden && state.editingEntry && text(state.editingEntry.entry_id) === entryID) {
+      closeManualForm();
+      return;
+    }
+    openManualForm(entry);
+    el('manual-form').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // armDelete 用「二次点击确认」避免误删：首次点击把按钮变成确认态，3 秒内再点才真正删除。
+  function armDelete(node) {
+    if (node.getAttribute('data-armed') !== '1') {
+      node.setAttribute('data-armed', '1');
+      node.textContent = '确认删除';
+      setTimeout(() => {
+        node.setAttribute('data-armed', '0');
+        node.textContent = '删除';
+      }, 3000);
+      return;
+    }
+    removeEntry(node.getAttribute('data-entry-id'));
+  }
+
+  async function removeEntry(entryID) {
+    const date = state.selected || today();
+    notify('正在删除…');
+    try {
+      await bridgeInvoke('work-log.entry.delete', { date: date, entry_id: entryID });
+      notify('已删除该条日志。');
+      await refresh(date);
+    } catch (error) {
+      notify('删除失败：' + String((error && error.message) || error), 'error');
+    }
   }
 
   function splitList(value) {
@@ -788,6 +929,26 @@
       .split(/[,，、;；]+/)
       .map((item) => item.trim())
       .filter(Boolean);
+  }
+
+  // ENTRY_FIELDS 只列出 capability schema 允许透传的条目字段。created_at/updated_at
+  // 由后端维护，且 schema 对 entry 声明了 additionalProperties:false；若把整条 entry
+  // 原样回传（含 created_at），保存会被直接拒绝。这正是「编辑保存失败：unknown
+  // property: created_at」的根因，所以编辑时按白名单挑选字段而不是整条克隆。
+  const ENTRY_FIELDS = [
+    'entry_id', 'date', 'source', 'session_id', 'project', 'feature', 'category',
+    'minutes', 'minutes_source', 'started_at', 'ended_at', 'title', 'summary',
+    'outcomes', 'decisions', 'learnings', 'blockers', 'next', 'tags', 'refs',
+  ];
+
+  function pickEntryFields(source) {
+    const out = {};
+    ENTRY_FIELDS.forEach((key) => {
+      if (source[key] !== undefined) {
+        out[key] = source[key];
+      }
+    });
+    return out;
   }
 
   async function submitManual() {
@@ -798,25 +959,35 @@
       return;
     }
     const date = text(el('m-date').value, today());
-    const entry = {
-      source: 'manual',
-      title: title,
-      project: text(el('m-project').value),
-      feature: text(el('m-feature').value),
-      category: text(el('m-category').value, 'other'),
-      summary: text(el('m-summary').value),
-      outcomes: splitList(el('m-outcomes').value),
-      next: splitList(el('m-next').value),
-    };
+    const editing = state.editingEntry;
+    // 编辑时以原条目为底，保证表单未覆盖的字段（source/session_id/refs/decisions 等）不丢；
+    // 只透传 schema 允许的字段（见 pickEntryFields），其余由后端接管。
+    // 传 overwrite=true 让后端整条替换，用户清空的字段才真正被清空。
+    const entry = editing ? pickEntryFields(editing) : { source: 'manual' };
+    entry.title = title;
+    entry.project = text(el('m-project').value);
+    entry.feature = text(el('m-feature').value);
+    entry.category = text(el('m-category').value, '其他');
+    entry.summary = text(el('m-summary').value);
+    entry.outcomes = splitList(el('m-outcomes').value);
+    entry.next = splitList(el('m-next').value);
     const minutes = Number(el('m-minutes').value);
     if (minutes > 0) {
       entry.minutes = Math.round(minutes);
       entry.minutes_source = 'manual';
+    } else {
+      delete entry.minutes;
+      delete entry.minutes_source;
+    }
+    const payload = { date: date, entry: entry };
+    if (editing) {
+      payload.overwrite = true;
+      payload.entry.entry_id = text(editing.entry_id);
     }
     setBusy(true, '保存中…');
     try {
-      await bridgeInvoke('work-log.entry.upsert', { date: date, entry: entry });
-      notify('已保存 ' + date + ' 的工作日志。');
+      await bridgeInvoke('work-log.entry.upsert', payload);
+      notify(editing ? '已更新 ' + date + ' 的日志。' : '已保存 ' + date + ' 的工作日志。');
       closeManualForm();
       await refresh(date);
     } catch (error) {
@@ -826,14 +997,119 @@
     }
   }
 
+  function monthRange(date) {
+    const key = monthKeyOf(date || today());
+    const parts = key.split('-').map(Number);
+    const year = parts[0];
+    const month = parts[1];
+    const pad = (value) => String(value).padStart(2, '0');
+    const lastDay = new Date(year, month, 0).getDate();
+    return {
+      from: year + '-' + pad(month) + '-01',
+      to: year + '-' + pad(month) + '-' + pad(lastDay),
+    };
+  }
+
+  // runSearch 在「当前选中日所在月」范围内做全文检索，命中结果替换时间线显示。
+  async function runSearch() {
+    const query = text(state.query);
+    if (!query) {
+      state.searchResults = null;
+      if (state.tab === 'timeline') renderPanel();
+      return;
+    }
+    const range = monthRange(state.selected || today());
+    try {
+      const data = await bridgeInvoke('work-log.entry.list', {
+        from: range.from,
+        to: range.to,
+        query: query,
+        limit: 200,
+      });
+      state.searchResults = { entries: (data && data.entries) || [], from: range.from, to: range.to };
+    } catch (error) {
+      state.searchResults = null;
+      notify('搜索失败：' + String((error && error.message) || error), 'error');
+    }
+    setActiveTab('timeline');
+    renderPanel();
+  }
+
+  function setActiveTab(tab) {
+    state.tab = tab;
+    document.querySelectorAll('.tabs .tab').forEach((node) => {
+      const on = node.getAttribute('data-tab') === tab;
+      node.classList.toggle('active', on);
+      node.setAttribute('aria-selected', on ? 'true' : 'false');
+      node.setAttribute('tabindex', on ? '0' : '-1');
+    });
+    const active = document.getElementById('tab-' + tab);
+    if (active) el('panel').setAttribute('aria-labelledby', active.id);
+  }
+
+  function switchView(view) {
+    state.view = view === 'projects' ? 'projects' : 'calendar';
+    el('calendar-view').hidden = state.view !== 'calendar';
+    el('projects-view').hidden = state.view !== 'projects';
+    document.querySelectorAll('.view-switch .switch').forEach((node) => {
+      const on = node.getAttribute('data-view') === state.view;
+      node.classList.toggle('active', on);
+      node.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    if (state.view === 'projects') {
+      closeManualForm();
+      loadProjects()
+        .then(renderProjectsPanel)
+        .catch((error) => notify('读取项目失败：' + String((error && error.message) || error), 'error'));
+    }
+  }
+
   function bind() {
     el('record').addEventListener('click', () => {
-      if (el('manual-form').hidden) openManualForm();
-      else closeManualForm();
+      if (el('manual-form').hidden) {
+        openManualForm(null);
+      } else {
+        closeManualForm();
+      }
     });
     el('refresh').addEventListener('click', () => refresh());
+    const search = el('search');
+    if (search) {
+      search.addEventListener('input', () => {
+        state.query = search.value || '';
+        if (state.searchResults) state.searchResults = null;
+        if (state.tab === 'timeline') renderPanel();
+      });
+      search.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          runSearch();
+        }
+      });
+    }
+    const logRootBtn = el('log-root');
+    if (logRootBtn) {
+      logRootBtn.addEventListener('click', () => copyText(state.logRoot, '已复制日志目录路径'));
+    }
+    const revealBtn = el('reveal-root');
+    if (revealBtn) {
+      revealBtn.addEventListener('click', () => {
+        bridgeInvoke('work-log.link.reveal', {}).then(
+          () => notify('已在文件管理器中打开日志目录。'),
+          (error) => notify('打开目录失败：' + String((error && error.message) || error), 'error'),
+        );
+      });
+    }
     el('m-cancel').addEventListener('click', closeManualForm);
-    el('m-save').addEventListener('click', submitManual);
+    el('manual-fields').addEventListener('submit', (event) => {
+      event.preventDefault();
+      submitManual();
+    });
+
+    document.querySelectorAll('.view-switch .switch').forEach((button) => {
+      button.addEventListener('click', () => switchView(button.getAttribute('data-view')));
+    });
+
     el('cal-prev').addEventListener('click', () => shiftMonth(-1));
     el('cal-next').addEventListener('click', () => shiftMonth(1));
     el('cal-grid').addEventListener('click', onCalendarClick);
@@ -843,26 +1119,31 @@
         notify('读取月历失败：' + String((error && error.message) || error), 'error'),
       );
     });
-    document.querySelectorAll('.tab').forEach((button) => {
+    document.querySelectorAll('.tabs .tab').forEach((button) => {
       button.addEventListener('click', () => {
-        state.tab = button.getAttribute('data-tab');
-        document.querySelectorAll('.tab').forEach((node) => node.classList.toggle('active', node === button));
-        if (state.tab === 'projects') {
-          loadProjects()
-            .then(renderProjectsPanel)
-            .catch((error) => notify('读取项目失败：' + String((error && error.message) || error), 'error'));
-        } else if (REPORT_TABS.indexOf(state.tab) >= 0) {
+        setActiveTab(button.getAttribute('data-tab'));
+        if (REPORT_TABS.indexOf(state.tab) >= 0) {
           loadReport(state.tab);
         } else {
           renderPanel();
         }
+      });
+      // 符合 WAI-ARIA tab 模式：方向键在同一组页签间移动并激活。
+      button.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+        const tabs = Array.prototype.slice.call(button.parentElement.querySelectorAll('.tab'));
+        const index = tabs.indexOf(button);
+        if (index < 0) return;
+        const next = event.key === 'ArrowRight' ? (index + 1) % tabs.length : (index - 1 + tabs.length) % tabs.length;
+        event.preventDefault();
+        tabs[next].focus();
+        tabs[next].click();
       });
     });
   }
 
   async function refresh(preferredDate) {
     try {
-      notify('');
       if (preferredDate) state.selected = preferredDate;
       const anchor = preferredDate || state.selected || today();
       const parts = anchor.split('-').map(Number);
@@ -882,6 +1163,8 @@
   }
 
   bind();
+  setActiveTab(state.tab);
+  switchView('calendar');
   refresh();
   window.__WORK_LOG_VIEW__ = { PLUGIN_ID: PLUGIN_ID, refresh: refresh };
 })();

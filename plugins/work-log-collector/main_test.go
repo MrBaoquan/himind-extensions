@@ -36,6 +36,8 @@ func quote(value string) string {
 // writeFixture 构造一个临时的 home：包含一个 Codex rollout 与一个 Claude 会话索引。
 func writeFixture(t *testing.T) string {
 	t.Helper()
+	// 扫描会落一份会话素材 artifact，测试里固定写到临时数据根，避免污染真实用户目录。
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
 	home := t.TempDir()
 	codexPath := filepath.Join(home, ".codex", "sessions", "2026", "10", "09", "rollout-2026-10-09T10-00-00-abc.jsonl")
 	if err := os.MkdirAll(filepath.Dir(codexPath), 0o755); err != nil {
@@ -166,6 +168,50 @@ func TestUnknownCapabilityRejected(t *testing.T) {
 	_, rpcError := handle(jsonrpc.Request{Method: "work-log.session.nope", Params: []byte(`{}`)})
 	if rpcError == nil {
 		t.Fatal("未知能力应被拒绝")
+	}
+}
+
+func TestMeaningfulTitleSkipsSystemBlocks(t *testing.T) {
+	prompts := []string{
+		"<environment_context>\n  <current_date>2026-10-09</current_date>\n</environment_context>\n我要修复登录问题",
+		"## My request:\n把打包脚本里的版本号改成变量",
+	}
+	if got := meaningfulTitle(prompts, 80); got != "我要修复登录问题" {
+		t.Fatalf("标题应跳过系统块取真实请求，实际 %q", got)
+	}
+	if got := meaningfulTitle([]string{"<environment_context>\n</environment_context>"}, 80); got != "" {
+		t.Fatalf("只有系统块时应返回空标题，实际 %q", got)
+	}
+}
+
+func TestScanEmitsMaterialArtifact(t *testing.T) {
+	home := writeFixture(t)
+	material := t.TempDir()
+	out := call(t, "work-log.session.scan", `{"home":`+quote(home)+`,"date":"2026-10-09","limit":10,"material_root":`+quote(material)+`}`)
+	arts, ok := out["artifacts"].([]any)
+	if !ok || len(arts) != 1 {
+		t.Fatalf("扫描应产出 1 个会话素材 artifact，实际 %#v", out["artifacts"])
+	}
+	artifact := arts[0].(map[string]any)
+	if artifact["artifact_type"] != "session_digest" || artifact["artifact_id"] != "session-digest" {
+		t.Fatalf("素材 artifact 标识异常: %#v", artifact)
+	}
+	uri, _ := artifact["uri"].(string)
+	path := strings.TrimPrefix(uri, "file:///")
+	path = filepath.FromSlash(path)
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("素材文件未写入或不可读: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		t.Fatalf("素材文件不是合法 JSON: %v", err)
+	}
+	if _, ok := payload["sessions"].([]any); !ok {
+		t.Fatalf("素材应符合 session-digest schema（含 sessions）: %v", payload)
+	}
+	if _, ok := payload["total"]; !ok {
+		t.Fatalf("素材应符合 session-digest schema（含 total）: %v", payload)
 	}
 }
 

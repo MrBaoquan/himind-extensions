@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AI 工作总结结果",
+  "type": "object",
+  "required": ["entries"],
+  "properties": {
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source", "session_id", "title", "summary"],
+        "properties": {
+          "source": {"type": "string", "minLength": 1},
+          "session_id": {"type": "string", "minLength": 1},
+          "project": {"type": "string"},
+          "feature": {"type": "string", "maxLength": 40},
+          "category": {"type": "string", "enum": ["开发", "修复", "设计", "调研", "文档", "评审", "会议", "运维", "其他"], "description": "受控工作类型（中文枚举）；不确定时用「其他」"},
+          "title": {"type": "string", "minLength": 1, "maxLength": 60},
+          "summary": {"type": "string", "minLength": 1, "maxLength": 600},
+          "outcomes": {"type": "array", "items": {"type": "string", "maxLength": 120}},
+          "decisions": {"type": "array", "items": {"type": "string", "maxLength": 120}},
+          "learnings": {"type": "array", "items": {"type": "string", "maxLength": 120}},
+          "blockers": {"type": "array", "items": {"type": "string", "maxLength": 120}},
+          "next": {"type": "array", "items": {"type": "string", "maxLength": 120}}
+        },
+        "additionalProperties": true
+      }
+    },
+    "narrative": {"type": "string", "maxLength": 800}
+  },
+  "additionalProperties": true
+}

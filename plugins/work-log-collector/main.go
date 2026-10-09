@@ -1,13 +1,16 @@
 // Command work-log-collector 探测本机 AI 客户端的会话存储，把指定日期的会话整理成
 // 工作日志素材摘要。
 //
-// 采集器只读，不写任何文件：写入工作日志由 com.himind.work-log 插件统一负责，
-// 保证日志库只有一个写入者。SQLite 会话库（OpenCode/Copilot）通过可选的 sqlite3
-// CLI 读取，缺失时如实标记为不可用，不引入第三方 Go 依赖。
+// 采集器不写工作日志库：写入日志由 com.himind.work-log 插件统一负责，保证日志库只有
+// 一个写入者。它至多把会话素材落一份临时 artifact（扩展私有数据目录），交给工作流的
+// AI 总结步骤读取。SQLite 会话库（OpenCode/Copilot）通过可选的 sqlite3 CLI 读取，
+// 缺失时如实标记为不可用，不引入第三方 Go 依赖。
 package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -49,6 +52,9 @@ type input struct {
 	SourcesConfig     []genericSource `json:"sources_config"`
 	SourcesConfigPath string          `json:"sources_config_path"`
 	IncludePresets    *bool           `json:"include_presets"`
+	// MaterialRoot 是会话素材文件的写入目录；缺省落到扩展私有数据目录。素材只供工作流
+	// 的 AI 总结步骤读取，绝不写入工作日志库。
+	MaterialRoot string `json:"material_root"`
 }
 
 func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
@@ -346,7 +352,7 @@ func scanCap(in input) (any, error) {
 		filtered = filtered[:limit]
 		truncated = true
 	}
-	return map[string]any{
+	result := map[string]any{
 		"home":        home,
 		"from":        from,
 		"to":          to,
@@ -356,7 +362,63 @@ func scanCap(in input) (any, error) {
 		"truncated":   truncated,
 		"skipped":     skipped,
 		"config_path": configPath,
+	}
+	// 会话素材落一份 artifact 文件，供工作流的 AI 总结步骤以 input_artifacts 消费。
+	// 这只是素材，不写日志库；写入的仍是 com.himind.work-log。
+	artifact, err := writeMaterial(in, from, to, result)
+	if err != nil {
+		return nil, err
+	}
+	result["artifacts"] = []map[string]any{artifact}
+	return result, nil
+}
+
+// writeMaterial 把会话素材写成一份符合 session-digest schema 的 JSON 文件，并返回
+// 供工作流引用的 artifact 描述（含 file:// URI 与 sha256）。
+func writeMaterial(in input, from, to string, content map[string]any) (map[string]any, error) {
+	root, err := materialRoot(in)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return nil, errors.New("会话素材目录创建失败")
+	}
+	payload, err := json.MarshalIndent(content, "", "  ")
+	if err != nil {
+		return nil, errors.New("会话素材序列化失败")
+	}
+	path := filepath.Join(root, fmt.Sprintf("session-digest-%s_%s.json", from, to))
+	if err := os.WriteFile(path, payload, 0o644); err != nil {
+		return nil, errors.New("会话素材写入失败")
+	}
+	sum := sha256.Sum256(payload)
+	return map[string]any{
+		"artifact_id":   "session-digest",
+		"artifact_type": "session_digest",
+		"name":          "会话素材 " + from + " ~ " + to,
+		"uri":           "file:///" + strings.ReplaceAll(path, "\\", "/"),
+		"sha256":        hex.EncodeToString(sum[:]),
 	}, nil
+}
+
+// materialRoot 解析会话素材目录：显式入参 > 扩展私有数据目录 > 系统临时目录。
+func materialRoot(in input) (string, error) {
+	if value := strings.TrimSpace(in.MaterialRoot); value != "" {
+		abs, err := filepath.Abs(value)
+		if err != nil {
+			return "", errors.New("material_root 无效")
+		}
+		return abs, nil
+	}
+	base := strings.TrimSpace(os.Getenv("HIMIND_PLUGIN_DATA_ROOT"))
+	if base == "" {
+		if local := strings.TrimSpace(os.Getenv("LOCALAPPDATA")); local != "" {
+			base = filepath.Join(local, "HiMindAgent", "extension-data", "com.himind.work-log-collector")
+		} else {
+			base = filepath.Join(os.TempDir(), "HiMindAgent", "extension-data", "com.himind.work-log-collector")
+		}
+	}
+	return filepath.Join(base, "material"), nil
 }
 
 // ---- 工时与功能推断 ----
@@ -481,7 +543,7 @@ func candidateEntries(digests []sessionDigest) []map[string]any {
 			"source":     digest.Source,
 			"session_id": digest.SessionID,
 			"project":    digest.Project,
-			"category":   "other",
+			"category":   "其他",
 			"started_at": digest.StartedAt,
 			"ended_at":   digest.EndedAt,
 			"title":      digest.Title,
@@ -542,8 +604,8 @@ func inRange(t time.Time, start, end time.Time) bool {
 }
 
 func trimDigest(d *sessionDigest, maxPrompts, maxChars int) {
-	if strings.TrimSpace(d.Title) == "" && len(d.UserPrompts) > 0 {
-		d.Title = firstLine(d.UserPrompts[0], 80)
+	if strings.TrimSpace(d.Title) == "" {
+		d.Title = meaningfulTitle(d.UserPrompts, 80)
 	}
 	budget := maxChars
 	trimList := func(items []string) []string {
@@ -1089,6 +1151,33 @@ func firstLine(text string, limit int) string {
 		}
 	}
 	return text
+}
+
+// isSystemBlockLine 判断一行是否是客户端注入的系统块（环境上下文、ambient UI 状态等），
+// 这类内容不能当作工作标题。
+func isSystemBlockLine(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" || strings.HasPrefix(trimmed, "<") || strings.HasPrefix(trimmed, "#") {
+		return true
+	}
+	if strings.HasPrefix(trimmed, "This block is automatically supplied") {
+		return true
+	}
+	return false
+}
+
+// meaningfulTitle 从用户消息里挑出能代表真实工作的标题：逐行跳过系统块与空行，
+// 取第一条有实际语义的文本行。
+func meaningfulTitle(prompts []string, limit int) string {
+	for _, prompt := range prompts {
+		for _, line := range strings.Split(prompt, "\n") {
+			if isSystemBlockLine(line) {
+				continue
+			}
+			return firstLine(strings.TrimSpace(line), limit)
+		}
+	}
+	return ""
 }
 
 func nonEmpty(items []string) []string {

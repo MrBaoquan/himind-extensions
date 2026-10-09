@@ -70,10 +70,10 @@ func writeProjects(root string, pf projectsFile) error {
 	if err != nil {
 		return errors.New("项目登记序列化失败")
 	}
-	if err := os.MkdirAll(root, 0o755); err != nil {
-		return errors.New("项目登记目录创建失败")
+	if err := writeFileAtomic(projectsPath(root), append(payload, '\n')); err != nil {
+		return errors.New("项目登记写入失败")
 	}
-	return os.WriteFile(projectsPath(root), append(payload, '\n'), 0o644)
+	return nil
 }
 
 func normalizeProjectKey(name string) string {
@@ -304,6 +304,8 @@ func projectUpsertCap(in input) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	unlock := lockRoot(root)
+	defer unlock()
 	name := strings.TrimSpace(in.ProjectName)
 	if name == "" {
 		return nil, errors.New("项目名称（project_name）不能为空")
@@ -385,6 +387,8 @@ func projectDeleteCap(in input) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	unlock := lockRoot(root)
+	defer unlock()
 	pf, err := readProjects(root)
 	if err != nil {
 		return nil, err
@@ -447,6 +451,8 @@ func projectAssignCap(in input) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	unlock := lockRoot(root)
+	defer unlock()
 	target := strings.TrimSpace(in.ProjectName)
 	if target == "" {
 		target = strings.TrimSpace(in.Project)

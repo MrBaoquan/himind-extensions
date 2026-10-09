@@ -4,8 +4,8 @@
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
   "description": "探测本机 AI 客户端的会话存储，把指定日期的会话整理成日志素材；内置 Codex、Claude、OpenCode、Copilot，并支持声明式通用来源接入更多客户端。",
-  "release_notes": "0.3.0：会话摘要新增功能/模块推断与工时（优先按消息间隔实测、其次区间、最后按轮次估算），并把真实起止时间与工时写入日志条目。",
-  "version": "0.3.0",
+  "release_notes": "0.4.1：会话素材的默认类型改为「其他」，与工作日志插件的受控类型枚举保持一致。",
+  "version": "0.4.1",
   "distribution_targets": ["workbench", "github"],
   "entry": "bin/work-log-collector.exe",
   "runtime": "process-jsonrpc-stdio",
@@ -62,6 +62,7 @@
           "limit": {"type": "integer", "minimum": 1, "maximum": 500},
           "max_prompts": {"type": "integer", "minimum": 1, "maximum": 50},
           "max_chars": {"type": "integer", "minimum": 200, "maximum": 20000},
+          "material_root": {"type": "string", "description": "会话素材文件写入目录；缺省落到扩展私有数据目录，仅用于工作流 AI 总结，不写日志库"},
           "log_root": {"type": "string", "description": "工作日志根目录，用于定位 <根>/config/sources.json"},
           "sources_config_path": {"type": "string", "description": "通用来源配置文件路径"},
           "sources_config": {
@@ -78,7 +79,7 @@
       "timeout_seconds": 600
     }
   ],
-  "permissions": ["filesystem.workspace.read"],
+  "permissions": ["filesystem.workspace.read", "filesystem.workspace.write"],
   "contributes": {
     "commands": [
       {"id": "work-log.session.scan", "title": "采集会话日志素材"},

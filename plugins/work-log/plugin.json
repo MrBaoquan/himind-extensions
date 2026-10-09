@@ -4,8 +4,8 @@
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
   "description": "以按日工作日志为核心，把每天的记录结构化归档并支持日历回看；条目带功能/模块与工时，报告按 项目 → 功能 聚合内容小结；项目是一份可管理的登记表（含别名归一与项目维度统计），周报等周期汇总仅作辅助。",
-  "release_notes": "0.3.0：条目新增 feature（功能/模块）与 minutes/minutes_source（工时及来源），报告与日历按项目→功能聚合内容小结并统计工时，支持按项目/功能的模型小结（narratives）。",
-  "version": "0.3.0",
+  "release_notes": "0.5.0：条目类型收紧为中文枚举并归一旧数据；新增条目搜索与打开日志目录；报告导出前提示脱敏。",
+  "version": "0.5.0",
   "distribution_targets": ["workbench", "github"],
   "entry": "bin/work-log.exe",
   "runtime": "process-jsonrpc-stdio",
@@ -23,9 +23,11 @@
           "log_root": {"type": "string"},
           "date": {"type": "string"},
           "mode": {"type": "string", "enum": ["merge", "replace"]},
+          "overwrite": {"type": "boolean", "description": "命中同一 entry_id 时整条替换而非字段级合并，用于视图编辑"},
           "resolve_projects": {"type": "boolean", "description": "按项目登记表归一项目名，默认 true"},
           "register_projects": {"type": "boolean", "description": "自动登记未知名项目，默认 true"},
           "entries_step": {"type": "string"},
+          "base_step": {"type": "string", "description": "上游确定性素材步骤；与 entries_step（AI 总结）配合时，工时/起止时间等以素材为准"},
           "workflow_context": {"type": "object", "additionalProperties": true},
           "entry": {
             "type": "object",
@@ -36,7 +38,7 @@
               "session_id": {"type": "string"},
               "project": {"type": "string"},
               "feature": {"type": "string", "description": "功能/模块名，用于按项目下的功能归类与小计"},
-              "category": {"type": "string"},
+              "category": {"type": "string", "enum": ["开发", "修复", "设计", "调研", "文档", "评审", "会议", "运维", "其他"], "description": "受控工作类型（中文枚举），未知值会被视为「其他」"},
               "minutes": {"type": "integer", "minimum": 0, "maximum": 1440, "description": "工时（分钟）"},
               "minutes_source": {"type": "string", "enum": ["measured", "span", "estimated", "manual"]},
               "started_at": {"type": "string"},
@@ -71,7 +73,7 @@
                 "session_id": {"type": "string"},
                 "project": {"type": "string"},
                 "feature": {"type": "string", "description": "功能/模块名，用于按项目下的功能归类与小计"},
-                "category": {"type": "string"},
+                "category": {"type": "string", "enum": ["开发", "修复", "设计", "调研", "文档", "评审", "会议", "运维", "其他"], "description": "受控工作类型（中文枚举），未知值会被视为「其他」"},
                 "minutes": {"type": "integer", "minimum": 0, "maximum": 1440, "description": "工时（分钟）"},
                 "minutes_source": {"type": "string", "enum": ["measured", "span", "estimated", "manual"]},
                 "started_at": {"type": "string"},
@@ -117,6 +119,7 @@
           "category": {"type": "string"},
           "source": {"type": "string"},
           "tag": {"type": "string"},
+          "query": {"type": "string", "description": "自由文本检索：匹配标题/摘要/功能/项目/标签"},
           "limit": {"type": "integer", "minimum": 1, "maximum": 5000}
         },
         "required": [],
@@ -138,6 +141,23 @@
         "additionalProperties": false
       },
       "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.entry.delete",
+      "description": "删除某天日志中的指定条目；删空后移除当天文件，日历不再残留空白日期",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "date": {"type": "string"},
+          "entry_id": {"type": "string"},
+          "entry_ids": {"type": "array", "items": {"type": "string"}}
+        },
+        "required": ["date"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
     },
     {
       "id": "work-log.archive.list",
@@ -348,6 +368,21 @@
         "additionalProperties": false
       },
       "risk_level": "local_action"
+    },
+    {
+      "id": "work-log.link.reveal",
+      "description": "在系统文件管理器中打开日志目录（或指定目录/文件）",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "path": {"type": "string", "description": "要定位的目录或文件；留空则打开日志根目录"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_action"
     }
   ],
   "permissions": ["filesystem.workspace.read", "filesystem.workspace.write"],
@@ -366,10 +401,12 @@
     ],
     "commands": [
       {"id": "work-log.entry.upsert", "title": "记录今日工作日志"},
+      {"id": "work-log.entry.delete", "title": "删除工作日志条目"},
       {"id": "work-log.archive.calendar", "title": "按日历回看工作日志"},
       {"id": "work-log.report.render", "title": "生成当日工作简报"},
       {"id": "work-log.archive.list", "title": "浏览工作日志归档"},
-      {"id": "work-log.project.list", "title": "查看项目归类"}
+      {"id": "work-log.project.list", "title": "查看项目归类"},
+      {"id": "work-log.link.reveal", "title": "打开日志目录"}
     ]
   }
 }

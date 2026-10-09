@@ -54,7 +54,7 @@
   ],
   "actions": [
     "collect",
-    "write",
+    "summarize",
     "report"
   ]
 }

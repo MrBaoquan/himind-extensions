@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/MrBaoquan/himind-extensions/sdk/jsonrpc"
@@ -131,6 +133,14 @@ func TestArchiveListAndReport(t *testing.T) {
 	read := call(t, "work-log.report.read", `{"log_root":`+quote(root)+`,"period":"daily","date":"2026-10-09"}`)
 	if read["key"] != "2026-10-09" {
 		t.Fatalf("报告读取键异常: %v", read["key"])
+	}
+	if read["date_from"] != "2026-10-09" || read["date_to"] != "2026-10-09" {
+		t.Fatalf("报告读取应带范围: from=%v to=%v", read["date_from"], read["date_to"])
+	}
+	call(t, "work-log.report.render", `{"log_root":`+quote(root)+`,"period":"weekly","date":"2026-10-09"}`)
+	weekly := call(t, "work-log.report.read", `{"log_root":`+quote(root)+`,"period":"weekly","date":"2026-10-09"}`)
+	if weekly["date_from"] != "2026-10-05" || weekly["date_to"] != "2026-10-11" {
+		t.Fatalf("周报读取范围异常: from=%v to=%v", weekly["date_from"], weekly["date_to"])
 	}
 }
 
@@ -492,6 +502,161 @@ func TestTimeSpanFormatsTimestamps(t *testing.T) {
 	if got := hoursText(90); got != "1.5 小时" {
 		t.Fatalf("小时文本异常: %q", got)
 	}
+}
+
+func TestDeleteEntryRemovesOneAndTrimsDay(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[
+		{"source":"manual","title":"保留"},
+		{"source":"manual","title":"删除"}
+	]}`)
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-09"}`)
+	var targetID string
+	for _, raw := range read["entries"].([]any) {
+		if item := raw.(map[string]any); item["title"] == "删除" {
+			targetID = item["entry_id"].(string)
+		}
+	}
+	if targetID == "" {
+		t.Fatal("未找到待删除条目")
+	}
+	deleted := call(t, "work-log.entry.delete", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entry_id":`+quote(targetID)+`}`)
+	if deleted["removed"].(float64) != 1 || deleted["count"].(float64) != 1 {
+		t.Fatalf("删除结果异常: %#v", deleted)
+	}
+	after := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-09"}`)
+	entries := after["entries"].([]any)
+	if len(entries) != 1 || entries[0].(map[string]any)["title"] != "保留" {
+		t.Fatalf("删除后剩余条目异常: %#v", entries)
+	}
+}
+
+func TestDeleteLastEntryRemovesDayFile(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[{"source":"manual","title":"唯一"}]}`)
+	path := filepath.Join(root, "logs", "2026", "2026-10-09.json")
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("日志文件应存在: %v", err)
+	}
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-09"}`)
+	id := read["entries"].([]any)[0].(map[string]any)["entry_id"].(string)
+	deleted := call(t, "work-log.entry.delete", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entry_id":`+quote(id)+`}`)
+	if deleted["deleted_day"] != true {
+		t.Fatalf("删空后应标记删除当天文件: %#v", deleted)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("删空后当天文件应被移除: %v", err)
+	}
+	cal := call(t, "work-log.archive.calendar", `{"log_root":`+quote(root)+`,"year":2026,"month":10}`)
+	if cal["total_entries"].(float64) != 0 {
+		t.Fatalf("删空后月历不应再有条目: %v", cal["total_entries"])
+	}
+}
+
+func TestDeleteRequiresTarget(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	if _, rpcError := handle(jsonrpc.Request{Method: "work-log.entry.delete", Params: []byte(`{"log_root":` + quote(root) + `,"date":"2026-10-09"}`)}); rpcError == nil {
+		t.Fatal("缺少 entry_id 时应被拒绝")
+	}
+}
+
+func TestUpsertOverwriteClearsFields(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[{"source":"manual","title":"编辑前","decisions":["旧决策"],"outcomes":["旧交付"]}]}`)
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-09"}`)
+	id := read["entries"].([]any)[0].(map[string]any)["entry_id"].(string)
+	// overwrite 下用显式空数组清空 outcomes，只保留 title。
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","overwrite":true,"entries":[{"entry_id":`+quote(id)+`,"source":"manual","title":"编辑后","outcomes":[]}]}`)
+	after := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-09"}`)
+	item := after["entries"].([]any)[0].(map[string]any)
+	if item["title"] != "编辑后" {
+		t.Fatalf("overwrite 应更新标题: %v", item["title"])
+	}
+	if got := item["outcomes"].([]any); len(got) != 0 {
+		t.Fatalf("overwrite 应清空 outcomes，实际 %#v", got)
+	}
+	if item["created_at"] == "" || item["created_at"] == nil {
+		t.Fatalf("overwrite 应保留 created_at")
+	}
+}
+
+func TestConcurrentUpsertsDoNotLoseEntries(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	const n = 20
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			params := `{"log_root":` + quote(root) + `,"date":"2026-10-09","entries":[{"source":"codex","session_id":"s` + strconv.Itoa(index) + `","title":"T` + strconv.Itoa(index) + `"}]}`
+			if _, rpcError := handle(jsonrpc.Request{Method: "work-log.entry.upsert", Params: []byte(params)}); rpcError != nil {
+				t.Errorf("并发写入失败: %s", rpcError.Message)
+			}
+		}(i)
+	}
+	wg.Wait()
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-09"}`)
+	if got := len(read["entries"].([]any)); got != n {
+		t.Fatalf("并发写入应保留全部 %d 条，实际 %d（存在丢更新）", n, got)
+	}
+}
+
+func TestUpsertMergesAISummaryOntoDeterministicBase(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	// AI 总结步骤只提供人类可读字段，且故意带上错误工时；base 步骤提供确定性字段。
+	params := `{"log_root":` + quote(root) + `,"date":"2026-10-09",
+		"entries_step":"WL-SUMMARY","base_step":"WL-COLLECT",
+		"workflow_context":{"steps":{
+			"WL-SUMMARY":{"entries":[{"source":"codex","session_id":"s1","title":"修复编辑保存报错","summary":"定位到整条克隆回传 created_at 被 schema 拒绝，改为白名单透传。","category":"修复","minutes":9999,"minutes_source":"estimated","outcomes":["编辑保存恢复正常"]}],"narrative":"今天修复了日志编辑保存。"},
+			"WL-COLLECT":{"entries":[{"source":"codex","session_id":"s1","project":"项目看板","feature":"工作日志","category":"other","started_at":"2026-10-09T09:00:00+08:00","ended_at":"2026-10-09T09:45:00+08:00","minutes":45,"minutes_source":"measured","title":"raw title","tags":["自动采集"]}]}
+		}}}`
+	call(t, "work-log.entry.upsert", params)
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-09"}`)
+	entries := read["entries"].([]any)
+	if len(entries) != 1 {
+		t.Fatalf("按会话合并后应只有 1 条，实际 %d", len(entries))
+	}
+	item := entries[0].(map[string]any)
+	if item["title"] != "修复编辑保存报错" {
+		t.Fatalf("title 应取 AI 总结，实际 %v", item["title"])
+	}
+	if item["project"] != "项目看板" || item["feature"] != "工作日志" {
+		t.Fatalf("project/feature 应取确定性素材，实际 %v / %v", item["project"], item["feature"])
+	}
+	if item["category"] != "修复" {
+		t.Fatalf("category 应取 AI 总结，实际 %v", item["category"])
+	}
+	// AI 的 minutes 必须被确定性素材覆盖。
+	if item["minutes"].(float64) != 45 {
+		t.Fatalf("minutes 应以素材为准(45)，实际 %v", item["minutes"])
+	}
+	if item["minutes_source"] != "measured" {
+		t.Fatalf("minutes_source 应以素材为准，实际 %v", item["minutes_source"])
+	}
+	tags := toStrings(item["tags"])
+	if !contains(strings.Join(tags, ","), "AI总结") {
+		t.Fatalf("合并后应带 AI总结 标记，实际 %v", tags)
+	}
+}
+
+func toStrings(value any) []string {
+	raw, ok := value.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		if text, ok := item.(string); ok {
+			out = append(out, text)
+		}
+	}
+	return out
 }
 
 func contains(haystack, needle string) bool {
