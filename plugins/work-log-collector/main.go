@@ -870,21 +870,13 @@ func scanCodex(root string, start, end time.Time) ([]sessionDigest, error) {
 	}
 	var digests []sessionDigest
 	for _, file := range files {
-		if fileDate := codexFileDate(file); fileDate != "" {
-			day, err := time.ParseInLocation(dateLayout, fileDate, time.Local)
-			if err == nil && (day.Before(start.AddDate(0, 0, -1)) || !day.Before(end)) {
-				continue
-			}
-		}
-		digest, ok, err := parseCodexFile(file)
-		if err != nil {
+		// 用文件修改时间做廉价预筛：窗口开始前就没再写过，文件里不可能有窗口内记录。
+		// 不再按文件名日期判断，避免把「跨日续写」的长会话文件整份跳过。
+		if info, statErr := os.Stat(file); statErr == nil && info.ModTime().Before(start) {
 			continue
 		}
-		if !ok {
-			continue
-		}
-		started, err := time.Parse(time.RFC3339, digest.StartedAt)
-		if err != nil || !inRange(started, start, end) {
+		digest, ok, err := parseCodexFile(file, start, end)
+		if err != nil || !ok {
 			continue
 		}
 		digests = append(digests, digest)
@@ -928,7 +920,7 @@ func codexFileDate(file string) string {
 	return ""
 }
 
-func parseCodexFile(file string) (sessionDigest, bool, error) {
+func parseCodexFile(file string, start, end time.Time) (sessionDigest, bool, error) {
 	handle, err := os.Open(file)
 	if err != nil {
 		return sessionDigest{}, false, err
@@ -936,8 +928,8 @@ func parseCodexFile(file string) (sessionDigest, bool, error) {
 	defer handle.Close()
 
 	digest := sessionDigest{Source: "codex", Ref: file}
-	var started, ended time.Time
-	var times []time.Time
+	var created time.Time
+	var winTimes []time.Time
 	var userPrompts, assistantExcerpts []string
 	decoder := json.NewDecoder(handle)
 	for {
@@ -945,14 +937,16 @@ func parseCodexFile(file string) (sessionDigest, bool, error) {
 		if err := decoder.Decode(&record); err != nil {
 			break
 		}
-		if ts, err := time.Parse(time.RFC3339, record.Timestamp); err == nil {
-			if started.IsZero() || ts.Before(started) {
-				started = ts
+		var ts time.Time
+		if parsed, err := time.Parse(time.RFC3339, record.Timestamp); err == nil {
+			ts = parsed
+			if created.IsZero() || ts.Before(created) {
+				created = ts
 			}
-			if ts.After(ended) {
-				ended = ts
-			}
-			times = append(times, ts)
+		}
+		inWindow := !ts.IsZero() && inRange(ts, start, end)
+		if inWindow {
+			winTimes = append(winTimes, ts)
 		}
 		switch record.Type {
 		case "session_meta":
@@ -969,13 +963,12 @@ func parseCodexFile(file string) (sessionDigest, bool, error) {
 				if digest.Directory == "" {
 					digest.Directory = meta.Cwd
 				}
-				if started.IsZero() && meta.Timestamp != "" {
-					if ts, err := time.Parse(time.RFC3339, meta.Timestamp); err == nil {
-						started = ts
-					}
-				}
 			}
 		case "response_item":
+			// 只把落在窗口内的对话计入当日素材，长会话据此按活跃日切分。
+			if !inWindow {
+				continue
+			}
 			var item struct {
 				Type    string `json:"type"`
 				Role    string `json:"role"`
@@ -1004,7 +997,11 @@ func parseCodexFile(file string) (sessionDigest, bool, error) {
 	if digest.SessionID == "" {
 		return sessionDigest{}, false, nil
 	}
+	started, ended := activityRange(winTimes, created, created)
 	if started.IsZero() {
+		return sessionDigest{}, false, nil
+	}
+	if len(winTimes) == 0 && !inRange(created, start, end) {
 		return sessionDigest{}, false, nil
 	}
 	digest.StartedAt = started.Format(time.RFC3339)
@@ -1016,7 +1013,7 @@ func parseCodexFile(file string) (sessionDigest, bool, error) {
 	if digest.Directory != "" {
 		digest.Project = filepath.Base(digest.Directory)
 	}
-	digest.Minutes, digest.MinutesSource = resolveMinutes(times, started, ended, digest.TurnCount)
+	digest.Minutes, digest.MinutesSource = resolveMinutes(winTimes, started, ended, digest.TurnCount)
 	return digest, true, nil
 }
 
@@ -1032,6 +1029,31 @@ func resolveMinutes(times []time.Time, started, ended time.Time, turns int) (int
 		return estimated, "estimated"
 	}
 	return 0, ""
+}
+
+// activityRange 从「窗口内消息时间点」得出会话在本窗口内的起止时间；窗口内没有任何
+// 时间点时退回兜底时间（通常是会话自身的创建/更新时间）。跨多日的长会话因此可以在
+// 每个活跃日各算一段，而不是只算创建当天。
+func activityRange(times []time.Time, fallbackStart, fallbackEnd time.Time) (time.Time, time.Time) {
+	var started, ended time.Time
+	for _, t := range times {
+		if t.IsZero() {
+			continue
+		}
+		if started.IsZero() || t.Before(started) {
+			started = t
+		}
+		if t.After(ended) {
+			ended = t
+		}
+	}
+	if started.IsZero() {
+		started = fallbackStart
+	}
+	if ended.IsZero() {
+		ended = fallbackEnd
+	}
+	return started, ended
 }
 
 // ---- Claude Code 索引 ----
@@ -1069,27 +1091,35 @@ func scanClaude(root string, start, end time.Time) ([]sessionDigest, error) {
 			return nil
 		}
 		for _, item := range index.Entries {
-			created, err := time.Parse(time.RFC3339, item.Created)
-			if err != nil || !inRange(created, start, end) {
+			created, createdErr := time.Parse(time.RFC3339, item.Created)
+			modified, _ := time.Parse(time.RFC3339, item.Modified)
+			createdIn := createdErr == nil && inRange(created, start, end)
+			modifiedIn := !modified.IsZero() && inRange(modified, start, end)
+			// 会话可能创建于更早、但当天仍在活跃：只要创建或最后修改落在窗口内就纳入，
+			// 归日取窗口内的时间点，避免长会话在后续活跃日整体丢失。
+			if !createdIn && !modifiedIn {
 				continue
 			}
-			modified, _ := time.Parse(time.RFC3339, item.Modified)
+			started, ended := created, modified
+			if !createdIn {
+				started = modified
+			}
 			digest := sessionDigest{
 				Source:      "claude",
 				SessionID:   item.SessionID,
 				Project:     filepath.Base(filepath.Clean(item.ProjectPath)),
 				Directory:   item.ProjectPath,
 				Title:       firstLine(item.FirstPrompt, 80),
-				Date:        created.Local().Format(dateLayout),
-				StartedAt:   created.Format(time.RFC3339),
+				Date:        started.Local().Format(dateLayout),
+				StartedAt:   started.Format(time.RFC3339),
 				TurnCount:   item.MessageCount,
 				UserPrompts: nonEmpty([]string{item.FirstPrompt}),
 				Ref:         path,
 			}
-			if !modified.IsZero() {
-				digest.EndedAt = modified.Format(time.RFC3339)
+			if !ended.IsZero() {
+				digest.EndedAt = ended.Format(time.RFC3339)
 			}
-			digest.Minutes, digest.MinutesSource = resolveMinutes(nil, created, modified, digest.TurnCount)
+			digest.Minutes, digest.MinutesSource = resolveMinutes(nil, started, ended, digest.TurnCount)
 			if digest.SessionID == "" {
 				continue
 			}
@@ -1109,8 +1139,10 @@ func scanOpenCode(db string, start, end time.Time) ([]sessionDigest, error) {
 	startMs := start.UnixMilli()
 	endMs := end.UnixMilli()
 	sessions, err := querySQLiteJSON(db, fmt.Sprintf(
-		"SELECT id, project_id, slug, directory, title, model, cost, tokens_input, tokens_output, time_created, time_updated FROM session_v2 WHERE time_created >= %d AND time_created < %d ORDER BY time_created DESC",
-		startMs, endMs))
+		"SELECT id, project_id, slug, directory, title, model, cost, tokens_input, tokens_output, time_created, time_updated FROM session_v2 "+
+			"WHERE time_created < %d AND (time_created >= %d OR id IN (SELECT DISTINCT session_id FROM session_message WHERE time_created >= %d AND time_created < %d)) "+
+			"ORDER BY time_created DESC",
+		endMs, startMs, startMs, endMs))
 	if err != nil {
 		return nil, err
 	}
@@ -1133,12 +1165,16 @@ func scanOpenCode(db string, start, end time.Time) ([]sessionDigest, error) {
 	prompts := map[string][]string{}
 	excerpts := map[string][]string{}
 	msgTimes := map[string][]time.Time{}
+	actTimes := map[string][]time.Time{}
 	for _, row := range messages {
+		id := asString(row, "session_id")
+		if created := asInt64(row, "time_created"); created > 0 {
+			actTimes[id] = append(actTimes[id], time.UnixMilli(created))
+		}
 		text := extractText(asString(row, "data"))
 		if strings.TrimSpace(text) == "" {
 			continue
 		}
-		id := asString(row, "session_id")
 		switch asString(row, "type") {
 		case "user":
 			prompts[id] = append(prompts[id], text)
@@ -1154,14 +1190,17 @@ func scanOpenCode(db string, start, end time.Time) ([]sessionDigest, error) {
 		id := asString(row, "id")
 		created := time.UnixMilli(asInt64(row, "time_created"))
 		updated := time.UnixMilli(asInt64(row, "time_updated"))
+		// 会话可能创建于更早、但当天仍在活跃：归日与起止都取窗口内活动时间，
+		// 长会话据此在每个活跃日各算一段，而不是只算创建当天。
+		started, ended := activityRange(actTimes[id], created, updated)
 		digest := sessionDigest{
 			Source:            "opencode",
 			SessionID:         id,
 			Project:           projects[asString(row, "project_id")],
 			Directory:         asString(row, "directory"),
 			Title:             asString(row, "title"),
-			Date:              created.Local().Format(dateLayout),
-			StartedAt:         created.Format(time.RFC3339),
+			Date:              started.Local().Format(dateLayout),
+			StartedAt:         started.Format(time.RFC3339),
 			UserPrompts:       prompts[id],
 			AssistantExcerpts: excerpts[id],
 			Cost:              asFloat(row, "cost"),
@@ -1169,11 +1208,11 @@ func scanOpenCode(db string, start, end time.Time) ([]sessionDigest, error) {
 			TokensOutput:      asInt64(row, "tokens_output"),
 			Ref:               db + "#" + id,
 		}
-		if !updated.IsZero() {
-			digest.EndedAt = updated.Format(time.RFC3339)
+		if !ended.IsZero() {
+			digest.EndedAt = ended.Format(time.RFC3339)
 		}
 		digest.TurnCount = len(digest.UserPrompts)
-		digest.Minutes, digest.MinutesSource = resolveMinutes(msgTimes[id], created, updated, digest.TurnCount)
+		digest.Minutes, digest.MinutesSource = resolveMinutes(msgTimes[id], started, ended, digest.TurnCount)
 		digests = append(digests, digest)
 	}
 	return digests, nil
@@ -1185,8 +1224,10 @@ func scanCopilot(db string, start, end time.Time) ([]sessionDigest, error) {
 	fromText := start.Format("2006-01-02 15:04:05")
 	toText := end.Format("2006-01-02 15:04:05")
 	sessions, err := querySQLiteJSON(db, fmt.Sprintf(
-		"SELECT id, cwd, repository, summary, created_at, updated_at FROM sessions WHERE created_at >= '%s' AND created_at < '%s' ORDER BY created_at DESC",
-		fromText, toText))
+		"SELECT id, cwd, repository, summary, created_at, updated_at FROM sessions "+
+			"WHERE created_at < '%s' AND (created_at >= '%s' OR id IN (SELECT DISTINCT session_id FROM turns WHERE timestamp >= '%s' AND timestamp < '%s')) "+
+			"ORDER BY created_at DESC",
+		toText, fromText, fromText, toText))
 	if err != nil {
 		return nil, err
 	}
@@ -1220,23 +1261,25 @@ func scanCopilot(db string, start, end time.Time) ([]sessionDigest, error) {
 		if title == "" && len(prompts[id]) > 0 {
 			title = firstLine(prompts[id][0], 80)
 		}
+		// 会话可能创建于更早、但当天仍在活跃：归日取窗口内的轮次时间。
+		started, ended := activityRange(turnTimes[id], created, updated)
 		digest := sessionDigest{
 			Source:            "copilot",
 			SessionID:         id,
 			Project:           firstNonEmpty(asString(row, "repository"), filepath.Base(asString(row, "cwd"))),
 			Directory:         asString(row, "cwd"),
 			Title:             title,
-			Date:              created.Local().Format(dateLayout),
-			StartedAt:         created.Format(time.RFC3339),
+			Date:              started.Local().Format(dateLayout),
+			StartedAt:         started.Format(time.RFC3339),
 			UserPrompts:       prompts[id],
 			AssistantExcerpts: excerpts[id],
 			Ref:               db + "#" + id,
 		}
-		if !updated.IsZero() {
-			digest.EndedAt = updated.Format(time.RFC3339)
+		if !ended.IsZero() {
+			digest.EndedAt = ended.Format(time.RFC3339)
 		}
 		digest.TurnCount = len(digest.UserPrompts)
-		digest.Minutes, digest.MinutesSource = resolveMinutes(turnTimes[id], created, updated, digest.TurnCount)
+		digest.Minutes, digest.MinutesSource = resolveMinutes(turnTimes[id], started, ended, digest.TurnCount)
 		digests = append(digests, digest)
 	}
 	return digests, nil
@@ -1308,12 +1351,8 @@ func scanVSCodeCopilot(roots []string, start, end time.Time) ([]sessionDigest, e
 				if info, err := file.Info(); err == nil && info.ModTime().Before(start) {
 					continue
 				}
-				digest, ok := parseVSCodeChatFile(filepath.Join(chatDir, file.Name()), dir)
+				digest, ok := parseVSCodeChatFile(filepath.Join(chatDir, file.Name()), dir, start, end)
 				if !ok {
-					continue
-				}
-				started, err := time.Parse(time.RFC3339, digest.StartedAt)
-				if err != nil || !inRange(started, start, end) {
 					continue
 				}
 				digests = append(digests, digest)
@@ -1324,7 +1363,8 @@ func scanVSCodeCopilot(roots []string, start, end time.Time) ([]sessionDigest, e
 }
 
 // parseVSCodeChatFile 回放 VS Code 会话文件的补丁序列，抽出会话标识、时间、用户提问与助手回答。
-func parseVSCodeChatFile(file, dir string) (sessionDigest, bool) {
+// 只把落在 [start, end) 窗口内的请求计入素材；跨多日的长会话据此在每个活跃日各算一段。
+func parseVSCodeChatFile(file, dir string, start, end time.Time) (sessionDigest, bool) {
 	handle, err := os.Open(file)
 	if err != nil {
 		return sessionDigest{}, false
@@ -1394,19 +1434,14 @@ func parseVSCodeChatFile(file, dir string) (sessionDigest, bool) {
 	}
 	digest.Title = firstLine(header.CustomTitle, 80)
 
-	started := timeFromMillis(header.CreationDate)
-	var ended time.Time
+	created := timeFromMillis(header.CreationDate)
 	var times []time.Time
 	for _, req := range requests {
-		if ts := timeFromMillis(req.Timestamp); !ts.IsZero() {
-			if started.IsZero() || ts.Before(started) {
-				started = ts
-			}
-			if ts.After(ended) {
-				ended = ts
-			}
-			times = append(times, ts)
+		ts := timeFromMillis(req.Timestamp)
+		if ts.IsZero() || !inRange(ts, start, end) {
+			continue
 		}
+		times = append(times, ts)
 		if text := cleanVSCodeText(req.Message.Text); strings.TrimSpace(text) != "" {
 			digest.UserPrompts = append(digest.UserPrompts, text)
 			if digest.Title == "" {
@@ -1417,13 +1452,14 @@ func parseVSCodeChatFile(file, dir string) (sessionDigest, bool) {
 			digest.AssistantExcerpts = append(digest.AssistantExcerpts, firstLine(text, 240))
 		}
 	}
-	if done := timeFromMillis(completed); !done.IsZero() {
-		if done.After(ended) {
-			ended = done
-		}
+	if done := timeFromMillis(completed); !done.IsZero() && inRange(done, start, end) {
 		times = append(times, done)
 	}
+	started, ended := activityRange(times, created, created)
 	if started.IsZero() {
+		return sessionDigest{}, false
+	}
+	if len(times) == 0 && !inRange(created, start, end) {
 		return sessionDigest{}, false
 	}
 	digest.StartedAt = started.Format(time.RFC3339)

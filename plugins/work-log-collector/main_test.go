@@ -756,3 +756,191 @@ func TestScanPrivacyConfigFile(t *testing.T) {
 		t.Fatalf("privacy.json 排除后应只剩 1 条，实际 %v", out["total"])
 	}
 }
+
+// TestScanOpenCodeCrossDaySession 回归：跨多日的长会话在「创建日」之外的活跃日也必须被
+// 采集，且每天只取当天消息。修复前只看 time_created，导致后续活跃日整体丢失。
+func TestScanOpenCodeCrossDaySession(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "opencode.db")
+	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(dbPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, stmt := range []string{
+		`CREATE TABLE project (id TEXT PRIMARY KEY, name TEXT, worktree TEXT)`,
+		`CREATE TABLE session_v2 (id TEXT PRIMARY KEY, project_id TEXT, slug TEXT, directory TEXT, title TEXT, model TEXT, cost REAL, tokens_input INTEGER, tokens_output INTEGER, time_created INTEGER, time_updated INTEGER)`,
+		`CREATE TABLE session_message (session_id TEXT, type TEXT, data TEXT, time_created INTEGER)`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.Exec(`INSERT INTO project (id, name, worktree) VALUES ('p1','IODevice','O:/DevModules/IODevice')`); err != nil {
+		t.Fatal(err)
+	}
+	day1 := time.Date(2026, 9, 22, 10, 0, 0, 0, time.Local)
+	day2 := time.Date(2026, 9, 24, 10, 0, 0, 0, time.Local)
+	if _, err := db.Exec(`INSERT INTO session_v2 (id, project_id, slug, directory, title, model, cost, tokens_input, tokens_output, time_created, time_updated) VALUES ('ses-long','p1','s','O:/DevModules/IODevice','IOUI Simulator架构','x',0,0,0,?,?)`, day1.UnixMilli(), day2.UnixMilli()); err != nil {
+		t.Fatal(err)
+	}
+	insert := func(kind, data string, when time.Time) {
+		if _, err := db.Exec(`INSERT INTO session_message (session_id, type, data, time_created) VALUES ('ses-long',?,?,?)`, kind, data, when.UnixMilli()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	insert("user", `{"text":"第一天：审查Simulator架构"}`, day1)
+	insert("user", `{"text":"第二天：推进时间线创作"}`, day2)
+	insert("assistant", `{"content":[{"text":"第二天已完成时间线改造"}]}`, day2.Add(30*time.Minute))
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	start2 := time.Date(2026, 9, 24, 0, 0, 0, 0, time.Local)
+	got2, err := scanOpenCode(dbPath, start2, start2.AddDate(0, 0, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got2) != 1 {
+		t.Fatalf("跨日会话在活跃日应被采集，实际 %d 条: %#v", len(got2), got2)
+	}
+	if got2[0].Date != "2026-09-24" {
+		t.Fatalf("归日应为活跃日 2026-09-24，实际 %q", got2[0].Date)
+	}
+	if len(got2[0].UserPrompts) != 1 || got2[0].UserPrompts[0] != "第二天：推进时间线创作" {
+		t.Fatalf("应只取当天用户提示，实际 %#v", got2[0].UserPrompts)
+	}
+	if len(got2[0].AssistantExcerpts) != 1 || !strings.Contains(got2[0].AssistantExcerpts[0], "第二天已完成") {
+		t.Fatalf("应只取当天助手摘要，实际 %#v", got2[0].AssistantExcerpts)
+	}
+
+	start1 := time.Date(2026, 9, 22, 0, 0, 0, 0, time.Local)
+	got1, err := scanOpenCode(dbPath, start1, start1.AddDate(0, 0, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got1) != 1 || got1[0].Date != "2026-09-22" {
+		t.Fatalf("创建日归日异常: %#v", got1)
+	}
+	if len(got1[0].UserPrompts) != 1 || got1[0].UserPrompts[0] != "第一天：审查Simulator架构" {
+		t.Fatalf("创建日应只取当天用户提示，实际 %#v", got1[0].UserPrompts)
+	}
+}
+
+// TestScanVSCodeCopilotCrossDaySession 回归：VS Code 会话在创建日之外的活跃日也能采集，
+// 且只回放当天的请求。
+func TestScanVSCodeCopilotCrossDaySession(t *testing.T) {
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	home := t.TempDir()
+	root := filepath.Join(home, "AppData", "Roaming", "Code", "User", "workspaceStorage")
+	wsDir := filepath.Join(root, "hash")
+	chatDir := filepath.Join(wsDir, "chatSessions")
+	if err := os.MkdirAll(chatDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wsDir, "workspace.json"), []byte(`{"folder":"file:///o%3A/DevModules/IODevice"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	day1 := time.Date(2026, 9, 22, 9, 0, 0, 0, time.Local)
+	day2 := time.Date(2026, 9, 24, 9, 0, 0, 0, time.Local)
+	header := map[string]any{"version": 3, "creationDate": day1.UnixMilli(), "customTitle": "IOUI Simulator架构审查", "sessionId": "vs-long", "requests": []any{
+		map[string]any{"requestId": "r1", "timestamp": day1.UnixMilli(), "message": map[string]any{"text": "第一天：审查Simulator架构"}, "response": []any{}},
+	}}
+	headerLine, _ := json.Marshal(map[string]any{"kind": 0, "v": header})
+	appendLine, _ := json.Marshal(map[string]any{"kind": 2, "k": []any{"requests"}, "v": []any{
+		map[string]any{"requestId": "r2", "timestamp": day2.UnixMilli(), "message": map[string]any{"text": "第二天：推进时间线创作"}, "response": []any{}},
+	}})
+	if err := os.WriteFile(filepath.Join(chatDir, "vs-long.jsonl"), []byte(strings.Join([]string{string(headerLine), string(appendLine)}, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	digests, err := scanVSCodeCopilot([]string{root}, day2, day2.AddDate(0, 0, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(digests) != 1 {
+		t.Fatalf("跨日 VS Code 会话在活跃日应被采集，实际 %d 条: %#v", len(digests), digests)
+	}
+	if digests[0].Date != "2026-09-24" {
+		t.Fatalf("归日应为活跃日 2026-09-24，实际 %q", digests[0].Date)
+	}
+	if len(digests[0].UserPrompts) != 1 || digests[0].UserPrompts[0] != "第二天：推进时间线创作" {
+		t.Fatalf("应只取当天请求，实际 %#v", digests[0].UserPrompts)
+	}
+}
+
+// TestScanCodexCrossDaySession 回归：Codex 长会话在创建日之外的活跃日也能采集。
+func TestScanCodexCrossDaySession(t *testing.T) {
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	home := t.TempDir()
+	path := filepath.Join(home, ".codex", "sessions", "2026", "09", "22", "rollout-2026-09-22T09-00-00-long.jsonl")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	lines := []string{
+		`{"timestamp":"2026-09-22T01:00:00Z","type":"session_meta","payload":{"session_id":"codex-long","id":"codex-long","cwd":"F:\\proj\\demo","timestamp":"2026-09-22T01:00:00Z"}}`,
+		`{"timestamp":"2026-09-22T01:00:05Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"第一天需求"}]}}`,
+		`{"timestamp":"2026-09-24T01:00:05Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"第二天需求"}]}}`,
+		`{"timestamp":"2026-09-24T01:01:00Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"第二天产出"}]}}`,
+	}
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	day2 := time.Date(2026, 9, 24, 0, 0, 0, 0, time.Local)
+	digests, err := scanCodex(filepath.Join(home, ".codex"), day2, day2.AddDate(0, 0, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(digests) != 1 {
+		t.Fatalf("跨日 Codex 会话在活跃日应被采集，实际 %d 条: %#v", len(digests), digests)
+	}
+	if len(digests[0].UserPrompts) != 1 || digests[0].UserPrompts[0] != "第二天需求" {
+		t.Fatalf("应只取当天用户提示，实际 %#v", digests[0].UserPrompts)
+	}
+	if len(digests[0].AssistantExcerpts) != 1 || !strings.Contains(digests[0].AssistantExcerpts[0], "第二天产出") {
+		t.Fatalf("应只取当天助手摘要，实际 %#v", digests[0].AssistantExcerpts)
+	}
+}
+
+// TestScanCopilotCrossDaySession 回归：Copilot CLI 长会话在创建日之外的活跃日也能采集。
+func TestScanCopilotCrossDaySession(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "session-store.db")
+	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(dbPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, stmt := range []string{
+		`CREATE TABLE sessions (id TEXT PRIMARY KEY, cwd TEXT, repository TEXT, summary TEXT, created_at TEXT, updated_at TEXT)`,
+		`CREATE TABLE turns (session_id TEXT, user_message TEXT, assistant_response TEXT, timestamp TEXT)`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.Exec(`INSERT INTO sessions (id, cwd, repository, summary, created_at, updated_at) VALUES ('cp-long','O:/DevModules/IODevice','','长会话','2026-09-22 09:00:00','2026-09-24 09:00:00')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO turns (session_id, user_message, assistant_response, timestamp) VALUES ('cp-long','第一天需求','第一天产出','2026-09-22 09:00:00')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO turns (session_id, user_message, assistant_response, timestamp) VALUES ('cp-long','第二天需求','第二天产出','2026-09-24 09:00:00')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	day2 := time.Date(2026, 9, 24, 0, 0, 0, 0, time.Local)
+	digests, err := scanCopilot(dbPath, day2, day2.AddDate(0, 0, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(digests) != 1 {
+		t.Fatalf("跨日 Copilot 会话在活跃日应被采集，实际 %d 条: %#v", len(digests), digests)
+	}
+	if len(digests[0].UserPrompts) != 1 || digests[0].UserPrompts[0] != "第二天需求" {
+		t.Fatalf("应只取当天用户消息，实际 %#v", digests[0].UserPrompts)
+	}
+	if len(digests[0].AssistantExcerpts) != 1 || !strings.Contains(digests[0].AssistantExcerpts[0], "第二天产出") {
+		t.Fatalf("应只取当天助手摘要，实际 %#v", digests[0].AssistantExcerpts)
+	}
+}

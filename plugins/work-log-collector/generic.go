@@ -555,6 +555,7 @@ func scanGeneric(spec genericSource, home string, start, end time.Time) ([]sessi
 		digest    sessionDigest
 		userTexts []string
 		asstTexts []string
+		first     time.Time
 		started   time.Time
 		ended     time.Time
 		times     []time.Time
@@ -589,17 +590,27 @@ func scanGeneric(spec genericSource, home string, start, end time.Time) ([]sessi
 			// 时间：优先字段，其次文件时间/文件名日期。
 			when, ok := genericRecordTime(spec, record, fileTime, dateHint)
 			if ok {
-				if g.started.IsZero() || when.Before(g.started) {
-					g.started = when
+				if g.first.IsZero() || when.Before(g.first) {
+					g.first = when
 				}
-				if when.After(g.ended) {
-					g.ended = when
+				// 只有落在窗口内的时间点才用于归日与工时，跨日长会话据此按活跃日切分。
+				if inRange(when, start, end) {
+					if g.started.IsZero() || when.Before(g.started) {
+						g.started = when
+					}
+					if when.After(g.ended) {
+						g.ended = when
+					}
+					g.times = append(g.times, when)
 				}
-				g.times = append(g.times, when)
 			}
 			role := strings.ToLower(firstText(record, spec.RoleField))
 			text := genericRecordText(spec, record)
 			if strings.TrimSpace(text) == "" {
+				continue
+			}
+			// 窗口外的对话不计入当日素材；无时间信息的记录按尽力纳入。
+			if ok && !inRange(when, start, end) {
 				continue
 			}
 			if spec.TitleField != "" && g.digest.Title == "" {
@@ -621,8 +632,10 @@ func scanGeneric(spec genericSource, home string, start, end time.Time) ([]sessi
 	for _, key := range order {
 		g := groups[key]
 		if g.started.IsZero() {
-			// 没有时间信息时，用文件日期兜底，仍可能落在范围内。
-			if hint := fileNameDate(g.digest.Ref, spec.FileNameDate); hint != "" {
+			// 窗口内没有时间点：退回会话最早时间，再退回文件日期兜底。
+			if !g.first.IsZero() {
+				g.started = g.first
+			} else if hint := fileNameDate(g.digest.Ref, spec.FileNameDate); hint != "" {
 				if parsed, err := time.ParseInLocation(dateLayout, hint, time.Local); err == nil {
 					g.started = parsed
 				}
