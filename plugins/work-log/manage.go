@@ -1004,14 +1004,14 @@ func archiveDedupeCap(in input) (any, error) {
 			}
 		}
 		others := make([]entry, 0, len(locs)-1)
-		removed := make([]map[string]any, 0, len(locs))
+		sources := make([]map[string]any, 0, len(locs))
 		for i, l := range locs {
 			if removals[l.Date] == nil {
 				removals[l.Date] = map[string]bool{}
 			}
 			removals[l.Date][l.Entry.EntryID] = true
 			affected[l.Date] = true
-			removed = append(removed, map[string]any{"date": l.Date, "entry_id": l.Entry.EntryID, "title": l.Entry.Title})
+			sources = append(sources, map[string]any{"date": l.Date, "entry_id": l.Entry.EntryID, "title": l.Entry.Title})
 			if i != primary {
 				others = append(others, l.Entry)
 			}
@@ -1022,9 +1022,10 @@ func archiveDedupeCap(in input) (any, error) {
 		affected[target] = true
 		removedTotal += len(locs) - 1
 		groupsOut = append(groupsOut, map[string]any{
-			"key":     key,
-			"kept":    map[string]any{"date": target, "entry_id": merged.EntryID, "title": merged.Title},
-			"removed": removed,
+			"key":           key,
+			"merge_into":    map[string]any{"date": target, "entry_id": merged.EntryID, "title": merged.Title},
+			"removed_count": len(locs) - 1,
+			"sources":       sources,
 		})
 	}
 
