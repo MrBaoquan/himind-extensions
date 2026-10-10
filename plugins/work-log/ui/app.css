@@ -560,11 +560,12 @@ body {
 }
 
 .entry .exhibit {
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   color: #0e7490;
-  background: #ecfeff;
+  background: #cffafe;
   border-radius: var(--radius-sm);
-  padding: 1px 6px;
+  padding: 1px 7px;
 }
 
 .entry .proj.miss {
@@ -584,8 +585,8 @@ body {
 
 .entry .feat {
   font-size: 11px;
-  color: #7c3aed;
-  background: #f5f3ff;
+  color: var(--muted);
+  background: #f1f5f9;
   border-radius: var(--radius-sm);
   padding: 1px 6px;
 }
@@ -678,10 +679,20 @@ body {
 
 .feature-group-head .fg-tag {
   font-size: 11px;
-  color: #7c3aed;
-  background: #f5f3ff;
+  color: var(--muted);
+  background: #f1f5f9;
   border-radius: var(--radius-sm);
   padding: 1px 6px;
+}
+
+.feature-group.exhibit-group .feature-group-head {
+  border-bottom-color: #a5f3fc;
+}
+
+.feature-group.exhibit-group .feature-group-head .fg-tag {
+  color: #0e7490;
+  background: #cffafe;
+  font-weight: 600;
 }
 
 .feature-group-head .fg-meta {
@@ -1675,8 +1686,8 @@ body.modal-open {
 
 .flow-feat {
   font-size: 11px;
-  color: #7c3aed;
-  background: #f5f3ff;
+  color: var(--muted);
+  background: #f1f5f9;
   border-radius: var(--radius-sm);
   padding: 1px 7px;
   display: inline-flex;
@@ -1684,9 +1695,29 @@ body.modal-open {
   gap: 4px;
 }
 
+.flow-feat.exhibit {
+  color: #0e7490;
+  background: #cffafe;
+  font-weight: 600;
+}
+
+.flow-feat.exhibit b {
+  color: #0e7490;
+}
+
 .flow-feat b {
   color: #0369a1;
   font-variant-numeric: tabular-nums;
+}
+
+.flow-feat.exhibit {
+  color: #0e7490;
+  background: #cffafe;
+  font-weight: 600;
+}
+
+.flow-feat.exhibit b {
+  color: #0e7490;
 }
 
 .flow-feat.muted {
@@ -2356,6 +2387,48 @@ body.modal-open {
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 600;
+}
+
+.badge.kind {
+  font-weight: 600;
+}
+
+.badge.kind-delivery {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+  color: #0f766e;
+}
+
+.badge.kind-platform {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.badge.kind-tooling {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.exhibit-id {
+  font-size: 11px;
+  color: var(--meta);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.pp-exhibit-name .exhibit-id {
+  font-weight: 400;
+}
+
+.badge.accent .exhibit-id {
+  color: var(--accent);
+}
+
+.pp-note {
+  font-size: 12px;
+  color: var(--meta);
 }
 
 .pp-toolbar {

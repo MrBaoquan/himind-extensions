@@ -27,6 +27,8 @@ type project struct {
 	Description string   `json:"description,omitempty"`
 	Status      string   `json:"status"`
 	Color       string   `json:"color,omitempty"`
+	// Kind 是项目类型：交付项目（场馆/展馆，含展项）/ 平台产品（自研，1 项目=1 路径，无展项）/ 通用沉淀。
+	Kind string `json:"kind,omitempty"`
 	// Source 标明项目来源：local（本地登记）或 workbench（从项目看板同步）。
 	Source string `json:"source,omitempty"`
 	// ExternalID 是工作台里的项目 ID（命中同步时填充），用于稳定关联。
@@ -341,6 +343,7 @@ func projectListCap(in input) (any, error) {
 			"description": p.Description,
 			"status":      p.Status,
 			"color":       p.Color,
+			"kind":        p.Kind,
 			"source":      p.Source,
 			"external_id": p.ExternalID,
 			"paths":       pathsToMaps(p.Paths),
@@ -439,6 +442,7 @@ func projectUpsertCap(in input) (any, error) {
 			Description: strings.TrimSpace(in.Description),
 			Status:      status,
 			Color:       strings.TrimSpace(in.Color),
+			Kind:        strings.TrimSpace(in.Kind),
 			Paths:       sanitizePaths(in.Paths),
 			CreatedAt:   now,
 			UpdatedAt:   now,
@@ -464,6 +468,9 @@ func projectUpsertCap(in input) (any, error) {
 		}
 		if color := strings.TrimSpace(in.Color); color != "" {
 			item.Color = color
+		}
+		if kind := strings.TrimSpace(in.Kind); kind != "" {
+			item.Kind = kind
 		}
 		item.UpdatedAt = now
 		pf.Projects[index] = item
@@ -968,6 +975,13 @@ func projectSyncCap(in input) (any, error) {
 		p.UpdatedAt = now
 		pf.Projects[at] = p
 		exUpdated++
+	}
+
+	// 有展项的项目自动归为「交付项目」（仅在未显式设置 kind 时）。
+	for i := range pf.Projects {
+		if pf.Projects[i].Kind == "" && len(pf.Projects[i].Exhibits) > 0 {
+			pf.Projects[i].Kind = "交付项目"
+		}
 	}
 
 	if created > 0 || updated > 0 || exUpdated > 0 {

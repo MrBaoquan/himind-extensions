@@ -82,8 +82,8 @@
     activeProject: '',
     projectEntries: null,
     projectLoading: false,
-    projectFeature: '',
-    projectFeatureExpanded: false,
+    projectExhibit: '',
+    projectExhibitsExpanded: false,
     projectGroupBy: 'time',
     // 登记管理（本地 UI 状态）
     registryQuery: '',
@@ -334,6 +334,28 @@
     return { projects: projects, categories: categoryList, totalMinutes: totalMinutes, count: (entries || []).length };
   }
 
+  // groupByExhibit 把一组条目按展项分组（未归类展项置末），用于「按展项」视图与当天明细。
+  function groupByExhibit(entries) {
+    const map = {};
+    const order = [];
+    (entries || []).forEach((item) => {
+      const name = text(item.exhibit, '未归类展项');
+      if (!map[name]) {
+        map[name] = { name: name, count: 0, minutes: 0, entries: [] };
+        order.push(name);
+      }
+      const g = map[name];
+      g.minutes += Number(item.minutes) || 0;
+      g.count += 1;
+      g.entries.push(item);
+    });
+    const named = order
+      .filter((name) => name !== '未归类展项')
+      .sort((a, b) => map[b].minutes - map[a].minutes || (a < b ? -1 : 1));
+    const final = map['未归类展项'] ? named.concat(['未归类展项']) : named;
+    return final.map((name) => map[name]);
+  }
+
   function categoryChips(categories) {
     if (!categories || !categories.length) return '';
     return (
@@ -358,18 +380,32 @@
     const flow = aggregateFlow(filtered);
     const items = flow.projects
       .map((project) => {
-        const features = project.featureList
-          .filter((feature) => feature.name !== '未分类功能' || project.featureList.length === 1)
-          .map((feature) => {
-            const label = feature.name === '未分类功能' ? '未归类' : feature.name;
-            return (
-              '<span class="flow-feat">' +
-              escapeHTML(label) +
-              (feature.minutes > 0 ? '<b>' + escapeHTML(hoursShort(feature.minutes)) + 'h</b>' : '') +
-              '</span>'
-            );
-          })
-          .join('');
+        // 有展项时优先展示展项；否则退回功能。
+        const byExhibit = project.entries.some((item) => text(item.exhibit));
+        const features = byExhibit
+          ? groupByExhibit(project.entries)
+              .map((g) => {
+                const label = g.name === '未归类展项' ? '未归类展项' : g.name;
+                return (
+                  '<span class="flow-feat exhibit">' +
+                  escapeHTML(label) +
+                  (g.minutes > 0 ? '<b>' + escapeHTML(hoursShort(g.minutes)) + 'h</b>' : '') +
+                  '</span>'
+                );
+              })
+              .join('')
+          : project.featureList
+              .filter((feature) => feature.name !== '未分类功能' || project.featureList.length === 1)
+              .map((feature) => {
+                const label = feature.name === '未分类功能' ? '未归类' : feature.name;
+                return (
+                  '<span class="flow-feat">' +
+                  escapeHTML(label) +
+                  (feature.minutes > 0 ? '<b>' + escapeHTML(hoursShort(feature.minutes)) + 'h</b>' : '') +
+                  '</span>'
+                );
+              })
+              .join('');
         return (
           '<div class="flow-item' +
           (project.name === '未落项目' ? ' miss' : '') +
@@ -532,6 +568,9 @@
         );
       }
     }
+    if (text(item.exhibit)) {
+      head.push('<span class="exhibit" title="展项（项目下的互动装置）">' + escapeHTML(item.exhibit) + '</span>');
+    }
     if (entryID) {
       head.push(
         '<button type="button" class="feat edit-field' +
@@ -542,14 +581,13 @@
           escapeHTML(entryDate) +
           '" data-value="' +
           escapeHTML(text(item.feature)) +
-          '" title="点击修改功能">' +
+          '" title="功能/工作内容（条目细节，点击修改）">' +
           escapeHTML(text(item.feature, '+ 功能')) +
           '</button>',
       );
     } else if (text(item.feature)) {
       head.push('<span class="feat">' + escapeHTML(item.feature) + '</span>');
     }
-    if (text(item.exhibit)) head.push('<span class="exhibit" title="展项">' + escapeHTML(item.exhibit) + '</span>');
     if (Number(item.minutes) > 0) {
       head.push('<span class="mins">' + escapeHTML(hoursShort(item.minutes)) + 'h</span>');
     }
@@ -696,19 +734,37 @@
     }
     html += flow.projects
       .map((project) => {
-        const features = project.featureList
-          .map((feature) => {
-            const label = feature.name === '未分类功能' ? '未分类功能' : '功能 · ' + feature.name;
+        // 有展项的条目按「展项」分组；否则退回「功能」（展项为主，功能为辅）。
+        const byExhibit = project.entries.some((item) => text(item.exhibit));
+        const groups = byExhibit
+          ? groupByExhibit(project.entries).map((g) => ({
+              label: g.name === '未归类展项' ? '未归类展项' : '展项 · ' + g.name,
+              count: g.count,
+              minutes: g.minutes,
+              entries: g.entries,
+              exhibit: true,
+            }))
+          : project.featureList.map((feature) => ({
+              label: feature.name === '未分类功能' ? '未分类功能' : '功能 · ' + feature.name,
+              count: feature.count,
+              minutes: feature.minutes,
+              entries: feature.entries,
+              exhibit: false,
+            }));
+        const features = groups
+          .map((g) => {
             return (
-              '<div class="feature-group">' +
+              '<div class="feature-group' +
+              (g.exhibit ? ' exhibit-group' : '') +
+              '">' +
               '<div class="feature-group-head"><span class="fg-tag">' +
-              escapeHTML(label) +
+              escapeHTML(g.label) +
               '</span><span class="fg-meta">' +
-              escapeHTML(feature.count) +
+              escapeHTML(g.count) +
               ' 条' +
-              (feature.minutes > 0 ? ' · 约 ' + escapeHTML(hoursLabel(feature.minutes)) : '') +
+              (g.minutes > 0 ? ' · 约 ' + escapeHTML(hoursLabel(g.minutes)) : '') +
               '</span></div>' +
-              feature.entries.map((item) => entryCard(item, { hideProject: true })).join('') +
+              g.entries.map((item) => entryCard(item, { hideProject: true })).join('') +
               '</div>'
             );
           })
@@ -1590,8 +1646,8 @@
 
   async function selectProject(name) {
     if (state.activeProject !== name) {
-      state.projectFeature = '';
-      state.projectFeatureExpanded = false;
+      state.projectExhibit = '';
+      state.projectExhibitsExpanded = false;
     }
     state.activeProject = name;
     renderProjectList();
@@ -1631,21 +1687,61 @@
       return;
     }
 
-    const flowAll = aggregateFlow(allEntries);
-    const allFeatures = flowAll.projects[0] ? flowAll.projects[0].featureList : [];
-    const namedFeatures = allFeatures.filter((f) => f.name !== '未分类功能');
-    const uncat = allFeatures.find((f) => f.name === '未分类功能');
+    const proj = (state.projects || []).find((p) => text(p.name) === state.activeProject) || null;
+    const kind = proj ? text(proj.kind) : '';
+    const exhibits = proj && Array.isArray(proj.exhibits) ? proj.exhibits : [];
+    const exhibitIDByName = {};
+    exhibits.forEach((ex) => {
+      exhibitIDByName[text(ex.name)] = text(ex.external_id);
+    });
 
-    const sel = text(state.projectFeature);
-    const entries = sel ? allEntries.filter((item) => text(item.feature, '未分类功能') === sel) : allEntries;
+    // 展项分布来自条目；未归类 = 条目没有展项。
+    const tally = {};
+    let unclassified = 0;
+    allEntries.forEach((item) => {
+      const name = text(item.exhibit);
+      if (!name) {
+        unclassified += 1;
+        return;
+      }
+      if (!tally[name]) tally[name] = { count: 0, minutes: 0 };
+      tally[name].count += 1;
+      tally[name].minutes += Number(item.minutes) || 0;
+    });
+    const registered = new Set(exhibits.map((ex) => text(ex.name)));
+    const withRecords = exhibits.filter((ex) => tally[text(ex.name)]);
+    const unregistered = Object.keys(tally).filter((name) => !registered.has(name));
+    const totalMinutes = allEntries.reduce((s, i) => s + (Number(i.minutes) || 0), 0);
+
+    const NONE = '__none__'; // 「未归类」哨兵值
+    const selRaw = text(state.projectExhibit);
+    const entries =
+      selRaw === NONE
+        ? allEntries.filter((item) => !text(item.exhibit))
+        : selRaw
+          ? allEntries.filter((item) => text(item.exhibit) === selRaw)
+          : allEntries;
     const flow = aggregateFlow(entries);
 
-    const dates = Object.keys(
-      entries.reduce((acc, item) => {
-        acc[item.date] = 1;
-        return acc;
-      }, {}),
-    ).sort().reverse();
+    const dateKeys = (list) =>
+      Object.keys(
+        list.reduce((acc, item) => {
+          acc[item.date] = 1;
+          return acc;
+        }, {}),
+      )
+        .sort()
+        .reverse();
+    const statLine = (list) => {
+      const ds = dateKeys(list);
+      return {
+        count: list.length,
+        days: ds.length,
+        mins: list.reduce((s, i) => s + (Number(i.minutes) || 0), 0),
+        range: ds.length ? text(ds[ds.length - 1]) + ' ~ ' + text(ds[0]) : '暂无记录',
+      };
+    };
+    const dates = dateKeys(entries);
     const activeDays = dates.length;
 
     // daySections 把一组条目按日期分节渲染（时间线内共用）。
@@ -1677,12 +1773,23 @@
         .join('');
     };
 
+    const kindClass =
+      kind === '交付项目' ? 'delivery' : kind === '平台产品' ? 'platform' : kind === '通用沉淀' ? 'tooling' : 'other';
+    const selLabel = selRaw === NONE ? '未归类' : selRaw;
+    const selID = selRaw && selRaw !== NONE ? exhibitIDByName[selRaw] : '';
+
     const head =
       '<div class="pp-head"><h2>' +
       escapeHTML(state.activeProject) +
       '</h2>' +
       '<div class="pp-stats">' +
-      (sel ? '<span class="badge accent">展项 · ' + escapeHTML(sel) + '</span>' : '') +
+      (kind ? '<span class="badge kind kind-' + kindClass + '">' + escapeHTML(kind) + '</span>' : '') +
+      (selRaw
+        ? '<span class="badge accent">展项 · ' +
+          escapeHTML(selLabel) +
+          (selID ? ' <span class="exhibit-id">' + escapeHTML(selID) + '</span>' : '') +
+          '</span>'
+        : '') +
       '<span class="badge">' +
       escapeHTML(flow.count) +
       ' 条</span><span class="badge">' +
@@ -1692,40 +1799,46 @@
       '<span class="badge">' +
       escapeHTML(text(dates[dates.length - 1]) + ' ~ ' + text(dates[0])) +
       '</span>' +
-      (sel ? '<button class="link-btn" type="button" data-feature-clear>返回全部</button>' : '') +
+      (selRaw ? '<button class="link-btn" type="button" data-exhibit-clear>返回全部</button>' : '') +
       '</div>' +
       categoryChips(flow.categories) +
       '</div>';
 
-    // 展项 / 功能 过滤条 + 视图切换。
+    // 展项过滤条 + 视图切换（仅交付项目有展项维度）。
     let toolbar = '';
-    if (allFeatures.length > 1) {
+    if (exhibits.length > 0) {
       const CAP = 14;
-      const expanded = !!state.projectFeatureExpanded;
-      let visible = expanded ? namedFeatures.slice() : namedFeatures.slice(0, CAP);
-      if (sel && sel !== '未分类功能' && !visible.some((f) => f.name === sel)) {
-        const hit = namedFeatures.find((f) => f.name === sel);
-        if (hit) visible = [hit].concat(visible);
+      const expanded = !!state.projectExhibitsExpanded;
+      const named = withRecords
+        .map((ex) => ({ name: text(ex.name), ext: text(ex.external_id), count: tally[text(ex.name)].count, minutes: tally[text(ex.name)].minutes }))
+        .sort((a, b) => b.minutes - a.minutes || b.count - a.count || a.name.localeCompare(b.name, 'zh'));
+      let visible = expanded ? named.slice() : named.slice(0, CAP);
+      if (selRaw && selRaw !== NONE && !visible.some((x) => x.name === selRaw)) {
+        const hit = named.find((x) => x.name === selRaw);
+        visible = [
+          hit || { name: selRaw, ext: exhibitIDByName[selRaw] || '', count: (tally[selRaw] || {}).count || 0, minutes: (tally[selRaw] || {}).minutes || 0 },
+        ].concat(visible);
       }
-      const chipHtml = (name, label, minutes, count, active) =>
+      const chip = (value, label, count, minutes, active, ext) =>
         '<button class="pp-feat-chip' +
         (active ? ' active' : '') +
-        '" type="button" data-feature="' +
-        escapeHTML(name) +
+        '" type="button" data-exhibit="' +
+        escapeHTML(value) +
         '" title="' +
-        escapeHTML(label) +
+        escapeHTML(label + (ext ? ' · ' + ext : '')) +
         '"><span class="pfc-name">' +
         escapeHTML(label) +
         '</span><b>' +
         (minutes > 0 ? escapeHTML(hoursShort(minutes)) + 'h' : escapeHTML(count) + ' 条') +
         '</b></button>';
       const chips =
-        chipHtml('', '全部', flowAll.projects[0] ? flowAll.projects[0].minutes : 0, allEntries.length, sel === '') +
-        visible.map((f) => chipHtml(f.name, f.name, f.minutes, f.count, sel === f.name)).join('') +
-        (uncat ? chipHtml('未分类功能', '未归类', 0, uncat.count, sel === '未分类功能') : '') +
-        (namedFeatures.length > CAP
-          ? '<button class="pp-feat-more" type="button" data-features-toggle>' +
-            (expanded ? '收起' : '展开全部 ' + namedFeatures.length + ' 项') +
+        chip('', '全部', allEntries.length, totalMinutes, selRaw === '', '') +
+        visible.map((x) => chip(x.name, x.name, x.count, x.minutes, selRaw === x.name, x.ext)).join('') +
+        unregistered.map((name) => chip(name, name, tally[name].count, tally[name].minutes, selRaw === name, '')).join('') +
+        (unclassified > 0 ? chip(NONE, '未归类', unclassified, 0, selRaw === NONE, '') : '') +
+        (named.length > CAP
+          ? '<button class="pp-feat-more" type="button" data-exhibits-toggle>' +
+            (expanded ? '收起' : '展开全部 ' + named.length + ' 项') +
             '</button>'
           : '');
       const grp = (key, label) =>
@@ -1738,47 +1851,63 @@
         '</button>';
       toolbar =
         '<div class="pp-toolbar">' +
-        '<div class="pp-feats"><span class="pp-feats-label">展项 / 功能</span><div class="pp-feat-chips' +
+        '<div class="pp-feats"><span class="pp-feats-label">展项</span><div class="pp-feat-chips' +
         (expanded ? ' expanded' : '') +
         '">' +
         chips +
         '</div></div>' +
         '<div class="pp-group"><span class="pp-group-label">视图</span>' +
         grp('time', '按时间') +
-        grp('feature', '按展项') +
+        grp('exhibit', '按展项') +
         '</div></div>';
+    } else if (kind === '平台产品' || kind === '通用沉淀') {
+      toolbar =
+        '<div class="pp-toolbar"><div class="pp-feats"><span class="pp-feats-label">维度</span>' +
+        '<span class="pp-note">' +
+        escapeHTML(kind) +
+        '：单一归属，无展项，按工作内容（功能）与时间推进。</span></div></div>';
     }
 
     let body;
-    if (state.projectGroupBy === 'feature') {
-      const feats = flow.projects[0] ? flow.projects[0].featureList : [];
+    if (exhibits.length > 0 && state.projectGroupBy === 'exhibit') {
+      const groups = {};
+      const order = [];
+      entries.forEach((item) => {
+        const name = text(item.exhibit, '未归类');
+        if (!groups[name]) {
+          groups[name] = { name: name, entries: [], count: 0, minutes: 0 };
+          order.push(name);
+        }
+        const g = groups[name];
+        g.entries.push(item);
+        g.count += 1;
+        g.minutes += Number(item.minutes) || 0;
+      });
+      const namedOrder = order
+        .filter((name) => name !== '未归类')
+        .sort((a, b) => groups[b].minutes - groups[a].minutes || groups[b].count - groups[a].count);
+      const finalOrder = groups['未归类'] ? namedOrder.concat(['未归类']) : namedOrder;
       body =
         '<div class="pp-exhibits">' +
-        feats
-          .map((feature) => {
-            const fEntries = feature.entries.slice();
-            const fDates = fEntries.map((i) => text(i.date)).sort();
-            const fDays = Object.keys(
-              fEntries.reduce((acc, i) => {
-                acc[i.date] = 1;
-                return acc;
-              }, {}),
-            ).length;
-            const range = fDates.length ? escapeHTML(fDates[0]) + ' ~ ' + escapeHTML(fDates[fDates.length - 1]) : '暂无记录';
-            const label = feature.name === '未分类功能' ? '未归类' : feature.name;
+        finalOrder
+          .map((name) => {
+            const g = groups[name];
+            const st = statLine(g.entries);
+            const ext = exhibitIDByName[name];
             return (
               '<section class="pp-exhibit"><div class="pp-exhibit-head"><span class="pp-exhibit-name">' +
-              escapeHTML(label) +
+              escapeHTML(name) +
+              (ext ? ' <span class="exhibit-id">' + escapeHTML(ext) + '</span>' : '') +
               '</span><span class="pp-exhibit-meta">' +
-              escapeHTML(feature.count) +
+              escapeHTML(st.count) +
               ' 条 · ' +
-              escapeHTML(fDays) +
+              escapeHTML(st.days) +
               ' 天' +
-              (feature.minutes > 0 ? ' · 约 ' + escapeHTML(hoursShort(feature.minutes)) + ' 小时' : '') +
+              (st.mins > 0 ? ' · 约 ' + escapeHTML(hoursShort(st.mins)) + ' 小时' : '') +
               ' · ' +
-              range +
+              escapeHTML(st.range) +
               '</span></div><div class="pp-timeline">' +
-              daySections(fEntries) +
+              daySections(g.entries) +
               '</div></section>'
             );
           })
@@ -1790,21 +1919,21 @@
 
     node.innerHTML = head + toolbar + body;
     bindEntryCards(node);
-    node.querySelectorAll('[data-feature]').forEach((btn) => {
+    node.querySelectorAll('[data-exhibit]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        state.projectFeature = btn.getAttribute('data-feature') || '';
+        state.projectExhibit = btn.getAttribute('data-exhibit') || '';
         renderProjectProgress();
       });
     });
-    node.querySelectorAll('[data-feature-clear]').forEach((btn) => {
+    node.querySelectorAll('[data-exhibit-clear]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        state.projectFeature = '';
+        state.projectExhibit = '';
         renderProjectProgress();
       });
     });
-    node.querySelectorAll('[data-features-toggle]').forEach((btn) => {
+    node.querySelectorAll('[data-exhibits-toggle]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        state.projectFeatureExpanded = !state.projectFeatureExpanded;
+        state.projectExhibitsExpanded = !state.projectExhibitsExpanded;
         renderProjectProgress();
       });
     });
@@ -2003,6 +2132,14 @@
         const archived = text(item.status, 'active') === 'archived';
         const src = text(item.source) === 'workbench' ? '<span class="badge new">看板</span>' : '';
         const statusBadge = archived ? '<span class="badge arch">已归档</span>' : '';
+        const projectKind = text(item.kind);
+        const kindBadge = projectKind
+          ? '<span class="badge kind kind-' +
+            (projectKind === '交付项目' ? 'delivery' : projectKind === '平台产品' ? 'platform' : projectKind === '通用沉淀' ? 'tooling' : 'other') +
+            '">' +
+            escapeHTML(projectKind) +
+            '</span>'
+          : '';
         const hasPath = (item.paths || []).length > 0;
         const pathHint = hasPath ? '' : '<span class="badge warn">未绑路径</span>';
         const checked = state.registrySelected[item.id] ? ' checked' : '';
@@ -2026,7 +2163,7 @@
         const mainRow =
           '<tr class="proj-row' + (archived ? ' archived' : '') + '"' + attrs + '>' +
           '<td class="reg-pick"><input type="checkbox" class="proj-check" data-id="' + escapeHTML(item.id) + '"' + checked + ' /></td>' +
-          '<td class="reg-name"><div class="reg-name-row">' + nameNode + src + statusBadge + pathHint + '</div></td>' +
+          '<td class="reg-name"><div class="reg-name-row">' + nameNode + kindBadge + src + statusBadge + pathHint + '</div></td>' +
           '<td class="reg-num">' + escapeHTML(item.entry_count || 0) + '</td>' +
           '<td class="reg-num">' + escapeHTML(item.active_days || 0) + '</td>' +
           '<td class="reg-cell">' + pathSummary(item) + '</td>' +

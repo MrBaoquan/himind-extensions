@@ -100,6 +100,8 @@ type input struct {
 	Description      string   `json:"description"`
 	Status           string   `json:"status"`
 	Color            string   `json:"color"`
+	// Kind 是项目类型：交付项目（场馆/展馆，含展项）/ 平台产品（自研，1 项目=1 路径，无展项）/ 通用沉淀。
+	Kind             string   `json:"kind"`
 	CurrentProject   string   `json:"current_project"`
 	IncludeStats     *bool    `json:"include_stats"`
 	ResolveProjects  *bool    `json:"resolve_projects"`
