@@ -91,8 +91,8 @@ type input struct {
 	// 避免模型把工时时长、时间戳写歪。
 	BaseStep string `json:"base_step"`
 	// 项目登记：ProjectID/ProjectName 等用于项目管理能力；ResolveProjects 控制写入时
-	// 是否按登记表归一项目名。RegisterProjects 已废弃：写入不再自动登记未知项目，
-	// 登记只由人工认领 / project.* 能力显式完成（保留字段以兼容旧调用）。
+	// 是否按登记表归一项目名并为未命中的项目自动建项目（默认开启）。RegisterProjects
+	// 已废弃：自动建项目由 ResolveProjects 统一控制（保留字段以兼容旧调用）。
 	ProjectID   string `json:"project_id"`
 	ProjectName string `json:"project_name"`
 	// NewName 供 work-log.project.rename：给项目改展示名（保持稳定 ID，并回绑历史条目）。

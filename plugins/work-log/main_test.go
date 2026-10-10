@@ -494,24 +494,28 @@ func TestProjectAssignReclassifies(t *testing.T) {
 	}
 }
 
-func TestEntryUpsertDoesNotAutoRegister(t *testing.T) {
+func TestEntryUpsertAutoCreatesProject(t *testing.T) {
 	withDataRoot(t)
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-06","entries":[{"source":"codex","session_id":"z1","project":"第三方仓库","title":"Z"}]}`)
 	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
-	if len(list["projects"].([]any)) != 0 {
-		t.Fatalf("写入不应自动登记未知项目，实际 %v", list["projects"])
+	projects := list["projects"].([]any)
+	if len(projects) != 1 {
+		t.Fatalf("未命中项目名应直接建项目，实际 %v", projects)
 	}
-	if _, err := os.Stat(projectsPath(root)); err == nil {
-		t.Fatal("不应因写入未知项目而落盘项目登记文件")
+	if name := projects[0].(map[string]any)["name"]; name != "第三方仓库" {
+		t.Fatalf("自动建项目名应为第三方仓库，实际 %v", name)
+	}
+	if _, err := os.Stat(projectsPath(root)); err != nil {
+		t.Fatal("自动建项目应落盘项目登记文件")
 	}
 	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-06"}`)
 	item := read["entries"].([]any)[0].(map[string]any)
 	if item["project"] != "第三方仓库" {
-		t.Fatalf("未命中项目名应保留用于展示/筛选，实际 %v", item["project"])
+		t.Fatalf("条目应归到自动建的项目，实际 %v", item["project"])
 	}
-	if id, _ := item["project_id"].(string); id != "" {
-		t.Fatalf("未登记项目不应带 project_id（待认领），实际 %v", id)
+	if id, _ := item["project_id"].(string); id == "" {
+		t.Fatalf("自动建项目应带稳定 project_id，实际 %v", item)
 	}
 }
 
@@ -807,9 +811,9 @@ func quote(value string) string {
 	return string(body)
 }
 
-// TestPathMappingResolvesAndMarksPending 验证：路径命中按映射归类；未命中的采集条目
-// 留空进「待认领」，且不新增假项目。
-func TestPathMappingResolvesAndMarksPending(t *testing.T) {
+// TestWriteAutoCreatesProjectForUnknownPath 验证：路径命中按映射归类；未命中的采集条目
+// 直接建项目（用条目自带项目名 / 目录名）并登记路径映射，不再有「待认领」环节。
+func TestWriteAutoCreatesProjectForUnknownPath(t *testing.T) {
 	withDataRoot(t)
 	root := t.TempDir()
 	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"深圳科技馆","paths":[{"path":"F:/work/szkjg","kind":"repo"}]}`)
@@ -826,19 +830,55 @@ func TestPathMappingResolvesAndMarksPending(t *testing.T) {
 	if got["a1"]["project"] != "深圳科技馆" {
 		t.Fatalf("路径命中应归一为深圳科技馆，实际 %v", got["a1"]["project"])
 	}
-	if got["a2"]["project"] != "" {
-		t.Fatalf("未命中路径应留空，实际 %v", got["a2"]["project"])
+	if got["a2"]["project"] != "unknown-repo" {
+		t.Fatalf("未命中路径应直接建项目 unknown-repo，实际 %v", got["a2"]["project"])
+	}
+	if pid, _ := got["a2"]["project_id"].(string); pid == "" {
+		t.Fatalf("自动建项目应带稳定 project_id，实际 %v", got["a2"])
 	}
 	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
-	if len(list["projects"].([]any)) != 1 {
-		t.Fatalf("未命中不应新增假项目，实际 %d 个", len(list["projects"].([]any)))
+	if len(list["projects"].([]any)) != 2 {
+		t.Fatalf("未命中应自动建项目，实际 %d 个", len(list["projects"].([]any)))
 	}
-	pending := list["pending_paths"].([]any)
-	if len(pending) != 1 {
-		t.Fatalf("应有 1 个待认领路径，实际 %v", pending)
+	if len(list["pending_paths"].([]any)) != 0 {
+		t.Fatalf("不再有待认领路径，实际 %v", list["pending_paths"])
 	}
-	if pending[0].(map[string]any)["path"] != "F:/work/unknown-repo" {
-		t.Fatalf("待认领路径异常: %v", pending[0])
+	// 新会话命中同一路径应直接归到刚建的项目（路径映射已登记）。
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-10","entries":[{"source":"codex","session_id":"a3","repo_path":"F:/work/unknown-repo/src","title":"再来"}]}`)
+	read2 := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-10"}`)
+	if read2["entries"].([]any)[0].(map[string]any)["project"] != "unknown-repo" {
+		t.Fatalf("同类会话应自动归类，实际 %v", read2["entries"].([]any)[0])
+	}
+}
+
+// TestAutoCreateUsesHintThenBasename 验证未命中建项目的命名兜底：project_hint 优先，其次目录名。
+func TestAutoCreateUsesHintThenBasename(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-07","entries":[
+		{"source":"codex","session_id":"h1","repo_path":"F:/work/MyRepo","project_hint":"自定义项目名","title":"带建议"},
+		{"source":"codex","session_id":"h2","repo_path":"F:/work/AnotherRepo","title":"无建议"}
+	]}`)
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-07"}`)
+	got := map[string]map[string]any{}
+	for _, raw := range read["entries"].([]any) {
+		item := raw.(map[string]any)
+		got[item["session_id"].(string)] = item
+	}
+	if got["h1"]["project"] != "自定义项目名" {
+		t.Fatalf("应优先用 project_hint 建项目，实际 %v", got["h1"]["project"])
+	}
+	if got["h2"]["project"] != "AnotherRepo" {
+		t.Fatalf("无建议应退回目录名建项目，实际 %v", got["h2"]["project"])
+	}
+	names := map[string]bool{}
+	for _, raw := range call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)["projects"].([]any) {
+		if name, _ := raw.(map[string]any)["name"].(string); name != "" {
+			names[name] = true
+		}
+	}
+	if !names["自定义项目名"] || !names["AnotherRepo"] {
+		t.Fatalf("应登记两个新项目，实际 %v", names)
 	}
 }
 
@@ -856,15 +896,16 @@ func TestExhibitPathOutranksProjectPath(t *testing.T) {
 	}
 }
 
-// TestClaimBackfillsPendingEntries 验证认领会把历史待认领条目回填到目标项目。
-func TestClaimBackfillsPendingEntries(t *testing.T) {
+// TestClaimBackfillsEntriesByPath 验证：显式把仓库路径归到项目时，会回填历史条目。
+func TestClaimBackfillsEntriesByPath(t *testing.T) {
 	withDataRoot(t)
 	root := t.TempDir()
 	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"新馆"}`)
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-05","entries":[{"source":"codex","session_id":"c1","repo_path":"F:/work/mystery","project":"mystery","title":"T"}]}`)
+	// 新行为：写入即自动建项目 mystery（不再是留空待认领）。
 	before := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-05"}`)
-	if before["entries"].([]any)[0].(map[string]any)["project"] != "" {
-		t.Fatal("认领前应留空")
+	if before["entries"].([]any)[0].(map[string]any)["project"] != "mystery" {
+		t.Fatal("写入应直接建项目 mystery")
 	}
 	claimed := call(t, "work-log.project.claim", `{"log_root":`+quote(root)+`,"repo_path":"F:/work/mystery","project_name":"新馆"}`)
 	if claimed["updated"].(float64) != 1 {
@@ -872,11 +913,11 @@ func TestClaimBackfillsPendingEntries(t *testing.T) {
 	}
 	after := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-05"}`)
 	if after["entries"].([]any)[0].(map[string]any)["project"] != "新馆" {
-		t.Fatal("认领后应归到新馆")
+		t.Fatal("归到新馆后应显示新馆")
 	}
 	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
 	if len(list["pending_paths"].([]any)) != 0 {
-		t.Fatalf("认领后待认领应为空，实际 %v", list["pending_paths"])
+		t.Fatalf("不应再有待认领，实际 %v", list["pending_paths"])
 	}
 }
 
@@ -1351,7 +1392,7 @@ func TestProjectSyncEnrichesOnlyLocalAssociations(t *testing.T) {
 	withDataRoot(t)
 	root := t.TempDir()
 
-	// 先显式建立本地关联（写入不再自动登记项目/展项，登记只由人工/能力显式完成）。
+	// 先建立本地项目（写入会按项目名/路径自动建项目，这里用导入显式带上展项）。
 	seed := `{"projects":[{"name":"邯郸馆","exhibits":[{"name":"诗海词趣","id":"exh_local"}]}]}`
 	call(t, "work-log.project.import", `{"log_root":`+quote(root)+`,"projects_json":`+quote(seed)+`}`)
 	// 本地只实际用到一个项目，且条目带了一个展项。

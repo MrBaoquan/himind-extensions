@@ -4,8 +4,8 @@
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
   "description": "以按日工作日志为核心：条目按仓库路径/项目/展项稳定归类，含功能与工时；报告按 项目→功能→工时 聚合，含月报、项目进展与月度工时表；周报/月报按自然周期自动补算并去重；支持条目导出/导入、整库备份与一键恢复、重扫对账预览与手工锁定防覆盖。",
-  "release_notes": "0.12.0：写入不再自动建项目（未命中保留名称、待认领）；新增条目导出/导入、整库备份恢复、重扫对账预览与条目锁定防覆盖。",
-  "version": "0.12.0",
+  "release_notes": "0.13.0：未命中项目/路径直接建项目并登记路径映射（不再有待认领）；界面新增条目锁定、整库备份恢复、条目导入导出与重扫对账。",
+  "version": "0.13.0",
   "distribution_targets": ["workbench", "github"],
   "entry": "bin/work-log.exe",
   "runtime": "process-jsonrpc-stdio",
@@ -23,8 +23,8 @@
           "log_root": {"type": "string"},
           "date": {"type": "string"},
           "overwrite": {"type": "boolean", "description": "命中同一 entry_id 时整条替换而非字段级合并，用于视图编辑"},
-          "resolve_projects": {"type": "boolean", "description": "按项目登记表归一项目名，默认 true"},
-          "register_projects": {"type": "boolean", "description": "已废弃：写入不再自动登记未知项目（登记只由人工认领 / project.* 能力显式完成），该字段被忽略"},
+          "resolve_projects": {"type": "boolean", "description": "按项目登记表归一项目名，并为未命中的项目自动建项目，默认 true"},
+          "register_projects": {"type": "boolean", "description": "已废弃字段，忽略；自动建项目统一由 resolve_projects 控制"},
           "entries_step": {"type": "string"},
           "base_step": {"type": "string", "description": "上游确定性素材步骤；与 entries_step（AI 总结）配合时，工时/起止时间等以素材为准"},
           "workflow_context": {"type": "object", "additionalProperties": true},
@@ -38,7 +38,7 @@
               "project": {"type": "string"},
               "feature": {"type": "string", "description": "功能/模块名，用于按项目下的功能归类与小计"},
               "exhibit": {"type": "string", "description": "展项名（项目下的具体展项），可留空"},
-              "repo_path": {"type": "string", "description": "会话仓库根路径（稳定标识）；写入时据此归类到项目/展项，未命中则留空待认领"},
+              "repo_path": {"type": "string", "description": "会话仓库根路径（稳定标识）；写入时据此归类，未命中则按项目名/目录名自动建项目并登记该路径"},
               "project_hint": {"type": "string", "description": "未归类时保留的原始项目名建议，仅作参考"},
               "category": {"type": "string", "enum": ["开发", "修复", "设计", "调研", "文档", "评审", "会议", "运维", "其他"], "description": "受控工作类型（中文枚举），未知值会被视为「其他」"},
               "minutes": {"type": "integer", "minimum": 0, "maximum": 1440, "description": "工时（分钟）"},
@@ -76,7 +76,7 @@
                 "project": {"type": "string"},
                 "feature": {"type": "string", "description": "功能/模块名，用于按项目下的功能归类与小计"},
                 "exhibit": {"type": "string", "description": "展项名（项目下的具体展项），可留空"},
-              "repo_path": {"type": "string", "description": "会话仓库根路径（稳定标识）；写入时据此归类到项目/展项，未命中则留空待认领"},
+              "repo_path": {"type": "string", "description": "会话仓库根路径（稳定标识）；写入时据此归类，未命中则按项目名/目录名自动建项目并登记该路径"},
               "project_hint": {"type": "string", "description": "未归类时保留的原始项目名建议，仅作参考"},
                 "category": {"type": "string", "enum": ["开发", "修复", "设计", "调研", "文档", "评审", "会议", "运维", "其他"], "description": "受控工作类型（中文枚举），未知值会被视为「其他」"},
                 "minutes": {"type": "integer", "minimum": 0, "maximum": 1440, "description": "工时（分钟）"},
@@ -203,7 +203,7 @@
     },
     {
       "id": "work-log.project.list",
-      "description": "列出项目登记表与条目统计，含路径映射、未归类项目名与待认领路径",
+      "description": "列出项目登记表与条目统计，含路径映射与未归类项目名",
       "availability": "local",
       "input_schema": {
         "type": "object",
@@ -308,7 +308,7 @@
     },
     {
       "id": "work-log.project.claim",
-      "description": "认领一个仓库路径到项目/展项，并回填历史条目",
+      "description": "把一个仓库路径归到项目/展项，并回填历史条目",
       "availability": "local",
       "input_schema": {
         "type": "object",
@@ -791,7 +791,7 @@
       {"id": "work-log.report.aggregate", "title": "汇总周报/月报"},
       {"id": "work-log.archive.list", "title": "浏览工作日志归档"},
       {"id": "work-log.project.list", "title": "查看项目归类"},
-      {"id": "work-log.project.claim", "title": "认领仓库路径到项目"},
+      {"id": "work-log.project.claim", "title": "把仓库路径归到项目"},
       {"id": "work-log.project.autofill", "title": "自动补全项目路径"},
       {"id": "work-log.link.reveal", "title": "打开日志目录"}
     ]

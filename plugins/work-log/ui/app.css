@@ -2821,3 +2821,55 @@ body.modal-open {
   max-width: 200px;
 }
 
+/* ---------- 条目锁定：锁定后自动重扫/合并不覆盖此条 ---------- */
+
+.link-btn.lock {
+  color: var(--muted);
+}
+
+.link-btn.lock.on {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+/* ---------- 维护弹窗：备份 / 迁移 / 对账 ---------- */
+
+.maint-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+#maint-status {
+  white-space: pre-line;
+  min-height: 16px;
+  margin: 4px 2px 10px;
+}
+
+#maint-status.error {
+  color: #b91c1c;
+}
+
+#maint-status.warn {
+  color: var(--warn);
+}
+
+#maint-io {
+  width: 100%;
+  min-height: 160px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  margin-bottom: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.btn.danger-armed {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+

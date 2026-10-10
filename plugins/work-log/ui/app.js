@@ -152,11 +152,40 @@
     return raw;
   }
 
+  // dayOfStamp 取 ISO 时间戳的日期部分（用于判断会话是否跨天）。
+  function dayOfStamp(value) {
+    const match = text(value).match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : '';
+  }
+
+  // crossDayLabel 返回跨天标记：跨 1 天为「（次日）」，跨多天为「（跨 N 日）」；同日返回空。
+  function crossDayLabel(startRaw, endRaw) {
+    const startDay = dayOfStamp(startRaw);
+    const endDay = dayOfStamp(endRaw);
+    if (startDay && endDay) {
+      const start = parseDate(startDay);
+      const end = parseDate(endDay);
+      if (start && end) {
+        const days = Math.round((end - start) / 86400000);
+        if (days === 1) return '（次日）';
+        if (days > 1) return '（跨 ' + days + ' 日）';
+        return '';
+      }
+    }
+    const start = formatTime(startRaw);
+    const end = formatTime(endRaw);
+    if (start && end && /^\d{2}:\d{2}$/.test(start) && /^\d{2}:\d{2}$/.test(end) && end < start) return '（次日）';
+    return '';
+  }
+
   function formatSpan(item) {
     const start = formatTime(item.started_at);
     const end = formatTime(item.ended_at);
     if (!start && !end) return '';
-    if (start && end) return start === end ? start : start + '–' + end;
+    if (start && end) {
+      if (start === end) return start;
+      return start + '–' + end + crossDayLabel(item.started_at, item.ended_at);
+    }
     return start || end;
   }
 
@@ -602,6 +631,19 @@
           '" data-date="' +
           escapeHTML(entryDate) +
           '">编辑</button>' +
+          '<button type="button" class="link-btn lock' +
+          (item.locked ? ' on' : '') +
+          '" data-action="lock" data-entry-id="' +
+          escapeHTML(entryID) +
+          '" data-date="' +
+          escapeHTML(entryDate) +
+          '" data-locked="' +
+          (item.locked ? '1' : '0') +
+          '" title="' +
+          (item.locked ? '已锁定：自动重扫与合并都会跳过此条，点击解锁' : '锁定此条：自动重扫与合并不会改写它') +
+          '">' +
+          (item.locked ? '已锁定' : '锁定') +
+          '</button>' +
           '<button type="button" class="link-btn danger" data-action="delete" data-entry-id="' +
           escapeHTML(entryID) +
           '" data-date="' +
@@ -825,6 +867,9 @@
     scope.querySelectorAll('[data-action="delete"]').forEach((node) => {
       node.addEventListener('click', () => armDelete(node));
     });
+    scope.querySelectorAll('[data-action="lock"]').forEach((node) => {
+      node.addEventListener('click', () => toggleEntryLock(node));
+    });
   }
 
   // editEntryField 就地编辑条目的某个字段（项目 / 功能）：点击标签 → 变成输入框 →
@@ -906,6 +951,22 @@
       }
     } catch (error) {
       notify('刷新失败：' + String((error && error.message) || error), 'error');
+    }
+  }
+
+  // toggleEntryLock 锁定/解锁一条日志：锁定后自动重扫与合并（upsert/import）默认跳过它，
+  // 只有显式 overwrite 才会整条替换，用于保护手工订正过的条目不被定时采集覆盖。
+  async function toggleEntryLock(button) {
+    const entryID = text(button.getAttribute('data-entry-id'));
+    const date = text(button.getAttribute('data-date'), state.selected || today());
+    if (!entryID || !date) return;
+    const next = button.getAttribute('data-locked') !== '1';
+    try {
+      await bridgeInvoke('work-log.entry.lock', { date, entry_id: entryID, locked: next });
+      notify(next ? '已锁定该条，自动重扫不会覆盖。' : '已解锁该条。');
+      await refreshAfterEntryEdit(date);
+    } catch (error) {
+      notify('锁定操作失败：' + String((error && error.message) || error), 'error');
     }
   }
 
@@ -1615,7 +1676,7 @@
     const query = text(state.query).toLowerCase();
     const list = (state.projects || []).filter((item) => !query || text(item.name).toLowerCase().indexOf(query) >= 0);
     if (!list.length) {
-      node.innerHTML = '<p class="meta pad">还没有项目。写入日志时带项目名会自动登记。</p>';
+      node.innerHTML = '<p class="meta pad">还没有项目。写入日志时会按项目名或仓库目录自动建项目。</p>';
       return;
     }
     node.innerHTML = list
@@ -1980,7 +2041,6 @@
     const data = state.projectsData || {};
     const projects = data.projects || [];
     const unmatched = data.unmatched || [];
-    const pending = data.pending_paths || [];
 
     const form = state.registryNewOpen
       ? '<div class="proj-form">' +
@@ -2252,32 +2312,7 @@
         '<label class="reg-pagesize">每页 <select id="p-pagesize">' + pageSizeOpts + '</select> 个</label></div>'
       : projects.length
         ? emptyBlock('当前筛选没有项目', ['换个筛选条件，或点「全部」查看所有登记项目。'])
-        : emptyBlock('还没有项目', ['写入日志时若带项目名会自动登记；也可以在上方手动添加。无项目时也可先给「待认领路径」认领到一个新项目。']);
-
-    const pendingBlock = pending.length
-      ? '<div class="proj-pending"><h3>待认领路径（未命中映射）</h3>' +
-        pending
-          .map((item) => {
-            const hint = text(item.project_hint);
-            return (
-              '<div class="pending-row" data-path="' + escapeHTML(text(item.path)) + '">' +
-              '<div class="pending-main"><code>' + escapeHTML(text(item.path)) + '</code>' +
-              '<span class="proj-meta">' + escapeHTML(item.entry_count || 0) + ' 条 · ' +
-              escapeHTML(item.active_days || 0) + ' 天' +
-              (hint ? ' · 建议「' + escapeHTML(hint) + '」' : '') + '</span></div>' +
-              '<div class="pending-actions">' +
-              '<input class="pending-project" type="text" list="p-names" placeholder="目标项目（可新建）" />' +
-              '<input class="pending-exhibit" type="text" placeholder="展项（可选）" />' +
-              '<button class="btn primary" type="button" data-action="claim">认领</button>' +
-              '</div></div>'
-            );
-          })
-          .join('') +
-        '<p class="meta">认领会把该路径写入目标项目（或展项），并把历史条目一并回填；之后同类会话自动归类。</p>' +
-        '<datalist id="p-names">' +
-        projects.map((item) => '<option value="' + escapeHTML(text(item.name)) + '"></option>').join('') +
-        '</datalist></div>'
-      : '';
+        : emptyBlock('还没有项目', ['写入日志时会按项目名或仓库目录自动建项目；也可以在上方手动添加。']);
 
     const unmatchedBlock = unmatched.length
       ? '<div class="proj-unmatched"><h3>未归类（登记表里没有）</h3><ul>' +
@@ -2287,7 +2322,7 @@
         '</ul><p class="meta">在上方登记同名项目，或用行内「并入」把历史条目归并到规范项目。</p></div>'
       : '';
 
-    panel.innerHTML = toolbar + form + '<div class="proj-list">' + list + '</div>' + pendingBlock + unmatchedBlock;
+    panel.innerHTML = toolbar + form + '<div class="proj-list">' + list + '</div>' + unmatchedBlock;
     bindProjectsPanel(panel);
   }
 
@@ -2764,31 +2799,6 @@
         }
       });
     });
-
-    // 认领待认领路径。
-    panel.querySelectorAll('.pending-row').forEach((row) => {
-      const btn = row.querySelector('[data-action="claim"]');
-      if (!btn) return;
-      btn.addEventListener('click', async () => {
-        const repoPath = row.getAttribute('data-path');
-        const project = text((row.querySelector('.pending-project') || {}).value);
-        const exhibit = text((row.querySelector('.pending-exhibit') || {}).value);
-        if (!project) {
-          notify('请先填写目标项目名。', 'warn');
-          return;
-        }
-        try {
-          const payload = { repo_path: repoPath, project_name: project, create_target: true };
-          if (exhibit) payload.exhibit_name = exhibit;
-          const result = await bridgeInvoke('work-log.project.claim', payload);
-          notify('已认领 ' + repoPath + '：回填 ' + text(result && result.updated) + ' 条');
-          await refreshProjects();
-          await loadProjects();
-        } catch (error) {
-          notify('认领失败：' + String((error && error.message) || error), 'error');
-        }
-      });
-    });
   }
 
   function renderProjectsView() {
@@ -2981,8 +2991,10 @@
   }
 
   function trapFocus(event) {
-    if (event.key !== 'Tab' || el('manual-backdrop').hidden) return;
-    const focusable = el('manual-form').querySelectorAll(
+    if (event.key !== 'Tab') return;
+    const backdrop = ['maint-backdrop', 'manual-backdrop'].map((id) => el(id)).find((node) => node && !node.hidden);
+    if (!backdrop) return;
+    const focusable = backdrop.querySelectorAll(
       'button, [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])',
     );
     if (!focusable.length) return;
@@ -2994,6 +3006,128 @@
     } else if (!event.shiftKey && document.activeElement === last) {
       event.preventDefault();
       first.focus();
+    }
+  }
+
+  // ---------- 维护弹窗：整库备份/恢复、条目导出/导入、重扫对账 ----------
+
+  let maintRestoreArmed = false;
+
+  function openMaintenance() {
+    setMaintStatus('');
+    el('maint-io').value = '';
+    disarmRestore();
+    lastFocused = document.activeElement;
+    el('maint-backdrop').hidden = false;
+    document.body.classList.add('modal-open');
+    el('maint-backup').focus();
+  }
+
+  function closeMaintenance() {
+    if (el('maint-backdrop').hidden) return;
+    el('maint-backdrop').hidden = true;
+    document.body.classList.remove('modal-open');
+    disarmRestore();
+    if (lastFocused && typeof lastFocused.focus === 'function') lastFocused.focus();
+    lastFocused = null;
+  }
+
+  function setMaintStatus(message, tone) {
+    const node = el('maint-status');
+    if (!node) return;
+    node.textContent = message || '';
+    node.className = 'meta' + (tone ? ' ' + tone : '');
+  }
+
+  function disarmRestore() {
+    maintRestoreArmed = false;
+    const btn = el('maint-restore');
+    if (!btn) return;
+    btn.classList.remove('danger-armed');
+    btn.textContent = '恢复最近备份';
+  }
+
+  async function backupArchive() {
+    setMaintStatus('正在备份整库…');
+    try {
+      const result = await bridgeInvoke('work-log.archive.backup', {});
+      setMaintStatus('已备份 ' + text(result && result.files) + ' 个文件：' + text(result && result.path));
+      notify('整库备份完成。');
+    } catch (error) {
+      setMaintStatus('备份失败：' + String((error && error.message) || error), 'error');
+    }
+  }
+
+  async function restoreArchive() {
+    if (!maintRestoreArmed) {
+      maintRestoreArmed = true;
+      const btn = el('maint-restore');
+      btn.classList.add('danger-armed');
+      btn.textContent = '再次点击确认恢复';
+      setMaintStatus('恢复会用最新备份覆盖当前日志库（恢复前会自动再留一份安全备份）。3 秒内再次点击确认。', 'warn');
+      setTimeout(disarmRestore, 3000);
+      return;
+    }
+    disarmRestore();
+    setMaintStatus('正在恢复…');
+    try {
+      const result = await bridgeInvoke('work-log.archive.restore', {});
+      setMaintStatus('已恢复 ' + text(result && result.files) + ' 个文件（来源：' + text(result && result.restored_from) + '）。');
+      notify('已从备份恢复。');
+      await refresh(state.selected);
+    } catch (error) {
+      setMaintStatus('恢复失败：' + String((error && error.message) || error), 'error');
+    }
+  }
+
+  async function exportEntries() {
+    const range = monthRange(state.selected || today());
+    setMaintStatus('正在导出 ' + range.from + ' ~ ' + range.to + ' …');
+    try {
+      const result = await bridgeInvoke('work-log.entry.export', { from: range.from, to: range.to });
+      el('maint-io').value = text(result && result.json);
+      setMaintStatus('已导出 ' + text(result && result.count) + ' 条（' + range.from + ' ~ ' + range.to + '），可复制保存。');
+    } catch (error) {
+      setMaintStatus('导出失败：' + String((error && error.message) || error), 'error');
+    }
+  }
+
+  async function importEntries() {
+    const json = text(el('maint-io').value);
+    if (!json) {
+      setMaintStatus('请先把条目 JSON 粘贴到下方文本框。', 'warn');
+      return;
+    }
+    setMaintStatus('正在导入（合并）…');
+    try {
+      const result = await bridgeInvoke('work-log.entry.import', { entries_json: json, mode: 'merge' });
+      setMaintStatus(
+        '已导入：新增 ' + text(result && result.added) + ' 条，更新 ' + text(result && result.updated) +
+          ' 条，跳过锁定 ' + text(result && result.locked_skipped) + ' 条。',
+      );
+      notify('条目导入完成。');
+      await refresh(state.selected);
+    } catch (error) {
+      setMaintStatus('导入失败：' + String((error && error.message) || error), 'error');
+    }
+  }
+
+  async function reconcileEntries() {
+    setMaintStatus('正在重扫对账…');
+    try {
+      const result = await bridgeInvoke('work-log.entry.reconcile', {});
+      const lines = [
+        '语料目录：' + text(result && result.material_dir),
+        '语料会话 ' + text(result && result.material_sessions) + ' · 日志会话 ' + text(result && result.log_sessions) + ' · 命中 ' + text(result && result.matched),
+        '未入账会话 ' + text(result && result.missing_count) + ' 条 · 过时条目 ' + text(result && result.stale_count) + ' 条',
+      ];
+      (result && result.missing ? result.missing.slice(0, 12) : []).forEach((item) => {
+        lines.push('· 未入账 ' + text(item.date) + ' ' + text(item.source) + '/' + text(item.session_id));
+      });
+      el('maint-io').value = JSON.stringify(result, null, 2);
+      setMaintStatus(lines.join('\n'));
+    } catch (error) {
+      setMaintStatus('对账失败：' + String((error && error.message) || error), 'error');
     }
   }
 
@@ -3199,6 +3333,18 @@
     el('manual-backdrop').addEventListener('mousedown', (event) => {
       if (event.target === el('manual-backdrop')) closeManualForm();
     });
+    el('maintain').addEventListener('click', openMaintenance);
+    el('maint-close').addEventListener('click', closeMaintenance);
+    el('maint-close2').addEventListener('click', closeMaintenance);
+    el('maint-backdrop').addEventListener('mousedown', (event) => {
+      if (event.target === el('maint-backdrop')) closeMaintenance();
+    });
+    el('maint-backup').addEventListener('click', backupArchive);
+    el('maint-restore').addEventListener('click', restoreArchive);
+    el('maint-export').addEventListener('click', exportEntries);
+    el('maint-import').addEventListener('click', importEntries);
+    el('maint-reconcile').addEventListener('click', reconcileEntries);
+    el('maint-copy').addEventListener('click', () => copyText(el('maint-io').value, '已复制到剪贴板'));
     el('manual-fields').addEventListener('submit', (event) => {
       event.preventDefault();
       submitManual();
@@ -3311,7 +3457,10 @@
     });
 
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') closeManualForm();
+      if (event.key === 'Escape') {
+        closeManualForm();
+        closeMaintenance();
+      }
       trapFocus(event);
     });
   }

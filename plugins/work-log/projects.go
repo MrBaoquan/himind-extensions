@@ -174,15 +174,16 @@ func registerProject(pf *projectsFile, index map[string]string, name string) boo
 	return true
 }
 
-// applyProjectRegistry 用登记表归一一批条目的项目名。
+// applyProjectRegistry 用登记表归一一批条目的项目名，并直接为未命中的项目建项目。
 //
-// 不再自动登记：登记只由人工认领 / project.* 能力显式完成，避免 AI 或目录名生成
-// 的「项目名」污染登记表。归类优先级：仓库路径（展项优先）> 名称/别名 > 未命中。
+// 归类优先级：仓库路径（展项优先）> 名称/别名 > 未命中即建。未命中时不再留下「待认领」
+// 环节，而是直接用条目自带项目名 / 采集建议 project_hint / 仓库目录名建项目，并把仓库
+// 路径登记为该项目的映射：之后同类会话自动命中，用户可在登记管理里改名或合并。
 //   - 命中路径/名称：填规范名与稳定 ID。
-//   - 带 repo_path 但未映射：留空并进入「待认领」（project_hint 保留原名）。
-//   - 纯名称未命中：保留名称供展示/筛选，清空不稳定 ID（project_id 为空即「待认领」）。
+//   - 未命中：建项目（名称取 raw > project_hint > 目录名），登记仓库路径映射与展项。
+//   - 既无名称也无路径：保持空（无从命名）。
 //
-// 返回值保留（bool, error）以兼容调用方；不再改登记表，故恒为 false。
+// 返回是否改动了登记表（改了就落盘 projects.json）。
 func applyProjectRegistry(root string, entries []entry, resolve bool) (bool, error) {
 	if !resolve {
 		return false, nil
@@ -192,6 +193,8 @@ func applyProjectRegistry(root string, entries []entry, resolve bool) (bool, err
 		return false, err
 	}
 	index := projectIndex(pf)
+	changed := false
+	now := time.Now().Format(time.RFC3339)
 	for i := range entries {
 		item := &entries[i]
 		raw := strings.TrimSpace(item.Project)
@@ -218,21 +221,99 @@ func applyProjectRegistry(root string, entries []entry, resolve bool) (bool, err
 				continue
 			}
 		}
-		// 未命中：清掉不稳定的 ID。
-		item.ProjectID = ""
-		item.ExhibitID = ""
-		if dir != "" {
-			// 有稳定路径事实却未映射：留空待认领，绝不登记假项目名。
-			if raw != "" {
-				item.ProjectHint = raw
-			}
-			item.Project = ""
-			item.Exhibit = ""
+		// 未命中：直接建项目（不再有待认领环节）。名称优先取条目自带项目名，
+		// 其次取采集建议 project_hint，最后退回仓库目录名（稳定事实）。
+		name := firstNonEmpty(raw, strings.TrimSpace(item.ProjectHint), repoBaseName(dir))
+		if name == "" {
+			item.ProjectID = ""
+			item.ExhibitID = ""
+			item.ProjectHint = ""
 			continue
 		}
-		// 纯名称未命中：保留名称（展示/筛选/报表分组），但 ID 已清空 = 待认领。
+		at := projectIndexByName(pf, name)
+		if at < 0 {
+			if registerProject(&pf, index, name) {
+				changed = true
+			}
+			at = projectIndexByName(pf, name)
+		}
+		if at < 0 {
+			item.ProjectID = ""
+			item.ExhibitID = ""
+			continue
+		}
+		target := &pf.Projects[at]
+		item.Project = target.Name
+		item.ProjectID = target.ID
+		if dir != "" && !projectHasPath(*target, dir) {
+			target.Paths = mergePaths(target.Paths, sanitizePaths([]pathSpec{{Path: dir, Kind: "repo", Source: "local"}}))
+			target.UpdatedAt = now
+			changed = true
+		}
+		if ex := strings.TrimSpace(item.Exhibit); ex != "" {
+			if !hasExhibitNamed(*target, ex) {
+				target.Exhibits = mergeExhibits(target.Exhibits, []exhibit{{
+					ID:      "ex-" + shortHash(normalizeProjectKey(ex)),
+					Name:    ex,
+					Aliases: []string{},
+				}})
+				target.UpdatedAt = now
+				changed = true
+			}
+			item.Exhibit = ex
+			item.ExhibitID = "ex-" + shortHash(normalizeProjectKey(ex))
+		} else {
+			item.ExhibitID = ""
+		}
+		item.ProjectHint = ""
 	}
-	return false, nil
+	if changed {
+		if err := writeProjects(root, pf); err != nil {
+			return false, err
+		}
+	}
+	return changed, nil
+}
+
+// projectIndexByName 按规范名（忽略大小写）找项目下标，找不到返回 -1。
+func projectIndexByName(pf projectsFile, name string) int {
+	key := normalizeProjectKey(name)
+	if key == "" {
+		return -1
+	}
+	for i := range pf.Projects {
+		if normalizeProjectKey(pf.Projects[i].Name) == key {
+			return i
+		}
+	}
+	return -1
+}
+
+// projectHasPath 判断项目是否已登记该路径（归一后比较）。
+func projectHasPath(p project, dir string) bool {
+	key := normalizePathKey(dir)
+	if key == "" {
+		return false
+	}
+	for _, item := range p.Paths {
+		if normalizePathKey(item.Path) == key {
+			return true
+		}
+	}
+	return false
+}
+
+// repoBaseName 取仓库/目录路径的最后一段，作为无从命名时的兜底项目名（保留原大小写）。
+func repoBaseName(p string) string {
+	s := strings.TrimSpace(strings.ReplaceAll(strings.TrimSpace(p), "\\", "/"))
+	s = strings.TrimRight(s, "/")
+	if s == "" {
+		return ""
+	}
+	if idx := strings.LastIndex(s, "/"); idx >= 0 {
+		s = s[idx+1:]
+	}
+	return strings.TrimSpace(s)
 }
 
 // applyExhibitLink 给单条条目补上稳定的项目/展项 ID，并把展项名归一。

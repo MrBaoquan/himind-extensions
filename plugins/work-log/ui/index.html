@@ -28,6 +28,7 @@
         </label>
         <button id="record" class="btn primary" type="button">记录一条</button>
         <button id="refresh" class="btn" type="button">刷新</button>
+        <button id="maintain" class="btn" type="button">维护</button>
       </div>
     </header>
 
@@ -80,6 +81,31 @@
             <button id="m-cancel" class="btn" type="button">取消</button>
           </div>
         </form>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="maint-backdrop" hidden>
+      <section id="maint-form" class="modal" role="dialog" aria-modal="true" aria-labelledby="maint-title">
+        <div class="modal-head">
+          <div>
+            <strong id="maint-title">维护：备份 / 迁移 / 对账</strong>
+            <span class="meta">整库备份与恢复、条目导出导入、重扫对账，均在本地日志库上执行。</span>
+          </div>
+          <button type="button" class="modal-close" id="maint-close" aria-label="关闭维护窗口">×</button>
+        </div>
+        <div class="maint-actions">
+          <button type="button" class="btn primary" id="maint-backup">备份整库</button>
+          <button type="button" class="btn danger" id="maint-restore">恢复最近备份</button>
+          <button type="button" class="btn" id="maint-export">导出本月条目</button>
+          <button type="button" class="btn" id="maint-import">导入条目（合并）</button>
+          <button type="button" class="btn" id="maint-reconcile">重扫对账</button>
+        </div>
+        <p id="maint-status" class="meta" aria-live="polite"></p>
+        <textarea id="maint-io" rows="9" placeholder="导出结果会出现在这里；导入时把条目 JSON 粘贴到这里后点「导入条目（合并）」。"></textarea>
+        <div class="manual-actions">
+          <button type="button" class="btn" id="maint-copy">复制文本</button>
+          <button type="button" class="btn" id="maint-close2">关闭</button>
+        </div>
       </section>
     </div>
 
