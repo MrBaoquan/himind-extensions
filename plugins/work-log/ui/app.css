@@ -1313,6 +1313,94 @@ body.modal-open {
   margin-bottom: 8px;
 }
 
+.report-agg {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #fbfcfe;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.report-agg .agg-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.report-agg .agg-head strong {
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.agg-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agg-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.agg-jump {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.agg-jump:hover,
+.agg-jump:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
+.agg-range,
+.agg-count {
+  color: var(--meta);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.agg-chip {
+  margin-left: auto;
+  border-radius: var(--radius-pill);
+  padding: 2px 10px;
+  font-size: 12px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.agg-chip.ok {
+  color: #15803d;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.agg-chip.todo {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.agg-chip.muted {
+  color: var(--meta);
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
 .stat-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

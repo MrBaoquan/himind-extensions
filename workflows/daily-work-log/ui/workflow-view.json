@@ -43,11 +43,11 @@
         },
         {
           "id": "period",
-          "label": "报告周期（默认日报，周/季度/年度为辅助）",
+          "label": "报告周期（默认日报；周/月报随运行自动跨期补算）",
           "type": "select",
           "required": false,
           "default": "daily",
-          "options": ["daily", "weekly", "quarterly", "yearly"]
+          "options": ["daily", "weekly", "monthly", "quarterly", "yearly"]
         }
       ]
     }

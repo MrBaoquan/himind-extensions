@@ -345,6 +345,95 @@ func TestPeriodRange(t *testing.T) {
 	}
 }
 
+func countReportFiles(t *testing.T, dir string) int {
+	t.Helper()
+	names, err := os.ReadDir(dir)
+	if err != nil {
+		return 0
+	}
+	count := 0
+	for _, name := range names {
+		if strings.HasSuffix(name.Name(), ".md") {
+			count++
+		}
+	}
+	return count
+}
+
+func TestAggregateCatchUpIsIdempotent(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-05","entries":[{"project":"P","title":"甲"}]}`)
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-08","entries":[{"project":"P","title":"乙"}]}`)
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-12","entries":[{"project":"P","title":"丙"}]}`)
+
+	// 锚点定在 2026-10-20：10-05 与 10-12 两个自然周都已结束，当前周尚未结束。
+	params := `{"log_root":` + quote(root) + `,"date":"2026-10-20","periods":["weekly"],"completed_only":true,"lookback":8}`
+	first := call(t, "work-log.report.aggregate", params)
+	if first["rendered"].(float64) < 2 {
+		t.Fatalf("跨期补算应生成至少 2 份周报，实际 %v", first["rendered"])
+	}
+	weeklyDir := filepath.Join(root, "reports", "weekly")
+	if got := countReportFiles(t, weeklyDir); got != 2 {
+		t.Fatalf("每个自然周应只有一份周报，实际 %d", got)
+	}
+	// 尚未结束的当前周不应被汇总。
+	_, _, currentKey, err := periodRange("weekly", "2026-10-20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(weeklyDir, currentKey+".md")); !os.IsNotExist(err) {
+		t.Fatalf("尚未结束的当前周不应生成周报")
+	}
+
+	// 再跑一次不得重复生成，文件数保持不变。
+	second := call(t, "work-log.report.aggregate", params)
+	if second["rendered"].(float64) != 0 || second["skipped"].(float64) < 2 {
+		t.Fatalf("重复运行应跳过全部，实际 rendered=%v skipped=%v", second["rendered"], second["skipped"])
+	}
+	if got := countReportFiles(t, weeklyDir); got != 2 {
+		t.Fatalf("重复运行后周报数不应变化，实际 %d", got)
+	}
+}
+
+func TestAggregateManualForceOverwritesSingleRecord(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-14","entries":[{"project":"P","title":"甲"}]}`)
+
+	// 手动模式：锚点所在周即便尚未结束也允许汇总。
+	forced := call(t, "work-log.report.aggregate", `{"log_root":`+quote(root)+`,"date":"2026-10-14","periods":["weekly"],"completed_only":false,"force":true}`)
+	if forced["rendered"].(float64) != 1 {
+		t.Fatalf("手动汇总应生成 1 份，实际 %v", forced["rendered"])
+	}
+	// 不 force 时命中已有记录应跳过。
+	skipped := call(t, "work-log.report.aggregate", `{"log_root":`+quote(root)+`,"date":"2026-10-14","periods":["weekly"],"completed_only":false,"force":false}`)
+	if skipped["rendered"].(float64) != 0 || skipped["skipped"].(float64) != 1 {
+		t.Fatalf("已有记录应跳过，实际 rendered=%v skipped=%v", skipped["rendered"], skipped["skipped"])
+	}
+	// force 覆盖重算后仍只有一份记录。
+	if again := call(t, "work-log.report.aggregate", `{"log_root":`+quote(root)+`,"date":"2026-10-14","periods":["weekly"],"completed_only":false,"force":true}`); again["rendered"].(float64) != 1 {
+		t.Fatalf("覆盖重算应仍生成 1 份，实际 %v", again["rendered"])
+	}
+	if got := countReportFiles(t, filepath.Join(root, "reports", "weekly")); got != 1 {
+		t.Fatalf("同一自然周应始终只有一份记录，实际 %d", got)
+	}
+}
+
+func TestAggregateDefaultPeriodsWeeklyAndMonthly(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-09-10","entries":[{"project":"P","title":"甲"}]}`)
+	result := call(t, "work-log.report.aggregate", `{"log_root":`+quote(root)+`,"date":"2026-11-05"}`)
+	periods := result["periods"].([]any)
+	if len(periods) != 2 || periods[0] != "weekly" || periods[1] != "monthly" {
+		t.Fatalf("默认周期应为 [weekly monthly]，实际 %v", periods)
+	}
+	if result["rendered"].(float64) < 1 {
+		t.Fatalf("应至少汇总 1 份记录，实际 %v", result["rendered"])
+	}
+}
+
 func TestUpsertRejectsBadDate(t *testing.T) {
 	withDataRoot(t)
 	root := t.TempDir()

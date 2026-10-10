@@ -3,9 +3,9 @@
   "name": "工作日志工具",
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
-  "description": "以按日工作日志为核心：条目带项目/展项、功能与工时；报告按 项目→功能→工时 聚合，含月报、项目进展与月度工时表（含 8 小时对齐）。",
-  "release_notes": "0.7.0：录入改为弹窗；报告重做并新增月报；核心脉络改为 项目·功能·工时；新增项目进展与月度工时表（实际/8 小时对齐）。",
-  "version": "0.7.0",
+  "description": "以按日工作日志为核心：条目带项目/展项、功能与工时；报告按 项目→功能→工时 聚合，含月报、项目进展与月度工时表；周报/月报按自然周期自动补算并去重。",
+  "release_notes": "0.8.0：新增周期汇总能力，随日报定时跨期补算周报/月报并按自然周/月去重，另提供手动汇总与覆盖重算。",
+  "version": "0.8.0",
   "distribution_targets": ["workbench", "github"],
   "entry": "bin/work-log.exe",
   "runtime": "process-jsonrpc-stdio",
@@ -376,6 +376,35 @@
       "risk_level": "read_only"
     },
     {
+      "id": "work-log.report.aggregate",
+      "description": "按自然周期汇总并归档日志；已有记录默认跳过，保证自然周/月各一条。",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "date": {"type": "string", "description": "锚点日期，默认今天"},
+          "periods": {
+            "type": "array",
+            "items": {"type": "string", "enum": ["daily", "weekly", "monthly", "quarterly", "yearly"]},
+            "description": "要汇总的周期集合，默认 周报+月报"
+          },
+          "completed_only": {"type": "boolean", "description": "只汇总已结束的自然周期（跨期补算），默认 true"},
+          "force": {"type": "boolean", "description": "覆盖已存在的归档记录，默认 false"},
+          "lookback": {"type": "integer", "minimum": 1, "maximum": 200, "description": "自动模式最多回溯的周期数，默认 24"},
+          "narrative": {"type": "string"},
+          "narratives": {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "description": "按项目或「项目/功能」的模型小结"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
       "id": "work-log.link.open",
       "description": "用系统默认程序打开引用链接",
       "availability": "local",
@@ -422,6 +451,7 @@
       {"id": "work-log.entry.delete", "title": "删除工作日志条目"},
       {"id": "work-log.archive.calendar", "title": "按日历回看工作日志"},
       {"id": "work-log.report.render", "title": "生成当日工作简报"},
+      {"id": "work-log.report.aggregate", "title": "汇总周报/月报"},
       {"id": "work-log.archive.list", "title": "浏览工作日志归档"},
       {"id": "work-log.project.list", "title": "查看项目归类"},
       {"id": "work-log.link.reveal", "title": "打开日志目录"}

@@ -68,6 +68,14 @@ type input struct {
 	// Narratives 是按项目 / 功能的模型叙述：键为项目名或 "项目/功能"，值为该组小结。
 	Narratives map[string]string `json:"narratives"`
 	Title      string            `json:"title"`
+	// Periods / CompletedOnly / Force / Lookback 供 work-log.report.aggregate 使用：
+	// periods 指定要汇总的周期集合（默认周报+月报）；completed_only 为 true 时只汇总
+	// 「已结束」的自然周期（跨期补算，供随日报定时自动汇总）；force 为 true 时覆盖已存在
+	// 的归档记录（手动重算）；lookback 限制自动模式单次回溯的周期数量，避免一次性补出大量历史。
+	Periods       []string `json:"periods"`
+	CompletedOnly *bool    `json:"completed_only"`
+	Force         *bool    `json:"force"`
+	Lookback      *int     `json:"lookback"`
 	// URL 用于 work-log.link.open。
 	URL string `json:"url"`
 	// Path 用于 work-log.link.reveal：在系统文件管理器中定位一个目录或文件。
@@ -210,6 +218,9 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 		return rpcResult(result, err)
 	case "work-log.report.read":
 		result, err := readReport(in)
+		return rpcResult(result, err)
+	case "work-log.report.aggregate":
+		result, err := aggregateReports(in)
 		return rpcResult(result, err)
 	case "work-log.link.open":
 		result, err := openLink(in)
@@ -1050,22 +1061,25 @@ func listReports(root string) ([]reportRecord, error) {
 
 // ---------- 报告 ----------
 
-func renderReport(in input) (any, error) {
-	root, err := logRoot(in.LogRoot)
-	if err != nil {
-		return nil, err
-	}
+// reportTarget 解析报告目标：周期（默认 daily）与锚点日期（默认今天）。
+func reportTarget(in input) (string, string, error) {
 	period := strings.ToLower(strings.TrimSpace(in.Period))
 	if period == "" {
 		period = "daily"
 	}
 	if !isKnownPeriod(period) {
-		return nil, errors.New("period 只能是 daily / weekly / monthly / quarterly / yearly")
+		return "", "", errors.New("period 只能是 daily / weekly / monthly / quarterly / yearly")
 	}
 	anchor := normalizeDate(in.Date)
 	if !validDate(anchor) {
-		return nil, errors.New("date 必须是 YYYY-MM-DD 格式")
+		return "", "", errors.New("date 必须是 YYYY-MM-DD 格式")
 	}
+	return period, anchor, nil
+}
+
+// renderPeriodReport 渲染并落盘一个报告周期。本期没有任何条目时返回 rendered=false，
+// 不落空文件（避免无工作日堆积空白报告）；成功时返回值里带 md/html/json 路径。
+func renderPeriodReport(root, period, anchor, title, narrative string, narratives map[string]string) (map[string]any, error) {
 	start, end, key, err := periodRange(period, anchor)
 	if err != nil {
 		return nil, err
@@ -1080,18 +1094,20 @@ func renderReport(in input) (any, error) {
 		return map[string]any{
 			"period":      period,
 			"key":         key,
+			"date_from":   start,
+			"date_to":     end,
 			"entry_count": 0,
 			"rendered":    false,
 			"reason":      "本期没有日志条目，跳过报告生成",
 		}, nil
 	}
-	narrative := resolveNarrative(in)
-	title := strings.TrimSpace(in.Title)
-	if title == "" {
+	if strings.TrimSpace(title) == "" {
 		title = periodLabel(period) + " · " + key
+	} else {
+		title = strings.TrimSpace(title)
 	}
-	markdown := renderMarkdown(title, period, key, start, end, entries, narrative, in.Narratives)
-	htmlBody := renderHTML(title, period, key, start, end, entries, narrative, in.Narratives)
+	markdown := renderMarkdown(title, period, key, start, end, entries, narrative, narratives)
+	htmlBody := renderHTML(title, period, key, start, end, entries, narrative, narratives)
 
 	dir := filepath.Join(root, "reports", period)
 	mdPath := filepath.Join(dir, key+".md")
@@ -1110,10 +1126,11 @@ func renderReport(in input) (any, error) {
 		"date_to":        end,
 		"entry_count":    len(entries),
 		"total_minutes":  groupMinutes(entries),
-		"narrative_used": narrative != "" || len(in.Narratives) > 0,
+		"narrative_used": narrative != "" || len(narratives) > 0,
 		"md_path":        mdPath,
 		"html_path":      htmlPath,
 		"markdown":       markdown,
+		"rendered":       true,
 	}
 	measuredMinutes, estimatedMinutes := splitMinutes(entries)
 	report["measured_minutes"] = measuredMinutes
@@ -1127,10 +1144,31 @@ func renderReport(in input) (any, error) {
 		return nil, errors.New("报告 JSON 写入失败")
 	}
 	report["json_path"] = jsonPath
+	return report, nil
+}
+
+func renderReport(in input) (any, error) {
+	root, err := logRoot(in.LogRoot)
+	if err != nil {
+		return nil, err
+	}
+	period, anchor, err := reportTarget(in)
+	if err != nil {
+		return nil, err
+	}
+	report, err := renderPeriodReport(root, period, anchor, strings.TrimSpace(in.Title), resolveNarrative(in), in.Narratives)
+	if err != nil {
+		return nil, err
+	}
+	if rendered, ok := report["rendered"].(bool); ok && !rendered {
+		return report, nil
+	}
+	jsonPath, _ := report["json_path"].(string)
 	jsonDigest, err := sha256OfFile(jsonPath)
 	if err != nil {
 		return nil, errors.New("报告摘要计算失败")
 	}
+	title, _ := report["title"].(string)
 	return map[string]any{
 		"report": report,
 		"artifacts": []map[string]any{{
@@ -1140,6 +1178,235 @@ func renderReport(in input) (any, error) {
 			"uri":           fileURIPath(jsonPath),
 			"sha256":        jsonDigest,
 		}},
+	}, nil
+}
+
+// ---------- 周期汇总 ----------
+
+// defaultAggregatePeriods 是自动汇总的默认周期集合：周报 + 月报。
+var defaultAggregatePeriods = []string{"weekly", "monthly"}
+
+func normalizeAggregatePeriods(values []string) ([]string, error) {
+	if len(values) == 0 {
+		return append([]string(nil), defaultAggregatePeriods...), nil
+	}
+	out := make([]string, 0, len(values))
+	seen := map[string]bool{}
+	for _, raw := range values {
+		period := strings.ToLower(strings.TrimSpace(raw))
+		if period == "" || seen[period] {
+			continue
+		}
+		if !isKnownPeriod(period) {
+			return nil, errors.New("periods 只支持 daily / weekly / monthly / quarterly / yearly")
+		}
+		seen[period] = true
+		out = append(out, period)
+	}
+	if len(out) == 0 {
+		return append([]string(nil), defaultAggregatePeriods...), nil
+	}
+	return out, nil
+}
+
+// reportExists 判断某个自然周期的归档记录是否已经存在（以 .md 为准）。
+func reportExists(root, period, key string) bool {
+	_, err := os.Stat(filepath.Join(root, "reports", period, key+".md"))
+	return err == nil
+}
+
+// periodShift 把锚点日期前后移动整数个自然周期。
+func periodShift(period, anchor string, delta int) (string, error) {
+	parsed, err := time.Parse("2006-01-02", anchor)
+	if err != nil {
+		return "", errors.New("date 必须是 YYYY-MM-DD 格式")
+	}
+	switch period {
+	case "daily":
+		parsed = parsed.AddDate(0, 0, delta)
+	case "weekly":
+		parsed = parsed.AddDate(0, 0, delta*7)
+	case "monthly":
+		parsed = parsed.AddDate(0, delta, 0)
+	case "quarterly":
+		parsed = parsed.AddDate(0, delta*3, 0)
+	case "yearly":
+		parsed = parsed.AddDate(delta, 0, 0)
+	default:
+		return "", errors.New("period 只能是 daily / weekly / monthly / quarterly / yearly")
+	}
+	return parsed.Format("2006-01-02"), nil
+}
+
+// aggregatePeriod 汇总锚点所在的单个自然周期。force=false 时若已有归档记录则跳过，
+// 保证同一自然周 / 月只会存在一条记录。
+func aggregatePeriod(root, period, anchor string, force bool, narrative string, narratives map[string]string) (map[string]any, error) {
+	start, end, key, err := periodRange(period, anchor)
+	if err != nil {
+		return nil, err
+	}
+	if !force && reportExists(root, period, key) {
+		return map[string]any{
+			"period": period, "key": key, "date_from": start, "date_to": end,
+			"status": "skipped", "reason": "该周期已有归档记录，未重复生成",
+		}, nil
+	}
+	report, err := renderPeriodReport(root, period, anchor, "", narrative, narratives)
+	if err != nil {
+		return nil, err
+	}
+	if rendered, ok := report["rendered"].(bool); ok && !rendered {
+		return map[string]any{
+			"period": period, "key": key, "date_from": start, "date_to": end,
+			"status": "empty", "reason": "本期没有日志条目",
+		}, nil
+	}
+	return map[string]any{
+		"period": period, "key": key, "date_from": start, "date_to": end,
+		"status":        "rendered",
+		"title":         report["title"],
+		"entry_count":   report["entry_count"],
+		"total_minutes": report["total_minutes"],
+		"md_path":       report["md_path"],
+		"html_path":     report["html_path"],
+		"json_path":     report["json_path"],
+	}, nil
+}
+
+// aggregateCompleted 从锚点回溯「已结束」的自然周期，逐个补算缺失的归档。锚点所在
+// 的当前周期一定不算已结束（先退回上一期）；回溯到早于最早日志的周期即停止；单次
+// 最多处理 lookback 个有数据的周期，避免一次性补出大量历史。已存在的记录默认跳过。
+func aggregateCompleted(root, period, anchor string, force bool, lookback int, narrative string, narratives map[string]string) ([]map[string]any, int, error) {
+	dates, err := listDates(root)
+	if err != nil {
+		return nil, 0, err
+	}
+	results := make([]map[string]any, 0)
+	if len(dates) == 0 {
+		return results, 0, nil
+	}
+	earliest := dates[0]
+	probe := anchor
+	_, end, _, err := periodRange(period, probe)
+	if err != nil {
+		return nil, 0, err
+	}
+	if end >= anchor {
+		probe, err = periodShift(period, probe, -1)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+	skipped, counted := 0, 0
+	for step := 0; step < 400; step++ {
+		start, periodEnd, key, err := periodRange(period, probe)
+		if err != nil {
+			return nil, 0, err
+		}
+		if periodEnd >= anchor || periodEnd < earliest {
+			break
+		}
+		entries, err := collectEntries(root, start, periodEnd)
+		if err != nil {
+			return nil, 0, err
+		}
+		if len(entries) == 0 {
+			probe, err = periodShift(period, probe, -1)
+			if err != nil {
+				return nil, 0, err
+			}
+			continue
+		}
+		counted++
+		if !force && reportExists(root, period, key) {
+			skipped++
+		} else {
+			item, err := aggregatePeriod(root, period, probe, force, narrative, narratives)
+			if err != nil {
+				return nil, 0, err
+			}
+			results = append(results, item)
+		}
+		if counted >= lookback {
+			break
+		}
+		probe, err = periodShift(period, probe, -1)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+	return results, skipped, nil
+}
+
+func aggregateReports(in input) (any, error) {
+	root, err := logRoot(in.LogRoot)
+	if err != nil {
+		return nil, err
+	}
+	anchor := normalizeDate(in.Date)
+	if !validDate(anchor) {
+		return nil, errors.New("date 必须是 YYYY-MM-DD 格式")
+	}
+	periods, err := normalizeAggregatePeriods(in.Periods)
+	if err != nil {
+		return nil, err
+	}
+	completedOnly := true
+	if in.CompletedOnly != nil {
+		completedOnly = *in.CompletedOnly
+	}
+	force := in.Force != nil && *in.Force
+	lookback := 24
+	if in.Lookback != nil && *in.Lookback > 0 {
+		lookback = *in.Lookback
+	}
+	narrative := resolveNarrative(in)
+
+	results := make([]map[string]any, 0)
+	rendered, skipped, empty := 0, 0, 0
+	for _, period := range periods {
+		if completedOnly {
+			items, skipCount, err := aggregateCompleted(root, period, anchor, force, lookback, narrative, in.Narratives)
+			if err != nil {
+				return nil, err
+			}
+			skipped += skipCount
+			for _, item := range items {
+				switch item["status"] {
+				case "rendered":
+					rendered++
+				case "empty":
+					empty++
+				}
+				results = append(results, item)
+			}
+			continue
+		}
+		item, err := aggregatePeriod(root, period, anchor, force, narrative, in.Narratives)
+		if err != nil {
+			return nil, err
+		}
+		switch item["status"] {
+		case "rendered":
+			rendered++
+		case "skipped":
+			skipped++
+		case "empty":
+			empty++
+		}
+		results = append(results, item)
+	}
+	return map[string]any{
+		"log_root":       root,
+		"date":           anchor,
+		"periods":        periods,
+		"completed_only": completedOnly,
+		"force":          force,
+		"lookback":       lookback,
+		"rendered":       rendered,
+		"skipped":        skipped,
+		"empty":          empty,
+		"results":        results,
 	}, nil
 }
 

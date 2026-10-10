@@ -141,10 +141,12 @@
           </div>
         </div>
         <div class="report-actions">
-          <button type="button" class="btn" id="report-generate">生成归档报告</button>
+          <button type="button" class="btn" id="report-generate" title="按当前周期覆盖生成归档">生成本期归档</button>
+          <button type="button" class="btn" id="report-aggregate" title="跨期补算周报/月报，已有记录不重复">汇总周报/月报</button>
           <button type="button" class="btn" id="report-open">打开归档</button>
           <button type="button" class="btn" id="report-copy">复制 Markdown</button>
         </div>
+        <div id="report-agg" class="report-agg" aria-live="polite"></div>
         <div id="report-body" class="panel-body"></div>
       </section>
     </div>

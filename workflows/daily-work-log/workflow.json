@@ -1,11 +1,11 @@
 {
   "schema_version": "workflow_package.v1",
   "id": "com.himind.workflow.daily-work-log",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "distribution_targets": ["workbench", "github"],
   "name": "每日工作日志",
-  "description": "采集本机 AI 会话素材，用内置 AI 总结成清晰的工作日志条目（落到项目/展项，按项目→功能聚合），写入全局工作日志并生成日报归档。",
-  "release_notes": "0.5.1：项目看板同步步骤改为不阻塞写入（best-effort），避免只跑「总结」入口时依赖缺失。",
+  "description": "采集本机 AI 会话素材，用内置 AI 总结成清晰的工作日志条目（落到项目/展项，按项目→功能聚合），写入全局工作日志，生成日报归档，并跨期补算周报/月报（自然周期去重）。",
+  "release_notes": "0.6.0：日报写入后自动跨期补算周报/月报（自然周/月各一条，已存在不重复），汇总失败不阻塞日报。",
   "min_agent_version": "0.3.47",
   "local_requirements": {
     "platform": "windows",
@@ -66,7 +66,8 @@
     "business.project.list",
     "work-log.session.scan",
     "work-log.entry.upsert",
-    "work-log.report.render"
+    "work-log.report.render",
+    "work-log.report.aggregate"
   ],
   "dependencies": {
     "skills": [],
@@ -138,6 +139,21 @@
       "depends_on": ["WL-SUMMARIZE"]
     },
     {
+      "id": "WL-AGGREGATE",
+      "title": "跨期补算周报/月报",
+      "kind": "capability",
+      "capability_id": "work-log.report.aggregate",
+      "execution_mode": "sync",
+      "risk_level": "local_write",
+      "on_failure": "continue",
+      "input": {
+        "periods": ["weekly", "monthly"],
+        "completed_only": true,
+        "force": false
+      },
+      "depends_on": ["WL-WRITE"]
+    },
+    {
       "id": "WL-REPORT",
       "title": "生成日报",
       "kind": "capability",
@@ -147,7 +163,7 @@
       "input": {
         "narrative_step": "WL-SUMMARIZE"
       },
-      "depends_on": ["WL-WRITE"]
+      "depends_on": ["WL-AGGREGATE"]
     }
   ],
   "artifacts": [

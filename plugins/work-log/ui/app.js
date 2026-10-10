@@ -70,6 +70,7 @@
     reportEntries: null,
     reportLoading: false,
     reportArchive: null,
+    aggStatus: null,
     // 工时表
     matrixYear: 0,
     matrixMonth: 0,
@@ -718,6 +719,18 @@
 
   // ---------- 报告 ----------
 
+  // isoWeekKey 计算 ISO 8601 周键（如 2026-W41），与后端报告归档的键保持一致。
+  function isoWeekKey(date) {
+    const target = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = (target.getUTCDay() + 6) % 7; // 周一为 0
+    target.setUTCDate(target.getUTCDate() - dayNum + 3); // 该周的周四
+    const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
+    const firstDayNum = (firstThursday.getUTCDay() + 6) % 7;
+    firstThursday.setUTCDate(firstThursday.getUTCDate() - firstDayNum + 3);
+    const week = 1 + Math.round((target - firstThursday) / (7 * 24 * 3600 * 1000));
+    return target.getUTCFullYear() + '-W' + pad2(week);
+  }
+
   function periodRangeJS(period, anchor) {
     const date = parseDate(anchor) || new Date();
     const year = date.getFullYear();
@@ -730,7 +743,7 @@
       const weekday = (date.getDay() + 6) % 7; // 周一为 0
       const monday = new Date(year, month, date.getDate() - weekday);
       const sunday = new Date(year, month, date.getDate() - weekday + 6);
-      return { from: formatDate(monday), to: formatDate(sunday), key: formatDate(monday) };
+      return { from: formatDate(monday), to: formatDate(sunday), key: isoWeekKey(monday) };
     }
     if (period === 'monthly') {
       const start = new Date(year, month, 1);
@@ -761,7 +774,9 @@
     if (!node) return;
     node.innerHTML = PERIOD_ORDER.map(
       (period) =>
-        '<button type="button" class="seg-btn" data-period="' +
+        '<button type="button" class="seg-btn' +
+        (period === state.reportPeriod ? ' active' : '') +
+        '" data-period="' +
         period +
         '" aria-pressed="' +
         (period === state.reportPeriod ? 'true' : 'false') +
@@ -795,6 +810,8 @@
       '<span class="badge">' + escapeHTML(range.key) + '</span>' +
       (range.from !== range.to ? '<span class="badge">' + escapeHTML(range.from) + ' ~ ' + escapeHTML(range.to) + '</span>' : '');
     renderReport();
+    renderAggregateStatus();
+    loadAggregateStatus();
   }
 
   function renderReport() {
@@ -1026,6 +1043,123 @@
       copyText(data && data.markdown, '已复制报告 Markdown（分享前请脱敏）');
     } catch (error) {
       notify('还没有归档报告：' + String((error && error.message) || error), 'warn');
+    }
+  }
+
+  // ---------- 周期汇总 ----------
+
+  // lastCompletedAnchor 返回最近一个「已结束」自然周期内的锚点日期。
+  // 锚点所在周期尚未结束时（end >= anchor），退回上一期。
+  function lastCompletedAnchor(period, anchor) {
+    const range = periodRangeJS(period, anchor);
+    if (range.to >= anchor) return shiftAnchor(period, anchor, -1);
+    return anchor;
+  }
+
+  function aggStatusText(row) {
+    if (!row.count) return { text: '无记录', cls: 'agg-chip muted' };
+    if (row.archived) return { text: '已归档', cls: 'agg-chip ok' };
+    return { text: '待补算', cls: 'agg-chip todo' };
+  }
+
+  function renderAggregateStatus() {
+    const node = el('report-agg');
+    if (!node) return;
+    const rows = state.aggStatus || [];
+    const head =
+      '<div class="agg-head"><strong>周期汇总</strong>' +
+      '<span class="meta">跟随每日报告自动跨期补算；已有记录不重复</span></div>';
+    if (!rows.length) {
+      node.innerHTML = head;
+      return;
+    }
+    const list =
+      '<div class="agg-rows">' +
+      rows
+        .map((row) => {
+          const label = PERIOD_LABELS[row.period] || row.period;
+          const status = aggStatusText(row);
+          return (
+            '<div class="agg-row">' +
+            '<button type="button" class="agg-jump" data-period="' +
+            row.period +
+            '" data-anchor="' +
+            row.anchor +
+            '" title="在报告中查看该周期">' +
+            escapeHTML(label + ' ' + row.key) +
+            '</button>' +
+            '<span class="agg-range">' +
+            escapeHTML(row.from + ' ~ ' + row.to) +
+            '</span>' +
+            '<span class="agg-count">' +
+            (row.count ? escapeHTML(row.count + ' 条') : '—') +
+            '</span>' +
+            '<span class="' +
+            status.cls +
+            '">' +
+            status.text +
+            '</span>' +
+            '</div>'
+          );
+        })
+        .join('') +
+      '</div>';
+    node.innerHTML = head + list;
+    node.querySelectorAll('.agg-jump').forEach((button) => {
+      button.addEventListener('click', () => {
+        state.reportPeriod = button.getAttribute('data-period');
+        state.reportAnchor = button.getAttribute('data-anchor');
+        loadReport();
+      });
+    });
+  }
+
+  async function loadAggregateStatus() {
+    const anchor = state.reportAnchor || state.selected || today();
+    const targets = ['weekly', 'monthly'];
+    const rows = [];
+    for (const period of targets) {
+      const target = lastCompletedAnchor(period, anchor);
+      const range = periodRangeJS(period, target);
+      let archived = false;
+      try {
+        await bridgeInvoke('work-log.report.read', { period: period, date: target });
+        archived = true;
+      } catch (error) {
+        archived = false;
+      }
+      let count = 0;
+      try {
+        const data = await bridgeInvoke('work-log.entry.list', { from: range.from, to: range.to, limit: 5000 });
+        count = ((data && data.entries) || []).length;
+      } catch (error) {
+        count = 0;
+      }
+      rows.push({ period: period, anchor: target, key: range.key, from: range.from, to: range.to, archived: archived, count: count });
+    }
+    state.aggStatus = rows;
+    renderAggregateStatus();
+  }
+
+  async function aggregateNow() {
+    notify('正在跨期补算周报/月报…');
+    try {
+      const data = await bridgeInvoke('work-log.report.aggregate', {
+        periods: ['weekly', 'monthly'],
+        completed_only: true,
+        force: false,
+      });
+      const rendered = (data && data.rendered) || 0;
+      const skipped = (data && data.skipped) || 0;
+      if (rendered > 0) {
+        notify('已补算 ' + rendered + ' 份周期汇总' + (skipped ? '（跳过 ' + skipped + ' 份已存在）' : '') + '。');
+      } else {
+        notify(skipped ? '没有需要补算的周期，已存在 ' + skipped + ' 份记录。' : '没有需要补算的周期。', 'warn');
+      }
+      await loadAggregateStatus();
+      if (state.view === 'report') loadReport();
+    } catch (error) {
+      notify('汇总失败：' + String((error && error.message) || error), 'error');
     }
   }
 
@@ -2051,6 +2185,7 @@
       loadReport();
     });
     el('report-generate').addEventListener('click', generateArchive);
+    el('report-aggregate').addEventListener('click', aggregateNow);
     el('report-open').addEventListener('click', openArchive);
     el('report-copy').addEventListener('click', copyArchive);
 
