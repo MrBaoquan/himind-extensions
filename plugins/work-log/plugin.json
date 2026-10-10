@@ -4,7 +4,7 @@
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
   "description": "以按日工作日志为核心：条目按仓库路径/项目/展项稳定归类，含功能与工时；报告按 项目→功能→工时 聚合，含月报、项目进展与月度工时表；周报/月报按自然周期自动补算并去重。",
-  "release_notes": "0.11.5：展项成为一等维度——从项目看板同步展项清单，推进记录可按展项查看；功能降级为条目细节，不再与展项同级。",
+  "release_notes": "0.11.5：展项成为一等维度，功能降级为条目细节；登记表改为本地优先——工作台只作权威来源，仅同步本地真正用到的项目/展项。",
   "version": "0.11.5",
   "distribution_targets": ["workbench", "github"],
   "entry": "bin/work-log.exe",
@@ -504,7 +504,7 @@
     },
     {
       "id": "work-log.project.sync",
-      "description": "把工作台项目（含展项与路径）并入本地项目登记表（项目看板同步入口）",
+      "description": "仅增补本地已有关联的项目/展项元数据（工作台只作权威来源，不批量导入）",
       "availability": "local",
       "input_schema": {
         "type": "object",

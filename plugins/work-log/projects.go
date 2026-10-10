@@ -235,6 +235,16 @@ func applyProjectRegistry(root string, entries []entry, resolve, register bool) 
 				}
 			}
 		}
+		// 条目实际用到的展项（本地关联）就地登记，不用等工作台同步。
+		if register {
+			projName := strings.TrimSpace(item.Project)
+			if projName == "" {
+				projName = raw
+			}
+			if registerExhibit(&pf, projName, item.Exhibit) {
+				changed = true
+			}
+		}
 	}
 	if changed {
 		if err := writeProjects(root, pf); err != nil {
@@ -890,31 +900,19 @@ func projectSyncCap(in input) (any, error) {
 		return nil, err
 	}
 	now := time.Now().Format(time.RFC3339)
-	created, updated := 0, 0
+	created, updated, skipped := 0, 0, 0
 	for _, raw := range items {
 		name := firstNonEmpty(mapStr(raw, "project_name"), mapStr(raw, "name"))
 		if name == "" {
 			continue
 		}
 		externalID := firstNonEmpty(mapStr(raw, "id"), mapStr(raw, "project_id"))
-		exhibits := exhibitsFromWorkbench(raw)
 		paths := projectPathsFromWorkbench(raw)
 
 		at := matchProjectIndex(pf, name, externalID)
 		if at < 0 {
-			pf.Projects = append(pf.Projects, project{
-				ID:         makeProjectID(name),
-				Name:       name,
-				Aliases:    []string{},
-				Status:     "active",
-				Source:     "workbench",
-				ExternalID: externalID,
-				Exhibits:   exhibits,
-				Paths:      paths,
-				CreatedAt:  now,
-				UpdatedAt:  now,
-			})
-			created++
+			// 本地没有实际关联（条目/路径）的项目不自动登记：工作台是权威来源，但不做批量导入。
+			skipped++
 			continue
 		}
 		p := pf.Projects[at]
@@ -922,7 +920,8 @@ func projectSyncCap(in input) (any, error) {
 			p.ExternalID = externalID
 		}
 		p.Source = "workbench"
-		p.Exhibits = mergeExhibits(p.Exhibits, exhibits)
+		// 仅增补本地已实际使用的展项；未在本地出现的展项不批量引入。
+		p.Exhibits = mergeExhibits(p.Exhibits, knownExhibitsOnly(p, exhibitsFromWorkbench(raw)))
 		p.Paths = mergePaths(p.Paths, paths)
 		p.UpdatedAt = now
 		pf.Projects[at] = p
@@ -953,24 +952,16 @@ func projectSyncCap(in input) (any, error) {
 			at = matchProjectIndex(pf, projectName, "")
 		}
 		if at < 0 {
-			if projectName == "" {
-				continue
-			}
-			pf.Projects = append(pf.Projects, project{
-				ID:         makeProjectID(projectName),
-				Name:       projectName,
-				Aliases:    []string{},
-				Status:     "active",
-				Source:     "workbench",
-				ExternalID: projectExt,
-				Exhibits:   []exhibit{ex},
-				CreatedAt:  now,
-				UpdatedAt:  now,
-			})
-			exUpdated++
+			// 本地没有该项目：不引入。
+			skipped++
 			continue
 		}
 		p := pf.Projects[at]
+		if !hasExhibitNamed(p, name) {
+			// 本地尚未实际使用的展项不批量引入（等条目/路径真正用到时再本地登记）。
+			skipped++
+			continue
+		}
 		p.Exhibits = mergeExhibits(p.Exhibits, []exhibit{ex})
 		p.UpdatedAt = now
 		pf.Projects[at] = p
@@ -996,7 +987,63 @@ func projectSyncCap(in input) (any, error) {
 		"updated":       updated,
 		"exhibits":      exUpdated,
 		"exhibit_total": len(exhibitItems),
+		"skipped":       skipped,
+		"note":          "仅增补本地已有关联的项目/展项，不对工作台做批量导入",
 	}, nil
+}
+
+// hasExhibitNamed 判断项目下是否已有同名（或别名）展项。
+func hasExhibitNamed(p project, name string) bool {
+	key := normalizeProjectKey(name)
+	if key == "" {
+		return false
+	}
+	for _, e := range p.Exhibits {
+		if normalizeProjectKey(e.Name) == key || aliasMatches(e.Aliases, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// knownExhibitsOnly 过滤掉项目本地尚未登记的展项，只保留可以增补元数据的已有关联展项。
+func knownExhibitsOnly(p project, incoming []exhibit) []exhibit {
+	if len(incoming) == 0 {
+		return nil
+	}
+	out := make([]exhibit, 0, len(incoming))
+	for _, ex := range incoming {
+		if hasExhibitNamed(p, ex.Name) {
+			out = append(out, ex)
+		}
+	}
+	return out
+}
+
+// registerExhibit 在项目（按名匹配）下按名本地登记一个展项（条目实际用到时调用）。
+// 项目不存在或展项已存在时返回 false。
+func registerExhibit(pf *projectsFile, projectName, exhibitName string) bool {
+	name := strings.TrimSpace(exhibitName)
+	key := normalizeProjectKey(projectName)
+	if name == "" || key == "" {
+		return false
+	}
+	for i := range pf.Projects {
+		if normalizeProjectKey(pf.Projects[i].Name) != key {
+			continue
+		}
+		if hasExhibitNamed(pf.Projects[i], name) {
+			return false
+		}
+		pf.Projects[i].Exhibits = mergeExhibits(pf.Projects[i].Exhibits, []exhibit{{
+			ID:      "ex-" + shortHash(normalizeProjectKey(name)),
+			Name:    name,
+			Aliases: []string{},
+		}})
+		pf.Projects[i].UpdatedAt = time.Now().Format(time.RFC3339)
+		return true
+	}
+	return false
 }
 
 // projectPathsFromWorkbench 从工作台项目对象里解析路径映射（paths 数组或 source_path）。

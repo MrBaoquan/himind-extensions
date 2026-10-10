@@ -1322,3 +1322,57 @@ func TestPreferCandidatePath(t *testing.T) {
 		t.Fatal("都不是仓库时应取更短路径")
 	}
 }
+
+// TestProjectSyncEnrichesOnlyLocalAssociations 验证：工作台同步只增补本地已有关联的项目/展项，
+// 不对整个工作台目录做批量导入；本地未实际用到的项目/展项一律跳过。
+func TestProjectSyncEnrichesOnlyLocalAssociations(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+
+	// 本地只实际用到一个项目，且条目带了一个展项。
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[
+		{"source":"codex","session_id":"a1","project":"邯郸馆","exhibit":"诗海词趣","title":"做展项"}
+	]}`)
+	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
+	projects := list["projects"].([]any)
+	if len(projects) != 1 {
+		t.Fatalf("本地应只有 1 个项目，实际 %d", len(projects))
+	}
+	if ex := projects[0].(map[string]any)["exhibits"].([]any); len(ex) != 1 {
+		t.Fatalf("条目用到的展项应就地登记，实际 %d 个", len(ex))
+	}
+
+	// 工作台带来 2 个项目、3 个展项，其中只有一个项目/展项是本地真正用过的。
+	syncParams := `{"log_root":` + quote(root) + `,"projects":[
+		{"project_name":"邯郸馆","id":"prj_handan"},
+		{"project_name":"从未用过的馆","id":"prj_unused"}
+	],"exhibits":[
+		{"exhibit_name":"诗海词趣","pid":"exh_1","project_id":"prj_handan"},
+		{"exhibit_name":"没用过的展项","pid":"exh_2","project_id":"prj_handan"},
+		{"exhibit_name":"另一个馆的展项","pid":"exh_3","project_id":"prj_unused"}
+	]}`
+	res := call(t, "work-log.project.sync", syncParams)
+	if res["created"].(float64) != 0 {
+		t.Fatalf("同步不应新建项目，实际 created=%v", res["created"])
+	}
+	if res["skipped"].(float64) == 0 {
+		t.Fatalf("同步应跳过无本地关联项，实际 skipped=%v", res["skipped"])
+	}
+
+	after := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
+	aps := after["projects"].([]any)
+	if len(aps) != 1 {
+		t.Fatalf("同步后本地仍应只有 1 个项目，实际 %d", len(aps))
+	}
+	p := aps[0].(map[string]any)
+	if p["external_id"] != "prj_handan" {
+		t.Fatalf("已有关联项目应补上 external_id，实际 %v", p["external_id"])
+	}
+	ex := p["exhibits"].([]any)
+	if len(ex) != 1 {
+		t.Fatalf("未使用的展项不应被引入，实际 %d 个", len(ex))
+	}
+	if ex[0].(map[string]any)["external_id"] != "exh_1" {
+		t.Fatalf("已有关联展项应补上 external_id，实际 %v", ex[0].(map[string]any)["external_id"])
+	}
+}
