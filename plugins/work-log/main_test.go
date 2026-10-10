@@ -698,6 +698,20 @@ func TestUpsertOverwriteClearsFields(t *testing.T) {
 	}
 }
 
+// TestUpsertModeReplaceDoesNotWipeDay 验证即便传入 mode=replace，也不会清空当天已有条目
+// （该历史开关已移除，防止连带抹掉手工条目）。
+func TestUpsertModeReplaceDoesNotWipeDay(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[{"source":"manual","title":"手工补录"}]}`)
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","mode":"replace","entries":[{"source":"codex","session_id":"x1","title":"采集条目"}]}`)
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-09"}`)
+	entries := read["entries"].([]any)
+	if len(entries) != 2 {
+		t.Fatalf("mode=replace 不应清空当天条目，应保留 2 条，实际 %d", len(entries))
+	}
+}
+
 func TestConcurrentUpsertsDoNotLoseEntries(t *testing.T) {
 	withDataRoot(t)
 	root := t.TempDir()

@@ -4,8 +4,8 @@
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
   "description": "以按日工作日志为核心：条目按仓库路径/项目/展项稳定归类，含功能与工时；报告按 项目→功能→工时 聚合，含月报、项目进展与月度工时表；周报/月报按自然周期自动补算并去重。",
-  "release_notes": "0.11.5：展项成为一等维度，功能降级为条目细节；登记表改为本地优先——工作台只作权威来源，仅同步本地真正用到的项目/展项。",
-  "version": "0.11.5",
+  "release_notes": "0.11.6：移除 entry.upsert 的整日清空开关（mode=replace），避免误删手工条目；删除请用 entry.delete。",
+  "version": "0.11.6",
   "distribution_targets": ["workbench", "github"],
   "entry": "bin/work-log.exe",
   "runtime": "process-jsonrpc-stdio",
@@ -22,7 +22,6 @@
         "properties": {
           "log_root": {"type": "string"},
           "date": {"type": "string"},
-          "mode": {"type": "string", "enum": ["merge", "replace"]},
           "overwrite": {"type": "boolean", "description": "命中同一 entry_id 时整条替换而非字段级合并，用于视图编辑"},
           "resolve_projects": {"type": "boolean", "description": "按项目登记表归一项目名，默认 true"},
           "register_projects": {"type": "boolean", "description": "自动登记未知名项目，默认 true"},

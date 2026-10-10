@@ -95,17 +95,17 @@ type input struct {
 	ProjectID   string `json:"project_id"`
 	ProjectName string `json:"project_name"`
 	// NewName 供 work-log.project.rename：给项目改展示名（保持稳定 ID，并回绑历史条目）。
-	NewName          string   `json:"new_name"`
-	Aliases          []string `json:"aliases"`
-	Description      string   `json:"description"`
-	Status           string   `json:"status"`
-	Color            string   `json:"color"`
+	NewName     string   `json:"new_name"`
+	Aliases     []string `json:"aliases"`
+	Description string   `json:"description"`
+	Status      string   `json:"status"`
+	Color       string   `json:"color"`
 	// Kind 是项目类型：交付项目（场馆/展馆，含展项）/ 平台产品（自研，1 项目=1 路径，无展项）/ 通用沉淀。
-	Kind             string   `json:"kind"`
-	CurrentProject   string   `json:"current_project"`
-	IncludeStats     *bool    `json:"include_stats"`
-	ResolveProjects  *bool    `json:"resolve_projects"`
-	RegisterProjects *bool    `json:"register_projects"`
+	Kind             string `json:"kind"`
+	CurrentProject   string `json:"current_project"`
+	IncludeStats     *bool  `json:"include_stats"`
+	ResolveProjects  *bool  `json:"resolve_projects"`
+	RegisterProjects *bool  `json:"register_projects"`
 	// 路径映射：项目/展项可通过本机目录/仓库路径稳定识别（路径优先于名称）。
 	// Paths/AddPaths/RemovePaths 供 work-log.project.path.set 与 project.upsert 管理映射；
 	// RepoPath 是会话仓库根、ExhibitID/ExhibitName 是展项目标选择器。
@@ -486,9 +486,8 @@ func upsert(in input) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if strings.EqualFold(strings.TrimSpace(in.Mode), "replace") {
-		day.Entries = nil
-	}
+	// 不再支持整日清空：早期曾用 mode=replace 先清空当天再写入，风险是连同手工条目
+	// 一起抹掉。写入一律按 entry_id 幂等合并；需要删除请用 work-log.entry.delete。
 	now := time.Now().Format(time.RFC3339)
 	for _, raw := range incoming {
 		item := normalizeEntry(raw, date, now)
