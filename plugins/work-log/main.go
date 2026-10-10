@@ -1193,6 +1193,14 @@ func logRoot(value string) (string, error) {
 	explicit := trimmed != ""
 	if !explicit {
 		trimmed = readState().LogRoot
+		// 记忆的日志目录若已被删除或不可访问（例如被临时测试/自动化误写），
+		// 退回默认目录，避免界面突然显示成“一条日志都没有”。
+		// 故意不覆盖记忆值：外接磁盘等临时不可用时，稍后可自动恢复。
+		if trimmed != "" {
+			if info, err := os.Stat(trimmed); err != nil || !info.IsDir() {
+				trimmed = ""
+			}
+		}
 	}
 	if trimmed == "" {
 		trimmed = defaultRoot()
