@@ -3,9 +3,9 @@
   "name": "工作日志工具",
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
-  "description": "以按日工作日志为核心：条目带项目/展项、功能与工时，默认精简可展开，按功能分组；报告按 项目→功能 聚合，项目登记表支持别名归一与看板同步。",
-  "release_notes": "0.6.2：修复窄窗口横向溢出，提升弱化文字对比度与角标字号，补齐页签/月历无障碍语义与键盘焦点。",
-  "version": "0.6.2",
+  "description": "以按日工作日志为核心：条目带项目/展项、功能与工时；报告按 项目→功能→工时 聚合，含月报、项目进展与月度工时表（含 8 小时对齐）。",
+  "release_notes": "0.7.0：录入改为弹窗；报告重做并新增月报；核心脉络改为 项目·功能·工时；新增项目进展与月度工时表（实际/8 小时对齐）。",
+  "version": "0.7.0",
   "distribution_targets": ["workbench", "github"],
   "entry": "bin/work-log.exe",
   "runtime": "process-jsonrpc-stdio",
@@ -336,13 +336,13 @@
     },
     {
       "id": "work-log.report.render",
-      "description": "把区间日志聚合渲染为日、周、季度或年度报告并归档",
+      "description": "把区间日志聚合渲染为日、周、月、季度或年度报告并归档",
       "availability": "local",
       "input_schema": {
         "type": "object",
         "properties": {
           "log_root": {"type": "string"},
-          "period": {"type": "string", "enum": ["daily", "weekly", "quarterly", "yearly"]},
+          "period": {"type": "string", "enum": ["daily", "weekly", "monthly", "quarterly", "yearly"]},
           "date": {"type": "string"},
           "narrative": {"type": "string"},
           "narratives": {
@@ -367,7 +367,7 @@
         "type": "object",
         "properties": {
           "log_root": {"type": "string"},
-          "period": {"type": "string", "enum": ["daily", "weekly", "quarterly", "yearly"]},
+          "period": {"type": "string", "enum": ["daily", "weekly", "monthly", "quarterly", "yearly"]},
           "date": {"type": "string"}
         },
         "required": [],

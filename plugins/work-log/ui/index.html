@@ -12,15 +12,17 @@
         <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H17a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5.5A1.5 1.5 0 0 1 4 19.5z" /><path d="M8 8h7M8 12h7M8 16h4" /></svg></span>
         <div class="brand-text">
           <strong>工作日志</strong>
-          <small>按天记录 · 日历回看 · 项目归档</small>
+          <small>项目 · 功能 · 工时</small>
         </div>
       </div>
       <div class="toolbar">
         <div class="view-switch" role="tablist" aria-label="主导航">
           <button id="view-calendar" class="switch active" type="button" role="tab" aria-selected="true" aria-controls="calendar-view" data-view="calendar">日历回看</button>
-          <button id="view-projects" class="switch" type="button" role="tab" aria-selected="false" aria-controls="projects-view" data-view="projects">项目管理</button>
+          <button id="view-report" class="switch" type="button" role="tab" aria-selected="false" aria-controls="report-view" data-view="report">报告</button>
+          <button id="view-matrix" class="switch" type="button" role="tab" aria-selected="false" aria-controls="matrix-view" data-view="matrix">工时表</button>
+          <button id="view-projects" class="switch" type="button" role="tab" aria-selected="false" aria-controls="projects-view" data-view="projects">项目</button>
         </div>
-        <label class="search-box" title="在当月日志里搜索标题、摘要、功能、项目、标签">
+        <label class="search-box" id="search-box" title="在当月日志里搜索标题、摘要、功能、项目、标签">
           <span class="search-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="M20.5 20.5 16.6 16.6" /></svg></span>
           <input id="search" type="search" placeholder="搜索日志…" aria-label="搜索工作日志" autocomplete="off" />
         </label>
@@ -31,50 +33,55 @@
 
     <p class="notice" id="notice" hidden role="status" aria-live="polite"></p>
 
-    <section id="manual-form" class="manual" hidden aria-label="工作日志录入">
-      <div class="manual-head">
-        <strong id="manual-title">手动记录一条工作日志</strong>
-        <span class="meta" id="manual-hint">纯手工入口，不依赖任何会话采集。</span>
-      </div>
-      <form id="manual-fields">
-        <input type="hidden" id="m-entry-id" />
-        <div class="manual-grid">
-          <label class="field"><span>日期</span><input id="m-date" type="date" /></label>
-          <label class="field"><span>标题</span><input id="m-title" type="text" placeholder="今天主要做了什么" /></label>
-          <label class="field"><span>项目</span><input id="m-project" type="text" list="project-options" placeholder="从项目列表选择或输入，可留空" /></label>
-          <datalist id="project-options"></datalist>
-          <label class="field"><span>类型</span>
-            <select id="m-category">
-              <option value="开发">开发</option>
-              <option value="修复">修复</option>
-              <option value="设计">设计</option>
-              <option value="调研">调研</option>
-              <option value="文档">文档</option>
-              <option value="评审">评审</option>
-              <option value="会议">会议</option>
-              <option value="运维">运维</option>
-              <option value="其他">其他</option>
-            </select>
-          </label>
-          <label class="field"><span>功能</span><input id="m-feature" type="text" placeholder="如：日历视图，可留空" /></label>
-          <label class="field"><span>展项</span><input id="m-exhibit" type="text" list="exhibit-options" placeholder="项目下的具体展项，可留空" /></label>
-          <datalist id="exhibit-options"></datalist>
-          <label class="field"><span>工时（分钟）</span><input id="m-minutes" type="number" min="0" max="1440" step="5" placeholder="如：60，可留空" /></label>
-        </div>
-        <label class="field block"><span>摘要</span><textarea id="m-summary" rows="2" placeholder="一句话说明成果与要点"></textarea></label>
-        <details class="manual-more">
-          <summary>补充信息（交付 / 后续，可留空）</summary>
-          <div class="manual-grid">
-            <label class="field"><span>交付（逗号分隔）</span><input id="m-outcomes" type="text" placeholder="完成 A，上线 B" /></label>
-            <label class="field"><span>后续（逗号分隔）</span><input id="m-next" type="text" placeholder="明天继续 C" /></label>
+    <div class="modal-backdrop" id="manual-backdrop" hidden>
+      <section id="manual-form" class="modal" role="dialog" aria-modal="true" aria-labelledby="manual-title">
+        <div class="modal-head">
+          <div>
+            <strong id="manual-title">手动记录一条工作日志</strong>
+            <span class="meta" id="manual-hint">纯手工入口，不依赖任何会话采集。</span>
           </div>
-        </details>
-        <div class="manual-actions">
-          <button id="m-save" class="btn primary" type="submit">保存到日志</button>
-          <button id="m-cancel" class="btn" type="button">取消</button>
+          <button type="button" class="modal-close" id="m-close" aria-label="关闭录入窗口">×</button>
         </div>
-      </form>
-    </section>
+        <form id="manual-fields">
+          <input type="hidden" id="m-entry-id" />
+          <div class="manual-grid">
+            <label class="field"><span>项目</span><input id="m-project" type="text" list="project-options" placeholder="从项目列表选择或输入" /></label>
+            <datalist id="project-options"></datalist>
+            <label class="field"><span>功能</span><input id="m-feature" type="text" placeholder="如：日历视图" /></label>
+            <label class="field"><span>工时（小时）</span><input id="m-hours" type="number" min="0" max="24" step="0.5" placeholder="如：3" /></label>
+            <label class="field"><span>类型</span>
+              <select id="m-category">
+                <option value="开发">开发</option>
+                <option value="修复">修复</option>
+                <option value="设计">设计</option>
+                <option value="调研">调研</option>
+                <option value="文档">文档</option>
+                <option value="评审">评审</option>
+                <option value="会议">会议</option>
+                <option value="运维">运维</option>
+                <option value="其他">其他</option>
+              </select>
+            </label>
+            <label class="field"><span>标题</span><input id="m-title" type="text" placeholder="这条做了什么" /></label>
+            <label class="field"><span>日期</span><input id="m-date" type="date" /></label>
+            <label class="field"><span>展项</span><input id="m-exhibit" type="text" list="exhibit-options" placeholder="项目下的具体展项，可留空" /></label>
+            <datalist id="exhibit-options"></datalist>
+          </div>
+          <label class="field block"><span>摘要</span><textarea id="m-summary" rows="2" placeholder="一句话说明成果与要点"></textarea></label>
+          <details class="manual-more">
+            <summary>补充信息（交付 / 后续，可留空）</summary>
+            <div class="manual-grid">
+              <label class="field"><span>交付（逗号分隔）</span><input id="m-outcomes" type="text" placeholder="完成 A，上线 B" /></label>
+              <label class="field"><span>后续（逗号分隔）</span><input id="m-next" type="text" placeholder="明天继续 C" /></label>
+            </div>
+          </details>
+          <div class="manual-actions">
+            <button id="m-save" class="btn primary" type="submit">保存到日志</button>
+            <button id="m-cancel" class="btn" type="button">取消</button>
+          </div>
+        </form>
+      </section>
+    </div>
 
     <div id="calendar-view" role="tabpanel" aria-labelledby="view-calendar">
       <main class="layout">
@@ -102,40 +109,88 @@
           <div class="detail-head">
             <div>
               <h1 id="detail-title">选择一个日期</h1>
-              <p id="detail-subtitle">月历按天统计；点一天查看当天时间线。</p>
+              <p id="detail-subtitle">月历按天统计；点一天查看当天脉络。</p>
             </div>
             <div class="detail-tools">
               <span id="detail-badges" class="badges"></span>
             </div>
           </div>
-          <div class="tabs" role="tablist" aria-label="按日视图">
-            <button class="tab active" id="tab-timeline" data-tab="timeline" role="tab" aria-selected="true" aria-controls="panel" type="button">时间线</button>
-            <button class="tab" id="tab-daily" data-tab="daily" role="tab" aria-selected="false" aria-controls="panel" type="button">日报</button>
-          </div>
-          <details class="more">
-            <summary>周期汇总（周 / 季度 / 年度，辅助视图）</summary>
-            <div class="tabs sub" role="group" aria-label="周期汇总">
-              <button class="tab" id="tab-weekly" data-tab="weekly" aria-pressed="false" type="button">周报</button>
-              <button class="tab" id="tab-quarterly" data-tab="quarterly" aria-pressed="false" type="button">季度</button>
-              <button class="tab" id="tab-yearly" data-tab="yearly" aria-pressed="false" type="button">年度</button>
-            </div>
-          </details>
+          <div id="day-flow" class="day-flow"></div>
           <div class="panel">
-            <section id="panel" class="panel-body" role="tabpanel" aria-labelledby="tab-timeline" tabindex="0"></section>
+            <section id="panel" class="panel-body" aria-label="当天明细" tabindex="0"></section>
           </div>
         </section>
       </main>
+    </div>
+
+    <div id="report-view" role="tabpanel" aria-labelledby="view-report" hidden>
+      <section class="detail report-plane">
+        <div class="detail-head">
+          <div>
+            <h1>报告</h1>
+            <p>按周期回看：项目 · 功能 · 工时。</p>
+          </div>
+          <div class="detail-tools"><span id="report-range" class="badges"></span></div>
+        </div>
+        <div class="report-controls">
+          <div class="seg" role="group" aria-label="报告周期" id="report-periods"></div>
+          <div class="report-nav">
+            <button type="button" class="btn" id="report-prev" aria-label="上一期">‹ 上一期</button>
+            <button type="button" class="btn" id="report-anchor" title="回到今天所在的周期">本期</button>
+            <button type="button" class="btn" id="report-next" aria-label="下一期">下一期 ›</button>
+          </div>
+        </div>
+        <div class="report-actions">
+          <button type="button" class="btn" id="report-generate">生成归档报告</button>
+          <button type="button" class="btn" id="report-open">打开归档</button>
+          <button type="button" class="btn" id="report-copy">复制 Markdown</button>
+        </div>
+        <div id="report-body" class="panel-body"></div>
+      </section>
+    </div>
+
+    <div id="matrix-view" role="tabpanel" aria-labelledby="view-matrix" hidden>
+      <section class="detail matrix-plane">
+        <div class="detail-head">
+          <div>
+            <h1>工时表</h1>
+            <p>按月汇总「项目 × 日期」的工时，可对照 8 小时口径。</p>
+          </div>
+          <div class="detail-tools"><span id="matrix-badges" class="badges"></span></div>
+        </div>
+        <div class="matrix-controls">
+          <div class="cal-head">
+            <button type="button" class="cal-nav" id="mx-prev" aria-label="上个月">‹</button>
+            <strong id="mx-title" aria-live="polite">—</strong>
+            <button type="button" class="cal-nav" id="mx-next" aria-label="下个月">›</button>
+          </div>
+          <div class="seg" role="group" aria-label="工时口径" id="matrix-mode">
+            <button type="button" class="seg-btn active" data-mode="actual" aria-pressed="true">实际工时</button>
+            <button type="button" class="seg-btn" data-mode="aligned" aria-pressed="false">8 小时对齐</button>
+          </div>
+        </div>
+        <p class="meta" id="matrix-note"></p>
+        <div id="matrix-body" class="matrix-scroll"></div>
+      </section>
     </div>
 
     <div id="projects-view" role="tabpanel" aria-labelledby="view-projects" hidden>
       <section class="detail projects-plane">
         <div class="detail-head">
           <div>
-            <h1>项目管理</h1>
-            <p>全局项目登记表：规范名称与别名，历史条目按别名归并到同一项目。</p>
+            <h1>项目</h1>
+            <p id="projects-subtitle">按项目回看推进记录；登记表用于别名归一。</p>
           </div>
         </div>
-        <div id="projects-panel" class="panel-body"></div>
+        <div class="seg" role="group" aria-label="项目视图" id="projects-mode">
+          <button type="button" class="seg-btn active" data-mode="progress" aria-pressed="true">推进记录</button>
+          <button type="button" class="seg-btn" data-mode="registry" aria-pressed="false">登记管理</button>
+        </div>
+        <div class="projects-layout" id="projects-progress">
+          <aside class="proj-list-col" id="proj-list"></aside>
+          <section class="proj-progress-col" id="proj-progress"></section>
+        </div>
+        <div id="projects-panel" class="panel-body" hidden></div>
       </section>
     </div>
 

@@ -99,6 +99,30 @@ func TestListFiltersByProject(t *testing.T) {
 	}
 }
 
+// 只给 project（不带 from/to/date）时必须跨全部历史查询：不能被默认收敛到今天，
+// 否则新增的「项目推进记录」会漏掉全部历史条目。
+func TestListByProjectWithoutRangeSpansHistory(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2025-01-02","entries":[{"project":"项目看板","title":"旧"}]}`)
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-08","entries":[{"project":"项目看板","title":"新"}]}`)
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[{"project":"别的项目","title":"其他"}]}`)
+
+	byProject := call(t, "work-log.entry.list", `{"log_root":`+quote(root)+`,"project":"项目看板"}`)
+	if byProject["total"].(float64) != 2 {
+		t.Fatalf("不带区间按项目查询应跨历史返回 2 条，实际 %v", byProject["total"])
+	}
+	all := call(t, "work-log.entry.list", `{"log_root":`+quote(root)+`}`)
+	if all["total"].(float64) != 3 {
+		t.Fatalf("不带任何条件的查询应返回全部 3 条，实际 %v", all["total"])
+	}
+	// 单日 date 仍应收敛为一天。
+	oneDay := call(t, "work-log.entry.list", `{"log_root":`+quote(root)+`,"date":"2026-10-09"}`)
+	if oneDay["total"].(float64) != 1 {
+		t.Fatalf("带 date 应只返回当天 1 条，实际 %v", oneDay["total"])
+	}
+}
+
 func TestArchiveListAndReport(t *testing.T) {
 	withDataRoot(t)
 	root := t.TempDir()
@@ -303,6 +327,7 @@ func TestPeriodRange(t *testing.T) {
 	}{
 		{"daily", "2026-10-09", "2026-10-09", "2026-10-09", "2026-10-09"},
 		{"weekly", "2026-10-09", "2026-10-05", "2026-10-11", ""},
+		{"monthly", "2026-10-09", "2026-10-01", "2026-10-31", "2026-10"},
 		{"quarterly", "2026-10-09", "2026-10-01", "2026-12-31", "2026-Q4"},
 		{"yearly", "2026-10-09", "2026-01-01", "2026-12-31", "2026"},
 	}

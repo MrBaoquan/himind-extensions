@@ -1016,7 +1016,7 @@ type reportRecord struct {
 
 func listReports(root string) ([]reportRecord, error) {
 	records := make([]reportRecord, 0)
-	periods := []string{"daily", "weekly", "quarterly", "yearly"}
+	periods := []string{"daily", "weekly", "monthly", "quarterly", "yearly"}
 	for _, period := range periods {
 		dir := filepath.Join(root, "reports", period)
 		names, err := readDirNames(dir)
@@ -1060,7 +1060,7 @@ func renderReport(in input) (any, error) {
 		period = "daily"
 	}
 	if !isKnownPeriod(period) {
-		return nil, errors.New("period 只能是 daily / weekly / quarterly / yearly")
+		return nil, errors.New("period 只能是 daily / weekly / monthly / quarterly / yearly")
 	}
 	anchor := normalizeDate(in.Date)
 	if !validDate(anchor) {
@@ -1153,7 +1153,7 @@ func readReport(in input) (any, error) {
 		period = "daily"
 	}
 	if !isKnownPeriod(period) {
-		return nil, errors.New("period 只能是 daily / weekly / quarterly / yearly")
+		return nil, errors.New("period 只能是 daily / weekly / monthly / quarterly / yearly")
 	}
 	anchor := normalizeDate(in.Date)
 	if !validDate(anchor) {
@@ -1369,21 +1369,31 @@ func collectEntries(root, from, to string) ([]entry, error) {
 
 // ---------- 周期与日期 ----------
 
+// resolveRange 归一 entry.list 的查询区间。
+//
+// 语义：显式 date 视为单日锚点，只在其缺失的一侧补位；from/to 任一缺失则该侧取
+// 开区间，最终由 listDates 只遍历真实存在的日期文件。注意「不传区间」不能收敛到
+// 今天——否则「只按项目查询历史推进」会漏掉全部历史记录。
 func resolveRange(from, to, date string) (string, string, error) {
 	start := strings.TrimSpace(from)
 	end := strings.TrimSpace(to)
-	anchor := normalizeDate(date)
-	if start == "" && anchor != "" {
-		start = anchor
-	}
-	if end == "" && anchor != "" {
-		end = anchor
+	anchor := strings.TrimSpace(date)
+	if anchor != "" {
+		if !validDate(anchor) {
+			return "", "", errors.New("date 必须是 YYYY-MM-DD 格式")
+		}
+		if start == "" {
+			start = anchor
+		}
+		if end == "" {
+			end = anchor
+		}
 	}
 	if start == "" {
-		start = time.Now().Format("2006-01-02")
+		start = "0001-01-01"
 	}
 	if end == "" {
-		end = start
+		end = "9999-12-31"
 	}
 	if !validDate(start) || !validDate(end) {
 		return "", "", errors.New("from / to 必须是 YYYY-MM-DD 格式")
@@ -1396,7 +1406,7 @@ func resolveRange(from, to, date string) (string, string, error) {
 
 func isKnownPeriod(period string) bool {
 	switch period {
-	case "daily", "weekly", "quarterly", "yearly":
+	case "daily", "weekly", "monthly", "quarterly", "yearly":
 		return true
 	default:
 		return false
@@ -1421,6 +1431,10 @@ func periodRange(period, anchor string) (string, string, string, error) {
 		sunday := monday.AddDate(0, 0, 6)
 		year, week := monday.ISOWeek()
 		return monday.Format("2006-01-02"), sunday.Format("2006-01-02"), fmt.Sprintf("%04d-W%02d", year, week), nil
+	case "monthly":
+		start := time.Date(parsed.Year(), parsed.Month(), 1, 0, 0, 0, 0, time.UTC)
+		end := start.AddDate(0, 1, -1)
+		return start.Format("2006-01-02"), end.Format("2006-01-02"), fmt.Sprintf("%04d-%02d", parsed.Year(), int(parsed.Month())), nil
 	case "quarterly":
 		quarter := (int(parsed.Month())-1)/3 + 1
 		startMonth := time.Month((quarter-1)*3 + 1)
@@ -1432,7 +1446,7 @@ func periodRange(period, anchor string) (string, string, string, error) {
 		end := time.Date(parsed.Year(), 12, 31, 0, 0, 0, 0, time.UTC)
 		return start.Format("2006-01-02"), end.Format("2006-01-02"), fmt.Sprintf("%04d", parsed.Year()), nil
 	default:
-		return "", "", "", errors.New("period 只能是 daily / weekly / quarterly / yearly")
+		return "", "", "", errors.New("period 只能是 daily / weekly / monthly / quarterly / yearly")
 	}
 }
 
@@ -1458,6 +1472,8 @@ func periodLabel(period string) string {
 		return "日报"
 	case "weekly":
 		return "周报"
+	case "monthly":
+		return "月报"
 	case "quarterly":
 		return "季度总结"
 	case "yearly":
