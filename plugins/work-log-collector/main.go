@@ -53,6 +53,11 @@ type input struct {
 	SourcesConfig     []genericSource `json:"sources_config"`
 	SourcesConfigPath string          `json:"sources_config_path"`
 	IncludePresets    *bool           `json:"include_presets"`
+	// ExcludePaths / ExcludeKeywords 是隐私排除规则：命中路径前缀或关键词的会话整条跳过，
+	// 内容绝不写入素材与日志库。也可写在 <log_root>/config/privacy.json。
+	ExcludePaths      []string `json:"exclude_paths"`
+	ExcludeKeywords   []string `json:"exclude_keywords"`
+	PrivacyConfigPath string   `json:"privacy_config_path"`
 	// MaterialRoot 是会话素材文件的写入目录；缺省落到扩展私有数据目录。素材只供工作流
 	// 的 AI 总结步骤读取，绝不写入工作日志库。
 	MaterialRoot string `json:"material_root"`
@@ -338,13 +343,21 @@ func scanCap(in input) (any, error) {
 		digests = append(digests, found...)
 	}
 
+	// 隐私排除规则：命中路径前缀或关键词的会话整条跳过，绝不进入素材与日志库。
+	privacy := loadPrivacy(in, home)
+
 	// 按会话标识过滤与去重，并丢弃没有任何用户内容的空会话（例如被误识别的客户端
 	// 状态文件，workbuddy 的 window-state 之类），避免空壳污染素材与 AI 上下文。
 	filtered := make([]sessionDigest, 0, len(digests))
 	seen := map[string]bool{}
 	empty := 0
+	excluded := 0
 	for _, d := range digests {
 		if id := strings.TrimSpace(in.SessionID); id != "" && d.SessionID != id {
+			continue
+		}
+		if reason := privacyBlocked(&d, privacy); reason != "" {
+			excluded++
 			continue
 		}
 		if len(d.UserPrompts) == 0 && len(d.AssistantExcerpts) == 0 {
@@ -361,6 +374,9 @@ func scanCap(in input) (any, error) {
 	}
 	if empty > 0 {
 		skipped = append(skipped, map[string]any{"source": "all", "reason": "跳过无用户内容的空会话", "count": empty})
+	}
+	if excluded > 0 {
+		skipped = append(skipped, map[string]any{"source": "all", "reason": "命中隐私排除规则，已跳过", "count": excluded})
 	}
 	for i := range filtered {
 		enrichSessionPath(&filtered[i])
@@ -1540,6 +1556,68 @@ func countVSCodeChatSessions(roots []string) int {
 		}
 	}
 	return total
+}
+
+// ---- 隐私排除 ----
+
+// privacyConfig 是隐私排除规则：路径前缀与关键词黑名单。命中的会话整条跳过。
+type privacyConfig struct {
+	ExcludePaths    []string `json:"exclude_paths"`
+	ExcludeKeywords []string `json:"exclude_keywords"`
+}
+
+// loadPrivacy 合并隐私规则：先读 <log_root>/config/privacy.json（或显式 privacy_config_path），
+// 再叠加调用方内联传入的 exclude_paths / exclude_keywords。
+func loadPrivacy(in input, home string) privacyConfig {
+	cfg := privacyConfig{}
+	path := strings.TrimSpace(in.PrivacyConfigPath)
+	if path == "" {
+		if root := strings.TrimSpace(expandPath(in.LogRoot, home)); root != "" {
+			path = filepath.Join(root, "config", "privacy.json")
+		}
+	}
+	if path != "" {
+		if data, err := os.ReadFile(path); err == nil {
+			_ = json.Unmarshal(data, &cfg)
+		}
+	}
+	cfg.ExcludePaths = append(cfg.ExcludePaths, in.ExcludePaths...)
+	cfg.ExcludeKeywords = append(cfg.ExcludeKeywords, in.ExcludeKeywords...)
+	return cfg
+}
+
+// privacyBlocked 判断会话是否命中隐私排除规则，返回命中原因（空串表示不排除）。
+func privacyBlocked(d *sessionDigest, cfg privacyConfig) string {
+	dir := toSlashLower(d.Directory)
+	repo := toSlashLower(d.RepoPath)
+	for _, raw := range cfg.ExcludePaths {
+		prefix := toSlashLower(strings.TrimSpace(raw))
+		if prefix == "" {
+			continue
+		}
+		if strings.HasPrefix(dir, prefix) || strings.HasPrefix(repo, prefix) {
+			return "命中隐私排除路径"
+		}
+	}
+	if len(cfg.ExcludeKeywords) > 0 {
+		haystack := strings.ToLower(strings.Join([]string{
+			d.Title,
+			strings.Join(d.UserPrompts, "\n"),
+			strings.Join(d.AssistantExcerpts, "\n"),
+		}, "\n"))
+		for _, raw := range cfg.ExcludeKeywords {
+			needle := strings.ToLower(strings.TrimSpace(raw))
+			if needle != "" && strings.Contains(haystack, needle) {
+				return "命中隐私排除关键词"
+			}
+		}
+	}
+	return ""
+}
+
+// toSlashLower 归一化路径：反斜杠转正斜杠并转小写，便于大小写不敏感的前缀匹配。
+func toSlashLower(value string) string {
+	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(value), "\\", "/"))
 }
 
 // ---- SQLite 辅助 ----

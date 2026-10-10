@@ -46,5 +46,7 @@
 - OpenCode/Copilot 的 SQLite 会话库由采集器内置的纯 Go 驱动读取，无需外部 `sqlite3`；来源缺失时在 `skipped` 里如实标记，不伪造结果。
 - 工作日志条目的标题与小结来自内置 AI 的总结（`WL-SUMMARIZE`），工时与起止时间取采集的确定性素材；若 AI 步骤失败，本次运行会失败而不是写入原始素材。没有内置 AI 时可用 `com.himind.skill.work-log` 技能从会话导出后再写回。
 - 通用来源预设依赖各客户端本地格式，标注为实验性；路径或字段不匹配时在 `<日志根>/config/sources.json` 覆盖即可，无需改代码。
+- **隐私**：所有会话读取与总结均在本机完成，不上传任何会话内容。可在 `<日志根>/config/privacy.json` 配置 `exclude_paths` / `exclude_keywords`，命中的会话整条跳过（也可在启动表单临时传入）。
+- **平台**：面向 Windows（`platforms: windows-x64`）；会话存储路径与 VS Code 目录约定均为 Windows。
 
 Workflow 源码使用 `workflow.json` 作为执行契约，`ui/workflow-view.json` 作为声明式 UI。标准目录包括 `schemas/`、`artifacts/`、`connectors/`、`examples/` 和 `tests/contract/`。

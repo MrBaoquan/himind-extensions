@@ -712,3 +712,47 @@ func TestScanOpenCodePureGoSQLite(t *testing.T) {
 		t.Fatalf("token 统计异常: %#v", d)
 	}
 }
+
+// TestScanPrivacyExcludePath 验证命中排除路径前缀的会话被整条跳过，其它来源照常保留。
+func TestScanPrivacyExcludePath(t *testing.T) {
+	home := writeFixture(t)
+	out := call(t, "work-log.session.scan", `{"home":`+quote(home)+`,"date":"2026-10-09","limit":10,"exclude_paths":["f:/proj"]}`)
+	if out["total"].(float64) != 1 {
+		t.Fatalf("排除 codex 路径后应只剩 1 条，实际 %v", out["total"])
+	}
+	sessions := out["sessions"].([]any)
+	if sessions[0].(map[string]any)["source"] != "claude" {
+		t.Fatalf("保留的应是 claude 会话: %#v", sessions[0])
+	}
+}
+
+// TestScanPrivacyExcludeKeyword 验证命中排除关键词的会话被整条跳过。
+func TestScanPrivacyExcludeKeyword(t *testing.T) {
+	home := writeFixture(t)
+	out := call(t, "work-log.session.scan", `{"home":`+quote(home)+`,"date":"2026-10-09","limit":10,"exclude_keywords":["实现登录"]}`)
+	if out["total"].(float64) != 1 {
+		t.Fatalf("排除关键词后应只剩 1 条，实际 %v", out["total"])
+	}
+	sessions := out["sessions"].([]any)
+	if sessions[0].(map[string]any)["source"] != "claude" {
+		t.Fatalf("保留的应是 claude 会话: %#v", sessions[0])
+	}
+}
+
+// TestScanPrivacyConfigFile 验证可从 <log_root>/config/privacy.json 读取排除规则。
+func TestScanPrivacyConfigFile(t *testing.T) {
+	home := writeFixture(t)
+	root := t.TempDir()
+	configDir := filepath.Join(root, "config")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	config := `{"exclude_keywords":["实现登录"]}`
+	if err := os.WriteFile(filepath.Join(configDir, "privacy.json"), []byte(config), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := call(t, "work-log.session.scan", `{"home":`+quote(home)+`,"log_root":`+quote(root)+`,"date":"2026-10-09","limit":10}`)
+	if out["total"].(float64) != 1 {
+		t.Fatalf("privacy.json 排除后应只剩 1 条，实际 %v", out["total"])
+	}
+}
