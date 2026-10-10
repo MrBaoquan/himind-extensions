@@ -450,6 +450,55 @@ func TestEnrichSessionPathUsesManifest(t *testing.T) {
 	}
 }
 
+// TestEnrichSessionPathResolvesWorktree 验证链接工作树解析到主仓库工作树根，
+// 而不是停在 C 盘缓存里的工作树目录。
+func TestEnrichSessionPathResolvesWorktree(t *testing.T) {
+	home := t.TempDir()
+	mainRepo := filepath.Join(home, "WebProjects", "AndX")
+	sub := filepath.Join(mainRepo, "src")
+	if err := os.MkdirAll(filepath.Join(mainRepo, ".git", "worktrees", "wt-1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// 模拟 C 盘缓存里的链接工作树：.git 为文件，指向主仓库。
+	worktree := filepath.Join(home, "cache", "copilot-worktrees", "AndX", "wt-1")
+	if err := os.MkdirAll(filepath.Join(worktree, "pkg"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitdir := "gitdir: " + filepath.ToSlash(filepath.Join(mainRepo, ".git", "worktrees", "wt-1"))
+	if err := os.WriteFile(filepath.Join(worktree, ".git"), []byte(gitdir), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	digest := sessionDigest{Source: "copilot", SessionID: "s3", Directory: filepath.Join(worktree, "pkg")}
+	enrichSessionPath(&digest)
+	if digest.RepoPath != mainRepo {
+		t.Fatalf("链接工作树应解析到主仓库工作树 %q，实际 %q", mainRepo, digest.RepoPath)
+	}
+}
+
+// TestGitMainRootWindowsBackslash 验证 gitdir 用反斜杠、且指向更深模块时也能截到主仓库根。
+func TestGitMainRootWindowsBackslash(t *testing.T) {
+	home := t.TempDir()
+	mainRepo := filepath.Join(home, "IODevice")
+	if err := os.MkdirAll(filepath.Join(mainRepo, ".git", "worktrees", "wt-2", "modules"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	worktree := filepath.Join(home, "cache", "wt-2", "IODevice")
+	if err := os.MkdirAll(worktree, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitdir := "gitdir: " + strings.ReplaceAll(filepath.Join(mainRepo, ".git", "worktrees", "wt-2", "modules", "IODevice"), "/", "\\")
+	if err := os.WriteFile(filepath.Join(worktree, ".git"), []byte(gitdir), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := gitMainRoot(worktree); got != mainRepo {
+		t.Fatalf("应截断到主仓库根 %q，实际 %q", mainRepo, got)
+	}
+}
+
 // TestEnrichSessionPathFallsBackToGitRoot 验证没有清单时退回 git 仓库根。
 func TestEnrichSessionPathFallsBackToGitRoot(t *testing.T) {
 	home := t.TempDir()

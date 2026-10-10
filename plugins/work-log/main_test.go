@@ -1207,3 +1207,118 @@ func TestProjectAutofillViaSiblingMaterialDir(t *testing.T) {
 		t.Fatalf("应补 1 个项目路径: %v", applied)
 	}
 }
+
+// TestEphemeralProjectPath 验证临时/缓存/草稿路径被识别，真实仓库不被误判。
+func TestEphemeralProjectPath(t *testing.T) {
+	ephemeral := []string{
+		filepath.Join(os.TempDir(), "himind-runtime-1", "workspace"),
+		`C:\Users\me\AppData\Local\Temp\himind-acp-real-deadbeef\workspace`,
+		`C:\Users\me\.copilot\repos\copilot-worktrees\AndX\mrbaoquan-wt`,
+		`C:\Users\me\.copilot\chats\2026-09-20\fuzzy-adventure`,
+		`C:\Users\me\Documents\Codex\2026-09-29\x-decrypted-3`,
+	}
+	for _, p := range ephemeral {
+		if !ephemeralProjectPath(p) {
+			t.Fatalf("应判为临时/缓存路径: %q", p)
+		}
+	}
+	real := []string{
+		`F:\WebProjects\AndX`,
+		`O:\DevModules\IODevice`,
+		`C:\Users\me\.copilot\repos\HiMind-Agent`,
+	}
+	for _, p := range real {
+		if ephemeralProjectPath(p) {
+			t.Fatalf("真实项目路径不应判为临时: %q", p)
+		}
+	}
+}
+
+// TestWorktreeMainRoot 验证从链接工作树（.git 为文件）解析到主仓库工作树根。
+func TestWorktreeMainRoot(t *testing.T) {
+	home := t.TempDir()
+	mainRepo := filepath.Join(home, "WebProjects", "AndX")
+	if err := os.MkdirAll(filepath.Join(mainRepo, ".git", "worktrees", "wt-1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wt := filepath.Join(home, "cache", "copilot-worktrees", "AndX", "wt-1")
+	if err := os.MkdirAll(filepath.Join(wt, "pkg"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitdir := "gitdir: " + filepath.ToSlash(filepath.Join(mainRepo, ".git", "worktrees", "wt-1"))
+	if err := os.WriteFile(filepath.Join(wt, ".git"), []byte(gitdir), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := worktreeMainRoot(filepath.Join(wt, "pkg")); got != mainRepo {
+		t.Fatalf("应解析到主仓库工作树 %q，实际 %q", mainRepo, got)
+	}
+	// 普通仓库（.git 是目录）不解析。
+	if got := worktreeMainRoot(mainRepo); got != "" {
+		t.Fatalf("普通仓库不应解析出主仓库根，实际 %q", got)
+	}
+}
+
+// TestAutofillSkipsCacheKeepsReal 验证同一项目同时有缓存工作树与真实路径时，只绑真实路径。
+func TestAutofillSkipsCacheKeepsReal(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"甲馆"}`)
+	material := t.TempDir()
+	digest := `{"sessions":[` +
+		`{"project":"甲馆","directory":"C:/Users/me/.copilot/repos/copilot-worktrees/jiaguan/mrbaoquan-very-long-name"},` +
+		`{"project":"甲馆","directory":"F:/WebProjects/jiaguan"}` +
+		`]}`
+	if err := os.WriteFile(filepath.Join(material, "session-digest-2026-10-03_2026-10-03.json"), []byte(digest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	applied := call(t, "work-log.project.autofill", `{"log_root":`+quote(root)+`,"material_root":`+quote(material)+`}`)
+	if applied["filled_count"].(float64) != 1 {
+		t.Fatalf("应补 1 个路径: %v", applied)
+	}
+	filled := applied["filled"].([]any)
+	if got := filled[0].(map[string]any)["path"]; got != "F:/WebProjects/jiaguan" {
+		t.Fatalf("应绑真实仓库路径而非缓存工作树，实际 %v", got)
+	}
+	paths := findProjectByName(t, root, "甲馆")["paths"].([]any)
+	if len(paths) != 1 || paths[0].(map[string]any)["path"] != "F:/WebProjects/jiaguan" {
+		t.Fatalf("登记表里也应只有真实路径: %v", paths)
+	}
+}
+
+// TestAutofillOnlyCacheLeavesUnbound 验证只有缓存路径的项目不被绑定，并出现在忽略清单里。
+func TestAutofillOnlyCacheLeavesUnbound(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"只有缓存"}`)
+	material := t.TempDir()
+	digest := `{"sessions":[{"project":"只有缓存","directory":"C:/Users/me/AppData/Local/Temp/himind-acp-real-1/workspace"}]}`
+	if err := os.WriteFile(filepath.Join(material, "session-digest-2026-10-04_2026-10-04.json"), []byte(digest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	applied := call(t, "work-log.project.autofill", `{"log_root":`+quote(root)+`,"material_root":`+quote(material)+`}`)
+	if applied["filled_count"].(float64) != 0 {
+		t.Fatalf("只有缓存路径时不应绑定: %v", applied)
+	}
+	if applied["ignored_count"].(float64) < 1 {
+		t.Fatalf("应报告被忽略的缓存路径: %v", applied)
+	}
+	if len(findProjectByName(t, root, "只有缓存")["paths"].([]any)) != 0 {
+		t.Fatalf("不应写入任何路径")
+	}
+}
+
+// TestPreferCandidatePath 验证候选择优：仓库根优先于普通目录，否则取更短路径。
+func TestPreferCandidatePath(t *testing.T) {
+	home := t.TempDir()
+	repo := filepath.Join(home, "repo")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	plain := filepath.Join(home, "some", "deeper", "plain")
+	if !preferCandidatePath(repo, plain) {
+		t.Fatal("仓库根应优先于普通目录（即使更短）")
+	}
+	if !preferCandidatePath(filepath.Join(home, "a"), filepath.Join(home, "a", "b", "c")) {
+		t.Fatal("都不是仓库时应取更短路径")
+	}
+}

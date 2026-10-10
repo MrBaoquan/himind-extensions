@@ -418,6 +418,82 @@ func sessionMaterialDir(value string) (string, error) {
 	return candidates[0], nil
 }
 
+// ephemeralProjectPath 判断会话工作目录是否是「临时/缓存/草稿」路径，不应作为项目主路径
+// 自动绑定：系统临时目录、Copilot 的工作树与聊天缓存、Codex 的任务草稿目录等。真正的
+// 项目仓库（哪怕是缓存克隆，如 .copilot/repos/<repo>）不在其列。
+func ephemeralProjectPath(p string) bool {
+	key := normalizePathKey(p)
+	if key == "" {
+		return false
+	}
+	for _, t := range []string{os.TempDir(), os.Getenv("TEMP"), os.Getenv("TMP")} {
+		tk := normalizePathKey(t)
+		if tk != "" && (key == tk || strings.HasPrefix(key, tk+"/")) {
+			return true
+		}
+	}
+	scratch := []string{
+		"appdata/local/temp/",
+		"copilot-worktrees/",
+		".copilot/chats/",
+		".copilot/workspaces/",
+		"documents/codex/",
+	}
+	for _, s := range scratch {
+		if strings.Contains(key, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// worktreeMainRoot 若路径位于链接工作树里（`.git` 是文件，内容为
+// `gitdir: <主仓库>/.git/worktrees/<名>`），返回主仓库工作树根；否则返回空。
+func worktreeMainRoot(dir string) string {
+	for {
+		gi := filepath.Join(dir, ".git")
+		info, err := os.Stat(gi)
+		if err == nil {
+			if info.IsDir() {
+				return ""
+			}
+			body, err := os.ReadFile(gi)
+			if err != nil {
+				return ""
+			}
+			line := strings.TrimSpace(string(body))
+			line = strings.TrimSpace(strings.TrimPrefix(line, "gitdir:"))
+			if line == "" {
+				return ""
+			}
+			norm := filepath.ToSlash(line)
+			if idx := strings.Index(strings.ToLower(norm), "/.git/"); idx > 0 {
+				return filepath.Clean(filepath.FromSlash(norm[:idx]))
+			}
+			return ""
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
+}
+
+// hasRepoMarker 判断路径本身是否像一个仓库/工程根（git/svn/hg 标记或工作日志自述清单）。
+func hasRepoMarker(p string) bool {
+	clean := filepath.Clean(p)
+	for _, marker := range []string{".git", ".svn", ".hg"} {
+		if _, err := os.Stat(filepath.Join(clean, marker)); err == nil {
+			return true
+		}
+	}
+	if _, err := os.Stat(filepath.Join(clean, ".himind", "project.json")); err == nil {
+		return true
+	}
+	return false
+}
+
 // projectAutofillCap 从 AI 工具会话记录（采集器落盘的会话素材）里「搜一轮」，为还没有
 // 绑定路径的登记项目自动补上仓库路径：会话里出现过的「项目名 → 工作目录/仓库根」，
 // 按名称（含别名）或路径末级目录名匹配到登记项目，命中即写入（source=session）。
@@ -444,13 +520,15 @@ func projectAutofillCap(in input) (any, error) {
 		}, nil
 	}
 
-	// 汇总 归一项目名 → 候选路径（出现次数最多者胜，次数相同取更长的路径）。
+	// 汇总 归一项目名 → 候选路径：优先非临时路径、其次出现次数多者、再取更短的规范根。
+	// 链接工作树（如 Copilot copilot-worktrees）先解析到主仓库工作树，避免绑定 C 盘缓存。
 	type cand struct {
 		path  string
 		count int
 	}
 	best := map[string]cand{}
 	display := map[string]string{}
+	skippedEphemeral := map[string]string{}
 	scanned := 0
 	for _, f := range files {
 		if f.IsDir() || !strings.HasPrefix(f.Name(), "session-digest-") || !strings.HasSuffix(f.Name(), ".json") {
@@ -470,6 +548,9 @@ func projectAutofillCap(in input) (any, error) {
 			if normalizePathKey(p) == "" {
 				continue
 			}
+			if main := worktreeMainRoot(p); main != "" {
+				p = main
+			}
 			label := strings.TrimSpace(s.Project)
 			if label == "" {
 				label = filepath.Base(filepath.Clean(p))
@@ -478,17 +559,21 @@ func projectAutofillCap(in input) (any, error) {
 			if key == "" {
 				continue
 			}
+			if _, ok := display[key]; !ok {
+				display[key] = label
+			}
+			if ephemeralProjectPath(p) {
+				skippedEphemeral[key] = p
+				continue
+			}
 			cur := best[key]
 			switch {
 			case cur.path == "" || cur.path == p:
 				cur = cand{path: p, count: cur.count + 1}
-			case len(p) > len(cur.path):
+			case preferCandidatePath(p, cur.path):
 				cur = cand{path: p, count: 1}
 			}
 			best[key] = cur
-			if _, ok := display[key]; !ok {
-				display[key] = label
-			}
 		}
 	}
 
@@ -545,21 +630,42 @@ func projectAutofillCap(in input) (any, error) {
 	sort.SliceStable(candidates, func(i, j int) bool {
 		return asInt(candidates[i]["count"]) > asInt(candidates[j]["count"])
 	})
+	ignored := make([]map[string]any, 0, len(skippedEphemeral))
+	for key, p := range skippedEphemeral {
+		if _, bonded := best[key]; bonded {
+			continue // 该项目另有可用路径，就不必再列忽略项。
+		}
+		ignored = append(ignored, map[string]any{"project": display[key], "path": p, "reason": "临时/缓存路径"})
+	}
 	if !dryRun && len(filled) > 0 {
 		if err := writeProjects(root, pf); err != nil {
 			return nil, err
 		}
 	}
 	return map[string]any{
-		"log_root":       root,
-		"material_dir":   dir,
-		"found_material": scanned > 0,
-		"files":          scanned,
-		"dry_run":        dryRun,
-		"filled":         filled,
-		"filled_count":   len(filled),
-		"candidates":     candidates,
+		"log_root":          root,
+		"material_dir":      dir,
+		"found_material":    scanned > 0,
+		"files":             scanned,
+		"dry_run":           dryRun,
+		"filled":            filled,
+		"filled_count":      len(filled),
+		"candidates":        candidates,
+		"ignored_ephemeral": ignored,
+		"ignored_count":     len(ignored),
 	}, nil
+}
+
+// preferCandidatePath 在同一个项目的两个候选路径间择优：优先更像仓库/工程根的，其次取
+// 更短的规范根（避免选到深层子目录或缓存工作树）。
+func preferCandidatePath(cand, cur string) bool {
+	if cur == "" {
+		return true
+	}
+	if cRepo, curRepo := hasRepoMarker(cand), hasRepoMarker(cur); cRepo != curRepo {
+		return cRepo
+	}
+	return len(cand) < len(cur)
 }
 
 // ---------- schema 迁移 ----------

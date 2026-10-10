@@ -554,6 +554,66 @@ func gitRoot(dir string) string {
 	}
 }
 
+// gitMainRoot 把「最近 git 根」解析成真正的主仓库工作树：链接工作树（git worktree add
+// 出来的目录）里 `.git` 是一个文件，内容为 `gitdir: <主仓库>/.git/worktrees/<名>`；把它
+// 截到 `/.git/` 之前即主仓库工作树根。嵌套模块/子模块（gitdir 更深）同样按此截断。
+// 不是链接工作树（`.git` 是目录）或无法解析时返回空。
+func gitMainRoot(root string) string {
+	gi := filepath.Join(root, ".git")
+	info, err := os.Stat(gi)
+	if err != nil || info.IsDir() {
+		return ""
+	}
+	body, err := os.ReadFile(gi)
+	if err != nil {
+		return ""
+	}
+	line := strings.TrimSpace(string(body))
+	line = strings.TrimSpace(strings.TrimPrefix(line, "gitdir:"))
+	if line == "" {
+		return ""
+	}
+	normalized := filepath.ToSlash(line)
+	// 兼容 `gitdir: /abs/path` 与 `gitdir: ../relative`（相对工作树目录）。
+	if !strings.HasPrefix(normalized, "/") && !isWindowsAbs(normalized) {
+		normalized = filepath.ToSlash(filepath.Join(root, filepath.FromSlash(normalized)))
+	}
+	idx := strings.Index(strings.ToLower(normalized), "/.git/")
+	if idx <= 0 {
+		return ""
+	}
+	mainRoot := strings.TrimSpace(filepath.FromSlash(normalized[:idx]))
+	if mainRoot == "" {
+		return ""
+	}
+	return filepath.Clean(mainRoot)
+}
+
+// isWindowsAbs 判断路径是否为 Windows 盘符绝对路径（形如 C:/...）。
+func isWindowsAbs(p string) bool {
+	if len(p) < 3 {
+		return false
+	}
+	c := p[0]
+	if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+		return false
+	}
+	return p[1] == ':' && (p[2] == '/' || p[2] == '\\')
+}
+
+// resolveRepoRoot 返回会话工作目录对应的稳定仓库根：链接工作树解析到主仓库工作树，
+// 否则退回普通 git 根。
+func resolveRepoRoot(dir string) string {
+	root := gitRoot(dir)
+	if root == "" {
+		return ""
+	}
+	if main := gitMainRoot(root); main != "" {
+		return main
+	}
+	return root
+}
+
 // vcsRoot 向上查找最近的版本库根（如 .svn 目录），找不到返回空。
 func vcsRoot(dir, marker string) string {
 	for {
@@ -587,7 +647,13 @@ func enrichSessionPath(d *sessionDigest) {
 		return
 	}
 	if root := gitRoot(clean); root != "" {
-		d.RepoPath = root
+		// 链接工作树（如 .copilot 的 copilot-worktrees）解析到主仓库工作树，避免把
+		// C 盘缓存里的工作树目录当成项目主路径。
+		if main := gitMainRoot(root); main != "" {
+			d.RepoPath = main
+		} else {
+			d.RepoPath = root
+		}
 		return
 	}
 	if root := vcsRoot(clean, ".svn"); root != "" {
