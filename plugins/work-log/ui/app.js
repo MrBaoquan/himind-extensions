@@ -82,6 +82,13 @@
     activeProject: '',
     projectEntries: null,
     projectLoading: false,
+    // 登记管理（本地 UI 状态）
+    registryQuery: '',
+    registryFilter: 'all',
+    registrySort: 'count',
+    registrySelected: {},
+    registryIOOpen: false,
+    registryIOText: '',
   };
 
   const el = (id) => document.getElementById(id);
@@ -493,18 +500,47 @@
       '<div class="entry ' + (expanded ? 'expanded' : 'compact') + '" data-entry-id="' + escapeHTML(entryID) + '">',
       '<div class="entry-head">',
     ];
+    const entryDate = text(item.date, state.selected);
     if (!hideProject) {
       if (text(item.project)) {
-        head.push('<span class="proj">' + escapeHTML(item.project) + '</span>');
+        head.push(
+          '<button type="button" class="proj edit-field" data-action="edit-field" data-field="project" data-entry-id="' +
+            escapeHTML(entryID) +
+            '" data-date="' +
+            escapeHTML(entryDate) +
+            '" data-value="' +
+            escapeHTML(item.project) +
+            '" title="点击修改项目">' +
+            escapeHTML(item.project) +
+            '</button>',
+        );
       } else if (entryID) {
         head.push(
-          '<button type="button" class="proj miss" data-action="assign" data-entry-id="' +
+          '<button type="button" class="proj miss edit-field" data-action="edit-field" data-field="project" data-entry-id="' +
             escapeHTML(entryID) +
-            '" title="还没落到项目，点击补全">未落项目</button>',
+            '" data-date="' +
+            escapeHTML(entryDate) +
+            '" data-value="" title="还没落到项目，点击补全">未落项目</button>',
         );
       }
     }
-    if (text(item.feature)) head.push('<span class="feat">' + escapeHTML(item.feature) + '</span>');
+    if (entryID) {
+      head.push(
+        '<button type="button" class="feat edit-field' +
+          (text(item.feature) ? '' : ' empty') +
+          '" data-action="edit-field" data-field="feature" data-entry-id="' +
+          escapeHTML(entryID) +
+          '" data-date="' +
+          escapeHTML(entryDate) +
+          '" data-value="' +
+          escapeHTML(text(item.feature)) +
+          '" title="点击修改功能">' +
+          escapeHTML(text(item.feature, '+ 功能')) +
+          '</button>',
+      );
+    } else if (text(item.feature)) {
+      head.push('<span class="feat">' + escapeHTML(item.feature) + '</span>');
+    }
     if (text(item.exhibit)) head.push('<span class="exhibit" title="展项">' + escapeHTML(item.exhibit) + '</span>');
     if (Number(item.minutes) > 0) {
       head.push('<span class="mins">' + escapeHTML(hoursShort(item.minutes)) + 'h</span>');
@@ -517,9 +553,13 @@
         '<span class="entry-actions">' +
           '<button type="button" class="link-btn" data-action="edit" data-entry-id="' +
           escapeHTML(entryID) +
+          '" data-date="' +
+          escapeHTML(entryDate) +
           '">编辑</button>' +
           '<button type="button" class="link-btn danger" data-action="delete" data-entry-id="' +
           escapeHTML(entryID) +
+          '" data-date="' +
+          escapeHTML(entryDate) +
           '">删除</button>' +
           '</span>',
       );
@@ -694,13 +734,19 @@
         });
       });
     });
-    panel.querySelectorAll('[data-action="edit"]').forEach((node) => {
-      node.addEventListener('click', () => startEdit(node.getAttribute('data-entry-id')));
+    bindEntryCards(panel);
+  }
+
+  // bindEntryCards 绑定一批条目卡片上的通用动作（编辑 / 就地改字段 / 展开 / 删除）。
+  // 日历、搜索结果与项目推进三处共用，避免行为漂移。
+  function bindEntryCards(scope) {
+    scope.querySelectorAll('[data-action="edit"]').forEach((node) => {
+      node.addEventListener('click', () => startEdit(node.getAttribute('data-entry-id'), node.getAttribute('data-date')));
     });
-    panel.querySelectorAll('[data-action="assign"]').forEach((node) => {
-      node.addEventListener('click', () => startEdit(node.getAttribute('data-entry-id')));
+    scope.querySelectorAll('[data-action="edit-field"]').forEach((node) => {
+      node.addEventListener('click', () => editEntryField(node));
     });
-    panel.querySelectorAll('[data-action="toggle"]').forEach((node) => {
+    scope.querySelectorAll('[data-action="toggle"]').forEach((node) => {
       node.addEventListener('click', () => {
         const id = node.getAttribute('data-entry-id');
         state.expanded[id] = !state.expanded[id];
@@ -712,9 +758,91 @@
         }
       });
     });
-    panel.querySelectorAll('[data-action="delete"]').forEach((node) => {
+    scope.querySelectorAll('[data-action="delete"]').forEach((node) => {
       node.addEventListener('click', () => armDelete(node));
     });
+  }
+
+  // editEntryField 就地编辑条目的某个字段（项目 / 功能）：点击标签 → 变成输入框 →
+  // 回车或失焦保存（只改这一个字段，走 work-log.entry.patch，不会注入默认值）。
+  function editEntryField(button) {
+    const entryID = button.getAttribute('data-entry-id');
+    const field = button.getAttribute('data-field');
+    const date = text(button.getAttribute('data-date'), state.selected);
+    const current = text(button.getAttribute('data-value'));
+    const host = button.parentElement;
+    if (!entryID || !date || !host || host.querySelector('.entry-inline-input')) return;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'entry-inline-input';
+    input.value = current;
+    input.placeholder = field === 'project' ? '项目名' : '功能，如：日历视图';
+    input.setAttribute('aria-label', field === 'project' ? '修改项目' : '修改功能');
+    host.replaceChild(input, button);
+    input.focus();
+    input.select();
+
+    let settled = false;
+    const restore = () => {
+      if (input.parentElement) input.parentElement.replaceChild(button, input);
+    };
+    const commit = async () => {
+      if (settled) return;
+      settled = true;
+      const value = text(input.value);
+      if (value === current) {
+        restore();
+        return;
+      }
+      const patch = {};
+      patch[field] = value;
+      try {
+        await bridgeInvoke('work-log.entry.patch', { date, entry_id: entryID, patch });
+        notify((field === 'project' ? '项目' : '功能') + '已更新：' + (value || '（已清空）'));
+        await refreshAfterEntryEdit(date);
+      } catch (error) {
+        notify('更新失败：' + String((error && error.message) || error), 'error');
+        restore();
+      }
+    };
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        commit();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        settled = true;
+        restore();
+      }
+    });
+    input.addEventListener('blur', () => {
+      commit();
+    });
+  }
+
+  // refreshAfterEntryEdit 改动单条后按当前视图局部刷新，避免整页跳回。
+  async function refreshAfterEntryEdit(date) {
+    try {
+      await loadProjects();
+      if (state.view === 'projects') {
+        if (state.projectsMode === 'registry') {
+          renderProjectsPanel();
+        } else if (state.activeProject) {
+          await selectProject(state.activeProject);
+        }
+        return;
+      }
+      if (state.view === 'calendar') {
+        if (state.searchResults) {
+          await runSearch();
+          return;
+        }
+        if (date) await selectDate(date);
+      }
+    } catch (error) {
+      notify('刷新失败：' + String((error && error.message) || error), 'error');
+    }
   }
 
   // ---------- 报告 ----------
@@ -1551,18 +1679,7 @@
       .join('');
 
     node.innerHTML = head + featureBlock + '<div class="pp-timeline">' + timeline + '</div>';
-    node.querySelectorAll('[data-action="toggle"]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const id = button.getAttribute('data-entry-id');
-        state.expanded[id] = !state.expanded[id];
-        const card = button.closest('.entry');
-        if (card) {
-          card.classList.toggle('expanded', !!state.expanded[id]);
-          card.classList.toggle('compact', !state.expanded[id]);
-          button.textContent = state.expanded[id] ? '收起' : '展开';
-        }
-      });
-    });
+    bindEntryCards(node);
     node.querySelectorAll('.ref').forEach((ref) => {
       ref.addEventListener('click', () => {
         const url = ref.getAttribute('data-url');
@@ -1617,15 +1734,137 @@
       '<datalist id="p-names">' + projectOptions(projects) + '</datalist>' +
       '</div>';
 
-    const rows = projects
+    const filters = [
+      { key: 'all', label: '全部' },
+      { key: 'used', label: '有记录' },
+      { key: 'empty', label: '无记录' },
+      { key: 'nopath', label: '未绑路径' },
+      { key: 'workbench', label: '看板' },
+      { key: 'archived', label: '已归档' },
+    ];
+    const sorts = [
+      { key: 'count', label: '条目多→少' },
+      { key: 'name', label: '名称' },
+      { key: 'recent', label: '最近更新' },
+      { key: 'paths', label: '路径多→少' },
+    ];
+    const q = text(state.registryQuery).toLowerCase();
+
+    function projectMatches(item) {
+      const status = text(item.status, 'active');
+      switch (state.registryFilter) {
+        case 'used':
+          return Number(item.entry_count || 0) > 0;
+        case 'empty':
+          return Number(item.entry_count || 0) === 0;
+        case 'nopath':
+          return !(item.paths || []).length && !(item.exhibits || []).some((ex) => ((ex && ex.paths) || []).length);
+        case 'workbench':
+          return text(item.source) === 'workbench';
+        case 'archived':
+          return status === 'archived';
+        default:
+          return status !== 'archived';
+      }
+    }
+    function matchesQuery(item) {
+      if (!q) return true;
+      const hay = [
+        item.name,
+        (item.aliases || []).join(' '),
+        (item.paths || []).map((p) => text(p && p.path)).join(' '),
+        item.external_id,
+      ]
+        .join(' ')
+        .toLowerCase();
+      return hay.indexOf(q) >= 0;
+    }
+
+    const visible = projects.filter((item) => matchesQuery(item) && projectMatches(item));
+    const sortKey = state.registrySort;
+    visible.sort((a, b) => {
+      if (sortKey === 'name') return String(a.name).localeCompare(String(b.name), 'zh-Hans-CN');
+      if (sortKey === 'recent') return String(b.last_date || '').localeCompare(String(a.last_date || ''));
+      if (sortKey === 'paths') {
+        return (b.paths || []).length + (b.exhibits || []).length - ((a.paths || []).length + (a.exhibits || []).length);
+      }
+      return Number(b.entry_count || 0) - Number(a.entry_count || 0);
+    });
+
+    const chips = filters
+      .map((f) => {
+        const on = state.registryFilter === f.key ? ' active' : '';
+        return '<button class="chip' + on + '" type="button" data-filter="' + f.key + '">' + escapeHTML(f.label) + '</button>';
+      })
+      .join('');
+    const sortOptions = sorts
+      .map((s) => '<option value="' + s.key + '"' + (state.registrySort === s.key ? ' selected' : '') + '>' + escapeHTML(s.label) + '</option>')
+      .join('');
+    const selectedIds = Object.keys(state.registrySelected).filter((k) => state.registrySelected[k]);
+    const zeroCount = projects.filter((item) => Number(item.entry_count || 0) === 0).length;
+    const toolbar =
+      '<div class="proj-tools">' +
+      '<input id="p-search" class="proj-search" type="search" placeholder="搜索项目名 / 别名 / 路径" value="' +
+      escapeHTML(state.registryQuery) +
+      '" />' +
+      '<div class="proj-chips">' +
+      chips +
+      '</div>' +
+      '<label class="proj-sort"><span>排序</span><select id="p-sort">' +
+      sortOptions +
+      '</select></label>' +
+      '</div>' +
+      '<div class="proj-bulk">' +
+      '<span class="meta">共 ' +
+      escapeHTML(projects.length) +
+      ' 个 · 当前 ' +
+      escapeHTML(visible.length) +
+      ' 个' +
+      (zeroCount ? ' · 无记录 ' + escapeHTML(zeroCount) + ' 个' : '') +
+      '</span>' +
+      '<button class="btn tiny" type="button" data-action="clean-empty"' +
+      (zeroCount ? '' : ' disabled') +
+      '>清理无记录</button>' +
+      '<button class="btn tiny" type="button" data-action="io-toggle">导出 / 导入</button>' +
+      '</div>' +
+      (selectedIds.length
+        ? '<div class="proj-selbar"><span>已选 ' +
+          escapeHTML(selectedIds.length) +
+          ' 个</span>' +
+          '<button class="btn tiny" type="button" data-action="bulk-archive">批量归档</button>' +
+          '<button class="btn tiny" type="button" data-action="bulk-restore">恢复</button>' +
+          '<button class="btn tiny danger" type="button" data-action="bulk-delete">批量删除</button>' +
+          '<button class="btn tiny" type="button" data-action="clear-sel">取消选择</button></div>'
+        : '') +
+      (state.registryIOOpen
+        ? '<div class="proj-io"><textarea id="p-io-text" placeholder="导出的登记表 JSON 会出现在这里；也可粘贴 JSON 后点「合并导入 / 替换导入」">' +
+          escapeHTML(state.registryIOText) +
+          '</textarea>' +
+          '<div class="proj-io-actions"><button class="btn tiny" type="button" data-action="io-export">导出到此框</button>' +
+          '<button class="btn tiny" type="button" data-action="io-copy">复制</button>' +
+          '<button class="btn tiny" type="button" data-action="io-merge">合并导入</button>' +
+          '<button class="btn tiny danger" type="button" data-action="io-replace">替换导入</button></div></div>'
+        : '');
+
+    const targets = projects
+      .filter((item) => text(item.status, 'active') !== 'archived')
+      .map((item) => '<option value="' + escapeHTML(item.id) + '">' + escapeHTML(item.name) + '</option>')
+      .join('');
+
+    const rows = visible
       .map((item) => {
         const aliases = (item.aliases || []).join(', ');
         const range = text(item.first_date)
           ? escapeHTML(item.first_date) + ' ~ ' + escapeHTML(text(item.last_date))
           : '暂无记录';
         const exhibits = item.exhibits || [];
+        const archived = text(item.status, 'active') === 'archived';
         const src = text(item.source) === 'workbench' ? '<span class="badge new">看板</span>' : '';
+        const statusBadge = archived ? '<span class="badge arch">已归档</span>' : '';
+        const hasPath = (item.paths || []).length > 0;
+        const pathHint = hasPath ? '' : '<span class="badge warn">未绑路径</span>';
         const paths = pathTags(item.paths, item.id, '');
+        const checked = state.registrySelected[item.id] ? ' checked' : '';
         const exhibitRows = exhibits
           .map((ex) => {
             const exName = text(ex && ex.name);
@@ -1642,13 +1881,21 @@
           })
           .join('');
         return (
-          '<div class="proj-row" data-id="' +
+          '<div class="proj-row' +
+          (archived ? ' archived' : '') +
+          '" data-id="' +
           escapeHTML(item.id) +
           '" data-name="' +
           escapeHTML(item.name) +
+          '" data-status="' +
+          (archived ? 'archived' : 'active') +
           '">' +
-          '<div class="proj-main"><strong>' +
+          '<label class="proj-pick"><input type="checkbox" class="proj-check" data-id="' + escapeHTML(item.id) + '"' + checked + ' /></label>' +
+          '<div class="proj-main">' +
+          '<strong>' +
           src +
+          statusBadge +
+          pathHint +
           escapeHTML(item.name) +
           '</strong><span class="proj-meta">' +
           escapeHTML(item.entry_count || 0) +
@@ -1663,6 +1910,13 @@
           escapeHTML(aliases) +
           '" placeholder="别名，逗号分隔" />' +
           '<button class="btn" type="button" data-action="alias">保存</button>' +
+          '<select class="proj-merge-target"><option value="">合并到…</option>' +
+          (targets || '') +
+          '</select>' +
+          '<button class="btn" type="button" data-action="merge">并入</button>' +
+          '<button class="btn" type="button" data-action="archive">' +
+          (archived ? '恢复' : '归档') +
+          '</button>' +
           '<button class="btn" type="button" data-action="delete">删除</button>' +
           '</div>' +
           '<div class="proj-paths"><span class="paths-label">路径</span>' +
@@ -1679,9 +1933,11 @@
       })
       .join('');
 
-    const list = projects.length
+    const list = visible.length
       ? rows
-      : emptyBlock('还没有项目', ['写入日志时若带项目名会自动登记；也可以在上方手动添加。无项目时也可先给「待认领路径」认领到一个新项目。']);
+      : projects.length
+        ? emptyBlock('当前筛选没有项目', ['换个筛选条件，或点「全部」查看所有登记项目。'])
+        : emptyBlock('还没有项目', ['写入日志时若带项目名会自动登记；也可以在上方手动添加。无项目时也可先给「待认领路径」认领到一个新项目。']);
 
     const pendingBlock = pending.length
       ? '<div class="proj-pending"><h3>待认领路径（未命中映射）</h3>' +
@@ -1713,7 +1969,7 @@
         '</ul><p class="meta">在上方登记同名项目并设置别名，即可把历史条目归并到规范项目。</p></div>'
       : '';
 
-    panel.innerHTML = form + '<div class="proj-list">' + list + '</div>' + pendingBlock + unmatchedBlock;
+    panel.innerHTML = toolbar + form + '<div class="proj-list">' + list + '</div>' + pendingBlock + unmatchedBlock;
     bindProjectsPanel(panel);
   }
 
@@ -1724,6 +1980,197 @@
   }
 
   function bindProjectsPanel(panel) {
+    const rerender = (focusId) => {
+      renderProjectsPanel();
+      if (focusId) {
+        const node = el(focusId);
+        if (node) {
+          node.focus();
+          if (node.setSelectionRange && typeof node.value === 'string') {
+            const end = node.value.length;
+            node.setSelectionRange(end, end);
+          }
+        }
+      }
+    };
+
+    const searchInput = panel.querySelector('#p-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', () => {
+        state.registryQuery = searchInput.value || '';
+        rerender('p-search');
+      });
+    }
+    panel.querySelectorAll('[data-filter]').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        state.registryFilter = chip.getAttribute('data-filter') || 'all';
+        renderProjectsPanel();
+      });
+    });
+    const sortSelect = panel.querySelector('#p-sort');
+    if (sortSelect) {
+      sortSelect.addEventListener('change', () => {
+        state.registrySort = sortSelect.value || 'count';
+        renderProjectsPanel();
+      });
+    }
+    panel.querySelectorAll('.proj-check').forEach((box) => {
+      box.addEventListener('change', () => {
+        state.registrySelected[box.getAttribute('data-id')] = box.checked;
+        if (!box.checked) delete state.registrySelected[box.getAttribute('data-id')];
+        renderProjectsPanel();
+      });
+    });
+    panel.querySelector('[data-action="clear-sel"]')?.addEventListener('click', () => {
+      state.registrySelected = {};
+      renderProjectsPanel();
+    });
+    panel.querySelector('[data-action="bulk-archive"]')?.addEventListener('click', async () => {
+      await bulkSetStatus(panel, 'archived');
+    });
+    panel.querySelector('[data-action="bulk-restore"]')?.addEventListener('click', async () => {
+      await bulkSetStatus(panel, 'active');
+    });
+    panel.querySelector('[data-action="bulk-delete"]')?.addEventListener('click', async (event) => {
+      const btn = event.currentTarget;
+      if (btn.getAttribute('data-armed') !== '1') {
+        btn.setAttribute('data-armed', '1');
+        btn.textContent = '确认删除';
+        return;
+      }
+      const ids = selectedProjectIds();
+      if (!ids.length) return;
+      try {
+        const result = await bridgeInvoke('work-log.project.delete', { project_ids: ids });
+        notify('已删除 ' + text((result && result.count) || ids.length) + ' 个项目登记');
+        state.registrySelected = {};
+        await refreshProjects();
+      } catch (error) {
+        notify('批量删除失败：' + String((error && error.message) || error), 'error');
+      }
+    });
+    panel.querySelector('[data-action="clean-empty"]')?.addEventListener('click', async (event) => {
+      const btn = event.currentTarget;
+      const empties = (state.projectsData && state.projectsData.projects ? state.projectsData.projects : []).filter(
+        (item) => Number(item.entry_count || 0) === 0,
+      );
+      if (!empties.length) return;
+      if (btn.getAttribute('data-armed') !== '1') {
+        btn.setAttribute('data-armed', '1');
+        btn.textContent = '确认清理 ' + empties.length + ' 个';
+        setTimeout(() => {
+          btn.setAttribute('data-armed', '0');
+          btn.textContent = '清理无记录';
+        }, 3000);
+        return;
+      }
+      try {
+        const result = await bridgeInvoke('work-log.project.delete', { project_ids: empties.map((item) => item.id) });
+        notify('已清理 ' + text((result && result.count) || empties.length) + ' 个无记录项目');
+        state.registrySelected = {};
+        await refreshProjects();
+      } catch (error) {
+        notify('清理失败：' + String((error && error.message) || error), 'error');
+      }
+    });
+
+    // 导出 / 导入。
+    panel.querySelector('[data-action="io-toggle"]')?.addEventListener('click', () => {
+      const box = panel.querySelector('#p-io-text');
+      if (box) state.registryIOText = box.value || '';
+      state.registryIOOpen = !state.registryIOOpen;
+      renderProjectsPanel();
+    });
+    panel.querySelector('[data-action="io-export"]')?.addEventListener('click', async () => {
+      try {
+        const result = await bridgeInvoke('work-log.project.export', {});
+        state.registryIOText = text(result && result.json);
+        state.registryIOOpen = true;
+        renderProjectsPanel();
+        notify('已导出 ' + text((result && result.count) || 0) + ' 个项目到文本框，可复制保存');
+      } catch (error) {
+        notify('导出失败：' + String((error && error.message) || error), 'error');
+      }
+    });
+    panel.querySelector('[data-action="io-copy"]')?.addEventListener('click', async () => {
+      const box = panel.querySelector('#p-io-text');
+      const value = (box && box.value) || state.registryIOText;
+      if (!value) {
+        notify('文本框为空，请先点「导出到此框」', 'warn');
+        return;
+      }
+      state.registryIOText = value;
+      try {
+        await navigator.clipboard.writeText(value);
+        notify('已复制到剪贴板');
+      } catch (error) {
+        if (box) {
+          box.focus();
+          box.select();
+        }
+        notify('请按 Ctrl+C 复制（浏览器未授权剪贴板）', 'warn');
+      }
+    });
+    panel.querySelector('[data-action="io-merge"]')?.addEventListener('click', () => importRegistry(panel, 'merge'));
+    panel.querySelector('[data-action="io-replace"]')?.addEventListener('click', async (event) => {
+      const btn = event.currentTarget;
+      if (btn.getAttribute('data-armed') !== '1') {
+        btn.setAttribute('data-armed', '1');
+        btn.textContent = '确认替换';
+        setTimeout(() => {
+          btn.setAttribute('data-armed', '0');
+          btn.textContent = '替换导入';
+        }, 3000);
+        return;
+      }
+      await importRegistry(panel, 'replace');
+    });
+
+    function selectedProjectIds() {
+      return Object.keys(state.registrySelected).filter((k) => state.registrySelected[k]);
+    }
+
+    async function bulkSetStatus(currentPanel, status) {
+      const ids = selectedProjectIds();
+      if (!ids.length) return;
+      const byId = {};
+      (state.projectsData && state.projectsData.projects ? state.projectsData.projects : []).forEach((item) => {
+        byId[item.id] = item;
+      });
+      try {
+        for (const id of ids) {
+          const item = byId[id];
+          if (!item) continue;
+          await bridgeInvoke('work-log.project.upsert', { project_id: id, project_name: item.name, status });
+        }
+        notify((status === 'archived' ? '已归档 ' : '已恢复 ') + ids.length + ' 个项目');
+        state.registrySelected = {};
+        await refreshProjects();
+      } catch (error) {
+        notify('批量操作失败：' + String((error && error.message) || error), 'error');
+      }
+    }
+
+    async function importRegistry(currentPanel, mode) {
+      const box = currentPanel.querySelector('#p-io-text');
+      const value = (box && box.value) || state.registryIOText;
+      if (!text(value)) {
+        notify('请先在文本框里粘贴登记表 JSON', 'warn');
+        return;
+      }
+      try {
+        const result = await bridgeInvoke('work-log.project.import', { projects_json: value, mode });
+        if (mode === 'replace') {
+          notify('已替换导入 ' + text((result && result.imported) || 0) + ' 个项目');
+        } else {
+          notify('已合并导入：新增 ' + text((result && result.created) || 0) + ' · 更新 ' + text((result && result.updated) || 0));
+        }
+        await refreshProjects();
+      } catch (error) {
+        notify('导入失败：' + String((error && error.message) || error), 'error');
+      }
+    }
+
     const save = panel.querySelector('#p-save');
     if (save) {
       save.addEventListener('click', async () => {
@@ -1834,6 +2281,53 @@
             await refreshProjects();
           } catch (error) {
             notify('删除失败：' + String((error && error.message) || error), 'error');
+          }
+        });
+      }
+
+      const archiveBtn = row.querySelector('[data-action="archive"]');
+      if (archiveBtn) {
+        archiveBtn.addEventListener('click', async () => {
+          const nextStatus = text(row.getAttribute('data-status')) === 'archived' ? 'active' : 'archived';
+          try {
+            await bridgeInvoke('work-log.project.upsert', { project_id: id, project_name: name, status: nextStatus });
+            notify((nextStatus === 'archived' ? '已归档：' : '已恢复：') + name);
+            await refreshProjects();
+          } catch (error) {
+            notify('操作失败：' + String((error && error.message) || error), 'error');
+          }
+        });
+      }
+
+      const mergeBtn = row.querySelector('[data-action="merge"]');
+      if (mergeBtn) {
+        mergeBtn.addEventListener('click', async () => {
+          const select = row.querySelector('.proj-merge-target');
+          const targetId = text(select ? select.value : '');
+          if (!targetId) {
+            notify('请先选择要并入的目标项目。', 'warn');
+            return;
+          }
+          const targetName = text(select.options[select.selectedIndex].textContent);
+          if (mergeBtn.getAttribute('data-armed') !== '1') {
+            mergeBtn.setAttribute('data-armed', '1');
+            mergeBtn.textContent = '确认并入';
+            setTimeout(() => {
+              mergeBtn.setAttribute('data-armed', '0');
+              mergeBtn.textContent = '并入';
+            }, 3000);
+            return;
+          }
+          try {
+            const result = await bridgeInvoke('work-log.project.merge', {
+              from_project: name,
+              to_project: targetName,
+              project_id: targetId,
+            });
+            notify('已把「' + name + '」并入「' + targetName + '」：改写 ' + text((result && result.updated) || 0) + ' 条');
+            await refreshProjects();
+          } catch (error) {
+            notify('合并失败：' + String((error && error.message) || error), 'error');
           }
         });
       }
@@ -2089,12 +2583,23 @@
     }
   }
 
-  function startEdit(entryID) {
-    const entry = state.entries.find((item) => text(item.entry_id) === entryID);
+  function findEntryByID(entryID, date) {
+    const pools = [state.entries, state.projectEntries, state.searchResults && state.searchResults.entries];
+    for (const pool of pools) {
+      if (!pool) continue;
+      const found = pool.find((item) => text(item.entry_id) === entryID);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function startEdit(entryID, date) {
+    const entry = findEntryByID(entryID, date);
     if (!entry) {
       notify('未找到要编辑的条目，请刷新后重试。', 'warn');
       return;
     }
+    if (date && !text(entry.date)) entry.date = date;
     openManualForm(entry);
   }
 
@@ -2109,16 +2614,19 @@
       }, 3000);
       return;
     }
-    removeEntry(node.getAttribute('data-entry-id'));
+    const entryID = node.getAttribute('data-entry-id');
+    const entry = findEntryByID(entryID);
+    const date = text(node.getAttribute('data-date'), (entry && text(entry.date)) || state.selected || today());
+    removeEntry(entryID, date);
   }
 
-  async function removeEntry(entryID) {
-    const date = state.selected || today();
+  async function removeEntry(entryID, date) {
+    const target = date || state.selected || today();
     notify('正在删除…');
     try {
-      await bridgeInvoke('work-log.entry.delete', { date: date, entry_id: entryID });
+      await bridgeInvoke('work-log.entry.delete', { date: target, entry_id: entryID });
       notify('已删除该条日志。');
-      await refresh(date);
+      await refresh(target);
     } catch (error) {
       notify('删除失败：' + String((error && error.message) || error), 'error');
     }

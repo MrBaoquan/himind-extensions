@@ -2081,3 +2081,179 @@ body.modal-open {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- 登记管理：搜索 / 筛选 / 批量 / 导入导出 ---------- */
+
+.proj-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.proj-search {
+  flex: 1 1 240px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 7px 10px;
+  font: inherit;
+}
+
+.proj-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chip.active {
+  border-color: var(--accent);
+  color: #fff;
+  background: var(--accent);
+}
+
+.proj-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.proj-sort select {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 5px 8px;
+  font: inherit;
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.proj-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.proj-selbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  background: var(--accent-soft);
+  font-size: 12px;
+}
+
+.proj-pick {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+}
+
+.proj-row.archived {
+  opacity: 0.62;
+}
+
+.proj-merge-target {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 5px 8px;
+  font: inherit;
+  min-width: 0;
+  max-width: 160px;
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.badge.arch {
+  border-color: #e2e8f0;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.badge.warn {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.btn.danger {
+  color: #b91c1c;
+}
+
+.proj-io {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  padding: 10px;
+}
+
+.proj-io textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.proj-io-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ---------- 条目：可点击就地编辑的字段标签 ---------- */
+
+.entry .proj.edit-field,
+.entry .feat.edit-field {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  padding: 1px 6px;
+}
+
+.entry .proj.edit-field:hover,
+.entry .feat.edit-field:hover {
+  text-decoration: underline dotted;
+}
+
+.entry .feat.empty {
+  color: var(--muted);
+  border: 1px dashed var(--line);
+}
+
+.entry-inline-input {
+  font: inherit;
+  font-size: 12px;
+  padding: 1px 6px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  min-width: 8ch;
+  max-width: 200px;
+}
+

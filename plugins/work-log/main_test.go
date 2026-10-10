@@ -896,3 +896,180 @@ func TestProjectMapPathPreview(t *testing.T) {
 		t.Fatalf("不应命中: %v", none)
 	}
 }
+
+// firstEntryID 读取某天第一条条目的 entry_id。
+func firstEntryID(t *testing.T, root, date string) string {
+	t.Helper()
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":`+quote(date)+`}`)
+	items := read["entries"].([]any)
+	if len(items) == 0 {
+		t.Fatalf("没有条目可读: %s", date)
+	}
+	return items[0].(map[string]any)["entry_id"].(string)
+}
+
+// findProjectByName 在登记表里按名称取一项。
+func findProjectByName(t *testing.T, root, name string) map[string]any {
+	t.Helper()
+	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
+	for _, raw := range list["projects"].([]any) {
+		p := raw.(map[string]any)
+		if p["name"] == name {
+			return p
+		}
+	}
+	return nil
+}
+
+// TestEntryPatchPreservesUnspecifiedFields 验证局部更新只改传入的键，不注入默认值。
+func TestEntryPatchPreservesUnspecifiedFields(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-06","entries":[{"source":"codex","session_id":"p1","project":"甲","category":"开发","title":"原始标题","summary":"原始摘要","minutes":30}]}`)
+	id := firstEntryID(t, root, "2026-10-06")
+	patched := call(t, "work-log.entry.patch", `{"log_root":`+quote(root)+`,"date":"2026-10-06","entry_id":`+quote(id)+`,"patch":{"feature":"日历视图","project":"乙","minutes":45}}`)
+	item := patched["entry"].(map[string]any)
+	if item["feature"] != "日历视图" {
+		t.Fatalf("feature 未更新: %v", item["feature"])
+	}
+	if item["project"] != "乙" {
+		t.Fatalf("project 未更新: %v", item["project"])
+	}
+	if item["minutes"].(float64) != 45 {
+		t.Fatalf("minutes 未更新: %v", item["minutes"])
+	}
+	// 未传入的键必须保持原值，尤其不能被默认值（source=manual / category=其他）冲掉。
+	if item["source"] != "codex" || item["category"] != "开发" {
+		t.Fatalf("未传入的 source/category 被改动: %#v", item)
+	}
+	if item["summary"] != "原始摘要" || item["title"] != "原始标题" {
+		t.Fatalf("未传入的 title/summary 被改动: %#v", item)
+	}
+	// 显式改了项目名，应把「乙」登记进表并绑定 ID。
+	if p := findProjectByName(t, root, "乙"); p == nil {
+		t.Fatal("显式设置的项目名应被登记")
+	}
+	if item["project_id"] == "" {
+		t.Fatal("改写项目后应绑定 project_id")
+	}
+}
+
+// TestProjectDeleteBatch 验证批量删除登记项目。
+func TestProjectDeleteBatch(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"甲"}`)
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"乙"}`)
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"丙"}`)
+	pjA := findProjectByName(t, root, "甲")["id"].(string)
+	pjB := findProjectByName(t, root, "乙")["id"].(string)
+	deleted := call(t, "work-log.project.delete", `{"log_root":`+quote(root)+`,"project_ids":[`+quote(pjA)+`,`+quote(pjB)+`]}`)
+	if deleted["count"].(float64) != 2 {
+		t.Fatalf("应删除 2 个，实际 %v", deleted["count"])
+	}
+	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
+	if len(list["projects"].([]any)) != 1 || findProjectByName(t, root, "丙") == nil {
+		t.Fatalf("应只剩「丙」，实际 %v", list["projects"])
+	}
+}
+
+// TestProjectMergeMultiSource 验证一次合并多个来源项目。
+func TestProjectMergeMultiSource(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"目标馆","paths":[{"path":"F:/tgt"}]}`)
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"甲","paths":[{"path":"F:/jia"}]}`)
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"乙"}`)
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-03","entries":[{"source":"manual","project":"甲","title":"a"},{"source":"manual","project":"乙","title":"b"}]}`)
+	merged := call(t, "work-log.project.merge", `{"log_root":`+quote(root)+`,"from_projects":["甲","乙"],"to_project":"目标馆"}`)
+	if merged["merged"] != true || merged["updated"].(float64) != 2 {
+		t.Fatalf("多来源合并异常: %v", merged)
+	}
+	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
+	if len(list["projects"].([]any)) != 1 {
+		t.Fatalf("应只剩目标项目，实际 %d", len(list["projects"].([]any)))
+	}
+	target := findProjectByName(t, root, "目标馆")
+	paths := target["paths"].([]any)
+	if len(paths) != 2 {
+		t.Fatalf("来源路径应并入目标，实际 %v", paths)
+	}
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-03"}`)
+	for _, raw := range read["entries"].([]any) {
+		if raw.(map[string]any)["project"] != "目标馆" {
+			t.Fatalf("条目应全部归到目标馆: %v", raw)
+		}
+	}
+}
+
+// TestProjectExportImport 验证登记表导出后可在另一日志根导入（含路径与别名）。
+func TestProjectExportImport(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"甲","aliases":["jia"],"paths":[{"path":"F:/jia","kind":"repo"}]}`)
+	exported := call(t, "work-log.project.export", `{"log_root":`+quote(root)+`}`)
+	body := exported["json"].(string)
+	if body == "" || exported["count"].(float64) != 1 {
+		t.Fatalf("导出异常: %v", exported)
+	}
+	root2 := t.TempDir()
+	params, _ := json.Marshal(map[string]any{"log_root": root2, "projects_json": body})
+	imported := call(t, "work-log.project.import", string(params))
+	if imported["created"].(float64) != 1 {
+		t.Fatalf("导入应新建 1 个，实际 %v", imported)
+	}
+	target := findProjectByName(t, root2, "甲")
+	if target == nil {
+		t.Fatal("导入后应存在「甲」")
+	}
+	paths := target["paths"].([]any)
+	if len(paths) != 1 || paths[0].(map[string]any)["path"] != "F:/jia" {
+		t.Fatalf("路径未随导入保留: %v", paths)
+	}
+}
+
+// TestArchiveMigrateStampsSchema 验证迁移把历史文件补齐到当前 schema，并留备份。
+func TestArchiveMigrateStampsSchema(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	dir := filepath.Join(root, "logs", "2026")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// 旧格式：没有 schema_version，条目缺 date。
+	legacyDay := `{"date":"2026-10-01","entries":[{"source":"manual","title":"旧条目"}]}`
+	if err := os.WriteFile(filepath.Join(dir, "2026-10-01.json"), []byte(legacyDay), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	legacyProjects := `{"projects":[{"name":"旧项目","aliases":[],"status":"active"}]}`
+	if err := os.WriteFile(filepath.Join(root, "projects.json"), []byte(legacyProjects), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res := call(t, "work-log.archive.migrate", `{"log_root":`+quote(root)+`}`)
+	if res["projects_changed"] != true || res["days_changed"].(float64) != 1 {
+		t.Fatalf("迁移应报告改动: %v", res)
+	}
+	dayBody, _ := os.ReadFile(filepath.Join(dir, "2026-10-01.json"))
+	var day map[string]any
+	if err := json.Unmarshal(dayBody, &day); err != nil {
+		t.Fatal(err)
+	}
+	if day["schema_version"] != schemaVersion {
+		t.Fatalf("日文件 schema 未补齐: %v", day["schema_version"])
+	}
+	item := day["entries"].([]any)[0].(map[string]any)
+	if item["date"] != "2026-10-01" {
+		t.Fatalf("条目 date 未补齐: %v", item["date"])
+	}
+	projBody, _ := os.ReadFile(filepath.Join(root, "projects.json"))
+	var pf map[string]any
+	if err := json.Unmarshal(projBody, &pf); err != nil {
+		t.Fatal(err)
+	}
+	if pf["projects"].([]any)[0].(map[string]any)["id"] == "" {
+		t.Fatal("项目 ID 未补齐")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "2026-10-01.json.bak")); err != nil {
+		t.Fatalf("写前应生成 .bak 备份: %v", err)
+	}
+}

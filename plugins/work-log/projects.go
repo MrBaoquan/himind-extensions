@@ -71,9 +71,8 @@ func readProjects(root string) (projectsFile, error) {
 	if err := json.Unmarshal(body, &pf); err != nil {
 		return projectsFile{}, errors.New("项目登记不是合法 JSON")
 	}
-	pf.SchemaVersion = projectsSchemaVersion
-	if pf.Projects == nil {
-		pf.Projects = []project{}
+	if err := migrateProjectsFile(&pf); err != nil {
+		return projectsFile{}, err
 	}
 	return pf, nil
 }
@@ -490,30 +489,49 @@ func projectDeleteCap(in input) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	id := strings.TrimSpace(in.ProjectID)
-	name := strings.TrimSpace(in.ProjectName)
-	if id == "" && name == "" {
-		return nil, errors.New("需要 project_id 或 project_name")
+	// 支持单个与批量：project_ids 优先，兼容 project_id / project_name。
+	wantedIDs := map[string]bool{}
+	for _, v := range in.ProjectIDs {
+		if s := strings.TrimSpace(v); s != "" {
+			wantedIDs[s] = true
+		}
+	}
+	if id := strings.TrimSpace(in.ProjectID); id != "" {
+		wantedIDs[id] = true
+	}
+	wantedNames := map[string]bool{}
+	if name := strings.TrimSpace(in.ProjectName); name != "" {
+		wantedNames[normalizeProjectKey(name)] = true
+	}
+	if len(wantedIDs) == 0 && len(wantedNames) == 0 {
+		return nil, errors.New("需要 project_id(s) 或 project_name")
 	}
 	kept := make([]project, 0, len(pf.Projects))
-	var removed *project
+	removed := make([]project, 0, 1)
 	for _, p := range pf.Projects {
-		match := (id != "" && p.ID == id) || (id == "" && name != "" && strings.EqualFold(p.Name, name))
-		if match && removed == nil {
-			copy := p
-			removed = &copy
+		if wantedIDs[p.ID] || wantedNames[normalizeProjectKey(p.Name)] {
+			removed = append(removed, p)
 			continue
 		}
 		kept = append(kept, p)
 	}
-	if removed == nil {
-		return map[string]any{"log_root": root, "removed": false}, nil
+	if len(removed) == 0 {
+		return map[string]any{"log_root": root, "removed": false, "count": 0}, nil
 	}
 	pf.Projects = kept
 	if err := writeProjects(root, pf); err != nil {
 		return nil, err
 	}
-	return map[string]any{"log_root": root, "removed": true, "project": removed}, nil
+	result := map[string]any{
+		"log_root": root,
+		"removed":  true,
+		"count":    len(removed),
+		"projects": removed,
+	}
+	if len(removed) == 1 {
+		result["project"] = removed[0]
+	}
+	return result, nil
 }
 
 func projectResolveCap(in input) (any, error) {

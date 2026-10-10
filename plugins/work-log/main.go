@@ -117,6 +117,15 @@ type input struct {
 	// Exhibits / ExhibitsStep 用于从工作台同步展项（含 source_path/release_path 路径）。
 	Exhibits     []map[string]any `json:"exhibits"`
 	ExhibitsStep string           `json:"exhibits_step"`
+	// ProjectIDs / FromProjects 供项目批量删除与多来源合并（登记管理的一次性清理）。
+	ProjectIDs   []string `json:"project_ids"`
+	FromProjects []string `json:"from_projects"`
+	// ProjectsJSON 供登记表导入（完整登记表 JSON 文本）；Mode=merge（默认）或 replace。
+	ProjectsJSON string `json:"projects_json"`
+	// DryRun 供迁移维护能力预览改动而不写盘。
+	DryRun *bool `json:"dry_run"`
+	// Patch 供 work-log.entry.patch 做字段级局部更新：只改显式传入的键，未传的键保持原值。
+	Patch map[string]any `json:"patch"`
 	// Projects / ProjectsStep 用于从工作台同步项目（含展项）到本地登记表：
 	// Projects 直接给数组，ProjectsStep 指向工作流里取工作台项目列表的上游步骤。
 	Projects     []map[string]any `json:"projects"`
@@ -235,6 +244,18 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 		return rpcResult(result, err)
 	case "work-log.project.merge":
 		result, err := projectMergeCap(in)
+		return rpcResult(result, err)
+	case "work-log.project.export":
+		result, err := projectExportCap(in)
+		return rpcResult(result, err)
+	case "work-log.project.import":
+		result, err := projectImportCap(in)
+		return rpcResult(result, err)
+	case "work-log.entry.patch":
+		result, err := entryPatchCap(in)
+		return rpcResult(result, err)
+	case "work-log.archive.migrate":
+		result, err := archiveMigrateCap(in)
 		return rpcResult(result, err)
 	case "work-log.project.sync":
 		result, err := projectSyncCap(in)
@@ -1606,8 +1627,7 @@ func readDay(root, date string) (dayFile, error) {
 		return dayFile{}, errors.New("日志文件不是合法 JSON：" + date)
 	}
 	day.Date = date
-	day.SchemaVersion = schemaVersion
-	day.Entries = nonNilEntries(day.Entries)
+	migrateDayFile(&day)
 	return day, nil
 }
 

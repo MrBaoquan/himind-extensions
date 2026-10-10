@@ -459,7 +459,8 @@ func projectClaimCap(in input) (any, error) {
 	return result, nil
 }
 
-// projectMergeCap 合并项目：把来源项目的别名/路径/展项并入目标项目，并改写条目归类。
+// projectMergeCap 合并项目：把一个或多个来源项目的别名/路径/展项并入目标项目，
+// 删除来源登记，并改写历史条目的归类。支持 from_project（单个）与 from_projects（批量）。
 func projectMergeCap(in input) (any, error) {
 	root, err := logRoot(in.LogRoot)
 	if err != nil {
@@ -471,37 +472,57 @@ func projectMergeCap(in input) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	fromAt := findProjectIndex(pf, "", firstNonEmpty(in.FromProject, in.Project))
-	if fromAt < 0 {
-		return nil, errors.New("未找到来源项目（from_project）")
-	}
 	toAt := findProjectIndex(pf, in.ProjectID, firstNonEmpty(in.ToProject, in.ProjectName))
 	if toAt < 0 {
 		return nil, errors.New("未找到目标项目（to_project）")
 	}
-	if fromAt == toAt {
-		return map[string]any{"log_root": root, "merged": false, "reason": "来源与目标相同"}, nil
+	// 收集来源：from_projects 批量优先，兼容 from_project / project。
+	rawSources := make([]string, 0, len(in.FromProjects)+1)
+	for _, s := range in.FromProjects {
+		if t := strings.TrimSpace(s); t != "" {
+			rawSources = append(rawSources, t)
+		}
 	}
-	source := pf.Projects[fromAt]
+	if single := firstNonEmpty(in.FromProject, in.Project); single != "" {
+		rawSources = append(rawSources, single)
+	}
+	if len(rawSources) == 0 {
+		return nil, errors.New("需要 from_project 或 from_projects（来源项目）")
+	}
+	fromSet := map[int]bool{}
+	for _, s := range rawSources {
+		if at := findProjectIndex(pf, "", s); at >= 0 {
+			fromSet[at] = true
+		}
+	}
+	delete(fromSet, toAt) // 目标不能作为来源。
+	if len(fromSet) == 0 {
+		return map[string]any{"log_root": root, "merged": false, "reason": "未找到来源项目"}, nil
+	}
+	sources := make([]project, 0, len(fromSet))
+	for at := range fromSet {
+		sources = append(sources, pf.Projects[at])
+	}
+	sort.SliceStable(sources, func(i, j int) bool { return sources[i].Name < sources[j].Name })
+
 	target := pf.Projects[toAt]
 	now := time.Now().Format(time.RFC3339)
-
-	// 来源名与别名并入目标的别名；展项与路径合并。
-	mergedAliases := mergeAliases(target.Aliases, append([]string{source.Name}, source.Aliases...))
-	mergedAliases = filterOut(mergedAliases, target.Name)
-	target.Aliases = mergedAliases
-	target.Paths = mergePaths(target.Paths, source.Paths)
-	target.Exhibits = mergeExhibits(target.Exhibits, source.Exhibits)
-	if target.ExternalID == "" {
-		target.ExternalID = source.ExternalID
+	for _, src := range sources {
+		target.Aliases = mergeAliases(target.Aliases, append([]string{src.Name}, src.Aliases...))
+		target.Aliases = filterOut(target.Aliases, target.Name)
+		target.Paths = mergePaths(target.Paths, src.Paths)
+		target.Exhibits = mergeExhibits(target.Exhibits, src.Exhibits)
+		if target.ExternalID == "" {
+			target.ExternalID = src.ExternalID
+		}
 	}
 	target.UpdatedAt = now
 	pf.Projects[toAt] = target
 
-	// 删除来源项目。
-	kept := make([]project, 0, len(pf.Projects)-1)
+	// 删除所有来源项目。
+	kept := make([]project, 0, len(pf.Projects)-len(fromSet))
 	for i, p := range pf.Projects {
-		if i == fromAt {
+		if fromSet[i] {
 			continue
 		}
 		kept = append(kept, p)
@@ -511,7 +532,19 @@ func projectMergeCap(in input) (any, error) {
 		return nil, err
 	}
 
-	// 改写历史条目：来源项目名/ID → 目标项目。
+	// 改写历史条目：来源项目名/ID/别名 → 目标项目。
+	sourceIDs := map[string]bool{}
+	sourceNames := map[string]bool{}
+	sourceAliases := map[string]bool{}
+	for _, src := range sources {
+		if src.ID != "" {
+			sourceIDs[src.ID] = true
+		}
+		sourceNames[normalizeProjectKey(src.Name)] = true
+		for _, a := range src.Aliases {
+			sourceAliases[normalizeProjectKey(a)] = true
+		}
+	}
 	updated := 0
 	touched := make([]string, 0)
 	dates, err := listDates(root)
@@ -526,9 +559,9 @@ func projectMergeCap(in input) (any, error) {
 		changed := false
 		for i := range day.Entries {
 			item := &day.Entries[i]
-			match := (source.ID != "" && item.ProjectID == source.ID) ||
-				strings.EqualFold(item.Project, source.Name) ||
-				aliasMatches(source.Aliases, item.Project)
+			key := normalizeProjectKey(item.Project)
+			match := (item.ProjectID != "" && sourceIDs[item.ProjectID]) ||
+				sourceNames[key] || sourceAliases[key]
 			if !match {
 				continue
 			}
@@ -545,10 +578,14 @@ func projectMergeCap(in input) (any, error) {
 			touched = append(touched, date)
 		}
 	}
+	names := make([]string, 0, len(sources))
+	for _, src := range sources {
+		names = append(names, src.Name)
+	}
 	return map[string]any{
 		"log_root": root,
 		"merged":   true,
-		"from":     source.Name,
+		"from":     strings.Join(names, ", "),
 		"to":       target.Name,
 		"updated":  updated,
 		"dates":    touched,

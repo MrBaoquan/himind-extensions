@@ -33,6 +33,11 @@ func writeFileAtomic(path string, payload []byte) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
+	// 写前保留一份备份：目标已存在时，覆盖前先把旧内容存为 <name>.bak，
+	// 便于误删或坏写后回收（这类文件都很小，重复拷贝成本可忽略）。
+	if existing, err := os.ReadFile(path); err == nil && len(existing) > 0 {
+		_ = os.WriteFile(path+".bak", existing, 0o644)
+	}
 	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp-*")
 	if err != nil {
 		return err
