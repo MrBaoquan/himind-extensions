@@ -19,7 +19,7 @@
           "type": "select",
           "required": false,
           "default": "all",
-          "options": ["all", "codex", "claude", "opencode", "copilot"]
+          "options": ["all", "codex", "claude", "opencode", "copilot", "vscode-copilot"]
         },
         {
           "id": "sqlite3_path",

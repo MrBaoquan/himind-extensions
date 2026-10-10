@@ -532,3 +532,122 @@ func TestCandidateEntriesCarryRepoPath(t *testing.T) {
 		t.Fatalf("候选条目应携带展项: %#v", entries[0])
 	}
 }
+
+// writeVSCodeChatFixture 构造一个 workspaceStorage/<hash>：含 workspace.json 与一个会话文件。
+func writeVSCodeChatFixture(t *testing.T, wsDir, workspaceJSON, fileName string, sessionID, title string, start time.Time) {
+	t.Helper()
+	chatDir := filepath.Join(wsDir, "chatSessions")
+	if err := os.MkdirAll(chatDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wsDir, "workspace.json"), []byte(workspaceJSON), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	header := map[string]any{
+		"version": 3, "creationDate": start.UnixMilli(), "customTitle": title, "sessionId": sessionID,
+		"requests": []any{
+			map[string]any{"requestId": "r1", "timestamp": start.UnixMilli(), "message": map[string]any{"text": "实现登录功能"}, "response": []any{}},
+		},
+	}
+	headerLine, _ := json.Marshal(map[string]any{"kind": 0, "v": header})
+	appendLine, _ := json.Marshal(map[string]any{"kind": 2, "k": []any{"requests"}, "v": []any{
+		map[string]any{"requestId": "r2", "timestamp": start.Add(30 * time.Minute).UnixMilli(), "message": map[string]any{"text": "补充回归测试"}, "response": []any{}},
+	}})
+	responseLine, _ := json.Marshal(map[string]any{"kind": 2, "k": []any{"requests", 0, "response"}, "v": []any{
+		map[string]any{"kind": "markdown", "value": "已完成登录功能并补充测试"},
+	}})
+	content := strings.Join([]string{string(headerLine), string(appendLine), string(responseLine)}, "\n") + "\n"
+	if err := os.WriteFile(filepath.Join(chatDir, fileName), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestScanVSCodeCopilot 验证稳定版与 Insiders 两个根下的 Copilot Chat 会话都能被采集。
+func TestScanVSCodeCopilot(t *testing.T) {
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	home := t.TempDir()
+	start := time.Date(2026, 10, 9, 2, 0, 0, 0, time.UTC)
+	stableWs := filepath.Join(home, "AppData", "Roaming", "Code", "User", "workspaceStorage", "stablehash")
+	writeVSCodeChatFixture(t, stableWs, `{"folder":"file:///f%3A/WebProjects/demo"}`, "vs-1.jsonl", "vs-1", "构建并启动FileSharer项目", start)
+	insidersWs := filepath.Join(home, "AppData", "Roaming", "Code - Insiders", "User", "workspaceStorage", "insidershash")
+	writeVSCodeChatFixture(t, insidersWs, `{"folder":"file:///f%3A/WebProjects/insiders-proj"}`, "vs-2.jsonl", "vs-2", "Insiders 会话", start)
+
+	sources := call(t, "work-log.session.sources", `{"home":`+quote(home)+`}`)
+	byID := map[string]map[string]any{}
+	for _, raw := range sources["sources"].([]any) {
+		item := raw.(map[string]any)
+		byID[item["id"].(string)] = item
+	}
+	if byID["vscode-copilot"]["exists"] != true || byID["vscode-copilot"]["supported"] != true {
+		t.Fatalf("VS Code Copilot Chat 应被识别为可用: %#v", byID["vscode-copilot"])
+	}
+	if byID["vscode-copilot"]["files"].(float64) != 2 {
+		t.Fatalf("应统计到 2 个会话文件: %#v", byID["vscode-copilot"])
+	}
+
+	out := call(t, "work-log.session.scan", `{"home":`+quote(home)+`,"date":"2026-10-09","limit":10,"source":"vscode-copilot"}`)
+	if out["total"].(float64) != 2 {
+		t.Fatalf("应扫描到 2 个 VS Code 会话，实际 %v", out["total"])
+	}
+	seen := map[string]map[string]any{}
+	for _, raw := range out["sessions"].([]any) {
+		item := raw.(map[string]any)
+		seen[item["session_id"].(string)] = item
+	}
+	first := seen["vs-1"]
+	if first == nil {
+		t.Fatalf("缺少 vs-1 会话: %#v", seen)
+	}
+	if first["source"] != "vscode-copilot" {
+		t.Fatalf("来源应标记为 vscode-copilot: %#v", first)
+	}
+	if first["project"] != "demo" {
+		t.Fatalf("应通过 workspace.json 解析出项目目录名 demo: %#v", first["project"])
+	}
+	if first["title"] != "构建并启动FileSharer项目" {
+		t.Fatalf("标题应取会话 customTitle: %#v", first["title"])
+	}
+	if first["date"] != "2026-10-09" {
+		t.Fatalf("日期应为本地 2026-10-09: %v", first["date"])
+	}
+	prompts := first["user_prompts"].([]any)
+	if len(prompts) != 2 || prompts[0] != "实现登录功能" || prompts[1] != "补充回归测试" {
+		t.Fatalf("应回放追加的请求: %#v", prompts)
+	}
+	excerpts := first["assistant_excerpts"].([]any)
+	if len(excerpts) != 1 || !strings.Contains(excerpts[0].(string), "已完成登录功能") {
+		t.Fatalf("应回放追加的响应分片: %#v", excerpts)
+	}
+	if seen["vs-2"] == nil || seen["vs-2"]["project"] != "insiders-proj" {
+		t.Fatalf("应采集 Insiders 根下的会话: %#v", seen["vs-2"])
+	}
+}
+
+// TestVSCodeCopilotSkipsEmptySession 验证无用户内容的空会话被跳过。
+func TestVSCodeCopilotSkipsEmptySession(t *testing.T) {
+	home := t.TempDir()
+	start := time.Date(2026, 10, 9, 2, 0, 0, 0, time.UTC)
+	wsDir := filepath.Join(home, "AppData", "Roaming", "Code", "User", "workspaceStorage", "emptyhash")
+	chatDir := filepath.Join(wsDir, "chatSessions")
+	if err := os.MkdirAll(chatDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wsDir, "workspace.json"), []byte(`{"folder":"file:///f%3A/WebProjects/empty"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	header := map[string]any{"version": 3, "creationDate": start.UnixMilli(), "sessionId": "vs-empty", "requests": []any{}}
+	line, _ := json.Marshal(map[string]any{"kind": 0, "v": header})
+	if err := os.WriteFile(filepath.Join(chatDir, "vs-empty.jsonl"), []byte(string(line)+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	digests, err := scanVSCodeCopilot([]string{filepath.Dir(filepath.Dir(chatDir))}, start, start.AddDate(0, 0, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(digests) != 1 {
+		t.Fatalf("应扫描到 1 个会话（内容为空由后续空会话过滤处理）: %#v", digests)
+	}
+	if len(digests[0].UserPrompts) != 0 {
+		t.Fatalf("空会话不应有用户提示: %#v", digests[0].UserPrompts)
+	}
+}

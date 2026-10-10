@@ -1,6 +1,6 @@
 # 每日工作日志
 
-采集本机 AI 客户端（Codex / Claude Code / OpenCode / Copilot）的会话素材，用内置 AI 总结成清晰的工作日志条目写入全局工作日志，并生成日报归档。适合每日收工或定时补记，把散落在各客户端里的工作痕迹沉淀成可检索的日志。
+采集本机 AI 客户端（Codex / Claude Code / OpenCode / Copilot / VS Code Copilot Chat）的会话素材，用内置 AI 总结成清晰的工作日志条目写入全局工作日志，并生成日报归档。适合每日收工或定时补记，把散落在各客户端里的工作痕迹沉淀成可检索的日志。
 
 核心是**按日的工作日志**：采集、总结、写入、日报都以单日为单位。周 / 季度 / 年度汇总只是辅助视图（`work-log.report.render` 的 `period` 参数），不在这条链路的默认路径上；日常回看走插件按日历查看的月视图。
 
@@ -27,6 +27,7 @@
 - **Codex**：`~/.codex` 下的 rollout JSONL（原生解析，无需外部工具）。
 - **Claude Code**：`~/.claude/projects` 下的会话索引。
 - **OpenCode / Copilot**：SQLite 会话库，需要 `sqlite3` CLI；缺失时在 `skipped` 里如实标记，不伪造结果。
+- **VS Code Copilot Chat**：`%APPDATA%/Code(- Insiders)/User/workspaceStorage/*/chatSessions/*.jsonl` 的会话补丁文件；按同目录 `workspace.json` 还原工作区路径，稳定版与 Insiders 一并覆盖，无需外部工具。
 - **通用可配置来源**：用声明式规格（路径 + 格式 + 字段映射）接入任意客户端，配置写在 `<日志根>/config/sources.json`，也可用 run 输入的 `sources_config` 内联覆盖。内置预设覆盖 Cursor、Gemini CLI、Cline、Continue、Windsurf、通义灵码、CodeBuddy、Kiro、WorkBuddy 等（标注实验性，字段可按实际结构调整）。
 
 ## 项目归类

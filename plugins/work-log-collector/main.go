@@ -8,6 +8,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
@@ -15,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -84,8 +86,10 @@ func rpcResult(result any, err error) (any, *jsonrpc.Error) {
 type sourceSpec struct {
 	ID         string
 	Label      string
-	Kind       string // sqlite | jsonl
+	Kind       string // sqlite | jsonl | vscode-chat
 	DefaultRel string
+	// DefaultRels 用于一个客户端存在多个存储根的场景（如 VS Code 稳定版 + Insiders）。
+	DefaultRels []string
 }
 
 func allSpecs() []sourceSpec {
@@ -94,6 +98,10 @@ func allSpecs() []sourceSpec {
 		{ID: "claude", Label: "Claude Code", Kind: "jsonl", DefaultRel: ".claude/projects"},
 		{ID: "opencode", Label: "OpenCode", Kind: "sqlite", DefaultRel: ".local/share/opencode/opencode.db"},
 		{ID: "copilot", Label: "GitHub Copilot", Kind: "sqlite", DefaultRel: ".copilot/session-store.db"},
+		{ID: "vscode-copilot", Label: "VS Code Copilot Chat", Kind: "vscode-chat", DefaultRels: []string{
+			"AppData/Roaming/Code/User/workspaceStorage",
+			"AppData/Roaming/Code - Insiders/User/workspaceStorage",
+		}},
 	}
 }
 
@@ -121,13 +129,33 @@ func resolveHome(in input) (string, error) {
 	return home, nil
 }
 
-func sourcePath(spec sourceSpec, home string, roots map[string]string) string {
+// sourcePaths 解析来源的存储根：显式 roots 覆盖优先；否则用 DefaultRels（多根）或 DefaultRel（单根）。
+func sourcePaths(spec sourceSpec, home string, roots map[string]string) []string {
 	if roots != nil {
 		if v := strings.TrimSpace(roots[spec.ID]); v != "" {
-			return v
+			return []string{v}
 		}
 	}
-	return filepath.Join(home, filepath.FromSlash(spec.DefaultRel))
+	if len(spec.DefaultRels) > 0 {
+		out := make([]string, 0, len(spec.DefaultRels))
+		for _, rel := range spec.DefaultRels {
+			out = append(out, filepath.Join(home, filepath.FromSlash(rel)))
+		}
+		return out
+	}
+	return []string{filepath.Join(home, filepath.FromSlash(spec.DefaultRel))}
+}
+
+// existingSourcePaths 返回实际存在的存储根（可能多个）。
+func existingSourcePaths(spec sourceSpec, home string, roots map[string]string) []string {
+	paths := sourcePaths(spec, home, roots)
+	found := make([]string, 0, len(paths))
+	for _, p := range paths {
+		if sourceExists(spec, p) {
+			found = append(found, p)
+		}
+	}
+	return found
 }
 
 // resolveSQLite 定位 sqlite3 CLI：优先显式参数，其次 PATH，最后环境变量 SQLITE3。
@@ -155,8 +183,9 @@ func sourcesCap(in input) (any, error) {
 	sqlitePath, sqliteNote := resolveSQLite(in)
 	statuses := make([]sourceStatus, 0)
 	for _, spec := range allSpecs() {
-		path := sourcePath(spec, home, in.Roots)
-		status := sourceStatus{ID: spec.ID, Label: spec.Label, Kind: spec.Kind, Path: path, Exists: sourceExists(spec, path)}
+		paths := sourcePaths(spec, home, in.Roots)
+		existing := existingSourcePaths(spec, home, in.Roots)
+		status := sourceStatus{ID: spec.ID, Label: spec.Label, Kind: spec.Kind, Path: strings.Join(paths, " | "), Exists: len(existing) > 0}
 		switch {
 		case spec.Kind == "sqlite" && sqlitePath == "":
 			status.Supported = false
@@ -166,6 +195,9 @@ func sourcesCap(in input) (any, error) {
 			status.Note = "未发现会话存储"
 		default:
 			status.Supported = true
+			if spec.Kind == "vscode-chat" {
+				status.Files = countVSCodeChatSessions(existing)
+			}
 		}
 		statuses = append(statuses, status)
 	}
@@ -278,32 +310,34 @@ func scanCap(in input) (any, error) {
 		if selected != "all" && selected != spec.ID {
 			continue
 		}
-		path := sourcePath(spec, home, in.Roots)
-		if !sourceExists(spec, path) {
-			skipped = append(skipped, map[string]any{"source": spec.ID, "reason": "未发现会话存储", "path": path})
+		existing := existingSourcePaths(spec, home, in.Roots)
+		if len(existing) == 0 {
+			skipped = append(skipped, map[string]any{"source": spec.ID, "reason": "未发现会话存储", "path": strings.Join(sourcePaths(spec, home, in.Roots), " | ")})
 			continue
 		}
 		var found []sessionDigest
 		switch spec.ID {
 		case "codex":
-			found, err = scanCodex(path, start, end)
+			found, err = scanCodex(existing[0], start, end)
 		case "claude":
-			found, err = scanClaude(path, start, end)
+			found, err = scanClaude(existing[0], start, end)
+		case "vscode-copilot":
+			found, err = scanVSCodeCopilot(existing, start, end)
 		case "opencode":
 			if sqlitePath == "" {
-				skipped = append(skipped, map[string]any{"source": spec.ID, "reason": "缺少 sqlite3 CLI", "path": path})
+				skipped = append(skipped, map[string]any{"source": spec.ID, "reason": "缺少 sqlite3 CLI", "path": existing[0]})
 				continue
 			}
-			found, err = scanOpenCode(sqlitePath, path, start, end)
+			found, err = scanOpenCode(sqlitePath, existing[0], start, end)
 		case "copilot":
 			if sqlitePath == "" {
-				skipped = append(skipped, map[string]any{"source": spec.ID, "reason": "缺少 sqlite3 CLI", "path": path})
+				skipped = append(skipped, map[string]any{"source": spec.ID, "reason": "缺少 sqlite3 CLI", "path": existing[0]})
 				continue
 			}
-			found, err = scanCopilot(sqlitePath, path, start, end)
+			found, err = scanCopilot(sqlitePath, existing[0], start, end)
 		}
 		if err != nil {
-			skipped = append(skipped, map[string]any{"source": spec.ID, "reason": err.Error(), "path": path})
+			skipped = append(skipped, map[string]any{"source": spec.ID, "reason": err.Error(), "path": strings.Join(existing, " | ")})
 			continue
 		}
 		digests = append(digests, found...)
@@ -1224,6 +1258,322 @@ func scanCopilot(sqlite3Path, db string, start, end time.Time) ([]sessionDigest,
 	return digests, nil
 }
 
+// ---- VS Code Copilot Chat ----
+
+// vscodePatchLine 是 VS Code 会话文件的增量补丁行：k 是字段路径，v 是值。
+// kind 0=初始状态，1=按路径赋值，2=向路径上的数组追加。
+type vscodePatchLine struct {
+	Kind int             `json:"kind"`
+	K    []any           `json:"k"`
+	V    json.RawMessage `json:"v"`
+}
+
+type vscodeChatResponsePart struct {
+	Kind  string `json:"kind"`
+	Value string `json:"value"`
+}
+
+type vscodeChatRequest struct {
+	RequestID string `json:"requestId"`
+	Timestamp int64  `json:"timestamp"`
+	Message   struct {
+		Text string `json:"text"`
+	} `json:"message"`
+	Response   []vscodeChatResponsePart `json:"response"`
+	ModelState struct {
+		CompletedAt int64 `json:"completedAt"`
+	} `json:"modelState"`
+}
+
+type vscodeChatHeader struct {
+	Version      int                 `json:"version"`
+	CreationDate int64               `json:"creationDate"`
+	CustomTitle  string              `json:"customTitle"`
+	SessionID    string              `json:"sessionId"`
+	Requests     []vscodeChatRequest `json:"requests"`
+}
+
+// scanVSCodeCopilot 扫描一个或多个 VS Code workspaceStorage 根下的 Copilot Chat 会话
+// （稳定版与 Insiders 可同时覆盖）。
+func scanVSCodeCopilot(roots []string, start, end time.Time) ([]sessionDigest, error) {
+	var digests []sessionDigest
+	for _, root := range roots {
+		entries, err := os.ReadDir(root)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			wsDir := filepath.Join(root, entry.Name())
+			chatDir := filepath.Join(wsDir, "chatSessions")
+			if !dirExists(chatDir) {
+				continue
+			}
+			dir := vscodeWorkspaceFolder(wsDir)
+			files, err := os.ReadDir(chatDir)
+			if err != nil {
+				continue
+			}
+			for _, file := range files {
+				if file.IsDir() || !strings.HasSuffix(file.Name(), ".jsonl") {
+					continue
+				}
+				// 文件最后修改时间早于区间起点，说明当天没有活动，快速跳过。
+				if info, err := file.Info(); err == nil && info.ModTime().Before(start) {
+					continue
+				}
+				digest, ok := parseVSCodeChatFile(filepath.Join(chatDir, file.Name()), dir)
+				if !ok {
+					continue
+				}
+				started, err := time.Parse(time.RFC3339, digest.StartedAt)
+				if err != nil || !inRange(started, start, end) {
+					continue
+				}
+				digests = append(digests, digest)
+			}
+		}
+	}
+	return digests, nil
+}
+
+// parseVSCodeChatFile 回放 VS Code 会话文件的补丁序列，抽出会话标识、时间、用户提问与助手回答。
+func parseVSCodeChatFile(file, dir string) (sessionDigest, bool) {
+	handle, err := os.Open(file)
+	if err != nil {
+		return sessionDigest{}, false
+	}
+	defer handle.Close()
+
+	reader := bufio.NewReaderSize(handle, 1<<20)
+	var header vscodeChatHeader
+	receivedHeader := false
+	requests := make([]vscodeChatRequest, 0)
+	completed := int64(0)
+	for {
+		line, err := reader.ReadBytes('\n')
+		trimmed := bytes.TrimSpace(line)
+		if len(trimmed) > 0 {
+			var patch vscodePatchLine
+			if json.Unmarshal(trimmed, &patch) == nil {
+				switch patch.Kind {
+				case 0:
+					if json.Unmarshal(patch.V, &header) == nil {
+						receivedHeader = true
+						requests = append(requests, header.Requests...)
+					}
+				case 2:
+					// 追加新请求：k == ["requests"]
+					if len(patch.K) == 1 && patchKeyName(patch.K[0]) == "requests" {
+						var items []vscodeChatRequest
+						if json.Unmarshal(patch.V, &items) == nil {
+							requests = append(requests, items...)
+						}
+					}
+					// 追加请求响应分片：k == ["requests", i, "response"]
+					if len(patch.K) == 3 && patchKeyName(patch.K[0]) == "requests" && patchKeyName(patch.K[2]) == "response" {
+						if idx := patchKeyIndex(patch.K[1]); idx >= 0 && idx < len(requests) {
+							var items []vscodeChatResponsePart
+							if json.Unmarshal(patch.V, &items) == nil {
+								requests[idx].Response = append(requests[idx].Response, items...)
+							}
+						}
+					}
+				case 1:
+					// 记录请求完成时间：k == ["requests", i, "modelState"]
+					if len(patch.K) == 3 && patchKeyName(patch.K[0]) == "requests" && patchKeyName(patch.K[2]) == "modelState" {
+						if idx := patchKeyIndex(patch.K[1]); idx >= 0 && idx < len(requests) {
+							var state struct {
+								CompletedAt int64 `json:"completedAt"`
+							}
+							if json.Unmarshal(patch.V, &state) == nil && state.CompletedAt > completed {
+								completed = state.CompletedAt
+							}
+						}
+					}
+				}
+			}
+		}
+		if err != nil {
+			break
+		}
+	}
+	if !receivedHeader || strings.TrimSpace(header.SessionID) == "" {
+		return sessionDigest{}, false
+	}
+
+	digest := sessionDigest{Source: "vscode-copilot", SessionID: header.SessionID, Directory: dir, Ref: file}
+	if dir != "" {
+		digest.Project = filepath.Base(dir)
+	}
+	digest.Title = firstLine(header.CustomTitle, 80)
+
+	started := timeFromMillis(header.CreationDate)
+	var ended time.Time
+	var times []time.Time
+	for _, req := range requests {
+		if ts := timeFromMillis(req.Timestamp); !ts.IsZero() {
+			if started.IsZero() || ts.Before(started) {
+				started = ts
+			}
+			if ts.After(ended) {
+				ended = ts
+			}
+			times = append(times, ts)
+		}
+		if text := cleanVSCodeText(req.Message.Text); strings.TrimSpace(text) != "" {
+			digest.UserPrompts = append(digest.UserPrompts, text)
+			if digest.Title == "" {
+				digest.Title = firstLine(text, 80)
+			}
+		}
+		if text := vscodeResponseText(req.Response); strings.TrimSpace(text) != "" {
+			digest.AssistantExcerpts = append(digest.AssistantExcerpts, firstLine(text, 240))
+		}
+	}
+	if done := timeFromMillis(completed); !done.IsZero() {
+		if done.After(ended) {
+			ended = done
+		}
+		times = append(times, done)
+	}
+	if started.IsZero() {
+		return sessionDigest{}, false
+	}
+	digest.StartedAt = started.Format(time.RFC3339)
+	if !ended.IsZero() {
+		digest.EndedAt = ended.Format(time.RFC3339)
+	}
+	digest.Date = started.Local().Format(dateLayout)
+	digest.TurnCount = len(digest.UserPrompts)
+	digest.Minutes, digest.MinutesSource = resolveMinutes(times, started, ended, digest.TurnCount)
+	return digest, true
+}
+
+// vscodeResponseText 汇总响应分片里可作为素材摘要的文本。
+func vscodeResponseText(parts []vscodeChatResponsePart) string {
+	var out []string
+	for _, part := range parts {
+		switch part.Kind {
+		case "text", "markdown", "thinking", "progress":
+			if strings.TrimSpace(part.Value) != "" {
+				out = append(out, part.Value)
+			}
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+// cleanVSCodeText 去掉 VS Code 注入的附件/上下文块，尽量只留用户真实问题。
+func cleanVSCodeText(text string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return ""
+	}
+	if strings.HasPrefix(text, "<") {
+		if idx := strings.LastIndex(text, "</attachments>"); idx >= 0 {
+			text = strings.TrimSpace(text[idx+len("</attachments>"):])
+		}
+		if idx := strings.LastIndex(text, "</context>"); idx >= 0 {
+			text = strings.TrimSpace(text[idx+len("</context>"):])
+		}
+	}
+	return text
+}
+
+// vscodeWorkspaceFolder 从 workspaceStorage/<hash>/workspace.json 解析该工作区对应的本地目录。
+func vscodeWorkspaceFolder(wsDir string) string {
+	data, err := os.ReadFile(filepath.Join(wsDir, "workspace.json"))
+	if err != nil {
+		return ""
+	}
+	var meta struct {
+		Folder    string `json:"folder"`
+		Workspace string `json:"workspace"`
+	}
+	if json.Unmarshal(data, &meta) != nil {
+		return ""
+	}
+	path := decodeFileURI(firstNonEmpty(meta.Folder, meta.Workspace))
+	if path == "" {
+		return ""
+	}
+	if strings.HasSuffix(strings.ToLower(path), ".code-workspace") {
+		return filepath.Dir(path)
+	}
+	return path
+}
+
+// decodeFileURI 把 file:///c%3A/... 这类 URI 还原成本地路径。
+func decodeFileURI(raw string) string {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return ""
+	}
+	if strings.HasPrefix(strings.ToLower(s), "file://") {
+		s = s[len("file://"):]
+	}
+	if unescaped, err := url.PathUnescape(s); err == nil {
+		s = unescaped
+	}
+	if len(s) >= 3 && s[0] == '/' && s[2] == ':' {
+		s = s[1:]
+	}
+	return filepath.FromSlash(s)
+}
+
+func timeFromMillis(ms int64) time.Time {
+	if ms <= 0 {
+		return time.Time{}
+	}
+	return time.UnixMilli(ms)
+}
+
+func patchKeyName(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return ""
+}
+
+func patchKeyIndex(v any) int {
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case int:
+		return n
+	}
+	return -1
+}
+
+// countVSCodeChatSessions 统计多个 workspaceStorage 根下的会话文件数。
+func countVSCodeChatSessions(roots []string) int {
+	total := 0
+	for _, root := range roots {
+		entries, err := os.ReadDir(root)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			files, err := os.ReadDir(filepath.Join(root, entry.Name(), "chatSessions"))
+			if err != nil {
+				continue
+			}
+			for _, file := range files {
+				if !file.IsDir() && strings.HasSuffix(file.Name(), ".jsonl") {
+					total++
+				}
+			}
+		}
+	}
+	return total
+}
+
 // ---- SQLite 辅助 ----
 
 func runSQLiteJSON(sqlite3Path, db, query string) ([]map[string]any, error) {
@@ -1320,9 +1670,9 @@ func dirExists(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-// sourceExists 按来源类型判断存储是否存在：JSONL 源是目录，SQLite 源是文件。
+// sourceExists 按来源类型判断存储是否存在：目录型（JSONL / VS Code 会话）是目录，SQLite 源是文件。
 func sourceExists(spec sourceSpec, path string) bool {
-	if spec.Kind == "jsonl" {
+	if spec.Kind == "jsonl" || spec.Kind == "vscode-chat" {
 		return dirExists(path)
 	}
 	return fileExists(path)

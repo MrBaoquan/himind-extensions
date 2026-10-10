@@ -1,11 +1,11 @@
 {
   "schema_version": "workflow_package.v1",
   "id": "com.himind.workflow.daily-work-log",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "distribution_targets": ["workbench", "github"],
   "name": "每日工作日志",
   "description": "采集本机 AI 会话素材，按仓库路径/项目/展项稳定归类并用内置 AI 总结成清晰的工作日志条目（按项目→功能聚合），写入全局工作日志，生成日报归档，并跨期补算周报/月报（自然周期去重）。",
-  "release_notes": "0.7.1：强化总结提示词，要求会话围绕具体功能/模块时 feature 必填，减少「未分类功能」堆积。",
+  "release_notes": "0.7.2：会话来源新增 VS Code Copilot Chat（稳定版 + Insiders），采集器一并覆盖。",
   "min_agent_version": "0.3.47",
   "local_requirements": {
     "platform": "windows",
