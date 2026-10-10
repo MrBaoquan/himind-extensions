@@ -927,14 +927,20 @@ func filterDates(dates []string, from, to string) []string {
 	return out
 }
 
-// archiveDedupeCap 合并同一会话的重复条目。历史补录按不同日期基准写入时，同一会话
-// 会散落在多天。默认 dry_run 预览；dry_run=false 时先备份受影响日文件再改写。
+// archiveDedupeCap 合并同一会话的重复条目。
+//
+// 采集器自 0.6.2 起按「活跃日」归集：同一条跨多日的长会话会在每一天各留一条记录，
+// 这是**正常记录**，不应被合并。因此默认只合并「同一天、同一会话」的真正重复条目
+// （例如 entry_id 规则变化前后各写过一次）。显式传 cross_day=true 时，才退回旧的
+// 「跨天合并到最早日期」行为，用于清理历史误录。默认 dry_run 预览；dry_run=false 时
+// 先备份受影响日文件再改写。
 func archiveDedupeCap(in input) (any, error) {
 	root, err := logRoot(in.LogRoot)
 	if err != nil {
 		return nil, err
 	}
 	dryRun := in.DryRun == nil || *in.DryRun
+	crossDay := in.CrossDay != nil && *in.CrossDay
 	unlock := lockRoot(root)
 	defer unlock()
 
@@ -974,6 +980,11 @@ func archiveDedupeCap(in input) (any, error) {
 			key := entrySessionKey(e)
 			if key == "" {
 				continue
+			}
+			// 默认只按「同一天 + 同一会话」去重，保留跨日归集出的多条正当记录；
+			// cross_day=true 时才按会话跨天归并。
+			if !crossDay {
+				key = key + "|" + d
 			}
 			groups[key] = append(groups[key], location{Date: d, Entry: e})
 		}
@@ -1077,6 +1088,7 @@ func archiveDedupeCap(in input) (any, error) {
 	return map[string]any{
 		"log_root":        root,
 		"dry_run":         dryRun,
+		"cross_day":       crossDay,
 		"days_scanned":    len(order),
 		"groups":          len(groupsOut),
 		"entries_removed": removedTotal,

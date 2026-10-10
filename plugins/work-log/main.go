@@ -128,6 +128,10 @@ type input struct {
 	ProjectsJSON string `json:"projects_json"`
 	// DryRun 供迁移维护能力预览改动而不写盘。
 	DryRun *bool `json:"dry_run"`
+	// CrossDay 供 work-log.entry.dedupe 选择是否跨天合并同一会话：默认 false 时只合并
+	// 「同一天、同一会话」的真正重复条目（采集器按活跃日归集后，同一长会话跨天出现是
+	// 正常记录，不该被合并）；显式 true 才启用旧的跨天合并（清理历史误录）。
+	CrossDay *bool `json:"cross_day"`
 	// MaterialRoot 供 work-log.project.autofill 指定「AI 会话素材」目录；缺省用采集器
 	// （com.himind.work-log-collector）私有数据目录下的 material/。
 	MaterialRoot string `json:"material_root"`

@@ -1408,9 +1408,89 @@ func writeDayFixture(t *testing.T, root, date string, entries []map[string]any) 
 	}
 }
 
-// TestDedupeMergesCrossDaySession 验证同一会话跨天重复会被合并到最早日期，内容取并集，
-// 且默认 dry_run 不改写、改写前生成备份。
-func TestDedupeMergesCrossDaySession(t *testing.T) {
+// TestDedupeKeepsCrossDayByDefault 验证默认语义：同一会话跨天出现是采集器按活跃日
+// 归集出的正常记录，默认不该被合并。
+func TestDedupeKeepsCrossDayByDefault(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	writeDayFixture(t, root, "2026-06-18", []map[string]any{{
+		"entry_id": "wl-a", "date": "2026-06-18", "source": "codex", "session_id": "s1",
+		"project": "项目看板", "category": "开发", "title": "实现登录", "summary": "实现了登录",
+		"outcomes": []string{"完成登录"},
+	}})
+	writeDayFixture(t, root, "2026-06-19", []map[string]any{{
+		"entry_id": "wl-b", "date": "2026-06-19", "source": "codex", "session_id": "s1",
+		"project": "项目看板", "category": "开发", "title": "继续登录", "summary": "实现登录并补充测试",
+		"outcomes": []string{"补充测试"},
+	}})
+
+	preview := call(t, "work-log.entry.dedupe", `{"log_root":`+quote(root)+`}`)
+	if preview["dry_run"] != true {
+		t.Fatalf("默认应是预览: %v", preview["dry_run"])
+	}
+	if preview["cross_day"] != false {
+		t.Fatalf("默认不应跨天合并: %v", preview["cross_day"])
+	}
+	if preview["groups"].(float64) != 0 || preview["entries_removed"].(float64) != 0 {
+		t.Fatalf("跨天同会话默认不该被合并，实际: %#v", preview)
+	}
+
+	apply := call(t, "work-log.entry.dedupe", `{"log_root":`+quote(root)+`,"dry_run":false}`)
+	if apply["days_changed"].(float64) != 0 {
+		t.Fatalf("默认不应改写任何天，实际 %v", apply["days_changed"])
+	}
+	d18 := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-06-18"}`)
+	d19 := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-06-19"}`)
+	if len(d18["entries"].([]any)) != 1 || len(d19["entries"].([]any)) != 1 {
+		t.Fatal("跨天记录应原样保留")
+	}
+}
+
+// TestDedupeMergesSameDayDuplicates 验证默认语义仍会合并「同一天+同一会话」的真正重复条目。
+func TestDedupeMergesSameDayDuplicates(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	writeDayFixture(t, root, "2026-06-18", []map[string]any{
+		{
+			"entry_id": "wl-x", "date": "2026-06-18", "source": "codex", "session_id": "s2",
+			"project": "项目看板", "category": "开发", "title": "实现登录", "summary": "实现了登录",
+			"outcomes": []string{"完成登录"},
+		},
+		{
+			"entry_id": "wl-y", "date": "2026-06-18", "source": "codex", "session_id": "s2",
+			"project": "项目看板", "category": "开发", "title": "实现登录", "summary": "实现登录并补充测试",
+			"outcomes": []string{"补充测试"}, "next": []string{"补文档"},
+		},
+	})
+
+	preview := call(t, "work-log.entry.dedupe", `{"log_root":`+quote(root)+`}`)
+	if preview["groups"].(float64) != 1 || preview["entries_removed"].(float64) != 1 {
+		t.Fatalf("应识别同天 1 组、移除 1 条: %#v", preview)
+	}
+
+	apply := call(t, "work-log.entry.dedupe", `{"log_root":`+quote(root)+`,"dry_run":false}`)
+	if apply["backup_dir"] == "" {
+		t.Fatal("改写应生成备份目录")
+	}
+	d18 := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-06-18"}`)
+	entries := d18["entries"].([]any)
+	if len(entries) != 1 {
+		t.Fatalf("合并后应只剩 1 条，实际 %d", len(entries))
+	}
+	item := entries[0].(map[string]any)
+	if got := toStrings(item["outcomes"]); len(got) != 2 {
+		t.Fatalf("outcomes 应取并集，实际 %#v", got)
+	}
+	if got := toStrings(item["next"]); len(got) != 1 || got[0] != "补文档" {
+		t.Fatalf("next 应保留，实际 %#v", got)
+	}
+	if item["summary"] != "实现登录并补充测试" {
+		t.Fatalf("summary 应取更长的一条，实际 %v", item["summary"])
+	}
+}
+
+// TestDedupeCrossDayOptIn 验证显式 cross_day=true 才退回旧的跨天合并行为（合并到最早日期）。
+func TestDedupeCrossDayOptIn(t *testing.T) {
 	withDataRoot(t)
 	root := t.TempDir()
 	writeDayFixture(t, root, "2026-06-18", []map[string]any{{
@@ -1424,28 +1504,20 @@ func TestDedupeMergesCrossDaySession(t *testing.T) {
 		"outcomes": []string{"补充测试"}, "next": []string{"补文档"},
 	}})
 
-	preview := call(t, "work-log.entry.dedupe", `{"log_root":`+quote(root)+`}`)
-	if preview["dry_run"] != true {
-		t.Fatalf("默认应是预览: %v", preview["dry_run"])
+	preview := call(t, "work-log.entry.dedupe", `{"log_root":`+quote(root)+`,"cross_day":true}`)
+	if preview["cross_day"] != true {
+		t.Fatalf("应识别跨天开关: %v", preview["cross_day"])
 	}
 	if preview["groups"].(float64) != 1 || preview["entries_removed"].(float64) != 1 {
 		t.Fatalf("应识别 1 组、移除 1 条: %#v", preview)
 	}
-	d18 := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-06-18"}`)
-	d19 := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-06-19"}`)
-	if len(d18["entries"].([]any)) != 1 || len(d19["entries"].([]any)) != 1 {
-		t.Fatal("预览不应改写文件")
-	}
 
-	apply := call(t, "work-log.entry.dedupe", `{"log_root":`+quote(root)+`,"dry_run":false}`)
-	if apply["backup_dir"] == "" {
-		t.Fatal("改写应生成备份目录")
-	}
+	apply := call(t, "work-log.entry.dedupe", `{"log_root":`+quote(root)+`,"cross_day":true,"dry_run":false}`)
 	if apply["days_changed"].(float64) != 2 {
 		t.Fatalf("应改写 2 天，实际 %v", apply["days_changed"])
 	}
-	d18 = call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-06-18"}`)
-	d19 = call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-06-19"}`)
+	d18 := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-06-18"}`)
+	d19 := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-06-19"}`)
 	e18 := d18["entries"].([]any)
 	e19 := d19["entries"].([]any)
 	if len(e18) != 1 || len(e19) != 0 {
@@ -1457,11 +1529,5 @@ func TestDedupeMergesCrossDaySession(t *testing.T) {
 	}
 	if got := toStrings(item["outcomes"]); len(got) != 2 {
 		t.Fatalf("outcomes 应取并集，实际 %#v", got)
-	}
-	if got := toStrings(item["next"]); len(got) != 1 || got[0] != "补文档" {
-		t.Fatalf("next 应保留，实际 %#v", got)
-	}
-	if item["summary"] != "实现登录并补充测试" {
-		t.Fatalf("summary 应取更长的一条，实际 %v", item["summary"])
 	}
 }
