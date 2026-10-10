@@ -10,9 +10,12 @@
 
 | 步骤 | 类型 | 风险 | 说明 |
 | --- | --- | --- | --- |
+| WL-PROJECTS | capability `business.project.list` | 只读 | 从项目看板同步项目（含类型）；未连接工作台时跳过 |
+| WL-EXHIBITS | capability `business.exhibit.list` | 只读 | 从项目看板同步展项及其本机路径；未连接工作台时跳过 |
 | WL-COLLECT | capability `work-log.session.scan` | 只读 | 探测本机会话来源，按目标日期提取会话摘要，落一份 `session-digest` 素材 artifact，并映射成带功能与工时的确定性条目草稿（`entries`） |
 | WL-SUMMARIZE | runtime `himind.builtin` | 只读 | 读取 `session-digest`，为每个真实工作会话产出「清晰标题 + 中文小结 + 完成/决策/经验/后续」的条目，并给当天 `narrative` |
 | WL-WRITE | capability `work-log.entry.upsert` | 本地写 | 取 AI 总结条目，按「来源+会话」叠加确定性素材（工时/起止时间），写入全局日志库；重复运行按稳定指纹合并 |
+| WL-AGGREGATE | capability `work-log.report.aggregate` | 本地写 | 跨期补算周报 / 月报（自然周期去重）；失败可容忍 |
 | WL-REPORT | capability `work-log.report.render` | 本地写 | 汇总当天条目产出 Markdown + 自包含 HTML 日报，按 项目 → 功能 聚合内容小结并统计工时，采用 AI `narrative` |
 
 入口分三段（`collect` / `summarize` / `report`），任一段坏了可按段重跑，不必从头再来。
@@ -42,6 +45,7 @@
 
 ## 边界
 
+- **工作台降级**：`WL-PROJECTS` / `WL-EXHIBITS` 从项目看板（工作台）同步项目与展项，属于可选 Provider。未连接工作台时这两步自动跳过（`on_failure: continue`），工作流继续用本地登记表完成采集、总结与写入；这两步也不在必需 `capabilities` 里，因此不会阻塞启动前检查。
 - 采集器不写工作日志库：它至多把会话素材落一份临时 artifact（扩展私有数据目录）供 AI 总结步骤读取；写入统一由 `work-log.entry.upsert` 负责，保证日志库只有一个写入者。
 - OpenCode/Copilot 的 SQLite 会话库由采集器内置的纯 Go 驱动读取，无需外部 `sqlite3`；来源缺失时在 `skipped` 里如实标记，不伪造结果。
 - 工作日志条目的标题与小结来自内置 AI 的总结（`WL-SUMMARIZE`），工时与起止时间取采集的确定性素材；若 AI 步骤失败，本次运行会失败而不是写入原始素材。没有内置 AI 时可用 `com.himind.skill.work-log` 技能从会话导出后再写回。
