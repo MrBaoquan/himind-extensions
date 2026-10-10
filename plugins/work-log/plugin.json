@@ -4,8 +4,8 @@
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
   "description": "以按日工作日志为核心：条目按仓库路径/项目/展项稳定归类，含功能与工时；报告按 项目→功能→工时 聚合，含月报、项目进展与月度工时表；周报/月报按自然周期自动补算并去重。",
-  "release_notes": "0.11.6：移除 entry.upsert 的整日清空开关（mode=replace），避免误删手工条目；删除请用 entry.delete。",
-  "version": "0.11.6",
+  "release_notes": "0.11.7：新增 entry.dedupe，按会话合并跨天重复条目（默认预览，改写前自动备份）。",
+  "version": "0.11.7",
   "distribution_targets": ["workbench", "github"],
   "entry": "bin/work-log.exe",
   "runtime": "process-jsonrpc-stdio",
@@ -462,6 +462,23 @@
       "risk_level": "local_write"
     },
     {
+      "id": "work-log.entry.dedupe",
+      "description": "合并同一会话的跨天重复条目（默认 dry_run 预览）",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "dry_run": {"type": "boolean", "description": "默认 true 只预览；传 false 才改写（改写前自动备份受影响日文件）"},
+          "from": {"type": "string"},
+          "to": {"type": "string"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
       "id": "work-log.project.resolve",
       "description": "把一个原始项目名按登记表归一为规范项目名",
       "availability": "local",
@@ -662,6 +679,7 @@
     "commands": [
       {"id": "work-log.entry.upsert", "title": "记录今日工作日志"},
       {"id": "work-log.entry.delete", "title": "删除工作日志条目"},
+      {"id": "work-log.entry.dedupe", "title": "整理重复条目"},
       {"id": "work-log.archive.calendar", "title": "按日历回看工作日志"},
       {"id": "work-log.report.render", "title": "生成当日工作简报"},
       {"id": "work-log.report.aggregate", "title": "汇总周报/月报"},

@@ -270,6 +270,9 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 	case "work-log.archive.migrate":
 		result, err := archiveMigrateCap(in)
 		return rpcResult(result, err)
+	case "work-log.entry.dedupe":
+		result, err := archiveDedupeCap(in)
+		return rpcResult(result, err)
 	case "work-log.project.sync":
 		result, err := projectSyncCap(in)
 		return rpcResult(result, err)

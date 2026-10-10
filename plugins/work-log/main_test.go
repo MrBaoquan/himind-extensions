@@ -1390,3 +1390,78 @@ func TestProjectSyncEnrichesOnlyLocalAssociations(t *testing.T) {
 		t.Fatalf("已有关联展项应补上 external_id，实际 %v", ex[0].(map[string]any)["external_id"])
 	}
 }
+
+// writeDayFixture 直接写一个日文件，解耦去重测试与写入幂等行为。
+func writeDayFixture(t *testing.T, root, date string, entries []map[string]any) {
+	t.Helper()
+	payload := map[string]any{"date": date, "schema_version": schemaVersion, "entries": entries, "count": len(entries)}
+	body, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(root, "logs", yearOfDate(date))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, date+".json"), append(body, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestDedupeMergesCrossDaySession 验证同一会话跨天重复会被合并到最早日期，内容取并集，
+// 且默认 dry_run 不改写、改写前生成备份。
+func TestDedupeMergesCrossDaySession(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	writeDayFixture(t, root, "2026-06-18", []map[string]any{{
+		"entry_id": "wl-a", "date": "2026-06-18", "source": "codex", "session_id": "s1",
+		"project": "项目看板", "category": "开发", "title": "实现登录", "summary": "实现了登录",
+		"outcomes": []string{"完成登录"},
+	}})
+	writeDayFixture(t, root, "2026-06-19", []map[string]any{{
+		"entry_id": "wl-b", "date": "2026-06-19", "source": "codex", "session_id": "s1",
+		"project": "项目看板", "category": "开发", "title": "实现登录", "summary": "实现登录并补充测试",
+		"outcomes": []string{"补充测试"}, "next": []string{"补文档"},
+	}})
+
+	preview := call(t, "work-log.entry.dedupe", `{"log_root":`+quote(root)+`}`)
+	if preview["dry_run"] != true {
+		t.Fatalf("默认应是预览: %v", preview["dry_run"])
+	}
+	if preview["groups"].(float64) != 1 || preview["entries_removed"].(float64) != 1 {
+		t.Fatalf("应识别 1 组、移除 1 条: %#v", preview)
+	}
+	d18 := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-06-18"}`)
+	d19 := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-06-19"}`)
+	if len(d18["entries"].([]any)) != 1 || len(d19["entries"].([]any)) != 1 {
+		t.Fatal("预览不应改写文件")
+	}
+
+	apply := call(t, "work-log.entry.dedupe", `{"log_root":`+quote(root)+`,"dry_run":false}`)
+	if apply["backup_dir"] == "" {
+		t.Fatal("改写应生成备份目录")
+	}
+	if apply["days_changed"].(float64) != 2 {
+		t.Fatalf("应改写 2 天，实际 %v", apply["days_changed"])
+	}
+	d18 = call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-06-18"}`)
+	d19 = call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-06-19"}`)
+	e18 := d18["entries"].([]any)
+	e19 := d19["entries"].([]any)
+	if len(e18) != 1 || len(e19) != 0 {
+		t.Fatalf("合并后应只剩最早日期 1 条，实际 d18=%d d19=%d", len(e18), len(e19))
+	}
+	item := e18[0].(map[string]any)
+	if item["date"] != "2026-06-18" {
+		t.Fatalf("合并条目应落在最早日期，实际 %v", item["date"])
+	}
+	if got := toStrings(item["outcomes"]); len(got) != 2 {
+		t.Fatalf("outcomes 应取并集，实际 %#v", got)
+	}
+	if got := toStrings(item["next"]); len(got) != 1 || got[0] != "补文档" {
+		t.Fatalf("next 应保留，实际 %#v", got)
+	}
+	if item["summary"] != "实现登录并补充测试" {
+		t.Fatalf("summary 应取更长的一条，实际 %v", item["summary"])
+	}
+}

@@ -783,6 +783,315 @@ func archiveMigrateCap(in input) (any, error) {
 	}, nil
 }
 
+// ---------- 重复条目整理 ----------
+
+// entrySessionKey 归一化会话身份键：同一来源的同一会话视为同一条目，与日期无关。
+func entrySessionKey(e entry) string {
+	id := strings.TrimSpace(e.SessionID)
+	if id == "" {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(e.Source)) + "|" + id
+}
+
+// entryWeight 粗略衡量条目内容充实度，用于在重复条目里挑选保留项。
+func entryWeight(e entry) int {
+	weight := 0
+	for _, field := range []string{e.Title, e.Summary, e.Project, e.Feature, e.Exhibit, e.ProjectHint, e.RepoPath, e.Category, e.StartedAt, e.EndedAt} {
+		if strings.TrimSpace(field) != "" {
+			weight++
+		}
+	}
+	weight += len(e.Outcomes) + len(e.Decisions) + len(e.Learnings) + len(e.Blockers) + len(e.Next) + len(e.Tags) + len(e.Refs)
+	if e.Minutes > 0 {
+		weight++
+	}
+	if len(e.Summary) > 40 {
+		weight++
+	}
+	return weight
+}
+
+// unionStrings 合并字符串列表：保持首次出现顺序并去重。
+func unionStrings(lists ...[]string) []string {
+	out := make([]string, 0)
+	seen := map[string]bool{}
+	for _, list := range lists {
+		for _, raw := range list {
+			value := strings.TrimSpace(raw)
+			if value == "" || seen[value] {
+				continue
+			}
+			seen[value] = true
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func earlierString(a, b string) bool {
+	at, bt := strings.TrimSpace(a), strings.TrimSpace(b)
+	if at == "" {
+		return false
+	}
+	if bt == "" {
+		return true
+	}
+	return at < bt
+}
+
+func laterString(a, b string) bool {
+	at, bt := strings.TrimSpace(a), strings.TrimSpace(b)
+	if at == "" {
+		return false
+	}
+	if bt == "" {
+		return true
+	}
+	return at > bt
+}
+
+// mergeDuplicates 把同一会话的重复条目合并为一条：内容取并集，时间取包络，工时取最大。
+func mergeDuplicates(primary entry, others []entry) entry {
+	merged := primary
+	for _, other := range others {
+		merged.Outcomes = unionStrings(merged.Outcomes, other.Outcomes)
+		merged.Decisions = unionStrings(merged.Decisions, other.Decisions)
+		merged.Learnings = unionStrings(merged.Learnings, other.Learnings)
+		merged.Blockers = unionStrings(merged.Blockers, other.Blockers)
+		merged.Next = unionStrings(merged.Next, other.Next)
+		merged.Tags = unionStrings(merged.Tags, other.Tags)
+		merged.Refs = append(merged.Refs, other.Refs...)
+		if strings.TrimSpace(merged.Project) == "" {
+			merged.Project = other.Project
+		}
+		if strings.TrimSpace(merged.Exhibit) == "" {
+			merged.Exhibit = other.Exhibit
+		}
+		if strings.TrimSpace(merged.ProjectID) == "" {
+			merged.ProjectID = other.ProjectID
+		}
+		if strings.TrimSpace(merged.ExhibitID) == "" {
+			merged.ExhibitID = other.ExhibitID
+		}
+		if strings.TrimSpace(merged.RepoPath) == "" {
+			merged.RepoPath = other.RepoPath
+		}
+		if strings.TrimSpace(merged.ProjectHint) == "" {
+			merged.ProjectHint = other.ProjectHint
+		}
+		if strings.TrimSpace(merged.Category) == "" {
+			merged.Category = other.Category
+		}
+		if strings.TrimSpace(merged.Title) == "" && strings.TrimSpace(other.Title) != "" {
+			merged.Title = other.Title
+		}
+		if len(strings.TrimSpace(other.Summary)) > len(strings.TrimSpace(merged.Summary)) {
+			merged.Summary = other.Summary
+		}
+		if merged.Minutes < other.Minutes {
+			merged.Minutes = other.Minutes
+			merged.MinutesSource = other.MinutesSource
+		}
+		if strings.TrimSpace(merged.Feature) == "" {
+			merged.Feature = other.Feature
+		}
+		if earlierString(other.StartedAt, merged.StartedAt) {
+			merged.StartedAt = other.StartedAt
+		}
+		if laterString(other.EndedAt, merged.EndedAt) {
+			merged.EndedAt = other.EndedAt
+		}
+		if earlierString(other.CreatedAt, merged.CreatedAt) {
+			merged.CreatedAt = other.CreatedAt
+		}
+		if laterString(other.UpdatedAt, merged.UpdatedAt) {
+			merged.UpdatedAt = other.UpdatedAt
+		}
+	}
+	return merged
+}
+
+// filterDates 按 [from,to] 区间筛选日期（空串表示不限）。
+func filterDates(dates []string, from, to string) []string {
+	out := make([]string, 0, len(dates))
+	for _, d := range dates {
+		if from != "" && d < from {
+			continue
+		}
+		if to != "" && d > to {
+			continue
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
+// archiveDedupeCap 合并同一会话的重复条目。历史补录按不同日期基准写入时，同一会话
+// 会散落在多天。默认 dry_run 预览；dry_run=false 时先备份受影响日文件再改写。
+func archiveDedupeCap(in input) (any, error) {
+	root, err := logRoot(in.LogRoot)
+	if err != nil {
+		return nil, err
+	}
+	dryRun := in.DryRun == nil || *in.DryRun
+	unlock := lockRoot(root)
+	defer unlock()
+
+	dates, err := listDates(root)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(in.From) != "" || strings.TrimSpace(in.To) != "" {
+		from, to := "", ""
+		if strings.TrimSpace(in.From) != "" {
+			from = normalizeDate(in.From)
+		}
+		if strings.TrimSpace(in.To) != "" {
+			to = normalizeDate(in.To)
+		}
+		dates = filterDates(dates, from, to)
+	}
+	days := map[string]*dayFile{}
+	order := make([]string, 0, len(dates))
+	for _, d := range dates {
+		day, err := readDay(root, d)
+		if err != nil {
+			continue
+		}
+		df := day
+		days[d] = &df
+		order = append(order, d)
+	}
+
+	type location struct {
+		Date  string
+		Entry entry
+	}
+	groups := map[string][]location{}
+	for _, d := range order {
+		for _, e := range days[d].Entries {
+			key := entrySessionKey(e)
+			if key == "" {
+				continue
+			}
+			groups[key] = append(groups[key], location{Date: d, Entry: e})
+		}
+	}
+
+	groupsOut := make([]map[string]any, 0)
+	removals := map[string]map[string]bool{}
+	additions := map[string][]entry{}
+	affected := map[string]bool{}
+	removedTotal := 0
+	for key, locs := range groups {
+		if len(locs) < 2 {
+			continue
+		}
+		// 保留内容最充实的一条；同等充实度取更早的日期。
+		primary := 0
+		for i := 1; i < len(locs); i++ {
+			wa, wb := entryWeight(locs[i].Entry), entryWeight(locs[primary].Entry)
+			if wa > wb || (wa == wb && earlierString(locs[i].Date, locs[primary].Date)) {
+				primary = i
+			}
+		}
+		// 合并结果落到最早的日期（会话开始的那天）。
+		target := locs[0].Date
+		for _, l := range locs {
+			if earlierString(l.Date, target) {
+				target = l.Date
+			}
+		}
+		others := make([]entry, 0, len(locs)-1)
+		removed := make([]map[string]any, 0, len(locs))
+		for i, l := range locs {
+			if removals[l.Date] == nil {
+				removals[l.Date] = map[string]bool{}
+			}
+			removals[l.Date][l.Entry.EntryID] = true
+			affected[l.Date] = true
+			removed = append(removed, map[string]any{"date": l.Date, "entry_id": l.Entry.EntryID, "title": l.Entry.Title})
+			if i != primary {
+				others = append(others, l.Entry)
+			}
+		}
+		merged := mergeDuplicates(locs[primary].Entry, others)
+		merged.Date = target
+		additions[target] = append(additions[target], merged)
+		affected[target] = true
+		removedTotal += len(locs) - 1
+		groupsOut = append(groupsOut, map[string]any{
+			"key":     key,
+			"kept":    map[string]any{"date": target, "entry_id": merged.EntryID, "title": merged.Title},
+			"removed": removed,
+		})
+	}
+
+	daysChanged := 0
+	backupDir := ""
+	if len(groupsOut) > 0 {
+		daysChanged = len(affected)
+	}
+	if len(groupsOut) > 0 && !dryRun {
+		backupDir = filepath.Join(root, "backups", "dedupe-"+time.Now().Format("20060102-150405"))
+		for d := range affected {
+			body, err := os.ReadFile(dayPath(root, d))
+			if err != nil {
+				continue
+			}
+			dest := filepath.Join(backupDir, "logs", yearOfDate(d), d+".json")
+			if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+				return nil, err
+			}
+			if err := os.WriteFile(dest, body, 0o644); err != nil {
+				return nil, err
+			}
+		}
+		daysChanged = 0
+		for d := range affected {
+			day := days[d]
+			kept := make([]entry, 0, len(day.Entries)+len(additions[d]))
+			for _, e := range day.Entries {
+				if removals[d][e.EntryID] {
+					continue
+				}
+				kept = append(kept, e)
+			}
+			kept = append(kept, additions[d]...)
+			sortEntries(kept)
+			day.Entries = kept
+			day.Date = d
+			day.SchemaVersion = schemaVersion
+			if err := writeDay(root, *day); err != nil {
+				return nil, err
+			}
+			daysChanged++
+		}
+	}
+
+	sort.Slice(groupsOut, func(i, j int) bool {
+		return groupsOut[i]["key"].(string) < groupsOut[j]["key"].(string)
+	})
+	return map[string]any{
+		"log_root":        root,
+		"dry_run":         dryRun,
+		"days_scanned":    len(order),
+		"groups":          len(groupsOut),
+		"entries_removed": removedTotal,
+		"days_changed":    daysChanged,
+		"backup_dir":      backupDir,
+		"duplicates":      groupsOut,
+	}, nil
+}
+
+func yearOfDate(date string) string {
+	if len(date) >= 4 {
+		return date[:4]
+	}
+	return date
+}
+
 // ---------- 小工具 ----------
 
 func asText(value any) string {
