@@ -82,6 +82,9 @@
     activeProject: '',
     projectEntries: null,
     projectLoading: false,
+    projectFeature: '',
+    projectFeatureExpanded: false,
+    projectGroupBy: 'time',
     // 登记管理（本地 UI 状态）
     registryQuery: '',
     registryFilter: 'all',
@@ -1586,6 +1589,10 @@
   }
 
   async function selectProject(name) {
+    if (state.activeProject !== name) {
+      state.projectFeature = '';
+      state.projectFeatureExpanded = false;
+    }
     state.activeProject = name;
     renderProjectList();
     const node = el('proj-progress');
@@ -1614,29 +1621,69 @@
       node.innerHTML = skeleton();
       return;
     }
-    const entries = state.projectEntries || [];
+    const allEntries = state.projectEntries || [];
     if (!state.activeProject) {
       node.innerHTML = emptyBlock('选择一个项目', ['左侧点一个项目，查看它的推进记录。']);
       return;
     }
-    if (!entries.length) {
+    if (!allEntries.length) {
       node.innerHTML = emptyBlock('这个项目还没有记录', ['写入日志时带上该项目名即可出现在这里。']);
       return;
     }
+
+    const flowAll = aggregateFlow(allEntries);
+    const allFeatures = flowAll.projects[0] ? flowAll.projects[0].featureList : [];
+    const namedFeatures = allFeatures.filter((f) => f.name !== '未分类功能');
+    const uncat = allFeatures.find((f) => f.name === '未分类功能');
+
+    const sel = text(state.projectFeature);
+    const entries = sel ? allEntries.filter((item) => text(item.feature, '未分类功能') === sel) : allEntries;
     const flow = aggregateFlow(entries);
-    const byDate = {};
-    entries.forEach((item) => {
-      if (!byDate[item.date]) byDate[item.date] = [];
-      byDate[item.date].push(item);
-    });
-    const dates = Object.keys(byDate).sort().reverse();
+
+    const dates = Object.keys(
+      entries.reduce((acc, item) => {
+        acc[item.date] = 1;
+        return acc;
+      }, {}),
+    ).sort().reverse();
     const activeDays = dates.length;
+
+    // daySections 把一组条目按日期分节渲染（时间线内共用）。
+    const daySections = (list) => {
+      const grouped = {};
+      list.forEach((item) => {
+        if (!grouped[item.date]) grouped[item.date] = [];
+        grouped[item.date].push(item);
+      });
+      return Object.keys(grouped)
+        .sort()
+        .reverse()
+        .map((date) => {
+          const dayEntries = grouped[date];
+          const minutes = dayEntries.reduce((s, i) => s + (Number(i.minutes) || 0), 0);
+          const cards = dayEntries.map((item) => entryCard(item, { hideProject: true })).join('');
+          return (
+            '<section class="pp-day"><div class="pp-day-head"><span class="pd-date">' +
+            escapeHTML(date) +
+            '</span><span class="pd-meta">' +
+            escapeHTML(dayEntries.length) +
+            ' 条' +
+            (minutes > 0 ? ' · ' + escapeHTML(hoursShort(minutes)) + 'h' : '') +
+            '</span></div>' +
+            cards +
+            '</section>'
+          );
+        })
+        .join('');
+    };
 
     const head =
       '<div class="pp-head"><h2>' +
       escapeHTML(state.activeProject) +
       '</h2>' +
-      '<div class="pp-stats"><span class="badge">' +
+      '<div class="pp-stats">' +
+      (sel ? '<span class="badge accent">展项 · ' + escapeHTML(sel) + '</span>' : '') +
+      '<span class="badge">' +
       escapeHTML(flow.count) +
       ' 条</span><span class="badge">' +
       escapeHTML(activeDays) +
@@ -1644,47 +1691,129 @@
       (flow.totalMinutes > 0 ? '<span class="badge">约 ' + escapeHTML(hoursShort(flow.totalMinutes)) + ' 小时</span>' : '') +
       '<span class="badge">' +
       escapeHTML(text(dates[dates.length - 1]) + ' ~ ' + text(dates[0])) +
-      '</span></div>' +
+      '</span>' +
+      (sel ? '<button class="link-btn" type="button" data-feature-clear>返回全部</button>' : '') +
+      '</div>' +
       categoryChips(flow.categories) +
       '</div>';
 
-    const features = flow.projects[0] ? flow.projects[0].featureList : [];
-    const featureBlock =
-      features.length > 1
-        ? '<div class="pp-features">' +
-          features
-            .map(
-              (feature) =>
-                '<span class="flow-feat">' +
-                escapeHTML(feature.name) +
-                (feature.minutes > 0 ? '<b>' + escapeHTML(hoursShort(feature.minutes)) + 'h</b>' : '') +
-                '</span>',
-            )
-            .join('') +
-          '</div>'
-        : '';
+    // 展项 / 功能 过滤条 + 视图切换。
+    let toolbar = '';
+    if (allFeatures.length > 1) {
+      const CAP = 14;
+      const expanded = !!state.projectFeatureExpanded;
+      let visible = expanded ? namedFeatures.slice() : namedFeatures.slice(0, CAP);
+      if (sel && sel !== '未分类功能' && !visible.some((f) => f.name === sel)) {
+        const hit = namedFeatures.find((f) => f.name === sel);
+        if (hit) visible = [hit].concat(visible);
+      }
+      const chipHtml = (name, label, minutes, count, active) =>
+        '<button class="pp-feat-chip' +
+        (active ? ' active' : '') +
+        '" type="button" data-feature="' +
+        escapeHTML(name) +
+        '" title="' +
+        escapeHTML(label) +
+        '"><span class="pfc-name">' +
+        escapeHTML(label) +
+        '</span><b>' +
+        (minutes > 0 ? escapeHTML(hoursShort(minutes)) + 'h' : escapeHTML(count) + ' 条') +
+        '</b></button>';
+      const chips =
+        chipHtml('', '全部', flowAll.projects[0] ? flowAll.projects[0].minutes : 0, allEntries.length, sel === '') +
+        visible.map((f) => chipHtml(f.name, f.name, f.minutes, f.count, sel === f.name)).join('') +
+        (uncat ? chipHtml('未分类功能', '未归类', 0, uncat.count, sel === '未分类功能') : '') +
+        (namedFeatures.length > CAP
+          ? '<button class="pp-feat-more" type="button" data-features-toggle>' +
+            (expanded ? '收起' : '展开全部 ' + namedFeatures.length + ' 项') +
+            '</button>'
+          : '');
+      const grp = (key, label) =>
+        '<button class="pp-grp-btn' +
+        (state.projectGroupBy === key ? ' active' : '') +
+        '" type="button" data-group="' +
+        key +
+        '">' +
+        label +
+        '</button>';
+      toolbar =
+        '<div class="pp-toolbar">' +
+        '<div class="pp-feats"><span class="pp-feats-label">展项 / 功能</span><div class="pp-feat-chips' +
+        (expanded ? ' expanded' : '') +
+        '">' +
+        chips +
+        '</div></div>' +
+        '<div class="pp-group"><span class="pp-group-label">视图</span>' +
+        grp('time', '按时间') +
+        grp('feature', '按展项') +
+        '</div></div>';
+    }
 
-    const timeline = dates
-      .map((date) => {
-        const dayEntries = byDate[date];
-        const minutes = dayEntries.reduce((s, i) => s + (Number(i.minutes) || 0), 0);
-        const cards = dayEntries.map((item) => entryCard(item, { hideProject: true })).join('');
-        return (
-          '<section class="pp-day"><div class="pp-day-head"><span class="pd-date">' +
-          escapeHTML(date) +
-          '</span><span class="pd-meta">' +
-          escapeHTML(dayEntries.length) +
-          ' 条' +
-          (minutes > 0 ? ' · ' + escapeHTML(hoursShort(minutes)) + 'h' : '') +
-          '</span></div>' +
-          cards +
-          '</section>'
-        );
-      })
-      .join('');
+    let body;
+    if (state.projectGroupBy === 'feature') {
+      const feats = flow.projects[0] ? flow.projects[0].featureList : [];
+      body =
+        '<div class="pp-exhibits">' +
+        feats
+          .map((feature) => {
+            const fEntries = feature.entries.slice();
+            const fDates = fEntries.map((i) => text(i.date)).sort();
+            const fDays = Object.keys(
+              fEntries.reduce((acc, i) => {
+                acc[i.date] = 1;
+                return acc;
+              }, {}),
+            ).length;
+            const range = fDates.length ? escapeHTML(fDates[0]) + ' ~ ' + escapeHTML(fDates[fDates.length - 1]) : '暂无记录';
+            const label = feature.name === '未分类功能' ? '未归类' : feature.name;
+            return (
+              '<section class="pp-exhibit"><div class="pp-exhibit-head"><span class="pp-exhibit-name">' +
+              escapeHTML(label) +
+              '</span><span class="pp-exhibit-meta">' +
+              escapeHTML(feature.count) +
+              ' 条 · ' +
+              escapeHTML(fDays) +
+              ' 天' +
+              (feature.minutes > 0 ? ' · 约 ' + escapeHTML(hoursShort(feature.minutes)) + ' 小时' : '') +
+              ' · ' +
+              range +
+              '</span></div><div class="pp-timeline">' +
+              daySections(fEntries) +
+              '</div></section>'
+            );
+          })
+          .join('') +
+        '</div>';
+    } else {
+      body = '<div class="pp-timeline">' + daySections(entries) + '</div>';
+    }
 
-    node.innerHTML = head + featureBlock + '<div class="pp-timeline">' + timeline + '</div>';
+    node.innerHTML = head + toolbar + body;
     bindEntryCards(node);
+    node.querySelectorAll('[data-feature]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.projectFeature = btn.getAttribute('data-feature') || '';
+        renderProjectProgress();
+      });
+    });
+    node.querySelectorAll('[data-feature-clear]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.projectFeature = '';
+        renderProjectProgress();
+      });
+    });
+    node.querySelectorAll('[data-features-toggle]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.projectFeatureExpanded = !state.projectFeatureExpanded;
+        renderProjectProgress();
+      });
+    });
+    node.querySelectorAll('[data-group]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.projectGroupBy = btn.getAttribute('data-group') || 'time';
+        renderProjectProgress();
+      });
+    });
     node.querySelectorAll('.ref').forEach((ref) => {
       ref.addEventListener('click', () => {
         const url = ref.getAttribute('data-url');
