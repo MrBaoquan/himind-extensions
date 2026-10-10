@@ -91,6 +91,9 @@
     registryIOText: '',
     registryNewOpen: false,
     registryEditingName: '',
+    registryPage: 1,
+    registryPageSize: 12,
+    registryExpanded: {},
   };
 
   const el = (id) => document.getElementById(id);
@@ -1850,19 +1853,66 @@
       .map((item) => '<option value="' + escapeHTML(item.id) + '">' + escapeHTML(item.name) + '</option>')
       .join('');
 
-    const rows = visible
+    // —— 分页 ——
+    const pageSize = Number(state.registryPageSize) || 12;
+    const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
+    const page = Math.max(1, Math.min(Number(state.registryPage) || 1, totalPages));
+    state.registryPage = page;
+    const pageItems = visible.slice((page - 1) * pageSize, page * pageSize);
+
+    function pathSummary(item) {
+      const paths = item.paths || [];
+      if (!paths.length) return '<span class="reg-muted">—</span>';
+      const first = text(paths[0] && paths[0].path);
+      const extra = paths.length > 1 ? '<span class="reg-plus">+' + (paths.length - 1) + '</span>' : '';
+      return '<span class="reg-path" title="' + escapeHTML(first) + '">' + escapeHTML(first) + '</span>' + extra;
+    }
+
+    const rows = pageItems
       .map((item) => {
-        const range = text(item.first_date)
-          ? escapeHTML(item.first_date) + ' ~ ' + escapeHTML(text(item.last_date))
-          : '暂无记录';
         const exhibits = item.exhibits || [];
         const archived = text(item.status, 'active') === 'archived';
         const src = text(item.source) === 'workbench' ? '<span class="badge new">看板</span>' : '';
         const statusBadge = archived ? '<span class="badge arch">已归档</span>' : '';
         const hasPath = (item.paths || []).length > 0;
         const pathHint = hasPath ? '' : '<span class="badge warn">未绑路径</span>';
-        const paths = pathTags(item.paths, item.id, '');
         const checked = state.registrySelected[item.id] ? ' checked' : '';
+        const expanded = !!state.registryExpanded[item.id];
+        const editing = state.registryEditingName === item.id;
+        const nameNode = editing
+          ? '<input id="p-rename" class="proj-name-input" type="text" data-id="' +
+            escapeHTML(item.id) +
+            '" value="' +
+            escapeHTML(item.name) +
+            '" aria-label="项目名" />'
+          : '<button class="proj-name" type="button" data-action="rename" data-id="' +
+            escapeHTML(item.id) +
+            '" title="点击修改项目名">' +
+            escapeHTML(item.name) +
+            '</button>';
+        const attrs =
+          ' data-id="' + escapeHTML(item.id) + '" data-name="' + escapeHTML(item.name) +
+          '" data-status="' + (archived ? 'archived' : 'active') + '"';
+
+        const mainRow =
+          '<tr class="proj-row' + (archived ? ' archived' : '') + '"' + attrs + '>' +
+          '<td class="reg-pick"><input type="checkbox" class="proj-check" data-id="' + escapeHTML(item.id) + '"' + checked + ' /></td>' +
+          '<td class="reg-name"><div class="reg-name-row">' + nameNode + src + statusBadge + pathHint + '</div></td>' +
+          '<td class="reg-num">' + escapeHTML(item.entry_count || 0) + '</td>' +
+          '<td class="reg-num">' + escapeHTML(item.active_days || 0) + '</td>' +
+          '<td class="reg-cell">' + pathSummary(item) + '</td>' +
+          '<td class="reg-num">' + escapeHTML(exhibits.length || 0) + '</td>' +
+          '<td class="reg-date">' + escapeHTML(text(item.last_date) || '—') + '</td>' +
+          '<td class="reg-exp"><button class="reg-toggle" type="button" data-action="toggle-row" data-id="' +
+          escapeHTML(item.id) + '" aria-expanded="' + (expanded ? 'true' : 'false') + '" title="展开/收起">' +
+          (expanded ? '▾' : '▸') + '</button></td>' +
+          '</tr>';
+
+        if (!expanded) return mainRow;
+
+        const range = text(item.first_date)
+          ? escapeHTML(item.first_date) + ' ~ ' + escapeHTML(text(item.last_date))
+          : '暂无记录';
         const exhibitRows = exhibits
           .map((ex) => {
             const exName = text(ex && ex.name);
@@ -1878,71 +1928,62 @@
             );
           })
           .join('');
-        const editing = state.registryEditingName === item.id;
-        const nameNode = editing
-          ? '<input id="p-rename" class="proj-name-input" type="text" data-id="' +
-            escapeHTML(item.id) +
-            '" value="' +
-            escapeHTML(item.name) +
-            '" aria-label="项目名" />'
-          : '<button class="proj-name" type="button" data-action="rename" data-id="' +
-            escapeHTML(item.id) +
-            '" title="点击修改项目名">' +
-            escapeHTML(item.name) +
-            '</button>';
-        return (
-          '<div class="proj-row' +
-          (archived ? ' archived' : '') +
-          '" data-id="' +
-          escapeHTML(item.id) +
-          '" data-name="' +
-          escapeHTML(item.name) +
-          '" data-status="' +
-          (archived ? 'archived' : 'active') +
-          '">' +
-          '<div class="proj-head">' +
-          '<label class="proj-pick"><input type="checkbox" class="proj-check" data-id="' + escapeHTML(item.id) + '"' + checked + ' /></label>' +
-          '<div class="proj-title">' +
-          '<div class="proj-name-row">' +
-          nameNode +
-          src +
-          statusBadge +
-          pathHint +
-          '</div>' +
-          '<span class="proj-meta">' +
-          escapeHTML(item.entry_count || 0) +
-          ' 条 · ' +
-          escapeHTML(item.active_days || 0) +
-          ' 天 · ' +
-          range +
-          (exhibits.length ? ' · 展项 ' + escapeHTML(exhibits.length) : '') +
-          '</span></div>' +
-          '<div class="proj-actions">' +
-          '<select class="proj-merge-target"><option value="">并入到…</option>' +
-          (targets || '') +
-          '</select>' +
-          '<button class="btn tiny" type="button" data-action="merge">并入</button>' +
-          '<button class="btn tiny" type="button" data-action="archive">' +
-          (archived ? '恢复' : '归档') +
-          '</button>' +
-          '<button class="btn tiny danger" type="button" data-action="delete">删除</button>' +
-          '</div></div>' +
-          '<div class="proj-paths"><span class="paths-label">路径</span>' +
-          paths +
+
+        const detailRow =
+          '<tr class="proj-row reg-detail' + (archived ? ' archived' : '') + '"' + attrs + '>' +
+          '<td colspan="8"><div class="reg-detail-inner">' +
+          '<div class="reg-detail-row"><span class="paths-label">路径</span>' +
+          pathTags(item.paths, item.id, '') +
           '<span class="path-add">' +
           '<input class="proj-path-input" type="text" placeholder="加目录路径" data-id="' + escapeHTML(item.id) + '" />' +
           '<button class="btn tiny" type="button" data-action="add-path">加路径</button>' +
           '</span></div>' +
+          '<div class="reg-detail-row"><span class="paths-label">展项</span>' +
           (exhibits.length
-            ? '<div class="proj-exhibits"><span class="paths-label">展项</span>' + exhibitRows + '</div>'
-            : '') +
-          '</div>'
-        );
+            ? '<div class="reg-exhibits">' + exhibitRows + '</div>'
+            : '<span class="reg-muted">暂无展项（写入日志时带「展项」会自动登记）</span>') +
+          '</div>' +
+          '<div class="reg-detail-row reg-detail-actions">' +
+          '<span class="proj-meta">' + escapeHTML(item.entry_count || 0) + ' 条 · ' + escapeHTML(item.active_days || 0) + ' 天 · ' + range + '</span>' +
+          '<span class="reg-spacer"></span>' +
+          '<select class="proj-merge-target"><option value="">并入到…</option>' + (targets || '') + '</select>' +
+          '<button class="btn tiny" type="button" data-action="merge">并入</button>' +
+          '<button class="btn tiny" type="button" data-action="archive">' + (archived ? '恢复' : '归档') + '</button>' +
+          '<button class="btn tiny danger" type="button" data-action="delete">删除</button>' +
+          '</div></div></td></tr>';
+
+        return mainRow + detailRow;
       })
       .join('');
 
+    // —— 分页控件 ——
+    const pageNums = [];
+    for (let n = 1; n <= totalPages; n++) {
+      if (n === 1 || n === totalPages || Math.abs(n - page) <= 2) {
+        if (pageNums.length && n - pageNums[pageNums.length - 1] > 1) pageNums.push('…');
+        pageNums.push(n);
+      }
+    }
+    const pagerBtns = pageNums
+      .map((n) =>
+        typeof n === 'number'
+          ? '<button class="reg-page' + (n === page ? ' active' : '') + '" type="button" data-page="' + n + '">' + n + '</button>'
+          : '<span class="reg-page-gap">…</span>',
+      )
+      .join('');
+    const pageSizeOpts = [12, 24, 48, 0]
+      .map((n) => '<option value="' + n + '"' + (pageSize === n ? ' selected' : '') + '>' + (n ? n : '全部') + '</option>')
+      .join('');
+
     const list = visible.length
-      ? rows
+      ? '<div class="reg-table-wrap"><table class="reg-table"><thead><tr>' +
+        '<th class="reg-pick"></th><th>项目</th><th class="reg-num">条目</th><th class="reg-num">天数</th><th>路径</th><th class="reg-num">展项</th><th class="reg-date">最近</th><th class="reg-exp"></th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+        '<div class="reg-pager"><span class="meta">共 ' + escapeHTML(visible.length) + ' 个 · 第 ' + escapeHTML(page) + ' / ' + escapeHTML(totalPages) + ' 页</span>' +
+        '<div class="reg-pager-btns"><button class="reg-page" type="button" data-page="' + (page - 1) + '"' + (page <= 1 ? ' disabled' : '') + '>‹</button>' +
+        pagerBtns +
+        '<button class="reg-page" type="button" data-page="' + (page + 1) + '"' + (page >= totalPages ? ' disabled' : '') + '>›</button></div>' +
+        '<label class="reg-pagesize">每页 <select id="p-pagesize">' + pageSizeOpts + '</select> 个</label></div>'
       : projects.length
         ? emptyBlock('当前筛选没有项目', ['换个筛选条件，或点「全部」查看所有登记项目。'])
         : emptyBlock('还没有项目', ['写入日志时若带项目名会自动登记；也可以在上方手动添加。无项目时也可先给「待认领路径」认领到一个新项目。']);
@@ -2009,12 +2050,14 @@
     if (searchInput) {
       searchInput.addEventListener('input', () => {
         state.registryQuery = searchInput.value || '';
+        state.registryPage = 1;
         rerender('p-search');
       });
     }
     panel.querySelectorAll('[data-filter]').forEach((chip) => {
       chip.addEventListener('click', () => {
         state.registryFilter = chip.getAttribute('data-filter') || 'all';
+        state.registryPage = 1;
         renderProjectsPanel();
       });
     });
@@ -2022,6 +2065,7 @@
     if (sortSelect) {
       sortSelect.addEventListener('change', () => {
         state.registrySort = sortSelect.value || 'count';
+        state.registryPage = 1;
         renderProjectsPanel();
       });
     }
@@ -2408,6 +2452,34 @@
         });
       }
     });
+
+    // 展开 / 收起行明细。
+    panel.querySelectorAll('[data-action="toggle-row"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id') || '';
+        if (state.registryExpanded[id]) delete state.registryExpanded[id];
+        else state.registryExpanded[id] = true;
+        renderProjectsPanel();
+      });
+    });
+
+    // 分页：页码按钮 + 每页条数。
+    panel.querySelectorAll('[data-page]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const n = Number(btn.getAttribute('data-page'));
+        if (!n || n < 1) return;
+        state.registryPage = n;
+        renderProjectsPanel();
+      });
+    });
+    const pageSizeSel = panel.querySelector('#p-pagesize');
+    if (pageSizeSel) {
+      pageSizeSel.addEventListener('change', () => {
+        state.registryPageSize = Number(pageSizeSel.value) || 12;
+        state.registryPage = 1;
+        renderProjectsPanel();
+      });
+    }
 
     // 移除路径：项目级与展项级共用。
     panel.querySelectorAll('[data-action="rm-path"]').forEach((btn) => {
