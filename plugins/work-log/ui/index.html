@@ -9,7 +9,7 @@
   <body>
     <header class="topbar">
       <div class="brand">
-        <span class="logo" aria-hidden="true">🗒️</span>
+        <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H17a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5.5A1.5 1.5 0 0 1 4 19.5z" /><path d="M8 8h7M8 12h7M8 16h4" /></svg></span>
         <div class="brand-text">
           <strong>工作日志</strong>
           <small>按天记录 · 日历回看 · 项目归档</small>
@@ -17,11 +17,11 @@
       </div>
       <div class="toolbar">
         <div class="view-switch" role="tablist" aria-label="主导航">
-          <button id="view-calendar" class="switch active" type="button" role="tab" aria-selected="true" data-view="calendar">日历回看</button>
-          <button id="view-projects" class="switch" type="button" role="tab" aria-selected="false" data-view="projects">项目管理</button>
+          <button id="view-calendar" class="switch active" type="button" role="tab" aria-selected="true" aria-controls="calendar-view" data-view="calendar">日历回看</button>
+          <button id="view-projects" class="switch" type="button" role="tab" aria-selected="false" aria-controls="projects-view" data-view="projects">项目管理</button>
         </div>
         <label class="search-box" title="在当月日志里搜索标题、摘要、功能、项目、标签">
-          <span class="search-icon" aria-hidden="true">🔍</span>
+          <span class="search-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="M20.5 20.5 16.6 16.6" /></svg></span>
           <input id="search" type="search" placeholder="搜索日志…" aria-label="搜索工作日志" autocomplete="off" />
         </label>
         <button id="record" class="btn primary" type="button">记录一条</button>
@@ -76,7 +76,7 @@
       </form>
     </section>
 
-    <div id="calendar-view">
+    <div id="calendar-view" role="tabpanel" aria-labelledby="view-calendar">
       <main class="layout">
         <aside class="rail">
           <div class="cal-head">
@@ -102,7 +102,7 @@
           <div class="detail-head">
             <div>
               <h1 id="detail-title">选择一个日期</h1>
-              <p id="detail-subtitle">左侧月历按天统计；点一天查看当天时间线。</p>
+              <p id="detail-subtitle">月历按天统计；点一天查看当天时间线。</p>
             </div>
             <div class="detail-tools">
               <span id="detail-badges" class="badges"></span>
@@ -114,10 +114,10 @@
           </div>
           <details class="more">
             <summary>周期汇总（周 / 季度 / 年度，辅助视图）</summary>
-            <div class="tabs sub" role="tablist" aria-label="周期汇总">
-              <button class="tab" id="tab-weekly" data-tab="weekly" role="tab" aria-selected="false" aria-controls="panel" type="button">周报</button>
-              <button class="tab" id="tab-quarterly" data-tab="quarterly" role="tab" aria-selected="false" aria-controls="panel" type="button">季度</button>
-              <button class="tab" id="tab-yearly" data-tab="yearly" role="tab" aria-selected="false" aria-controls="panel" type="button">年度</button>
+            <div class="tabs sub" role="group" aria-label="周期汇总">
+              <button class="tab" id="tab-weekly" data-tab="weekly" aria-pressed="false" type="button">周报</button>
+              <button class="tab" id="tab-quarterly" data-tab="quarterly" aria-pressed="false" type="button">季度</button>
+              <button class="tab" id="tab-yearly" data-tab="yearly" aria-pressed="false" type="button">年度</button>
             </div>
           </details>
           <div class="panel">
@@ -127,7 +127,7 @@
       </main>
     </div>
 
-    <div id="projects-view" hidden>
+    <div id="projects-view" role="tabpanel" aria-labelledby="view-projects" hidden>
       <section class="detail projects-plane">
         <div class="detail-head">
           <div>

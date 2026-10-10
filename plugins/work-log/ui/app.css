@@ -4,10 +4,18 @@
   --line: #e5e7eb;
   --ink: #111827;
   --muted: #6b7280;
+  /* 元信息与弱化文本用更深的灰，保证正文级对比度 ≥ 4.5:1。 */
+  --meta: #64748b;
+  --dim: #6b7280;
   --accent: #2563eb;
   --accent-soft: #eff6ff;
   --teal: #0f766e;
   --warn: #b45309;
+  /* 圆角只有三档 + 胶囊，同层元素取同一档。 */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-pill: 999px;
 }
 
 * {
@@ -40,7 +48,8 @@ body {
 }
 
 .logo {
-  font-size: 26px;
+  display: inline-flex;
+  color: var(--accent);
 }
 
 .brand-text strong {
@@ -63,7 +72,7 @@ body {
   background: var(--panel);
   color: var(--ink);
   padding: 7px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font: inherit;
   white-space: nowrap;
@@ -93,7 +102,7 @@ body {
   max-width: 1180px;
   margin: 0 auto 12px;
   padding: 9px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--accent-soft);
   border: 1px solid #bfdbfe;
   color: #1e40af;
@@ -119,7 +128,7 @@ body {
   margin: 0 auto 16px;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 16px;
 }
 
@@ -157,7 +166,7 @@ body {
 .field select,
 .field textarea {
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   padding: 7px 9px;
   font: inherit;
   background: #fff;
@@ -185,7 +194,7 @@ body {
 .rail {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 12px;
   position: sticky;
   top: 12px;
@@ -201,7 +210,7 @@ body {
 .pill {
   background: #eef2ff;
   color: #4338ca;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 8px;
   font-size: 11px;
 }
@@ -220,7 +229,7 @@ body {
 .cal-nav {
   border: 1px solid var(--line);
   background: var(--panel);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   width: 28px;
   height: 28px;
   cursor: pointer;
@@ -258,7 +267,7 @@ body {
   position: relative;
   border: 1px solid transparent;
   background: transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   min-height: 0;
   height: 40px;
   padding: 0 2px;
@@ -283,7 +292,7 @@ body {
 }
 
 .cal-cell.out {
-  color: #cbd5e1;
+  color: var(--dim);
 }
 
 .cal-cell.today {
@@ -308,18 +317,18 @@ body {
 
 .cal-count {
   position: absolute;
-  top: 1px;
-  right: 2px;
-  height: 12px;
-  min-width: 12px;
+  top: 0;
+  right: 1px;
+  height: 14px;
+  min-width: 14px;
   padding: 0 3px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent);
   color: #fff;
 }
@@ -345,7 +354,7 @@ body {
   background: transparent;
   padding: 2px 0;
   text-align: left;
-  color: #94a3b8;
+  color: var(--meta);
   font: inherit;
   font-size: 11px;
   overflow: hidden;
@@ -375,13 +384,18 @@ body {
   gap: 6px;
   border: 1px solid var(--line);
   background: var(--panel);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 0 10px;
 }
 
 .search-box .search-icon {
-  font-size: 12px;
-  opacity: 0.6;
+  display: inline-flex;
+  color: var(--meta);
+}
+
+.search-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .search-box input {
@@ -406,14 +420,14 @@ body {
   border: 1px solid #fcd34d;
   background: #fffbeb;
   color: #92400e;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 12px;
 }
 
 .detail {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 18px;
   min-height: 300px;
 }
@@ -443,7 +457,7 @@ body {
 
 .badge {
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 9px;
   font-size: 11px;
   color: var(--muted);
@@ -505,7 +519,7 @@ body {
 
 .entry {
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: var(--radius-lg);
   padding: 12px 14px;
   margin-bottom: 10px;
 }
@@ -522,7 +536,7 @@ body {
 }
 
 .entry .time {
-  color: #94a3b8;
+  color: var(--meta);
   font-variant-numeric: tabular-nums;
   font-size: 12px;
 }
@@ -531,7 +545,7 @@ body {
   font-size: 11px;
   color: #4338ca;
   background: #eef2ff;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 1px 6px;
 }
 
@@ -544,14 +558,14 @@ body {
   font-size: 11px;
   color: #0e7490;
   background: #ecfeff;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 1px 6px;
 }
 
 .entry .proj.miss {
   color: #b45309;
   background: #fffbeb;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 1px 6px;
   border: none;
   cursor: pointer;
@@ -567,7 +581,7 @@ body {
   font-size: 11px;
   color: #7c3aed;
   background: #f5f3ff;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 1px 6px;
 }
 
@@ -661,7 +675,7 @@ body {
   font-size: 11px;
   color: #7c3aed;
   background: #f5f3ff;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 1px 6px;
 }
 
@@ -683,7 +697,7 @@ body {
   border: 1px solid #fcd34d;
   background: #fffbeb;
   color: #92400e;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 12px;
 }
 
@@ -697,7 +711,7 @@ body {
 .entry .refs button {
   border: 1px solid var(--line);
   background: #fff;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 2px 8px;
   cursor: pointer;
   font-size: 12px;
@@ -715,7 +729,7 @@ body {
 pre.source {
   background: #0f172a;
   color: #e2e8f0;
-  border-radius: 9px;
+  border-radius: var(--radius-lg);
   padding: 14px;
   overflow: auto;
   max-height: 60vh;
@@ -758,7 +772,7 @@ pre.source {
 .error,
 .skeleton {
   border: 1px dashed var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 22px;
   color: var(--muted);
   background: #fbfcfe;
@@ -797,7 +811,7 @@ pre.source {
   flex: 1;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   padding: 5px 8px;
   font: inherit;
   color: var(--ink);
@@ -810,7 +824,7 @@ pre.source {
   align-items: flex-end;
   gap: 10px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 12px;
   margin-bottom: 12px;
   background: #fbfcfe;
@@ -833,7 +847,7 @@ pre.source {
   gap: 12px;
   flex-wrap: wrap;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: var(--radius-lg);
   padding: 10px 14px;
 }
 
@@ -861,7 +875,7 @@ pre.source {
 
 .proj-alias-input {
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   padding: 5px 8px;
   font: inherit;
   min-width: 180px;
@@ -888,7 +902,7 @@ pre.source {
 .view-switch {
   display: inline-flex;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--panel);
 }
@@ -949,4 +963,38 @@ pre.source {
 
 .manual-more .manual-grid {
   margin-top: 8px;
+}
+
+/* 焦点指示：键盘可见，与相邻背景对比 ≥ 3:1。 */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   界面约束（集中维护，编号可引用；改这里可覆盖同类页面）
+   I1  网格 / 弹性子项允许收缩：长路径、单行摘要不再把布局顶出视口。
+   I2  侧栏底部的日志路径不撑宽侧栏。
+   I3  窄窗口下工具栏、表单换行而不是横向顶出容器。
+   ───────────────────────────────────────────────────────────── */
+.layout > * {
+  min-width: 0;
+}
+.rail-foot {
+  min-width: 0;
+}
+.log-root-path {
+  flex: 1 1 0;
+}
+.topbar > * {
+  min-width: 0;
+}
+.toolbar {
+  min-width: 0;
+}
+.search-box {
+  min-width: 0;
+}
+.manual-grid > * {
+  min-width: 0;
 }

@@ -239,15 +239,27 @@
             if (cell.entry_count > 0) classes.push('has');
             const projects = (cell.projects || []).join('、');
             const hours = hoursLabel(cell.total_minutes);
+            const dowIndex = new Date(cell.date + 'T00:00:00').getDay();
+            const dow =
+              calendar.week_start === 'sunday'
+                ? WEEKDAYS_SUNDAY[dowIndex]
+                : WEEKDAYS_MONDAY[(dowIndex + 6) % 7];
+            const ariaLabel =
+              text(cell.date) +
+              (dow ? ' ' + dow : '') +
+              (cell.entry_count > 0 ? '，' + cell.entry_count + ' 条' : '，无记录') +
+              (projects ? '，' + projects : '');
             const titleAttr =
               text(cell.date) + (projects ? ' · ' + projects : '') + (hours ? ' · 约 ' + hours : '');
             const marker =
               cell.entry_count > 0 ? '<span class="cal-count">' + escapeHTML(cell.entry_count) + '</span>' : '';
             return (
-              '<button type="button" role="gridcell" class="' +
+              '<button type="button" class="' +
               classes.join(' ') +
               '" data-date="' +
               escapeHTML(cell.date) +
+              '" aria-label="' +
+              escapeHTML(ariaLabel) +
               '" title="' +
               escapeHTML(titleAttr) +
               '"><span class="cal-day">' +
@@ -284,7 +296,7 @@
   function updateHead() {
     if (!state.selected) {
       el('detail-title').textContent = '选择一个日期';
-      el('detail-subtitle').textContent = '左侧月历按天统计；点一天查看当天时间线。';
+      el('detail-subtitle').textContent = '月历按天统计；点一天查看当天时间线。';
       el('detail-badges').innerHTML = '';
       return;
     }
@@ -1195,11 +1207,19 @@
     document.querySelectorAll('.tabs .tab').forEach((node) => {
       const on = node.getAttribute('data-tab') === tab;
       node.classList.toggle('active', on);
-      node.setAttribute('aria-selected', on ? 'true' : 'false');
-      node.setAttribute('tabindex', on ? '0' : '-1');
+      if (node.getAttribute('role') === 'tab') {
+        node.setAttribute('aria-selected', on ? 'true' : 'false');
+        node.setAttribute('tabindex', on ? '0' : '-1');
+      } else {
+        // 周期汇总是一组切换按钮（role=group），用 aria-pressed 表达选中。
+        node.setAttribute('aria-pressed', on ? 'true' : 'false');
+      }
     });
     const active = document.getElementById('tab-' + tab);
-    if (active) el('panel').setAttribute('aria-labelledby', active.id);
+    // 面板只由「时间线 / 日报」这组页签标注；周期按钮不接管 aria-labelledby。
+    if (active && active.getAttribute('role') === 'tab') {
+      el('panel').setAttribute('aria-labelledby', active.id);
+    }
   }
 
   function switchView(view) {
