@@ -20,13 +20,6 @@
           "required": false,
           "default": "all",
           "options": ["all", "codex", "claude", "opencode", "copilot", "vscode-copilot"]
-        },
-        {
-          "id": "sqlite3_path",
-          "label": "sqlite3 路径",
-          "type": "text",
-          "required": false,
-          "placeholder": "读取 OpenCode/Copilot 会话库需要，例如 ...\\platform-tools\\sqlite3.exe"
         }
       ]
     },

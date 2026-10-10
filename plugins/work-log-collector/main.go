@@ -3,14 +3,14 @@
 //
 // 采集器不写工作日志库：写入日志由 com.himind.work-log 插件统一负责，保证日志库只有
 // 一个写入者。它至多把会话素材落一份临时 artifact（扩展私有数据目录），交给工作流的
-// AI 总结步骤读取。SQLite 会话库（OpenCode/Copilot）通过可选的 sqlite3 CLI 读取，
-// 缺失时如实标记为不可用，不引入第三方 Go 依赖。
+// AI 总结步骤读取。SQLite 会话库（OpenCode/Copilot）由内置的纯 Go 驱动读取，无外部依赖。
 package main
 
 import (
 	"bufio"
 	"bytes"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -18,7 +18,6 @@ import (
 	"math"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -26,6 +25,7 @@ import (
 	"time"
 
 	"github.com/MrBaoquan/himind-extensions/sdk/jsonrpc"
+	_ "modernc.org/sqlite"
 )
 
 const dateLayout = "2006-01-02"
@@ -38,17 +38,16 @@ func main() {
 }
 
 type input struct {
-	Source      string            `json:"source"`
-	From        string            `json:"from"`
-	To          string            `json:"to"`
-	Date        string            `json:"date"`
-	SessionID   string            `json:"session_id"`
-	Home        string            `json:"home"`
-	Roots       map[string]string `json:"roots"`
-	SQLite3Path string            `json:"sqlite3_path"`
-	Limit       int               `json:"limit"`
-	MaxPrompts  int               `json:"max_prompts"`
-	MaxChars    int               `json:"max_chars"`
+	Source     string            `json:"source"`
+	From       string            `json:"from"`
+	To         string            `json:"to"`
+	Date       string            `json:"date"`
+	SessionID  string            `json:"session_id"`
+	Home       string            `json:"home"`
+	Roots      map[string]string `json:"roots"`
+	Limit      int               `json:"limit"`
+	MaxPrompts int               `json:"max_prompts"`
+	MaxChars   int               `json:"max_chars"`
 	// 通用可配置来源：内联规格优先，其次配置文件，最后内置预设。
 	LogRoot           string          `json:"log_root"`
 	SourcesConfig     []genericSource `json:"sources_config"`
@@ -158,38 +157,17 @@ func existingSourcePaths(spec sourceSpec, home string, roots map[string]string) 
 	return found
 }
 
-// resolveSQLite 定位 sqlite3 CLI：优先显式参数，其次 PATH，最后环境变量 SQLITE3。
-func resolveSQLite(in input) (string, string) {
-	if p := strings.TrimSpace(in.SQLite3Path); p != "" {
-		if fileExists(p) {
-			return p, ""
-		}
-		return "", "参数指定的 sqlite3_path 不存在"
-	}
-	if p, err := exec.LookPath("sqlite3"); err == nil {
-		return p, ""
-	}
-	if p := strings.TrimSpace(os.Getenv("SQLITE3")); p != "" && fileExists(p) {
-		return p, ""
-	}
-	return "", "未找到 sqlite3 CLI，SQLite 类来源不可用；可用 sqlite3_path 指定路径"
-}
-
 func sourcesCap(in input) (any, error) {
 	home, err := resolveHome(in)
 	if err != nil {
 		return nil, err
 	}
-	sqlitePath, sqliteNote := resolveSQLite(in)
 	statuses := make([]sourceStatus, 0)
 	for _, spec := range allSpecs() {
 		paths := sourcePaths(spec, home, in.Roots)
 		existing := existingSourcePaths(spec, home, in.Roots)
 		status := sourceStatus{ID: spec.ID, Label: spec.Label, Kind: spec.Kind, Path: strings.Join(paths, " | "), Exists: len(existing) > 0}
 		switch {
-		case spec.Kind == "sqlite" && sqlitePath == "":
-			status.Supported = false
-			status.Note = "缺少 sqlite3 CLI"
 		case !status.Exists:
 			status.Supported = false
 			status.Note = "未发现会话存储"
@@ -224,7 +202,6 @@ func sourcesCap(in input) (any, error) {
 	}
 	return map[string]any{
 		"home":        home,
-		"sqlite3":     map[string]any{"available": sqlitePath != "", "path": sqlitePath, "note": sqliteNote},
 		"sources":     statuses,
 		"config_path": configPath,
 	}, nil
@@ -298,7 +275,6 @@ func scanCap(in input) (any, error) {
 		maxChars = 4000
 	}
 
-	sqlitePath, _ := resolveSQLite(in)
 	selected := strings.TrimSpace(in.Source)
 	if selected == "" {
 		selected = "all"
@@ -324,17 +300,9 @@ func scanCap(in input) (any, error) {
 		case "vscode-copilot":
 			found, err = scanVSCodeCopilot(existing, start, end)
 		case "opencode":
-			if sqlitePath == "" {
-				skipped = append(skipped, map[string]any{"source": spec.ID, "reason": "缺少 sqlite3 CLI", "path": existing[0]})
-				continue
-			}
-			found, err = scanOpenCode(sqlitePath, existing[0], start, end)
+			found, err = scanOpenCode(existing[0], start, end)
 		case "copilot":
-			if sqlitePath == "" {
-				skipped = append(skipped, map[string]any{"source": spec.ID, "reason": "缺少 sqlite3 CLI", "path": existing[0]})
-				continue
-			}
-			found, err = scanCopilot(sqlitePath, existing[0], start, end)
+			found, err = scanCopilot(existing[0], start, end)
 		}
 		if err != nil {
 			skipped = append(skipped, map[string]any{"source": spec.ID, "reason": err.Error(), "path": strings.Join(existing, " | ")})
@@ -1121,17 +1089,17 @@ func scanClaude(root string, start, end time.Time) ([]sessionDigest, error) {
 
 // ---- OpenCode SQLite ----
 
-func scanOpenCode(sqlite3Path, db string, start, end time.Time) ([]sessionDigest, error) {
+func scanOpenCode(db string, start, end time.Time) ([]sessionDigest, error) {
 	startMs := start.UnixMilli()
 	endMs := end.UnixMilli()
-	sessions, err := runSQLiteJSON(sqlite3Path, db, fmt.Sprintf(
+	sessions, err := querySQLiteJSON(db, fmt.Sprintf(
 		"SELECT id, project_id, slug, directory, title, model, cost, tokens_input, tokens_output, time_created, time_updated FROM session_v2 WHERE time_created >= %d AND time_created < %d ORDER BY time_created DESC",
 		startMs, endMs))
 	if err != nil {
 		return nil, err
 	}
 	projects := map[string]string{}
-	if rows, err := runSQLiteJSON(sqlite3Path, db, "SELECT id, name, worktree FROM project"); err == nil {
+	if rows, err := querySQLiteJSON(db, "SELECT id, name, worktree FROM project"); err == nil {
 		for _, row := range rows {
 			name := asString(row, "name")
 			if name == "" {
@@ -1140,7 +1108,7 @@ func scanOpenCode(sqlite3Path, db string, start, end time.Time) ([]sessionDigest
 			projects[asString(row, "id")] = name
 		}
 	}
-	messages, err := runSQLiteJSON(sqlite3Path, db, fmt.Sprintf(
+	messages, err := querySQLiteJSON(db, fmt.Sprintf(
 		"SELECT session_id, type, data, time_created FROM session_message WHERE time_created >= %d AND time_created < %d ORDER BY time_created",
 		startMs, endMs))
 	if err != nil {
@@ -1197,16 +1165,16 @@ func scanOpenCode(sqlite3Path, db string, start, end time.Time) ([]sessionDigest
 
 // ---- Copilot SQLite ----
 
-func scanCopilot(sqlite3Path, db string, start, end time.Time) ([]sessionDigest, error) {
+func scanCopilot(db string, start, end time.Time) ([]sessionDigest, error) {
 	fromText := start.Format("2006-01-02 15:04:05")
 	toText := end.Format("2006-01-02 15:04:05")
-	sessions, err := runSQLiteJSON(sqlite3Path, db, fmt.Sprintf(
+	sessions, err := querySQLiteJSON(db, fmt.Sprintf(
 		"SELECT id, cwd, repository, summary, created_at, updated_at FROM sessions WHERE created_at >= '%s' AND created_at < '%s' ORDER BY created_at DESC",
 		fromText, toText))
 	if err != nil {
 		return nil, err
 	}
-	turns, err := runSQLiteJSON(sqlite3Path, db, fmt.Sprintf(
+	turns, err := querySQLiteJSON(db, fmt.Sprintf(
 		"SELECT session_id, user_message, assistant_response, timestamp FROM turns WHERE timestamp >= '%s' AND timestamp < '%s' ORDER BY timestamp",
 		fromText, toText))
 	if err != nil {
@@ -1576,23 +1544,57 @@ func countVSCodeChatSessions(roots []string) int {
 
 // ---- SQLite 辅助 ----
 
-func runSQLiteJSON(sqlite3Path, db, query string) ([]map[string]any, error) {
-	command := exec.Command(sqlite3Path, "-json", db, query)
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &stdout
-	command.Stderr = &stderr
-	if err := command.Run(); err != nil {
-		return nil, fmt.Errorf("sqlite3 执行失败: %s", strings.TrimSpace(stderr.String()))
+// querySQLiteJSON 用内置的纯 Go SQLite 驱动只读查询会话库，无需外部 sqlite3 CLI。
+func querySQLiteJSON(db, query string) ([]map[string]any, error) {
+	dsn := "file:" + filepath.ToSlash(db) + "?mode=ro"
+	handle, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("打开会话库失败: %w", err)
 	}
-	text := strings.TrimSpace(stdout.String())
-	if text == "" || text == "[]" {
-		return nil, nil
+	defer handle.Close()
+
+	rows, err := handle.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("读取会话库失败: %w", err)
 	}
-	var rows []map[string]any
-	if err := json.Unmarshal([]byte(text), &rows); err != nil {
-		return nil, fmt.Errorf("sqlite3 输出不是合法 JSON")
+	defer rows.Close()
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, err
 	}
-	return rows, nil
+	out := make([]map[string]any, 0)
+	for rows.Next() {
+		cells := make([]any, len(columns))
+		ptrs := make([]any, len(columns))
+		for i := range cells {
+			ptrs[i] = &cells[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			return nil, err
+		}
+		row := make(map[string]any, len(columns))
+		for i, name := range columns {
+			row[name] = normalizeSQLiteValue(cells[i])
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// normalizeSQLiteValue 把驱动返回值收敛成 JSON 友好的基础类型。
+func normalizeSQLiteValue(value any) any {
+	switch v := value.(type) {
+	case []byte:
+		return string(v)
+	case time.Time:
+		return v.Format(time.RFC3339)
+	default:
+		return v
+	}
 }
 
 // extractText 从会话消息的 JSON data 里尽力提取正文。

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/MrBaoquan/himind-extensions/sdk/jsonrpc"
+	_ "modernc.org/sqlite"
 )
 
 func call(t *testing.T, method string, params string) map[string]any {
@@ -649,5 +651,64 @@ func TestVSCodeCopilotSkipsEmptySession(t *testing.T) {
 	}
 	if len(digests[0].UserPrompts) != 0 {
 		t.Fatalf("空会话不应有用户提示: %#v", digests[0].UserPrompts)
+	}
+}
+
+// TestScanOpenCodePureGoSQLite 验证内置纯 Go 驱动能直接读取 OpenCode 会话库，
+// 不需要外部 sqlite3 CLI。
+func TestScanOpenCodePureGoSQLite(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "opencode.db")
+	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(dbPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	schema := []string{
+		`CREATE TABLE project (id TEXT PRIMARY KEY, name TEXT, worktree TEXT)`,
+		`CREATE TABLE session_v2 (id TEXT PRIMARY KEY, project_id TEXT, slug TEXT, directory TEXT, title TEXT, model TEXT, cost REAL, tokens_input INTEGER, tokens_output INTEGER, time_created INTEGER, time_updated INTEGER)`,
+		`CREATE TABLE session_message (session_id TEXT, type TEXT, data TEXT, time_created INTEGER)`,
+	}
+	for _, stmt := range schema {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.Exec(`INSERT INTO project (id, name, worktree) VALUES ('p1','项目看板','F:/proj/kb')`); err != nil {
+		t.Fatal(err)
+	}
+	created := time.Date(2026, 10, 9, 1, 0, 0, 0, time.UTC).UnixMilli()
+	updated := created + 45*60*1000
+	if _, err := db.Exec(`INSERT INTO session_v2 (id, project_id, slug, directory, title, model, cost, tokens_input, tokens_output, time_created, time_updated) VALUES ('oc-1','p1','s','F:/proj/kb/src','实现日历','x',0.5,100,200,?,?)`, created, updated); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO session_message (session_id, type, data, time_created) VALUES ('oc-1','user','{"text":"实现日历视图"}',?)`, created); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO session_message (session_id, type, data, time_created) VALUES ('oc-1','assistant','{"content":[{"text":"已完成月历栅格"}]}',?)`, created+30*60*1000); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	start := time.Date(2026, 10, 9, 0, 0, 0, 0, time.Local)
+	digests, err := scanOpenCode(dbPath, start, start.AddDate(0, 0, 1))
+	if err != nil {
+		t.Fatalf("纯 Go 驱动读取 OpenCode 库失败: %v", err)
+	}
+	if len(digests) != 1 {
+		t.Fatalf("应扫描到 1 个 OpenCode 会话，实际 %d", len(digests))
+	}
+	d := digests[0]
+	if d.SessionID != "oc-1" || d.Project != "项目看板" || d.Title != "实现日历" {
+		t.Fatalf("OpenCode 会话字段异常: %#v", d)
+	}
+	if len(d.UserPrompts) != 1 || d.UserPrompts[0] != "实现日历视图" {
+		t.Fatalf("用户提示提取异常: %#v", d.UserPrompts)
+	}
+	if len(d.AssistantExcerpts) != 1 || !strings.Contains(d.AssistantExcerpts[0], "月历栅格") {
+		t.Fatalf("助手摘要提取异常: %#v", d.AssistantExcerpts)
+	}
+	if d.TokensInput != 100 || d.TokensOutput != 200 {
+		t.Fatalf("token 统计异常: %#v", d)
 	}
 }
