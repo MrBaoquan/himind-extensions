@@ -32,9 +32,11 @@ type project struct {
 	// ExternalID 是工作台里的项目 ID（命中同步时填充），用于稳定关联。
 	ExternalID string `json:"external_id,omitempty"`
 	// Exhibits 是该项目下的展项（可选维度）。展项也支持别名。
-	Exhibits  []exhibit `json:"exhibits,omitempty"`
-	CreatedAt string    `json:"created_at"`
-	UpdatedAt string    `json:"updated_at"`
+	Exhibits []exhibit `json:"exhibits,omitempty"`
+	// Paths 是该项目的本机目录/仓库映射（路径是稳定标识，名称只是展示）。
+	Paths     []projectPath `json:"paths,omitempty"`
+	CreatedAt string        `json:"created_at"`
+	UpdatedAt string        `json:"updated_at"`
 }
 
 // exhibit 是项目下的展项（工作台维度）。
@@ -43,6 +45,8 @@ type exhibit struct {
 	Name       string   `json:"name"`
 	Aliases    []string `json:"aliases,omitempty"`
 	ExternalID string   `json:"external_id,omitempty"`
+	// Paths 是展项对应的本机目录/仓库映射（路径优先于名称，用于稳定归类）。
+	Paths []projectPath `json:"paths,omitempty"`
 }
 
 type projectsFile struct {
@@ -170,6 +174,8 @@ func registerProject(pf *projectsFile, index map[string]string, name string) boo
 }
 
 // applyProjectRegistry 用登记表归一一批条目的项目名；登记表缺失时按配置补登。
+// 归类优先级：仓库路径（展项优先）> 名称/别名 > 未命中。
+// 采集条目（带 repo_path）未命中时留空并进入「待认领」，不再生成假项目；手工条目仍可登记。
 // 返回是否改动了登记表。resolve/register 两个开关都关时直接跳过。
 func applyProjectRegistry(root string, entries []entry, resolve, register bool) (bool, error) {
 	if !resolve && !register {
@@ -182,16 +188,51 @@ func applyProjectRegistry(root string, entries []entry, resolve, register bool) 
 	index := projectIndex(pf)
 	changed := false
 	for i := range entries {
-		raw := strings.TrimSpace(entries[i].Project)
-		if raw == "" {
-			continue
+		item := &entries[i]
+		raw := strings.TrimSpace(item.Project)
+		dir := strings.TrimSpace(item.RepoPath)
+		if resolve {
+			if dir != "" {
+				if hit, ok := matchPathEntry(pf, dir); ok {
+					item.Project = hit.Project
+					item.ProjectID = hit.ProjectID
+					if hit.Exhibit != "" {
+						item.Exhibit = hit.Exhibit
+						item.ExhibitID = hit.ExhibitID
+					} else {
+						applyExhibitLink(pf, item)
+					}
+					item.ProjectHint = ""
+					continue
+				}
+			}
+			if raw != "" {
+				if canonical, ok := resolveProjectName(index, raw); ok {
+					item.Project = canonical
+					applyExhibitLink(pf, item)
+					item.ProjectHint = ""
+					continue
+				}
+			}
+			// 未命中：清掉不稳定的 ID。
+			item.ProjectID = ""
+			item.ExhibitID = ""
+			if dir != "" {
+				// 有稳定路径事实却未映射：留空待认领，绝不登记假项目名。
+				if raw != "" {
+					item.ProjectHint = raw
+				}
+				item.Project = ""
+				item.Exhibit = ""
+				continue
+			}
 		}
-		if canonical, ok := resolveProjectName(index, raw); ok {
-			entries[i].Project = canonical
-			continue
-		}
-		if register && registerProject(&pf, index, raw) {
-			changed = true
+		if register && raw != "" {
+			if _, exists := index[normalizeProjectKey(raw)]; !exists {
+				if registerProject(&pf, index, raw) {
+					changed = true
+				}
+			}
 		}
 	}
 	if changed {
@@ -200,6 +241,34 @@ func applyProjectRegistry(root string, entries []entry, resolve, register bool) 
 		}
 	}
 	return changed, nil
+}
+
+// applyExhibitLink 给单条条目补上稳定的项目/展项 ID，并把展项名归一。
+func applyExhibitLink(pf projectsFile, item *entry) {
+	project := strings.TrimSpace(item.Project)
+	if project == "" {
+		return
+	}
+	for _, p := range pf.Projects {
+		if !strings.EqualFold(p.Name, project) {
+			continue
+		}
+		item.Project = p.Name
+		item.ProjectID = p.ID
+		ex := strings.TrimSpace(item.Exhibit)
+		if ex == "" {
+			return
+		}
+		for _, e := range p.Exhibits {
+			if strings.EqualFold(e.Name, ex) || aliasMatches(e.Aliases, ex) {
+				item.Exhibit = e.Name
+				item.ExhibitID = e.ID
+				return
+			}
+		}
+		item.ExhibitID = ""
+		return
+	}
 }
 
 // ---------- 能力实现 ----------
@@ -228,6 +297,7 @@ func projectListCap(in input) (any, error) {
 	}
 	stats := map[string]*projectStat{}
 	unmatched := map[string]int{}
+	var pending []entry
 	if includeStats {
 		entries, err := collectEntries(root, "0000-01-01", "9999-12-31")
 		if err != nil {
@@ -236,6 +306,7 @@ func projectListCap(in input) (any, error) {
 		for _, item := range entries {
 			raw := strings.TrimSpace(item.Project)
 			if raw == "" {
+				pending = append(pending, item)
 				continue
 			}
 			canonical, ok := resolveProjectName(index, raw)
@@ -273,6 +344,7 @@ func projectListCap(in input) (any, error) {
 			"color":       p.Color,
 			"source":      p.Source,
 			"external_id": p.ExternalID,
+			"paths":       pathsToMaps(p.Paths),
 			"exhibits":    exhibitsToMaps(p.Exhibits),
 			"created_at":  p.CreatedAt,
 			"updated_at":  p.UpdatedAt,
@@ -309,10 +381,11 @@ func projectListCap(in input) (any, error) {
 	})
 
 	return map[string]any{
-		"log_root":  root,
-		"total":     len(out),
-		"projects":  out,
-		"unmatched": unmatchedList,
+		"log_root":      root,
+		"total":         len(out),
+		"projects":      out,
+		"unmatched":     unmatchedList,
+		"pending_paths": collectPendingPaths(pending),
 	}, nil
 }
 
@@ -367,6 +440,7 @@ func projectUpsertCap(in input) (any, error) {
 			Description: strings.TrimSpace(in.Description),
 			Status:      status,
 			Color:       strings.TrimSpace(in.Color),
+			Paths:       sanitizePaths(in.Paths),
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		})
@@ -376,6 +450,12 @@ func projectUpsertCap(in input) (any, error) {
 		item.Name = name
 		if len(aliases) > 0 {
 			item.Aliases = mergeAliases(item.Aliases, aliases)
+		}
+		if in.Paths != nil {
+			item.Paths = sanitizePaths(in.Paths)
+		} else {
+			item.Paths = mergePaths(item.Paths, sanitizePaths(in.AddPaths))
+			item.Paths = removePaths(item.Paths, in.RemovePaths)
 		}
 		if description := strings.TrimSpace(in.Description); description != "" {
 			item.Description = description
@@ -630,7 +710,8 @@ func exhibitsFromWorkbench(item map[string]any) []exhibit {
 		out = append(out, exhibit{
 			ID:         "ex-" + shortHash(normalizeProjectKey(name)),
 			Name:       name,
-			ExternalID: firstNonEmpty(mapStr(m, "id"), mapStr(m, "exhibit_id")),
+			ExternalID: firstNonEmpty(mapStr(m, "id"), mapStr(m, "pid"), mapStr(m, "exhibit_id")),
+			Paths:      exhibitPathsFromWorkbench(m),
 		})
 	}
 	return out
@@ -640,18 +721,39 @@ func mergeExhibits(current, incoming []exhibit) []exhibit {
 	if len(incoming) == 0 {
 		return current
 	}
-	seen := map[string]bool{}
+	seen := map[string]int{}
 	out := make([]exhibit, 0, len(current)+len(incoming))
 	for _, ex := range append(append([]exhibit{}, current...), incoming...) {
 		key := normalizeProjectKey(ex.Name)
-		if key == "" || seen[key] {
+		if key == "" {
 			continue
 		}
-		seen[key] = true
+		if at, ok := seen[key]; ok {
+			// 同名展项：合并路径与别名，补齐外部 ID。
+			out[at].Paths = mergePaths(out[at].Paths, ex.Paths)
+			out[at].Aliases = mergeAliases(out[at].Aliases, ex.Aliases)
+			if out[at].ExternalID == "" {
+				out[at].ExternalID = ex.ExternalID
+			}
+			continue
+		}
+		seen[key] = len(out)
 		out = append(out, ex)
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
+}
+
+// exhibitPathsFromWorkbench 从工作台展项对象里解析本机路径（source_path / release_path）。
+func exhibitPathsFromWorkbench(m map[string]any) []projectPath {
+	var specs []pathSpec
+	if sp := firstNonEmpty(mapStr(m, "source_path"), mapStr(m, "sourcePath")); sp != "" {
+		specs = append(specs, pathSpec{Path: sp, Kind: "repo", Source: "workbench"})
+	}
+	if rp := firstNonEmpty(mapStr(m, "release_path"), mapStr(m, "releasePath")); rp != "" {
+		specs = append(specs, pathSpec{Path: rp, Kind: "release", Source: "workbench"})
+	}
+	return sanitizePaths(specs)
 }
 
 func exhibitsToMaps(items []exhibit) []map[string]any {
@@ -662,6 +764,7 @@ func exhibitsToMaps(items []exhibit) []map[string]any {
 			"name":        ex.Name,
 			"aliases":     nonNilStrings(ex.Aliases),
 			"external_id": ex.ExternalID,
+			"paths":       pathsToMaps(ex.Paths),
 		})
 	}
 	return out
@@ -741,7 +844,7 @@ func enrichEntryLinks(pf projectsFile, entries []entry) {
 	}
 }
 
-// projectSyncCap 把工作台项目（含展项）并入本地登记表；已存在则补齐 source/external_id/展项。
+// projectSyncCap 把工作台项目（含展项）并入本地登记表；已存在则补齐 source/external_id/展项/路径。
 func projectSyncCap(in input) (any, error) {
 	root, err := logRoot(in.LogRoot)
 	if err != nil {
@@ -750,6 +853,10 @@ func projectSyncCap(in input) (any, error) {
 	items := in.Projects
 	if len(items) == 0 {
 		items = workbenchProjectsFromStep(in, in.ProjectsStep)
+	}
+	exhibitItems := in.Exhibits
+	if len(exhibitItems) == 0 {
+		exhibitItems = workbenchExhibitsFromStep(in, in.ExhibitsStep)
 	}
 	unlock := lockRoot(root)
 	defer unlock()
@@ -766,6 +873,7 @@ func projectSyncCap(in input) (any, error) {
 		}
 		externalID := firstNonEmpty(mapStr(raw, "id"), mapStr(raw, "project_id"))
 		exhibits := exhibitsFromWorkbench(raw)
+		paths := projectPathsFromWorkbench(raw)
 
 		at := matchProjectIndex(pf, name, externalID)
 		if at < 0 {
@@ -777,6 +885,7 @@ func projectSyncCap(in input) (any, error) {
 				Source:     "workbench",
 				ExternalID: externalID,
 				Exhibits:   exhibits,
+				Paths:      paths,
 				CreatedAt:  now,
 				UpdatedAt:  now,
 			})
@@ -789,21 +898,115 @@ func projectSyncCap(in input) (any, error) {
 		}
 		p.Source = "workbench"
 		p.Exhibits = mergeExhibits(p.Exhibits, exhibits)
+		p.Paths = mergePaths(p.Paths, paths)
 		p.UpdatedAt = now
 		pf.Projects[at] = p
 		updated++
 	}
-	if created > 0 || updated > 0 {
+
+	// 扁平展项列表（来自 business.exhibit.list）：按项目归位，携带 source_path/release_path。
+	exUpdated := 0
+	for _, raw := range exhibitItems {
+		name := firstNonEmpty(mapStr(raw, "exhibit_name"), mapStr(raw, "name"))
+		if name == "" {
+			continue
+		}
+		pid := firstNonEmpty(mapStr(raw, "pid"), mapStr(raw, "id"), mapStr(raw, "exhibit_id"))
+		projectName := firstNonEmpty(mapStr(raw, "project_name"), mapStr(raw, "project"))
+		projectExt := mapStr(raw, "project_id")
+		ex := exhibit{
+			ID:         "ex-" + shortHash(normalizeProjectKey(name)),
+			Name:       name,
+			ExternalID: pid,
+			Paths:      exhibitPathsFromWorkbench(raw),
+		}
+		at := -1
+		if projectExt != "" {
+			at = matchProjectIndex(pf, "", projectExt)
+		}
+		if at < 0 && projectName != "" {
+			at = matchProjectIndex(pf, projectName, "")
+		}
+		if at < 0 {
+			if projectName == "" {
+				continue
+			}
+			pf.Projects = append(pf.Projects, project{
+				ID:         makeProjectID(projectName),
+				Name:       projectName,
+				Aliases:    []string{},
+				Status:     "active",
+				Source:     "workbench",
+				ExternalID: projectExt,
+				Exhibits:   []exhibit{ex},
+				CreatedAt:  now,
+				UpdatedAt:  now,
+			})
+			exUpdated++
+			continue
+		}
+		p := pf.Projects[at]
+		p.Exhibits = mergeExhibits(p.Exhibits, []exhibit{ex})
+		p.UpdatedAt = now
+		pf.Projects[at] = p
+		exUpdated++
+	}
+
+	if created > 0 || updated > 0 || exUpdated > 0 {
 		if err := writeProjects(root, pf); err != nil {
 			return nil, err
 		}
 	}
 	return map[string]any{
-		"log_root": root,
-		"total":    len(items),
-		"created":  created,
-		"updated":  updated,
+		"log_root":      root,
+		"total":         len(items),
+		"created":       created,
+		"updated":       updated,
+		"exhibits":      exUpdated,
+		"exhibit_total": len(exhibitItems),
 	}, nil
+}
+
+// projectPathsFromWorkbench 从工作台项目对象里解析路径映射（paths 数组或 source_path）。
+func projectPathsFromWorkbench(m map[string]any) []projectPath {
+	var specs []pathSpec
+	if arr, ok := m["paths"].([]any); ok {
+		for _, node := range arr {
+			switch v := node.(type) {
+			case map[string]any:
+				specs = append(specs, pathSpec{
+					Path:   mapStr(v, "path"),
+					Kind:   mapStr(v, "kind"),
+					Label:  mapStr(v, "label"),
+					Source: firstNonEmpty(mapStr(v, "source"), "workbench"),
+				})
+			case string:
+				specs = append(specs, pathSpec{Path: v, Source: "workbench"})
+			}
+		}
+	}
+	if sp := firstNonEmpty(mapStr(m, "source_path"), mapStr(m, "sourcePath")); sp != "" {
+		specs = append(specs, pathSpec{Path: sp, Kind: "repo", Source: "workbench"})
+	}
+	return sanitizePaths(specs)
+}
+
+// workbenchExhibitsFromStep 读取上游步骤输出里的展项数组（兼容 {items:[...]} 与直接数组）。
+func workbenchExhibitsFromStep(in input, stepID string) []map[string]any {
+	stepID = strings.TrimSpace(stepID)
+	if stepID == "" {
+		return nil
+	}
+	out := upstreamStepOutput(in, stepID)
+	if out == nil {
+		return nil
+	}
+	for _, key := range []string{"items", "exhibits", "list", "data"} {
+		if arr, ok := out[key].([]any); ok {
+			return asMapList(arr)
+		}
+	}
+	return nil
 }
 
 func mapInt(value any) int {

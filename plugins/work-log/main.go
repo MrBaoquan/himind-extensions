@@ -102,6 +102,21 @@ type input struct {
 	IncludeStats     *bool    `json:"include_stats"`
 	ResolveProjects  *bool    `json:"resolve_projects"`
 	RegisterProjects *bool    `json:"register_projects"`
+	// 路径映射：项目/展项可通过本机目录/仓库路径稳定识别（路径优先于名称）。
+	// Paths/AddPaths/RemovePaths 供 work-log.project.path.set 与 project.upsert 管理映射；
+	// RepoPath 是会话仓库根、ExhibitID/ExhibitName 是展项目标选择器。
+	Paths        []pathSpec `json:"paths"`
+	AddPaths     []pathSpec `json:"add_paths"`
+	RemovePaths  []string   `json:"remove_paths"`
+	RepoPath     string     `json:"repo_path"`
+	ExhibitID    string     `json:"exhibit_id"`
+	ExhibitName  string     `json:"exhibit_name"`
+	FromProject  string     `json:"from_project"`
+	ToProject    string     `json:"to_project"`
+	CreateTarget *bool      `json:"create_target"`
+	// Exhibits / ExhibitsStep 用于从工作台同步展项（含 source_path/release_path 路径）。
+	Exhibits     []map[string]any `json:"exhibits"`
+	ExhibitsStep string           `json:"exhibits_step"`
 	// Projects / ProjectsStep 用于从工作台同步项目（含展项）到本地登记表：
 	// Projects 直接给数组，ProjectsStep 指向工作流里取工作台项目列表的上游步骤。
 	Projects     []map[string]any `json:"projects"`
@@ -131,9 +146,14 @@ type entry struct {
 	// ProjectID / ExhibitID 是命中工作台登记后的稳定 ID（未命中留空，供用户确认后再补）。
 	ProjectID string `json:"project_id,omitempty"`
 	ExhibitID string `json:"exhibit_id,omitempty"`
-	Category  string `json:"category"`
-	StartedAt string `json:"started_at"`
-	EndedAt   string `json:"ended_at"`
+	// RepoPath 是会话工作目录对应的仓库根（采集器写入的稳定路径事实）。
+	// 写入时按「路径 → 项目/展项」映射归类，未命中则留空并进入待认领。
+	RepoPath string `json:"repo_path,omitempty"`
+	// ProjectHint 是未归类时保留的原始项目名建议（AI/目录名/仓库自述），仅供待认领界面参考。
+	ProjectHint string `json:"project_hint,omitempty"`
+	Category    string `json:"category"`
+	StartedAt   string `json:"started_at"`
+	EndedAt     string `json:"ended_at"`
 	// Minutes 是该条目的工时（分钟）。MinutesSource 标明来源：measured（按消息间隔实测的活跃时长）
 	// / span（仅有起止时间的粗粒度区间）/ estimated（按轮次估算）/ manual（人工填写）。
 	Minutes       int      `json:"minutes,omitempty"`
@@ -203,6 +223,18 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 		return rpcResult(result, err)
 	case "work-log.project.assign":
 		result, err := projectAssignCap(in)
+		return rpcResult(result, err)
+	case "work-log.project.path.set":
+		result, err := projectPathSetCap(in)
+		return rpcResult(result, err)
+	case "work-log.project.mapPath":
+		result, err := projectMapPathCap(in)
+		return rpcResult(result, err)
+	case "work-log.project.claim":
+		result, err := projectClaimCap(in)
+		return rpcResult(result, err)
+	case "work-log.project.merge":
+		result, err := projectMergeCap(in)
 		return rpcResult(result, err)
 	case "work-log.project.sync":
 		result, err := projectSyncCap(in)
@@ -548,6 +580,9 @@ func normalizeEntry(item entry, date, now string) entry {
 	item.Source = fallbackValue(strings.TrimSpace(item.Source), "manual")
 	item.EntryID = strings.TrimSpace(item.EntryID)
 	item.Project = strings.TrimSpace(item.Project)
+	item.Exhibit = strings.TrimSpace(item.Exhibit)
+	item.RepoPath = strings.TrimSpace(item.RepoPath)
+	item.ProjectHint = strings.TrimSpace(item.ProjectHint)
 	item.Category = fallbackValue(strings.TrimSpace(item.Category), defaultCategory)
 	item.SessionID = strings.TrimSpace(item.SessionID)
 	item.StartedAt = strings.TrimSpace(item.StartedAt)

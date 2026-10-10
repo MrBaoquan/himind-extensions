@@ -20,6 +20,8 @@
           "project": {"type": "string"},
           "feature": {"type": "string"},
           "directory": {"type": "string"},
+          "repo_path": {"type": "string"},
+          "exhibit": {"type": "string"},
           "title": {"type": "string"},
           "date": {"type": "string"},
           "started_at": {"type": "string"},

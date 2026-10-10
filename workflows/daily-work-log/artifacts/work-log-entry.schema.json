@@ -20,6 +20,8 @@
           "exhibit": {"type": "string"},
           "project_id": {"type": "string"},
           "exhibit_id": {"type": "string"},
+          "repo_path": {"type": "string"},
+          "project_hint": {"type": "string"},
           "category": {"type": "string"},
           "started_at": {"type": "string"},
           "ended_at": {"type": "string"},

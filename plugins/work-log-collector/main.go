@@ -218,11 +218,16 @@ func pathExists(path string) bool {
 // ---- 扫描 ----
 
 type sessionDigest struct {
-	Source            string   `json:"source"`
-	SessionID         string   `json:"session_id"`
-	Project           string   `json:"project,omitempty"`
-	Feature           string   `json:"feature,omitempty"`
-	Directory         string   `json:"directory,omitempty"`
+	Source    string `json:"source"`
+	SessionID string `json:"session_id"`
+	Project   string `json:"project,omitempty"`
+	Feature   string `json:"feature,omitempty"`
+	Directory string `json:"directory,omitempty"`
+	// RepoPath 是会话工作目录对应的仓库根（路径事实）：优先取仓库自述清单 `.himind/project.json`
+	// 所在目录，其次 git/svn 仓库根，最后退回工作目录本身。写入端据此稳定归类。
+	RepoPath string `json:"repo_path,omitempty"`
+	// Exhibit 是仓库自述清单里声明的展项（可选）。
+	Exhibit           string   `json:"exhibit,omitempty"`
 	Title             string   `json:"title,omitempty"`
 	Date              string   `json:"date"`
 	StartedAt         string   `json:"started_at,omitempty"`
@@ -354,6 +359,9 @@ func scanCap(in input) (any, error) {
 	}
 	if empty > 0 {
 		skipped = append(skipped, map[string]any{"source": "all", "reason": "跳过无用户内容的空会话", "count": empty})
+	}
+	for i := range filtered {
+		enrichSessionPath(&filtered[i])
 	}
 	sort.Slice(filtered, func(i, j int) bool { return filtered[i].StartedAt > filtered[j].StartedAt })
 	truncated := false
@@ -487,6 +495,25 @@ func clampMinutes(minutes int) int {
 	return minutes
 }
 
+// featureFromRepo 取会话工作目录相对仓库根（repo_path）的末级目录作为「功能/模块」。
+func featureFromRepo(directory, repoPath string) string {
+	directory = strings.TrimSpace(directory)
+	repoPath = strings.TrimSpace(repoPath)
+	if directory == "" || repoPath == "" {
+		return ""
+	}
+	rel, err := filepath.Rel(filepath.Clean(repoPath), filepath.Clean(directory))
+	if err != nil || rel == "." || rel == "" || strings.HasPrefix(rel, "..") {
+		return ""
+	}
+	parts := strings.Split(filepath.ToSlash(rel), "/")
+	last := strings.TrimSpace(parts[len(parts)-1])
+	if last == "" || last == "." {
+		return ""
+	}
+	return last
+}
+
 // featureFromDirectory 尽力从会话工作目录推断「功能/模块」：优先取 git 仓库内、
 // 相对仓库根的末级目录；没有仓库信息时，若目录名与项目名不同则取目录名。
 func featureFromDirectory(directory, project string) string {
@@ -527,6 +554,96 @@ func gitRoot(dir string) string {
 	}
 }
 
+// vcsRoot 向上查找最近的版本库根（如 .svn 目录），找不到返回空。
+func vcsRoot(dir, marker string) string {
+	for {
+		if _, err := os.Stat(filepath.Join(dir, marker)); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
+}
+
+// enrichSessionPath 用会话工作目录补齐稳定路径事实 repo_path：优先仓库自述清单
+// .himind/project.json（同时读取声明的项目/展项），其次 git/svn 仓库根，最后退回工作目录本身。
+func enrichSessionPath(d *sessionDigest) {
+	dir := strings.TrimSpace(d.Directory)
+	if dir == "" {
+		return
+	}
+	clean := filepath.Clean(dir)
+	if root, project, exhibit := manifestAt(clean); root != "" {
+		d.RepoPath = root
+		if project != "" {
+			d.Project = project
+		}
+		if exhibit != "" {
+			d.Exhibit = exhibit
+		}
+		return
+	}
+	if root := gitRoot(clean); root != "" {
+		d.RepoPath = root
+		return
+	}
+	if root := vcsRoot(clean, ".svn"); root != "" {
+		d.RepoPath = root
+		return
+	}
+	d.RepoPath = clean
+}
+
+// manifestAt 从目录向上查找 .himind/project.json，返回其所在目录与声明的项目/展项。
+func manifestAt(dir string) (root, project, exhibit string) {
+	for {
+		candidate := filepath.Join(dir, ".himind", "project.json")
+		if body, err := os.ReadFile(candidate); err == nil {
+			p, e := parseProjectManifest(body)
+			return dir, p, e
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", "", ""
+		}
+		dir = parent
+	}
+}
+
+// parseProjectManifest 从工程清单里尽力解析项目/展项名（兼容不同键名与嵌套对象）。
+func parseProjectManifest(body []byte) (string, string) {
+	var raw map[string]any
+	if json.Unmarshal(body, &raw) != nil {
+		return "", ""
+	}
+	project := manifestText(raw, "project_name", "projectName", "project")
+	exhibit := manifestText(raw, "exhibit_name", "exhibitName", "exhibit", "target_exhibit", "targetExhibit")
+	if project == "" {
+		if nested, ok := raw["project"].(map[string]any); ok {
+			project = manifestText(nested, "name", "project_name")
+		}
+	}
+	if exhibit == "" {
+		if nested, ok := raw["exhibit"].(map[string]any); ok {
+			exhibit = manifestText(nested, "name", "exhibit_name")
+		}
+	}
+	return strings.TrimSpace(project), strings.TrimSpace(exhibit)
+}
+
+// manifestText 取第一个非空字符串键（键名直取，不做点路径遍历）。
+func manifestText(raw map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if v, ok := raw[key].(string); ok && strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}
+
 // candidateEntries 把会话素材映射成工作日志条目草稿，字段与 com.himind.work-log
 // 的写入契约对齐，便于工作流把采集结果直接交给写入能力（确定性、无需人工）。
 func candidateEntries(digests []sessionDigest) []map[string]any {
@@ -537,6 +654,9 @@ func candidateEntries(digests []sessionDigest) []map[string]any {
 			summary = strings.TrimSpace(strings.Join(digest.UserPrompts, "\n"))
 		}
 		feature := strings.TrimSpace(digest.Feature)
+		if feature == "" {
+			feature = featureFromRepo(digest.Directory, digest.RepoPath)
+		}
 		if feature == "" {
 			feature = featureFromDirectory(digest.Directory, digest.Project)
 		}
@@ -558,6 +678,12 @@ func candidateEntries(digests []sessionDigest) []map[string]any {
 			"title":      digest.Title,
 			"summary":    summary,
 			"tags":       []string{"自动采集"},
+		}
+		if repoPath := strings.TrimSpace(digest.RepoPath); repoPath != "" {
+			item["repo_path"] = repoPath
+		}
+		if exhibit := strings.TrimSpace(digest.Exhibit); exhibit != "" {
+			item["exhibit"] = exhibit
 		}
 		if feature != "" {
 			item["feature"] = feature

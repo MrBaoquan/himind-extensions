@@ -424,3 +424,62 @@ func TestScanCandidateEntriesMeasureMinutes(t *testing.T) {
 		t.Fatalf("Claude 会话应按起止区间给出工时: %#v", claude)
 	}
 }
+
+// TestEnrichSessionPathUsesManifest 验证仓库自述清单优先，并读取声明的项目/展项。
+func TestEnrichSessionPathUsesManifest(t *testing.T) {
+	home := t.TempDir()
+	repo := filepath.Join(home, "proj")
+	sub := filepath.Join(repo, "assets", "scenes")
+	if err := os.MkdirAll(filepath.Join(repo, ".himind"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := `{"project_name":"深圳科技馆","exhibit_name":"太空环"}`
+	if err := os.WriteFile(filepath.Join(repo, ".himind", "project.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	digest := sessionDigest{Source: "codex", SessionID: "s1", Directory: sub, Project: "proj"}
+	enrichSessionPath(&digest)
+	if digest.RepoPath != repo {
+		t.Fatalf("repo_path 应为清单所在目录，实际 %q", digest.RepoPath)
+	}
+	if digest.Project != "深圳科技馆" || digest.Exhibit != "太空环" {
+		t.Fatalf("应读取清单声明的项目/展项，实际 project=%q exhibit=%q", digest.Project, digest.Exhibit)
+	}
+}
+
+// TestEnrichSessionPathFallsBackToGitRoot 验证没有清单时退回 git 仓库根。
+func TestEnrichSessionPathFallsBackToGitRoot(t *testing.T) {
+	home := t.TempDir()
+	repo := filepath.Join(home, "my-repo")
+	sub := filepath.Join(repo, "src", "calendar")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	digest := sessionDigest{Source: "codex", SessionID: "s2", Directory: sub}
+	enrichSessionPath(&digest)
+	if digest.RepoPath != repo {
+		t.Fatalf("无清单时应退回 git 仓库根，实际 %q", digest.RepoPath)
+	}
+}
+
+// TestCandidateEntriesCarryRepoPath 验证候选条目携带 repo_path 与展项。
+func TestCandidateEntriesCarryRepoPath(t *testing.T) {
+	digests := []sessionDigest{{
+		Source: "codex", SessionID: "s1", Project: "proj",
+		RepoPath: "F:\\work\\repo", Exhibit: "太空环",
+		Title: "T", StartedAt: "2026-10-09T09:00:00+08:00",
+	}}
+	entries := candidateEntries(digests)
+	if len(entries) != 1 || entries[0]["repo_path"] != "F:\\work\\repo" {
+		t.Fatalf("候选条目应携带 repo_path: %#v", entries)
+	}
+	if entries[0]["exhibit"] != "太空环" {
+		t.Fatalf("候选条目应携带展项: %#v", entries[0])
+	}
+}

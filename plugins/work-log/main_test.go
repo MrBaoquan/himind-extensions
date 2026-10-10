@@ -784,3 +784,115 @@ func quote(value string) string {
 	}
 	return string(body)
 }
+
+// TestPathMappingResolvesAndMarksPending 验证：路径命中按映射归类；未命中的采集条目
+// 留空进「待认领」，且不新增假项目。
+func TestPathMappingResolvesAndMarksPending(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"深圳科技馆","paths":[{"path":"F:/work/szkjg","kind":"repo"}]}`)
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[
+		{"source":"codex","session_id":"a1","repo_path":"F:/work/szkjg/sub/dir","project":"随手起的名字","title":"命中"},
+		{"source":"codex","session_id":"a2","repo_path":"F:/work/unknown-repo","project":"unknown-repo","title":"未命中"}
+	]}`)
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-09"}`)
+	got := map[string]map[string]any{}
+	for _, raw := range read["entries"].([]any) {
+		item := raw.(map[string]any)
+		got[item["session_id"].(string)] = item
+	}
+	if got["a1"]["project"] != "深圳科技馆" {
+		t.Fatalf("路径命中应归一为深圳科技馆，实际 %v", got["a1"]["project"])
+	}
+	if got["a2"]["project"] != "" {
+		t.Fatalf("未命中路径应留空，实际 %v", got["a2"]["project"])
+	}
+	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
+	if len(list["projects"].([]any)) != 1 {
+		t.Fatalf("未命中不应新增假项目，实际 %d 个", len(list["projects"].([]any)))
+	}
+	pending := list["pending_paths"].([]any)
+	if len(pending) != 1 {
+		t.Fatalf("应有 1 个待认领路径，实际 %v", pending)
+	}
+	if pending[0].(map[string]any)["path"] != "F:/work/unknown-repo" {
+		t.Fatalf("待认领路径异常: %v", pending[0])
+	}
+}
+
+// TestExhibitPathOutranksProjectPath 验证更具体的展项路径优先于项目路径。
+func TestExhibitPathOutranksProjectPath(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"某馆","paths":[{"path":"F:/work/hall"}]}`)
+	call(t, "work-log.project.claim", `{"log_root":`+quote(root)+`,"repo_path":"F:/work/hall/ex1","project_name":"某馆","exhibit_name":"一号展项"}`)
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-08","entries":[{"source":"codex","session_id":"b1","repo_path":"F:/work/hall/ex1/src","title":"展项"}]}`)
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-08"}`)
+	item := read["entries"].([]any)[0].(map[string]any)
+	if item["project"] != "某馆" || item["exhibit"] != "一号展项" {
+		t.Fatalf("应命中展项，实际 project=%v exhibit=%v", item["project"], item["exhibit"])
+	}
+}
+
+// TestClaimBackfillsPendingEntries 验证认领会把历史待认领条目回填到目标项目。
+func TestClaimBackfillsPendingEntries(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"新馆"}`)
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-05","entries":[{"source":"codex","session_id":"c1","repo_path":"F:/work/mystery","project":"mystery","title":"T"}]}`)
+	before := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-05"}`)
+	if before["entries"].([]any)[0].(map[string]any)["project"] != "" {
+		t.Fatal("认领前应留空")
+	}
+	claimed := call(t, "work-log.project.claim", `{"log_root":`+quote(root)+`,"repo_path":"F:/work/mystery","project_name":"新馆"}`)
+	if claimed["updated"].(float64) != 1 {
+		t.Fatalf("应回填 1 条，实际 %v", claimed["updated"])
+	}
+	after := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-05"}`)
+	if after["entries"].([]any)[0].(map[string]any)["project"] != "新馆" {
+		t.Fatal("认领后应归到新馆")
+	}
+	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
+	if len(list["pending_paths"].([]any)) != 0 {
+		t.Fatalf("认领后待认领应为空，实际 %v", list["pending_paths"])
+	}
+}
+
+// TestProjectMergeMovesEntriesAndPaths 验证合并会搬移条目并保留路径映射。
+func TestProjectMergeMovesEntriesAndPaths(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"目标馆","paths":[{"path":"F:/work/target"}]}`)
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"旧名","aliases":["legacy"]}`)
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-04","entries":[{"source":"manual","project":"旧名","title":"m"}]}`)
+	merged := call(t, "work-log.project.merge", `{"log_root":`+quote(root)+`,"from_project":"旧名","to_project":"目标馆"}`)
+	if merged["merged"] != true {
+		t.Fatalf("合并失败: %v", merged)
+	}
+	if merged["updated"].(float64) != 1 {
+		t.Fatalf("应改写 1 条，实际 %v", merged["updated"])
+	}
+	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
+	if len(list["projects"].([]any)) != 1 {
+		t.Fatalf("合并后应剩 1 个项目，实际 %d", len(list["projects"].([]any)))
+	}
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-04"}`)
+	if read["entries"].([]any)[0].(map[string]any)["project"] != "目标馆" {
+		t.Fatal("条目应归到目标馆")
+	}
+}
+
+// TestProjectMapPathPreview 验证只读路径预览能力。
+func TestProjectMapPathPreview(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"甲项目"}`)
+	call(t, "work-log.project.path.set", `{"log_root":`+quote(root)+`,"project_name":"甲项目","paths":[{"path":"F:/work/jia","kind":"repo"}]}`)
+	mapped := call(t, "work-log.project.mapPath", `{"log_root":`+quote(root)+`,"path":"F:/work/jia/app"}`)
+	if mapped["matched"] != true || mapped["project"] != "甲项目" || mapped["match_type"] != "project_path" {
+		t.Fatalf("路径预览异常: %v", mapped)
+	}
+	if none := call(t, "work-log.project.mapPath", `{"log_root":`+quote(root)+`,"path":"F:/elsewhere"}`); none["matched"] != false {
+		t.Fatalf("不应命中: %v", none)
+	}
+}

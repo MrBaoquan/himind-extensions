@@ -1573,18 +1573,48 @@
     });
   }
 
+  // pathTags 渲染一组路径映射为可移除的标签。
+  function pathTags(paths, projectId, exhibitName) {
+    const items = Array.isArray(paths) ? paths : [];
+    if (!items.length) return '<span class="path-empty">未绑定路径</span>';
+    return items
+      .map((p) => {
+        const kind = text(p && p.kind);
+        const value = text(p && p.path);
+        return (
+          '<span class="path-tag" title="' + escapeHTML(value) + '">' +
+          (kind ? '<em>' + escapeHTML(kind) + '</em>' : '') +
+          '<span class="path-text">' + escapeHTML(value) + '</span>' +
+          '<button class="path-remove" type="button" data-action="rm-path" data-id="' + escapeHTML(projectId) +
+          '" data-exhibit="' + escapeHTML(text(exhibitName)) + '" data-path="' + escapeHTML(value) +
+          '" aria-label="移除路径">×</button>' +
+          '</span>'
+        );
+      })
+      .join('');
+  }
+
+  function projectOptions(projects) {
+    return (projects || [])
+      .map((item) => '<option value="' + escapeHTML(text(item.name)) + '"></option>')
+      .join('');
+  }
+
   function renderProjectsPanel() {
     const panel = el('projects-panel');
     if (!panel) return;
     const data = state.projectsData || {};
     const projects = data.projects || [];
     const unmatched = data.unmatched || [];
+    const pending = data.pending_paths || [];
 
     const form =
       '<div class="proj-form">' +
-      '<label class="field"><span>项目名</span><input id="p-name" type="text" placeholder="如：项目看板" /></label>' +
-      '<label class="field"><span>别名（逗号分隔）</span><input id="p-aliases" type="text" placeholder="如：kanban, 看板项目" /></label>' +
+      '<label class="field"><span>项目名</span><input id="p-name" type="text" placeholder="如：深圳科技馆" list="p-names" /></label>' +
+      '<label class="field"><span>别名（逗号分隔）</span><input id="p-aliases" type="text" placeholder="如：szkjg, 深圳馆" /></label>' +
+      '<label class="field"><span>仓库/目录路径（逗号分隔，可选）</span><input id="p-paths" type="text" placeholder="如：F:/work/szkjg" /></label>' +
       '<button id="p-save" class="btn primary" type="button">添加 / 更新</button>' +
+      '<datalist id="p-names">' + projectOptions(projects) + '</datalist>' +
       '</div>';
 
     const rows = projects
@@ -1593,9 +1623,24 @@
         const range = text(item.first_date)
           ? escapeHTML(item.first_date) + ' ~ ' + escapeHTML(text(item.last_date))
           : '暂无记录';
-        const exhibits = (item.exhibits || []).map((ex) => text(ex && ex.name)).filter(Boolean);
+        const exhibits = item.exhibits || [];
         const src = text(item.source) === 'workbench' ? '<span class="badge new">看板</span>' : '';
-        const exhibitTag = exhibits.length ? ' · 展项 ' + escapeHTML(exhibits.length) : '';
+        const paths = pathTags(item.paths, item.id, '');
+        const exhibitRows = exhibits
+          .map((ex) => {
+            const exName = text(ex && ex.name);
+            return (
+              '<div class="proj-exhibit">' +
+              '<span class="ex-name">' + escapeHTML(exName) + '</span>' +
+              '<span class="ex-paths">' + pathTags(ex && ex.paths, item.id, exName) + '</span>' +
+              '<span class="ex-add">' +
+              '<input class="proj-ex-path-input" type="text" placeholder="展项目录路径" data-id="' + escapeHTML(item.id) +
+              '" data-exhibit="' + escapeHTML(exName) + '" />' +
+              '<button class="btn tiny" type="button" data-action="add-ex-path">加</button>' +
+              '</span></div>'
+            );
+          })
+          .join('');
         return (
           '<div class="proj-row" data-id="' +
           escapeHTML(item.id) +
@@ -1611,8 +1656,7 @@
           escapeHTML(item.active_days || 0) +
           ' 天 · ' +
           range +
-          exhibitTag +
-          (exhibits.length ? '（' + escapeHTML(exhibits.slice(0, 4).join('、')) + (exhibits.length > 4 ? ' 等' : '') + '）' : '') +
+          (exhibits.length ? ' · 展项 ' + escapeHTML(exhibits.length) : '') +
           '</span></div>' +
           '<div class="proj-edit">' +
           '<input class="proj-alias-input" type="text" value="' +
@@ -1620,14 +1664,46 @@
           '" placeholder="别名，逗号分隔" />' +
           '<button class="btn" type="button" data-action="alias">保存</button>' +
           '<button class="btn" type="button" data-action="delete">删除</button>' +
-          '</div></div>'
+          '</div>' +
+          '<div class="proj-paths"><span class="paths-label">路径</span>' +
+          paths +
+          '<span class="path-add">' +
+          '<input class="proj-path-input" type="text" placeholder="加目录路径" data-id="' + escapeHTML(item.id) + '" />' +
+          '<button class="btn tiny" type="button" data-action="add-path">加路径</button>' +
+          '</span></div>' +
+          (exhibits.length
+            ? '<div class="proj-exhibits"><span class="paths-label">展项</span>' + exhibitRows + '</div>'
+            : '') +
+          '</div>'
         );
       })
       .join('');
 
     const list = projects.length
       ? rows
-      : emptyBlock('还没有项目', ['写入日志时若带项目名会自动登记；也可以在上方手动添加。']);
+      : emptyBlock('还没有项目', ['写入日志时若带项目名会自动登记；也可以在上方手动添加。无项目时也可先给「待认领路径」认领到一个新项目。']);
+
+    const pendingBlock = pending.length
+      ? '<div class="proj-pending"><h3>待认领路径（未命中映射）</h3>' +
+        pending
+          .map((item) => {
+            const hint = text(item.project_hint);
+            return (
+              '<div class="pending-row" data-path="' + escapeHTML(text(item.path)) + '">' +
+              '<div class="pending-main"><code>' + escapeHTML(text(item.path)) + '</code>' +
+              '<span class="proj-meta">' + escapeHTML(item.entry_count || 0) + ' 条 · ' +
+              escapeHTML(item.active_days || 0) + ' 天' +
+              (hint ? ' · 建议「' + escapeHTML(hint) + '」' : '') + '</span></div>' +
+              '<div class="pending-actions">' +
+              '<input class="pending-project" type="text" list="p-names" placeholder="目标项目（可新建）" />' +
+              '<input class="pending-exhibit" type="text" placeholder="展项（可选）" />' +
+              '<button class="btn primary" type="button" data-action="claim">认领</button>' +
+              '</div></div>'
+            );
+          })
+          .join('') +
+        '<p class="meta">认领会把该路径写入目标项目（或展项），并把历史条目一并回填；之后同类会话自动归类。</p></div>'
+      : '';
 
     const unmatchedBlock = unmatched.length
       ? '<div class="proj-unmatched"><h3>未归类（登记表里没有）</h3><ul>' +
@@ -1637,8 +1713,14 @@
         '</ul><p class="meta">在上方登记同名项目并设置别名，即可把历史条目归并到规范项目。</p></div>'
       : '';
 
-    panel.innerHTML = form + '<div class="proj-list">' + list + '</div>' + unmatchedBlock;
+    panel.innerHTML = form + '<div class="proj-list">' + list + '</div>' + pendingBlock + unmatchedBlock;
     bindProjectsPanel(panel);
+  }
+
+  async function refreshProjects() {
+    await loadProjects();
+    renderProjectsPanel();
+    renderProjectList();
   }
 
   function bindProjectsPanel(panel) {
@@ -1651,17 +1733,16 @@
           el('p-name').focus();
           return;
         }
+        const paths = splitList(el('p-paths').value).map((p) => ({ path: p, kind: 'repo' }));
         try {
-          await bridgeInvoke('work-log.project.upsert', {
-            project_name: name,
-            aliases: splitList(el('p-aliases').value),
-          });
+          const payload = { project_name: name, aliases: splitList(el('p-aliases').value) };
+          if (paths.length) payload.add_paths = paths;
+          await bridgeInvoke('work-log.project.upsert', payload);
           notify('已保存项目：' + name);
           el('p-name').value = '';
           el('p-aliases').value = '';
-          await loadProjects();
-          renderProjectsPanel();
-          renderProjectList();
+          el('p-paths').value = '';
+          await refreshProjects();
         } catch (error) {
           notify('保存项目失败：' + String((error && error.message) || error), 'error');
         }
@@ -1683,14 +1764,57 @@
               aliases: splitList(input ? input.value : ''),
             });
             notify('已更新别名：' + name);
-            await loadProjects();
-            renderProjectsPanel();
-            renderProjectList();
+            await refreshProjects();
           } catch (error) {
             notify('更新别名失败：' + String((error && error.message) || error), 'error');
           }
         });
       }
+
+      const addPathBtn = row.querySelector('[data-action="add-path"]');
+      if (addPathBtn) {
+        addPathBtn.addEventListener('click', async () => {
+          const input = row.querySelector('.proj-path-input');
+          const path = text(input ? input.value : '');
+          if (!path) {
+            notify('请先填写目录路径。', 'warn');
+            return;
+          }
+          try {
+            await bridgeInvoke('work-log.project.path.set', {
+              project_id: id,
+              add_paths: [{ path: path, kind: 'repo' }],
+            });
+            notify('已为「' + name + '」添加路径');
+            await refreshProjects();
+          } catch (error) {
+            notify('添加路径失败：' + String((error && error.message) || error), 'error');
+          }
+        });
+      }
+
+      row.querySelectorAll('[data-action="add-ex-path"]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const input = btn.parentElement.querySelector('.proj-ex-path-input');
+          const path = text(input ? input.value : '');
+          const exhibit = input ? text(input.getAttribute('data-exhibit')) : '';
+          if (!path) {
+            notify('请先填写展项目录路径。', 'warn');
+            return;
+          }
+          try {
+            await bridgeInvoke('work-log.project.path.set', {
+              project_id: id,
+              exhibit_name: exhibit,
+              add_paths: [{ path: path, kind: 'repo' }],
+            });
+            notify('已为展项「' + exhibit + '」添加路径');
+            await refreshProjects();
+          } catch (error) {
+            notify('添加展项路径失败：' + String((error && error.message) || error), 'error');
+          }
+        });
+      });
 
       const delBtn = row.querySelector('[data-action="delete"]');
       if (delBtn) {
@@ -1707,14 +1831,55 @@
           try {
             await bridgeInvoke('work-log.project.delete', { project_id: id });
             notify('已删除项目登记：' + name + '（既有条目不受影响）');
-            await loadProjects();
-            renderProjectsPanel();
-            renderProjectList();
+            await refreshProjects();
           } catch (error) {
             notify('删除失败：' + String((error && error.message) || error), 'error');
           }
         });
       }
+    });
+
+    // 移除路径：项目级与展项级共用。
+    panel.querySelectorAll('[data-action="rm-path"]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        const exhibit = text(btn.getAttribute('data-exhibit'));
+        const path = btn.getAttribute('data-path');
+        try {
+          const payload = { project_id: id, remove_paths: [path] };
+          if (exhibit) payload.exhibit_name = exhibit;
+          await bridgeInvoke('work-log.project.path.set', payload);
+          notify('已移除路径');
+          await refreshProjects();
+        } catch (error) {
+          notify('移除路径失败：' + String((error && error.message) || error), 'error');
+        }
+      });
+    });
+
+    // 认领待认领路径。
+    panel.querySelectorAll('.pending-row').forEach((row) => {
+      const btn = row.querySelector('[data-action="claim"]');
+      if (!btn) return;
+      btn.addEventListener('click', async () => {
+        const repoPath = row.getAttribute('data-path');
+        const project = text((row.querySelector('.pending-project') || {}).value);
+        const exhibit = text((row.querySelector('.pending-exhibit') || {}).value);
+        if (!project) {
+          notify('请先填写目标项目名。', 'warn');
+          return;
+        }
+        try {
+          const payload = { repo_path: repoPath, project_name: project, create_target: true };
+          if (exhibit) payload.exhibit_name = exhibit;
+          const result = await bridgeInvoke('work-log.project.claim', payload);
+          notify('已认领 ' + repoPath + '：回填 ' + text(result && result.updated) + ' 条');
+          await refreshProjects();
+          await loadProjects();
+        } catch (error) {
+          notify('认领失败：' + String((error && error.message) || error), 'error');
+        }
+      });
     });
   }
 
