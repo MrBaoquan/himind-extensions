@@ -1073,3 +1073,137 @@ func TestArchiveMigrateStampsSchema(t *testing.T) {
 		t.Fatalf("写前应生成 .bak 备份: %v", err)
 	}
 }
+
+// TestProjectRenameRebindsEntries 验证项目改名：保持稳定 ID，并把历史条目回绑到新名。
+func TestProjectRenameRebindsEntries(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"甲"}`)
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-02","entries":[{"source":"manual","project":"甲","title":"a"},{"source":"manual","project":"甲","title":"b"}]}`)
+	before := findProjectByName(t, root, "甲")
+	id := before["id"].(string)
+
+	renamed := call(t, "work-log.project.rename", `{"log_root":`+quote(root)+`,"project_id":`+quote(id)+`,"new_name":"甲馆"}`)
+	if renamed["renamed"] != true || renamed["updated"].(float64) != 2 {
+		t.Fatalf("改名应回绑 2 条: %v", renamed)
+	}
+	if findProjectByName(t, root, "甲") != nil {
+		t.Fatal("旧名不应再存在")
+	}
+	after := findProjectByName(t, root, "甲馆")
+	if after == nil || after["id"].(string) != id {
+		t.Fatalf("改名应保持稳定 ID，实际 %v", after)
+	}
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-02"}`)
+	for _, raw := range read["entries"].([]any) {
+		item := raw.(map[string]any)
+		if item["project"] != "甲馆" || item["project_id"] != id {
+			t.Fatalf("条目未回绑到新名: %v", item)
+		}
+	}
+
+	// 新名被其它项目占用时应报错，而不是静默覆盖。
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"乙"}`)
+	_, rpcError := handle(jsonrpc.Request{Method: "work-log.project.rename", Params: []byte(`{"log_root":` + quote(root) + `,"project_id":` + quote(id) + `,"new_name":"乙"}`)})
+	if rpcError == nil {
+		t.Fatal("名称冲突时应报错")
+	}
+}
+
+// TestProjectAutofillFromSessionMaterial 验证从会话素材搜一轮自动补全项目路径，且 dry_run 不写盘。
+func TestProjectAutofillFromSessionMaterial(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"甲馆"}`)
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"乙馆","paths":[{"path":"F:/keep"}]}`)
+
+	material := t.TempDir()
+	digest := `{"sessions":[` +
+		`{"project":"甲馆","directory":"F:/work/jiaguan"},` +
+		`{"project":"甲馆","repo_path":"F:/work/jiaguan"},` +
+		`{"project":"乙馆","directory":"F:/work/yiguan"},` +
+		`{"project":"孤儿","directory":"F:/work/orphan"}` +
+		`]}`
+	if err := os.WriteFile(filepath.Join(material, "session-digest-2026-10-02_2026-10-02.json"), []byte(digest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// dry_run：只预览，不写盘。
+	preview := call(t, "work-log.project.autofill", `{"log_root":`+quote(root)+`,"material_root":`+quote(material)+`,"dry_run":true}`)
+	if preview["filled_count"].(float64) != 1 {
+		t.Fatalf("dry_run 应预览 1 个待补项目: %v", preview)
+	}
+	if len(findProjectByName(t, root, "甲馆")["paths"].([]any)) != 0 {
+		t.Fatal("dry_run 不应真正写入路径")
+	}
+
+	applied := call(t, "work-log.project.autofill", `{"log_root":`+quote(root)+`,"material_root":`+quote(material)+`}`)
+	if applied["filled_count"].(float64) != 1 {
+		t.Fatalf("应补 1 个项目路径: %v", applied)
+	}
+	paths := findProjectByName(t, root, "甲馆")["paths"].([]any)
+	if len(paths) != 1 || paths[0].(map[string]any)["path"] != "F:/work/jiaguan" {
+		t.Fatalf("路径未自动补全: %v", paths)
+	}
+	if paths[0].(map[string]any)["source"] != "session" {
+		t.Fatalf("自动补全来源应为 session: %v", paths[0])
+	}
+	// 已有路径的项目不被覆盖。
+	kept := findProjectByName(t, root, "乙馆")["paths"].([]any)
+	if len(kept) != 1 || kept[0].(map[string]any)["path"] != "F:/keep" {
+		t.Fatalf("已有路径不应被覆盖: %v", kept)
+	}
+}
+
+// TestSessionMaterialDirSiblingLayout 验证未显式给 material_root 时，能从采集器（同级插件）
+// 的私有数据目录找到素材：HIMIND_PLUGIN_DATA_ROOT 指向本插件目录，素材在同级目录。
+func TestSessionMaterialDirSiblingLayout(t *testing.T) {
+	pluginData := t.TempDir()
+	own := filepath.Join(pluginData, "com.himind.work-log")
+	if err := os.MkdirAll(own, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sibling := filepath.Join(pluginData, "com.himind.work-log-collector", "material")
+	if err := os.MkdirAll(sibling, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", own)
+
+	got, err := sessionMaterialDir("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Clean(got) != filepath.Clean(sibling) {
+		t.Fatalf("应解析到同级采集器素材目录 %q，实际 %q", sibling, got)
+	}
+}
+
+// TestProjectAutofillViaSiblingMaterialDir 走真实环境变量路径（不给 material_root）时，
+// autofill 应能读到同级采集器素材并补全路径。
+func TestProjectAutofillViaSiblingMaterialDir(t *testing.T) {
+	pluginData := t.TempDir()
+	own := filepath.Join(pluginData, "com.himind.work-log")
+	if err := os.MkdirAll(own, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	material := filepath.Join(pluginData, "com.himind.work-log-collector", "material")
+	if err := os.MkdirAll(material, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", own)
+
+	root := t.TempDir()
+	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"甲馆"}`)
+	digest := `{"sessions":[{"project":"甲馆","directory":"F:/work/jiaguan"}]}`
+	if err := os.WriteFile(filepath.Join(material, "session-digest-2026-10-02_2026-10-02.json"), []byte(digest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	applied := call(t, "work-log.project.autofill", `{"log_root":`+quote(root)+`}`)
+	if applied["found_material"] != true {
+		t.Fatalf("应找到同级采集器素材: %v", applied)
+	}
+	if applied["filled_count"].(float64) != 1 {
+		t.Fatalf("应补 1 个项目路径: %v", applied)
+	}
+}

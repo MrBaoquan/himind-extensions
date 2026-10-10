@@ -4,12 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
 
 // 本文件实现「登记管理增强」与「存储稳健性」相关能力：
 //   - work-log.entry.patch   单条条目的字段级局部更新（只改传入的键，不注入默认值）
+//   - work-log.project.rename       项目改名（保持稳定 ID，回绑历史条目）
+//   - work-log.project.autofill     从 AI 会话素材自动补全项目路径（可预览）
 //   - work-log.project.export / import  登记表导出与导入（备份 / 迁移 / 跨机复制）
 //   - work-log.archive.migrate          把历史文件补齐到当前 schema（一次性维护）
 // 以及对应的迁移函数 migrateProjectsFile / migrateDayFile。
@@ -269,6 +273,293 @@ func nonNilProjects(items []project) []project {
 		out = append(out, p)
 	}
 	return out
+}
+
+// ---------- 项目改名 ----------
+
+// projectRenameCap 修改项目的展示名：保持稳定 ID 不变，并把历史条目里按旧名/旧别名
+// 归类的条目回绑到新名，避免改名后老条目变成未归类。新名若已被其它项目（含别名）
+// 占用则报错，提示改用「并入」而不是静默覆盖。
+func projectRenameCap(in input) (any, error) {
+	root, err := logRoot(in.LogRoot)
+	if err != nil {
+		return nil, err
+	}
+	newName := strings.TrimSpace(in.NewName)
+	if newName == "" {
+		return nil, errors.New("需要 new_name（新的项目名）")
+	}
+	unlock := lockRoot(root)
+	defer unlock()
+	pf, err := readProjects(root)
+	if err != nil {
+		return nil, err
+	}
+	at := findProjectIndex(pf, in.ProjectID, firstNonEmpty(in.ProjectName, in.Project))
+	if at < 0 {
+		return nil, errors.New("未找到目标项目：请提供有效的 project_id 或 project_name")
+	}
+	oldName := pf.Projects[at].Name
+	if normalizeProjectKey(oldName) == normalizeProjectKey(newName) {
+		return map[string]any{
+			"log_root": root,
+			"renamed":  false,
+			"reason":   "名称未变化",
+			"project":  pf.Projects[at],
+		}, nil
+	}
+	if canonical, ok := resolveProjectName(projectIndex(pf), newName); ok && !strings.EqualFold(canonical, oldName) {
+		return nil, errors.New("名称已被「" + canonical + "」占用，请改用「并入」合并到该项目")
+	}
+	now := time.Now().Format(time.RFC3339)
+	oldAliases := append([]string{}, pf.Projects[at].Aliases...)
+	pf.Projects[at].Name = newName
+	pf.Projects[at].UpdatedAt = now
+	targetID := pf.Projects[at].ID
+	if err := writeProjects(root, pf); err != nil {
+		return nil, err
+	}
+
+	// 回绑历史条目：按 ID / 旧名 / 旧别名命中即改写到新名。
+	oldKey := normalizeProjectKey(oldName)
+	aliasKeys := map[string]bool{}
+	for _, a := range oldAliases {
+		if k := normalizeProjectKey(a); k != "" {
+			aliasKeys[k] = true
+		}
+	}
+	updated := 0
+	touched := make([]string, 0)
+	dates, err := listDates(root)
+	if err != nil {
+		return nil, err
+	}
+	for _, date := range dates {
+		day, err := readDay(root, date)
+		if err != nil {
+			return nil, err
+		}
+		changed := false
+		for i := range day.Entries {
+			item := &day.Entries[i]
+			match := (targetID != "" && item.ProjectID == targetID) ||
+				normalizeProjectKey(item.Project) == oldKey ||
+				aliasKeys[normalizeProjectKey(item.Project)]
+			if !match {
+				continue
+			}
+			item.Project = newName
+			item.ProjectID = targetID
+			item.UpdatedAt = now
+			updated++
+			changed = true
+		}
+		if changed {
+			if err := writeDay(root, day); err != nil {
+				return nil, err
+			}
+			touched = append(touched, date)
+		}
+	}
+	return map[string]any{
+		"log_root": root,
+		"renamed":  true,
+		"from":     oldName,
+		"to":       newName,
+		"project":  pf.Projects[at],
+		"updated":  updated,
+		"dates":    touched,
+	}, nil
+}
+
+// ---------- 会话记录自动填充路径 ----------
+
+// materialSession 是会话素材里与会话路径相关的最小字段集。
+type materialSession struct {
+	Project   string `json:"project"`
+	Directory string `json:"directory"`
+	RepoPath  string `json:"repo_path"`
+}
+
+type materialFile struct {
+	Sessions []materialSession `json:"sessions"`
+}
+
+// sessionMaterialDir 解析「AI 会话素材」目录：显式入参 > 采集器私有数据目录 material/。
+func sessionMaterialDir(value string) (string, error) {
+	if v := strings.TrimSpace(value); v != "" {
+		abs, err := filepath.Abs(v)
+		if err != nil {
+			return "", errors.New("material_root 无效")
+		}
+		return abs, nil
+	}
+	base := strings.TrimSpace(os.Getenv("HIMIND_PLUGIN_DATA_ROOT"))
+	if base == "" {
+		if local := strings.TrimSpace(os.Getenv("LOCALAPPDATA")); local != "" {
+			base = filepath.Join(local, "HiMindAgent", "plugin-data")
+		} else {
+			base = filepath.Join(os.TempDir(), "HiMindAgent", "plugin-data")
+		}
+		return filepath.Join(base, "com.himind.work-log-collector", "material"), nil
+	}
+	// HIMIND_PLUGIN_DATA_ROOT 指向本插件的私有数据目录（…/plugin-data/com.himind.work-log），
+	// 采集器是其同级插件。素材目录在 plugin-data 下的同级目录里；若某些宿主把它设成了
+	// 共享的 plugin-data 根，则退回同名嵌套目录。两种布局都探测，取其存在者。
+	candidates := []string{
+		filepath.Join(filepath.Dir(base), "com.himind.work-log-collector", "material"),
+		filepath.Join(base, "com.himind.work-log-collector", "material"),
+	}
+	for _, c := range candidates {
+		if info, err := os.Stat(c); err == nil && info.IsDir() {
+			return c, nil
+		}
+	}
+	return candidates[0], nil
+}
+
+// projectAutofillCap 从 AI 工具会话记录（采集器落盘的会话素材）里「搜一轮」，为还没有
+// 绑定路径的登记项目自动补上仓库路径：会话里出现过的「项目名 → 工作目录/仓库根」，
+// 按名称（含别名）或路径末级目录名匹配到登记项目，命中即写入（source=session）。
+// dry_run 时只预览；只补空，绝不覆盖已有路径。
+func projectAutofillCap(in input) (any, error) {
+	root, err := logRoot(in.LogRoot)
+	if err != nil {
+		return nil, err
+	}
+	dir, err := sessionMaterialDir(in.MaterialRoot)
+	if err != nil {
+		return nil, err
+	}
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return map[string]any{
+			"log_root":       root,
+			"material_dir":   dir,
+			"found_material": false,
+			"filled":         []any{},
+			"filled_count":   0,
+			"candidates":     []any{},
+			"message":        "未找到会话素材目录，请先运行一次采集：" + dir,
+		}, nil
+	}
+
+	// 汇总 归一项目名 → 候选路径（出现次数最多者胜，次数相同取更长的路径）。
+	type cand struct {
+		path  string
+		count int
+	}
+	best := map[string]cand{}
+	display := map[string]string{}
+	scanned := 0
+	for _, f := range files {
+		if f.IsDir() || !strings.HasPrefix(f.Name(), "session-digest-") || !strings.HasSuffix(f.Name(), ".json") {
+			continue
+		}
+		body, err := os.ReadFile(filepath.Join(dir, f.Name()))
+		if err != nil {
+			continue
+		}
+		var mf materialFile
+		if json.Unmarshal(body, &mf) != nil {
+			continue
+		}
+		scanned++
+		for _, s := range mf.Sessions {
+			p := firstNonEmpty(s.RepoPath, s.Directory)
+			if normalizePathKey(p) == "" {
+				continue
+			}
+			label := strings.TrimSpace(s.Project)
+			if label == "" {
+				label = filepath.Base(filepath.Clean(p))
+			}
+			key := normalizeProjectKey(label)
+			if key == "" {
+				continue
+			}
+			cur := best[key]
+			switch {
+			case cur.path == "" || cur.path == p:
+				cur = cand{path: p, count: cur.count + 1}
+			case len(p) > len(cur.path):
+				cur = cand{path: p, count: 1}
+			}
+			best[key] = cur
+			if _, ok := display[key]; !ok {
+				display[key] = label
+			}
+		}
+	}
+
+	unlock := lockRoot(root)
+	defer unlock()
+	pf, err := readProjects(root)
+	if err != nil {
+		return nil, err
+	}
+	dryRun := in.DryRun != nil && *in.DryRun
+	now := time.Now().Format(time.RFC3339)
+	index := projectIndex(pf)
+	nameAt := map[string]int{}
+	for i := range pf.Projects {
+		nameAt[pf.Projects[i].Name] = i
+	}
+	filled := make([]map[string]any, 0)
+	matched := map[string]bool{}
+	for key, c := range best {
+		label := display[key]
+		canonical, ok := resolveProjectName(index, label)
+		if !ok {
+			canonical, ok = resolveProjectName(index, filepath.Base(filepath.Clean(c.path)))
+		}
+		if !ok {
+			continue
+		}
+		at, ok := nameAt[canonical]
+		if !ok || len(pf.Projects[at].Paths) > 0 {
+			continue // 只补空，不覆盖已有路径。
+		}
+		matched[key] = true
+		filled = append(filled, map[string]any{
+			"project_id": pf.Projects[at].ID,
+			"project":    pf.Projects[at].Name,
+			"path":       c.path,
+			"from":       label,
+		})
+		if !dryRun {
+			pf.Projects[at].Paths = mergePaths(pf.Projects[at].Paths, sanitizePaths([]pathSpec{{Path: c.path, Kind: "repo", Source: "session"}}))
+			pf.Projects[at].UpdatedAt = now
+		}
+	}
+
+	candidates := make([]map[string]any, 0, len(best))
+	for key, c := range best {
+		candidates = append(candidates, map[string]any{
+			"project": display[key],
+			"path":    c.path,
+			"count":   c.count,
+			"matched": matched[key],
+		})
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		return asInt(candidates[i]["count"]) > asInt(candidates[j]["count"])
+	})
+	if !dryRun && len(filled) > 0 {
+		if err := writeProjects(root, pf); err != nil {
+			return nil, err
+		}
+	}
+	return map[string]any{
+		"log_root":       root,
+		"material_dir":   dir,
+		"found_material": scanned > 0,
+		"files":          scanned,
+		"dry_run":        dryRun,
+		"filled":         filled,
+		"filled_count":   len(filled),
+		"candidates":     candidates,
+	}, nil
 }
 
 // ---------- schema 迁移 ----------

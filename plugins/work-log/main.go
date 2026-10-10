@@ -92,8 +92,10 @@ type input struct {
 	BaseStep string `json:"base_step"`
 	// 项目登记：ProjectID/ProjectName 等用于项目管理能力；ResolveProjects/RegisterProjects
 	// 控制写入时是否按登记表归一项目名、是否自动登记未知项目。
-	ProjectID        string   `json:"project_id"`
-	ProjectName      string   `json:"project_name"`
+	ProjectID   string `json:"project_id"`
+	ProjectName string `json:"project_name"`
+	// NewName 供 work-log.project.rename：给项目改展示名（保持稳定 ID，并回绑历史条目）。
+	NewName          string   `json:"new_name"`
 	Aliases          []string `json:"aliases"`
 	Description      string   `json:"description"`
 	Status           string   `json:"status"`
@@ -124,6 +126,9 @@ type input struct {
 	ProjectsJSON string `json:"projects_json"`
 	// DryRun 供迁移维护能力预览改动而不写盘。
 	DryRun *bool `json:"dry_run"`
+	// MaterialRoot 供 work-log.project.autofill 指定「AI 会话素材」目录；缺省用采集器
+	// （com.himind.work-log-collector）私有数据目录下的 material/。
+	MaterialRoot string `json:"material_root"`
 	// Patch 供 work-log.entry.patch 做字段级局部更新：只改显式传入的键，未传的键保持原值。
 	Patch map[string]any `json:"patch"`
 	// Projects / ProjectsStep 用于从工作台同步项目（含展项）到本地登记表：
@@ -224,6 +229,9 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 	case "work-log.project.upsert":
 		result, err := projectUpsertCap(in)
 		return rpcResult(result, err)
+	case "work-log.project.rename":
+		result, err := projectRenameCap(in)
+		return rpcResult(result, err)
 	case "work-log.project.delete":
 		result, err := projectDeleteCap(in)
 		return rpcResult(result, err)
@@ -244,6 +252,9 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 		return rpcResult(result, err)
 	case "work-log.project.merge":
 		result, err := projectMergeCap(in)
+		return rpcResult(result, err)
+	case "work-log.project.autofill":
+		result, err := projectAutofillCap(in)
 		return rpcResult(result, err)
 	case "work-log.project.export":
 		result, err := projectExportCap(in)

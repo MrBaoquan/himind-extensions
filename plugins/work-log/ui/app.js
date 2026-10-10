@@ -5,7 +5,7 @@
  *   日历回看：按天看当天脉络（项目 · 功能 · 工时）与明细。
  *   报告：按周期（日/周/月/季度/年）回看，核心仍是项目 → 功能 → 工时。
  *   工时表：按月生成「项目 × 日期」矩阵，可切换到 8 小时对齐口径。
- *   项目：按项目回看推进记录，并管理项目登记表与别名。
+ *   项目：按项目回看推进记录，并管理项目登记表与路径映射。
  *
  * 视图只消费本插件 Manifest 已声明的能力：月历统计、条目录入/读取/删除、区间查询、
  * 报告渲染/读取、项目登记、打开链接/目录。它不直接读文件系统，也不依赖宿主页面。
@@ -89,6 +89,8 @@
     registrySelected: {},
     registryIOOpen: false,
     registryIOText: '',
+    registryNewOpen: false,
+    registryEditingName: '',
   };
 
   const el = (id) => document.getElementById(id);
@@ -1693,7 +1695,7 @@
   // pathTags 渲染一组路径映射为可移除的标签。
   function pathTags(paths, projectId, exhibitName) {
     const items = Array.isArray(paths) ? paths : [];
-    if (!items.length) return '<span class="path-empty">未绑定路径</span>';
+    if (!items.length) return '<span class="path-empty">未绑定</span>';
     return items
       .map((p) => {
         const kind = text(p && p.kind);
@@ -1711,12 +1713,6 @@
       .join('');
   }
 
-  function projectOptions(projects) {
-    return (projects || [])
-      .map((item) => '<option value="' + escapeHTML(text(item.name)) + '"></option>')
-      .join('');
-  }
-
   function renderProjectsPanel() {
     const panel = el('projects-panel');
     if (!panel) return;
@@ -1725,14 +1721,14 @@
     const unmatched = data.unmatched || [];
     const pending = data.pending_paths || [];
 
-    const form =
-      '<div class="proj-form">' +
-      '<label class="field"><span>项目名</span><input id="p-name" type="text" placeholder="如：深圳科技馆" list="p-names" /></label>' +
-      '<label class="field"><span>别名（逗号分隔）</span><input id="p-aliases" type="text" placeholder="如：szkjg, 深圳馆" /></label>' +
-      '<label class="field"><span>仓库/目录路径（逗号分隔，可选）</span><input id="p-paths" type="text" placeholder="如：F:/work/szkjg" /></label>' +
-      '<button id="p-save" class="btn primary" type="button">添加 / 更新</button>' +
-      '<datalist id="p-names">' + projectOptions(projects) + '</datalist>' +
-      '</div>';
+    const form = state.registryNewOpen
+      ? '<div class="proj-form">' +
+        '<label class="field"><span>项目名</span><input id="p-name" type="text" placeholder="如：深圳科技馆" /></label>' +
+        '<label class="field"><span>仓库 / 目录路径（可选）</span><input id="p-paths" type="text" placeholder="如：F:/work/szkjg" /></label>' +
+        '<button id="p-save" class="btn primary" type="button">创建项目</button>' +
+        '<button id="p-cancel" class="btn" type="button">取消</button>' +
+        '</div>'
+      : '';
 
     const filters = [
       { key: 'all', label: '全部' },
@@ -1771,7 +1767,6 @@
       if (!q) return true;
       const hay = [
         item.name,
-        (item.aliases || []).join(' '),
         (item.paths || []).map((p) => text(p && p.path)).join(' '),
         item.external_id,
       ]
@@ -1804,7 +1799,7 @@
     const zeroCount = projects.filter((item) => Number(item.entry_count || 0) === 0).length;
     const toolbar =
       '<div class="proj-tools">' +
-      '<input id="p-search" class="proj-search" type="search" placeholder="搜索项目名 / 别名 / 路径" value="' +
+      '<input id="p-search" class="proj-search" type="search" placeholder="搜索项目名 / 路径" value="' +
       escapeHTML(state.registryQuery) +
       '" />' +
       '<div class="proj-chips">' +
@@ -1822,10 +1817,14 @@
       ' 个' +
       (zeroCount ? ' · 无记录 ' + escapeHTML(zeroCount) + ' 个' : '') +
       '</span>' +
+      '<button class="btn tiny" type="button" data-action="autofill">自动填充路径</button>' +
       '<button class="btn tiny" type="button" data-action="clean-empty"' +
       (zeroCount ? '' : ' disabled') +
       '>清理无记录</button>' +
       '<button class="btn tiny" type="button" data-action="io-toggle">导出 / 导入</button>' +
+      '<button class="btn tiny primary" type="button" data-action="new-toggle">' +
+      (state.registryNewOpen ? '收起新建' : '+ 新建项目') +
+      '</button>' +
       '</div>' +
       (selectedIds.length
         ? '<div class="proj-selbar"><span>已选 ' +
@@ -1853,7 +1852,6 @@
 
     const rows = visible
       .map((item) => {
-        const aliases = (item.aliases || []).join(', ');
         const range = text(item.first_date)
           ? escapeHTML(item.first_date) + ' ~ ' + escapeHTML(text(item.last_date))
           : '暂无记录';
@@ -1880,6 +1878,18 @@
             );
           })
           .join('');
+        const editing = state.registryEditingName === item.id;
+        const nameNode = editing
+          ? '<input id="p-rename" class="proj-name-input" type="text" data-id="' +
+            escapeHTML(item.id) +
+            '" value="' +
+            escapeHTML(item.name) +
+            '" aria-label="项目名" />'
+          : '<button class="proj-name" type="button" data-action="rename" data-id="' +
+            escapeHTML(item.id) +
+            '" title="点击修改项目名">' +
+            escapeHTML(item.name) +
+            '</button>';
         return (
           '<div class="proj-row' +
           (archived ? ' archived' : '') +
@@ -1890,14 +1900,16 @@
           '" data-status="' +
           (archived ? 'archived' : 'active') +
           '">' +
+          '<div class="proj-head">' +
           '<label class="proj-pick"><input type="checkbox" class="proj-check" data-id="' + escapeHTML(item.id) + '"' + checked + ' /></label>' +
-          '<div class="proj-main">' +
-          '<strong>' +
+          '<div class="proj-title">' +
+          '<div class="proj-name-row">' +
+          nameNode +
           src +
           statusBadge +
           pathHint +
-          escapeHTML(item.name) +
-          '</strong><span class="proj-meta">' +
+          '</div>' +
+          '<span class="proj-meta">' +
           escapeHTML(item.entry_count || 0) +
           ' 条 · ' +
           escapeHTML(item.active_days || 0) +
@@ -1905,20 +1917,16 @@
           range +
           (exhibits.length ? ' · 展项 ' + escapeHTML(exhibits.length) : '') +
           '</span></div>' +
-          '<div class="proj-edit">' +
-          '<input class="proj-alias-input" type="text" value="' +
-          escapeHTML(aliases) +
-          '" placeholder="别名，逗号分隔" />' +
-          '<button class="btn" type="button" data-action="alias">保存</button>' +
-          '<select class="proj-merge-target"><option value="">合并到…</option>' +
+          '<div class="proj-actions">' +
+          '<select class="proj-merge-target"><option value="">并入到…</option>' +
           (targets || '') +
           '</select>' +
-          '<button class="btn" type="button" data-action="merge">并入</button>' +
-          '<button class="btn" type="button" data-action="archive">' +
+          '<button class="btn tiny" type="button" data-action="merge">并入</button>' +
+          '<button class="btn tiny" type="button" data-action="archive">' +
           (archived ? '恢复' : '归档') +
           '</button>' +
-          '<button class="btn" type="button" data-action="delete">删除</button>' +
-          '</div>' +
+          '<button class="btn tiny danger" type="button" data-action="delete">删除</button>' +
+          '</div></div>' +
           '<div class="proj-paths"><span class="paths-label">路径</span>' +
           paths +
           '<span class="path-add">' +
@@ -1958,7 +1966,10 @@
             );
           })
           .join('') +
-        '<p class="meta">认领会把该路径写入目标项目（或展项），并把历史条目一并回填；之后同类会话自动归类。</p></div>'
+        '<p class="meta">认领会把该路径写入目标项目（或展项），并把历史条目一并回填；之后同类会话自动归类。</p>' +
+        '<datalist id="p-names">' +
+        projects.map((item) => '<option value="' + escapeHTML(text(item.name)) + '"></option>').join('') +
+        '</datalist></div>'
       : '';
 
     const unmatchedBlock = unmatched.length
@@ -1966,7 +1977,7 @@
         unmatched
           .map((item) => '<li>' + escapeHTML(item.name) + ' · ' + escapeHTML(item.entry_count) + ' 条</li>')
           .join('') +
-        '</ul><p class="meta">在上方登记同名项目并设置别名，即可把历史条目归并到规范项目。</p></div>'
+        '</ul><p class="meta">在上方登记同名项目，或用行内「并入」把历史条目归并到规范项目。</p></div>'
       : '';
 
     panel.innerHTML = toolbar + form + '<div class="proj-list">' + list + '</div>' + pendingBlock + unmatchedBlock;
@@ -2171,6 +2182,36 @@
       }
     }
 
+    panel.querySelector('[data-action="new-toggle"]')?.addEventListener('click', () => {
+      state.registryNewOpen = !state.registryNewOpen;
+      renderProjectsPanel();
+      if (state.registryNewOpen) {
+        const input = el('p-name');
+        if (input) input.focus();
+      }
+    });
+    panel.querySelector('[data-action="autofill"]')?.addEventListener('click', async (event) => {
+      const btn = event.currentTarget;
+      btn.disabled = true;
+      try {
+        const result = await bridgeInvoke('work-log.project.autofill', {});
+        const count = Number((result && result.filled_count) || 0);
+        if (!count) {
+          notify('没有可自动补全的路径：会话记录里没找到与登记项目匹配的目录', 'warn');
+        } else {
+          const sample = (result.filled || [])
+            .map((f) => text(f && f.project) + ' → ' + text(f && f.path))
+            .slice(0, 3)
+            .join('；');
+          notify('已自动补全 ' + count + ' 个项目路径：' + sample + (count > 3 ? ' 等' : ''));
+        }
+        await refreshProjects();
+      } catch (error) {
+        notify('自动填充失败：' + String((error && error.message) || error), 'error');
+        btn.disabled = false;
+      }
+    });
+
     const save = panel.querySelector('#p-save');
     if (save) {
       save.addEventListener('click', async () => {
@@ -2182,41 +2223,76 @@
         }
         const paths = splitList(el('p-paths').value).map((p) => ({ path: p, kind: 'repo' }));
         try {
-          const payload = { project_name: name, aliases: splitList(el('p-aliases').value) };
-          if (paths.length) payload.add_paths = paths;
+          const payload = { project_name: name };
+          if (paths.length) payload.paths = paths;
           await bridgeInvoke('work-log.project.upsert', payload);
-          notify('已保存项目：' + name);
-          el('p-name').value = '';
-          el('p-aliases').value = '';
-          el('p-paths').value = '';
+          notify('已创建项目：' + name);
+          state.registryNewOpen = false;
           await refreshProjects();
         } catch (error) {
-          notify('保存项目失败：' + String((error && error.message) || error), 'error');
+          notify('创建项目失败：' + String((error && error.message) || error), 'error');
         }
       });
+    }
+    panel.querySelector('#p-cancel')?.addEventListener('click', () => {
+      state.registryNewOpen = false;
+      renderProjectsPanel();
+    });
+
+    // 名称就地编辑：点击名称 → 输入框，回车 / 失焦保存，Esc 取消。
+    panel.querySelectorAll('[data-action="rename"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.registryEditingName = btn.getAttribute('data-id') || '';
+        renderProjectsPanel();
+        const input = el('p-rename');
+        if (input) {
+          input.focus();
+          if (input.select) input.select();
+        }
+      });
+    });
+    const renameInput = panel.querySelector('.proj-name-input');
+    if (renameInput) {
+      const editId = renameInput.getAttribute('data-id') || '';
+      const source = (state.projectsData && state.projectsData.projects ? state.projectsData.projects : []).find(
+        (item) => item.id === editId,
+      );
+      const oldName = text(source && source.name);
+      let finished = false;
+      const finish = async (commitRename) => {
+        if (finished) return;
+        finished = true;
+        const value = text(renameInput.value);
+        state.registryEditingName = '';
+        if (!commitRename || !value || value === oldName) {
+          renderProjectsPanel();
+          return;
+        }
+        try {
+          const result = await bridgeInvoke('work-log.project.rename', { project_id: editId, new_name: value });
+          const rebound = Number((result && result.updated) || 0);
+          notify('已改名为「' + value + '」' + (rebound ? '，回绑 ' + rebound + ' 条记录' : ''));
+          await refreshProjects();
+        } catch (error) {
+          notify('改名失败：' + String((error && error.message) || error), 'error');
+          await refreshProjects();
+        }
+      };
+      renameInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          finish(true);
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          finish(false);
+        }
+      });
+      renameInput.addEventListener('blur', () => finish(true));
     }
 
     panel.querySelectorAll('.proj-row').forEach((row) => {
       const id = row.getAttribute('data-id');
       const name = row.getAttribute('data-name');
-
-      const aliasBtn = row.querySelector('[data-action="alias"]');
-      if (aliasBtn) {
-        aliasBtn.addEventListener('click', async () => {
-          const input = row.querySelector('.proj-alias-input');
-          try {
-            await bridgeInvoke('work-log.project.upsert', {
-              project_id: id,
-              project_name: name,
-              aliases: splitList(input ? input.value : ''),
-            });
-            notify('已更新别名：' + name);
-            await refreshProjects();
-          } catch (error) {
-            notify('更新别名失败：' + String((error && error.message) || error), 'error');
-          }
-        });
-      }
 
       const addPathBtn = row.querySelector('[data-action="add-path"]');
       if (addPathBtn) {

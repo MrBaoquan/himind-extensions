@@ -847,23 +847,77 @@ pre.source {
 
 .proj-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 8px;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  padding: 10px 14px;
+  padding: 12px 14px;
+  min-width: 0;
 }
 
-.proj-main {
+.proj-row.archived {
+  opacity: 0.62;
+  background: #fbfbfd;
+}
+
+.proj-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.proj-pick {
+  flex: 0 0 auto;
+  padding-top: 3px;
+}
+
+.proj-title {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
-.proj-main strong {
+.proj-name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.proj-name {
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: var(--radius-md);
+  padding: 2px 6px;
+  margin: 0;
+  font: inherit;
   font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: text;
+  text-align: left;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.proj-name:hover {
+  border-color: var(--line);
+  background: #f1f5f9;
+}
+
+.proj-name-input {
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  padding: 3px 8px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  min-width: 180px;
+  max-width: 100%;
 }
 
 .proj-meta {
@@ -871,24 +925,28 @@ pre.source {
   color: var(--muted);
 }
 
-.proj-edit {
+.proj-actions {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+  flex: 0 0 auto;
 }
 
-.proj-alias-input {
+.proj-merge-target {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  padding: 5px 8px;
+  padding: 4px 6px;
   font: inherit;
-  min-width: 0;
-  flex: 1 1 160px;
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 150px;
 }
 
 .proj-row,
-.proj-edit,
+.proj-head,
+.proj-title,
+.proj-actions,
 .proj-paths,
 .proj-exhibits,
 .proj-exhibit,
@@ -899,13 +957,11 @@ pre.source {
 
 .proj-paths,
 .proj-exhibits {
-  flex: 1 1 100%;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 6px;
-  padding-top: 6px;
+  padding-top: 8px;
   border-top: 1px dashed var(--line);
 }
 

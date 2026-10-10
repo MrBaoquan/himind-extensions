@@ -4,8 +4,8 @@
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
   "description": "以按日工作日志为核心：条目按仓库路径/项目/展项稳定归类，含功能与工时；报告按 项目→功能→工时 聚合，含月报、项目进展与月度工时表；周报/月报按自然周期自动补算并去重。",
-  "release_notes": "0.10.0：登记管理升级（搜索/筛选/排序/归档/批量删除/并入合并/导出导入）；条目可就地编辑项目与功能；新增 entry.patch、project.export/import、archive.migrate，写入保留 .bak。",
-  "version": "0.10.0",
+  "release_notes": "0.11.1：登记管理重排信息架构、移除别名、项目名可就地改；新增 project.rename 与 project.autofill（从 AI 会话记录一键补路径）。",
+  "version": "0.11.1",
   "distribution_targets": ["workbench", "github"],
   "entry": "bin/work-log.exe",
   "runtime": "process-jsonrpc-stdio",
@@ -363,6 +363,39 @@
       "risk_level": "local_write"
     },
     {
+      "id": "work-log.project.rename",
+      "description": "修改项目展示名，并回绑历史条目到新名",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "project_id": {"type": "string"},
+          "project_name": {"type": "string"},
+          "new_name": {"type": "string", "description": "新的项目展示名"}
+        },
+        "required": ["new_name"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.project.autofill",
+      "description": "从本机 AI 会话记录搜一轮，自动补全项目路径",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "material_root": {"type": "string", "description": "会话素材目录，缺省用采集器私有数据目录"},
+          "dry_run": {"type": "boolean", "description": "只预览不写盘"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
       "id": "work-log.project.export",
       "description": "导出完整项目登记表（含别名/路径/展项）为 JSON",
       "availability": "local",
@@ -635,6 +668,7 @@
       {"id": "work-log.archive.list", "title": "浏览工作日志归档"},
       {"id": "work-log.project.list", "title": "查看项目归类"},
       {"id": "work-log.project.claim", "title": "认领仓库路径到项目"},
+      {"id": "work-log.project.autofill", "title": "自动补全项目路径"},
       {"id": "work-log.link.reveal", "title": "打开日志目录"}
     ]
   }
