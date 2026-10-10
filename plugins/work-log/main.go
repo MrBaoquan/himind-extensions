@@ -90,8 +90,9 @@ type input struct {
 	// AI 总结结果）配合时，用工时/起止时间/来源/会话等确定性字段兜底，AI 只覆盖人类可读内容，
 	// 避免模型把工时时长、时间戳写歪。
 	BaseStep string `json:"base_step"`
-	// 项目登记：ProjectID/ProjectName 等用于项目管理能力；ResolveProjects/RegisterProjects
-	// 控制写入时是否按登记表归一项目名、是否自动登记未知项目。
+	// 项目登记：ProjectID/ProjectName 等用于项目管理能力；ResolveProjects 控制写入时
+	// 是否按登记表归一项目名。RegisterProjects 已废弃：写入不再自动登记未知项目，
+	// 登记只由人工认领 / project.* 能力显式完成（保留字段以兼容旧调用）。
 	ProjectID   string `json:"project_id"`
 	ProjectName string `json:"project_name"`
 	// NewName 供 work-log.project.rename：给项目改展示名（保持稳定 ID，并回绑历史条目）。
@@ -126,6 +127,12 @@ type input struct {
 	FromProjects []string `json:"from_projects"`
 	// ProjectsJSON 供登记表导入（完整登记表 JSON 文本）；Mode=merge（默认）或 replace。
 	ProjectsJSON string `json:"projects_json"`
+	// EntriesJSON 供日志条目导出/导入（work-log.entry.export / entry.import）：导出产出的 JSON 文本。
+	EntriesJSON string `json:"entries_json"`
+	// BackupPath 供 work-log.archive.restore 指定要恢复的备份包；留空则用最新一份。
+	BackupPath string `json:"backup_path"`
+	// Locked 供 work-log.entry.lock 设置/取消条目手工锁定。
+	Locked *bool `json:"locked"`
 	// DryRun 供迁移维护能力预览改动而不写盘。
 	DryRun *bool `json:"dry_run"`
 	// CrossDay 供 work-log.entry.dedupe 选择是否跨天合并同一会话：默认 false 时只合并
@@ -189,6 +196,9 @@ type entry struct {
 	Refs          []ref    `json:"refs"`
 	CreatedAt     string   `json:"created_at"`
 	UpdatedAt     string   `json:"updated_at"`
+	// Locked 标记条目被手工锁定：自动重扫/写入不会再改写它（防覆盖），
+	// 需要改动时先 work-log.entry.lock 解锁，或在 upsert 里显式 overwrite 整条替换。
+	Locked bool `json:"locked,omitempty"`
 }
 
 // dayFile 是一天的日志文件，按天分片便于人读、diff 和迁移。
@@ -276,6 +286,24 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 		return rpcResult(result, err)
 	case "work-log.entry.dedupe":
 		result, err := archiveDedupeCap(in)
+		return rpcResult(result, err)
+	case "work-log.entry.export":
+		result, err := entryExportCap(in)
+		return rpcResult(result, err)
+	case "work-log.entry.import":
+		result, err := entryImportCap(in)
+		return rpcResult(result, err)
+	case "work-log.entry.lock":
+		result, err := entryLockCap(in)
+		return rpcResult(result, err)
+	case "work-log.entry.reconcile":
+		result, err := entryReconcileCap(in)
+		return rpcResult(result, err)
+	case "work-log.archive.backup":
+		result, err := archiveBackupCap(in)
+		return rpcResult(result, err)
+	case "work-log.archive.restore":
+		result, err := archiveRestoreCap(in)
 		return rpcResult(result, err)
 	case "work-log.project.sync":
 		result, err := projectSyncCap(in)
@@ -496,6 +524,7 @@ func upsert(in input) (any, error) {
 	// 不再支持整日清空：早期曾用 mode=replace 先清空当天再写入，风险是连同手工条目
 	// 一起抹掉。写入一律按 entry_id 幂等合并；需要删除请用 work-log.entry.delete。
 	now := time.Now().Format(time.RFC3339)
+	lockedSkipped := 0
 	for _, raw := range incoming {
 		item := normalizeEntry(raw, date, now)
 		existing := -1
@@ -506,6 +535,11 @@ func upsert(in input) (any, error) {
 			}
 		}
 		if existing >= 0 {
+			// 手工锁定的条目不再被自动写入/合并改写（防覆盖）；只有显式 overwrite 才允许整条替换。
+			if day.Entries[existing].Locked && !in.Overwrite {
+				lockedSkipped++
+				continue
+			}
 			// 合并语义：保留首次创建时间，逐字段以新值覆盖，空字段不冲掉旧值。
 			// overwrite=true 时改为整条替换，让编辑可以真正清空字段。
 			item.CreatedAt = day.Entries[existing].CreatedAt
@@ -522,12 +556,11 @@ func upsert(in input) (any, error) {
 	day.Date = date
 	day.SchemaVersion = schemaVersion
 	resolve := in.ResolveProjects == nil || *in.ResolveProjects
-	register := in.RegisterProjects == nil || *in.RegisterProjects
-	if _, err := applyProjectRegistry(root, day.Entries, resolve, register); err != nil {
+	if _, err := applyProjectRegistry(root, day.Entries, resolve); err != nil {
 		return nil, err
 	}
 	// 用登记表补上稳定的项目/展项 ID（工作台同步进来的项目也会在这里被命中）。
-	if resolve || register {
+	if resolve {
 		if pf, err := readProjects(root); err == nil {
 			enrichEntryLinks(pf, day.Entries)
 		}
@@ -541,9 +574,10 @@ func upsert(in input) (any, error) {
 		return nil, errors.New("日志摘要计算失败")
 	}
 	return map[string]any{
-		"date":    date,
-		"count":   len(day.Entries),
-		"entries": day.Entries,
+		"date":           date,
+		"count":          len(day.Entries),
+		"entries":        day.Entries,
+		"locked_skipped": lockedSkipped,
 		"artifacts": []map[string]any{{
 			"artifact_id":   "work-log-entry",
 			"artifact_type": "work_log_entry",
@@ -611,6 +645,8 @@ func mergeEntry(current, incoming entry) entry {
 	if len(merged.Refs) == 0 {
 		merged.Refs = current.Refs
 	}
+	// 锁定是可累积的：已锁定或本次显式锁定的条目保持锁定，自动合并不会解锁。
+	merged.Locked = current.Locked || merged.Locked
 	return merged
 }
 

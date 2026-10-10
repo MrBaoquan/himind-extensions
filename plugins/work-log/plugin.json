@@ -3,9 +3,9 @@
   "name": "工作日志工具",
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
-  "description": "以按日工作日志为核心：条目按仓库路径/项目/展项稳定归类，含功能与工时；报告按 项目→功能→工时 聚合，含月报、项目进展与月度工时表；周报/月报按自然周期自动补算并去重。",
-  "release_notes": "0.11.8：修正 entry.dedupe 语义——默认只合并「同一天+同一会话」的真正重复条目，避免误并采集器按活跃日归集出的跨天长会话记录；跨天合并改为显式 cross_day=true。",
-  "version": "0.11.8",
+  "description": "以按日工作日志为核心：条目按仓库路径/项目/展项稳定归类，含功能与工时；报告按 项目→功能→工时 聚合，含月报、项目进展与月度工时表；周报/月报按自然周期自动补算并去重；支持条目导出/导入、整库备份与一键恢复、重扫对账预览与手工锁定防覆盖。",
+  "release_notes": "0.12.0：写入不再自动建项目（未命中保留名称、待认领）；新增条目导出/导入、整库备份恢复、重扫对账预览与条目锁定防覆盖。",
+  "version": "0.12.0",
   "distribution_targets": ["workbench", "github"],
   "entry": "bin/work-log.exe",
   "runtime": "process-jsonrpc-stdio",
@@ -24,7 +24,7 @@
           "date": {"type": "string"},
           "overwrite": {"type": "boolean", "description": "命中同一 entry_id 时整条替换而非字段级合并，用于视图编辑"},
           "resolve_projects": {"type": "boolean", "description": "按项目登记表归一项目名，默认 true"},
-          "register_projects": {"type": "boolean", "description": "自动登记未知名项目，默认 true"},
+          "register_projects": {"type": "boolean", "description": "已废弃：写入不再自动登记未知项目（登记只由人工认领 / project.* 能力显式完成），该字段被忽略"},
           "entries_step": {"type": "string"},
           "base_step": {"type": "string", "description": "上游确定性素材步骤；与 entries_step（AI 总结）配合时，工时/起止时间等以素材为准"},
           "workflow_context": {"type": "object", "additionalProperties": true},
@@ -463,7 +463,7 @@
     },
     {
       "id": "work-log.entry.dedupe",
-      "description": "合并同一天的同一会话重复条目（默认 dry_run 预览；cross_day=true 才跨天合并）",
+      "description": "合并同一天同一会话的重复条目（默认 dry_run 预览）",
       "availability": "local",
       "input_schema": {
         "type": "object",
@@ -473,6 +473,105 @@
           "cross_day": {"type": "boolean", "description": "默认 false：只合并「同一天+同一会话」的真正重复条目；显式 true 才把同一会话的跨天记录合并到最早日期（会抹掉按活跃日归集的记录，慎用）"},
           "from": {"type": "string"},
           "to": {"type": "string"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.entry.export",
+      "description": "导出日志条目为可迁移的 JSON 文本（默认全量，可按 from/to/date 限定）",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "from": {"type": "string"},
+          "to": {"type": "string"},
+          "date": {"type": "string"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.entry.import",
+      "description": "从导出 JSON 导入日志条目；按 entry_id 幂等合并",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "entries_json": {"type": "string", "description": "导出的条目 JSON 文本"},
+          "mode": {"type": "string", "enum": ["merge", "replace"]},
+          "resolve_projects": {"type": "boolean", "description": "按项目登记表归一项目名，默认 true"}
+        },
+        "required": ["entries_json"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.entry.lock",
+      "description": "锁定/解锁某天的指定条目：锁定的条目不会被自动重扫或合并覆盖（防覆盖）",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "date": {"type": "string"},
+          "entry_id": {"type": "string"},
+          "entry_ids": {"type": "array", "items": {"type": "string"}},
+          "locked": {"type": "boolean", "description": "true 锁定，false 解锁；默认 true"}
+        },
+        "required": ["date"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.entry.reconcile",
+      "description": "重扫对账预览（只读）：比对采集语料与日志，列出未入账会话",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "material_root": {"type": "string", "description": "采集语料目录；留空用默认插件数据目录"},
+          "date": {"type": "string"},
+          "from": {"type": "string"},
+          "to": {"type": "string"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.archive.backup",
+      "description": "把整个日志库打包为带清单的 zip 备份",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.archive.restore",
+      "description": "从备份包一键恢复日志库；恢复前自动留一份安全备份",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "backup_path": {"type": "string", "description": "要恢复的备份 zip；留空则用最新一份"}
         },
         "required": [],
         "additionalProperties": false
@@ -681,6 +780,12 @@
       {"id": "work-log.entry.upsert", "title": "记录今日工作日志"},
       {"id": "work-log.entry.delete", "title": "删除工作日志条目"},
       {"id": "work-log.entry.dedupe", "title": "整理重复条目"},
+      {"id": "work-log.entry.lock", "title": "锁定/解锁日志条目"},
+      {"id": "work-log.entry.export", "title": "导出日志条目"},
+      {"id": "work-log.entry.import", "title": "导入日志条目"},
+      {"id": "work-log.entry.reconcile", "title": "重扫对账预览"},
+      {"id": "work-log.archive.backup", "title": "备份整个日志库"},
+      {"id": "work-log.archive.restore", "title": "从备份恢复日志库"},
       {"id": "work-log.archive.calendar", "title": "按日历回看工作日志"},
       {"id": "work-log.report.render", "title": "生成当日工作简报"},
       {"id": "work-log.report.aggregate", "title": "汇总周报/月报"},

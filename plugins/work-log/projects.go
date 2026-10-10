@@ -174,12 +174,17 @@ func registerProject(pf *projectsFile, index map[string]string, name string) boo
 	return true
 }
 
-// applyProjectRegistry 用登记表归一一批条目的项目名；登记表缺失时按配置补登。
-// 归类优先级：仓库路径（展项优先）> 名称/别名 > 未命中。
-// 采集条目（带 repo_path）未命中时留空并进入「待认领」，不再生成假项目；手工条目仍可登记。
-// 返回是否改动了登记表。resolve/register 两个开关都关时直接跳过。
-func applyProjectRegistry(root string, entries []entry, resolve, register bool) (bool, error) {
-	if !resolve && !register {
+// applyProjectRegistry 用登记表归一一批条目的项目名。
+//
+// 不再自动登记：登记只由人工认领 / project.* 能力显式完成，避免 AI 或目录名生成
+// 的「项目名」污染登记表。归类优先级：仓库路径（展项优先）> 名称/别名 > 未命中。
+//   - 命中路径/名称：填规范名与稳定 ID。
+//   - 带 repo_path 但未映射：留空并进入「待认领」（project_hint 保留原名）。
+//   - 纯名称未命中：保留名称供展示/筛选，清空不稳定 ID（project_id 为空即「待认领」）。
+//
+// 返回值保留（bool, error）以兼容调用方；不再改登记表，故恒为 false。
+func applyProjectRegistry(root string, entries []entry, resolve bool) (bool, error) {
+	if !resolve {
 		return false, nil
 	}
 	pf, err := readProjects(root)
@@ -187,71 +192,47 @@ func applyProjectRegistry(root string, entries []entry, resolve, register bool) 
 		return false, err
 	}
 	index := projectIndex(pf)
-	changed := false
 	for i := range entries {
 		item := &entries[i]
 		raw := strings.TrimSpace(item.Project)
 		dir := strings.TrimSpace(item.RepoPath)
-		if resolve {
-			if dir != "" {
-				if hit, ok := matchPathEntry(pf, dir); ok {
-					item.Project = hit.Project
-					item.ProjectID = hit.ProjectID
-					if hit.Exhibit != "" {
-						item.Exhibit = hit.Exhibit
-						item.ExhibitID = hit.ExhibitID
-					} else {
-						applyExhibitLink(pf, item)
-					}
-					item.ProjectHint = ""
-					continue
-				}
-			}
-			if raw != "" {
-				if canonical, ok := resolveProjectName(index, raw); ok {
-					item.Project = canonical
+		if dir != "" {
+			if hit, ok := matchPathEntry(pf, dir); ok {
+				item.Project = hit.Project
+				item.ProjectID = hit.ProjectID
+				if hit.Exhibit != "" {
+					item.Exhibit = hit.Exhibit
+					item.ExhibitID = hit.ExhibitID
+				} else {
 					applyExhibitLink(pf, item)
-					item.ProjectHint = ""
-					continue
 				}
-			}
-			// 未命中：清掉不稳定的 ID。
-			item.ProjectID = ""
-			item.ExhibitID = ""
-			if dir != "" {
-				// 有稳定路径事实却未映射：留空待认领，绝不登记假项目名。
-				if raw != "" {
-					item.ProjectHint = raw
-				}
-				item.Project = ""
-				item.Exhibit = ""
+				item.ProjectHint = ""
 				continue
 			}
 		}
-		if register && raw != "" {
-			if _, exists := index[normalizeProjectKey(raw)]; !exists {
-				if registerProject(&pf, index, raw) {
-					changed = true
-				}
+		if raw != "" {
+			if canonical, ok := resolveProjectName(index, raw); ok {
+				item.Project = canonical
+				applyExhibitLink(pf, item)
+				item.ProjectHint = ""
+				continue
 			}
 		}
-		// 条目实际用到的展项（本地关联）就地登记，不用等工作台同步。
-		if register {
-			projName := strings.TrimSpace(item.Project)
-			if projName == "" {
-				projName = raw
+		// 未命中：清掉不稳定的 ID。
+		item.ProjectID = ""
+		item.ExhibitID = ""
+		if dir != "" {
+			// 有稳定路径事实却未映射：留空待认领，绝不登记假项目名。
+			if raw != "" {
+				item.ProjectHint = raw
 			}
-			if registerExhibit(&pf, projName, item.Exhibit) {
-				changed = true
-			}
+			item.Project = ""
+			item.Exhibit = ""
+			continue
 		}
+		// 纯名称未命中：保留名称（展示/筛选/报表分组），但 ID 已清空 = 待认领。
 	}
-	if changed {
-		if err := writeProjects(root, pf); err != nil {
-			return false, err
-		}
-	}
-	return changed, nil
+	return false, nil
 }
 
 // applyExhibitLink 给单条条目补上稳定的项目/展项 ID，并把展项名归一。

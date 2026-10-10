@@ -494,16 +494,24 @@ func TestProjectAssignReclassifies(t *testing.T) {
 	}
 }
 
-func TestProjectAutoRegistersUnknownOnWrite(t *testing.T) {
+func TestEntryUpsertDoesNotAutoRegister(t *testing.T) {
 	withDataRoot(t)
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-06","entries":[{"source":"codex","session_id":"z1","project":"第三方仓库","title":"Z"}]}`)
 	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
-	if len(list["projects"].([]any)) != 1 {
-		t.Fatalf("写入未知项目时应自动登记，实际 %v", list["projects"])
+	if len(list["projects"].([]any)) != 0 {
+		t.Fatalf("写入不应自动登记未知项目，实际 %v", list["projects"])
 	}
-	if _, err := os.Stat(projectsPath(root)); err != nil {
-		t.Fatalf("项目登记文件未落盘: %v", err)
+	if _, err := os.Stat(projectsPath(root)); err == nil {
+		t.Fatal("不应因写入未知项目而落盘项目登记文件")
+	}
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-06"}`)
+	item := read["entries"].([]any)[0].(map[string]any)
+	if item["project"] != "第三方仓库" {
+		t.Fatalf("未命中项目名应保留用于展示/筛选，实际 %v", item["project"])
+	}
+	if id, _ := item["project_id"].(string); id != "" {
+		t.Fatalf("未登记项目不应带 project_id（待认领），实际 %v", id)
 	}
 }
 
@@ -1343,6 +1351,9 @@ func TestProjectSyncEnrichesOnlyLocalAssociations(t *testing.T) {
 	withDataRoot(t)
 	root := t.TempDir()
 
+	// 先显式建立本地关联（写入不再自动登记项目/展项，登记只由人工/能力显式完成）。
+	seed := `{"projects":[{"name":"邯郸馆","exhibits":[{"name":"诗海词趣","id":"exh_local"}]}]}`
+	call(t, "work-log.project.import", `{"log_root":`+quote(root)+`,"projects_json":`+quote(seed)+`}`)
 	// 本地只实际用到一个项目，且条目带了一个展项。
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[
 		{"source":"codex","session_id":"a1","project":"邯郸馆","exhibit":"诗海词趣","title":"做展项"}
@@ -1353,7 +1364,7 @@ func TestProjectSyncEnrichesOnlyLocalAssociations(t *testing.T) {
 		t.Fatalf("本地应只有 1 个项目，实际 %d", len(projects))
 	}
 	if ex := projects[0].(map[string]any)["exhibits"].([]any); len(ex) != 1 {
-		t.Fatalf("条目用到的展项应就地登记，实际 %d 个", len(ex))
+		t.Fatalf("已登记的展项应保留，实际 %d 个", len(ex))
 	}
 
 	// 工作台带来 2 个项目、3 个展项，其中只有一个项目/展项是本地真正用过的。
@@ -1529,5 +1540,112 @@ func TestDedupeCrossDayOptIn(t *testing.T) {
 	}
 	if got := toStrings(item["outcomes"]); len(got) != 2 {
 		t.Fatalf("outcomes 应取并集，实际 %#v", got)
+	}
+}
+
+// TestEntryLockPreventsOverwrite 验证手工锁定条目不会被自动写入改写，只有显式 overwrite 才能覆盖。
+func TestEntryLockPreventsOverwrite(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-05","entries":[{"source":"codex","session_id":"lk1","project":"P","title":"原始","summary":"原始摘要"}]}`)
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-05"}`)
+	id := read["entries"].([]any)[0].(map[string]any)["entry_id"].(string)
+	locked := call(t, "work-log.entry.lock", `{"log_root":`+quote(root)+`,"date":"2026-10-05","entry_id":`+quote(id)+`,"locked":true}`)
+	if locked["updated"].(float64) != 1 || locked["locked"] != true {
+		t.Fatalf("锁定结果异常: %v", locked)
+	}
+	res := call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-05","entries":[{"source":"codex","session_id":"lk1","title":"被改标题"}]}`)
+	if res["locked_skipped"].(float64) != 1 {
+		t.Fatalf("锁定条目应被跳过，实际 %v", res["locked_skipped"])
+	}
+	after := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-05"}`)
+	if got := after["entries"].([]any)[0].(map[string]any)["title"]; got != "原始" {
+		t.Fatalf("锁定条目不应被覆盖，实际标题 %v", got)
+	}
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-05","overwrite":true,"entries":[{"source":"codex","session_id":"lk1","title":"显式覆盖"}]}`)
+	ov := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-05"}`)
+	if got := ov["entries"].([]any)[0].(map[string]any)["title"]; got != "显式覆盖" {
+		t.Fatalf("overwrite=true 应能覆盖锁定条目，实际 %v", got)
+	}
+}
+
+// TestEntryExportImportRoundTrip 验证导出/导入可往返迁移，且重复导入幂等。
+func TestEntryExportImportRoundTrip(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-04","entries":[{"source":"codex","session_id":"e1","project":"项目看板","title":"甲","minutes":30,"minutes_source":"measured"}]}`)
+	exported := call(t, "work-log.entry.export", `{"log_root":`+quote(root)+`}`)
+	if exported["count"].(float64) != 1 {
+		t.Fatalf("导出条目数异常: %v", exported["count"])
+	}
+	js := exported["json"].(string)
+	root2 := t.TempDir()
+	imp := call(t, "work-log.entry.import", `{"log_root":`+quote(root2)+`,"entries_json":`+quote(js)+`}`)
+	if imp["added"].(float64) != 1 {
+		t.Fatalf("导入应新增 1 条，实际 %v", imp["added"])
+	}
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root2)+`,"date":"2026-10-04"}`)
+	item := read["entries"].([]any)[0].(map[string]any)
+	if item["title"] != "甲" || item["project"] != "项目看板" {
+		t.Fatalf("导入条目内容不一致: %v", item)
+	}
+	imp2 := call(t, "work-log.entry.import", `{"log_root":`+quote(root2)+`,"entries_json":`+quote(js)+`}`)
+	if imp2["added"].(float64) != 0 || imp2["updated"].(float64) != 1 {
+		t.Fatalf("重复导入应合并而非重复，实际 added=%v updated=%v", imp2["added"], imp2["updated"])
+	}
+}
+
+// TestArchiveBackupAndRestore 验证整库备份后可从备份包一键恢复。
+func TestArchiveBackupAndRestore(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-03","entries":[{"source":"codex","session_id":"b1","project":"P","title":"备份前"}]}`)
+	bk := call(t, "work-log.archive.backup", `{"log_root":`+quote(root)+`}`)
+	path := bk["path"].(string)
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("备份包未生成: %v", err)
+	}
+	if bk["files"].(float64) < 1 {
+		t.Fatalf("备份应包含文件，实际 %v", bk["files"])
+	}
+	read0 := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-03"}`)
+	delID := read0["entries"].([]any)[0].(map[string]any)["entry_id"].(string)
+	call(t, "work-log.entry.delete", `{"log_root":`+quote(root)+`,"date":"2026-10-03","entry_id":`+quote(delID)+`}`)
+	if _, err := os.Stat(filepath.Join(root, "logs", "2026", "2026-10-03.json")); err == nil {
+		t.Fatal("删除后当日文件应不存在")
+	}
+	restored := call(t, "work-log.archive.restore", `{"log_root":`+quote(root)+`,"backup_path":`+quote(path)+`}`)
+	if restored["files"].(float64) < 1 {
+		t.Fatalf("恢复文件数异常: %v", restored["files"])
+	}
+	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-03"}`)
+	if len(read["entries"].([]any)) != 1 {
+		t.Fatalf("恢复后应回到 1 条，实际 %v", read["entries"])
+	}
+}
+
+// TestEntryReconcileDetectsMissing 验证重扫对账能发现「有语料但未入账」的会话。
+func TestEntryReconcileDetectsMissing(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	material := t.TempDir()
+	materialDoc := `{"sessions":[
+		{"source":"codex","session_id":"s1","date":"2026-10-02","repo_path":"F:/WebProjects/项目看板","title":"有会话有日志","minutes":10},
+		{"source":"codex","session_id":"s2","date":"2026-10-02","repo_path":"F:/WebProjects/项目看板","title":"有会话无日志","minutes":20}
+	]}`
+	if err := os.WriteFile(filepath.Join(material, "session-digest-2026-10-02_2026-10-02.json"), []byte(materialDoc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-02","entries":[{"source":"codex","session_id":"s1","project":"项目看板","title":"有会话有日志"}]}`)
+	rec := call(t, "work-log.entry.reconcile", `{"log_root":`+quote(root)+`,"date":"2026-10-02","material_root":`+quote(material)+`}`)
+	if rec["missing_count"].(float64) != 1 {
+		t.Fatalf("应发现 1 条未入账会话，实际 %v", rec["missing_count"])
+	}
+	if rec["matched"].(float64) != 1 {
+		t.Fatalf("应匹配 1 条，实际 %v", rec["matched"])
+	}
+	missing := rec["missing"].([]any)
+	if missing[0].(map[string]any)["session_id"] != "s2" {
+		t.Fatalf("未入账会话应为 s2，实际 %v", missing[0])
 	}
 }
