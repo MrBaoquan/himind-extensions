@@ -61,6 +61,10 @@ type input struct {
 	// MaterialRoot 是会话素材文件的写入目录；缺省落到扩展私有数据目录。素材只供工作流
 	// 的 AI 总结步骤读取，绝不写入工作日志库。
 	MaterialRoot string `json:"material_root"`
+	// LookbackDays 是「未显式指定 date/from/to」时默认回看的自然日数：1=仅今天（默认），
+	// 2=昨天+今天。配合写入侧按「来源+会话+日期」的稳定指纹幂等合并，可把前一天较晚开始、
+	// 当天定时运行时还没发生的工作在次日补回。
+	LookbackDays int `json:"lookback_days"`
 }
 
 func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
@@ -263,7 +267,8 @@ func scanCap(in input) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	start, end, from, to, err := resolveRange(in.From, in.To, in.Date)
+	from, to, date := resolveWindow(in)
+	start, end, from, to, err := resolveRange(from, to, date)
 	if err != nil {
 		return nil, err
 	}
@@ -285,62 +290,33 @@ func scanCap(in input) (any, error) {
 		selected = "all"
 	}
 
-	var digests []sessionDigest
-	skipped := make([]map[string]any, 0)
-	for _, spec := range allSpecs() {
-		if selected != "all" && selected != spec.ID {
-			continue
-		}
-		existing := existingSourcePaths(spec, home, in.Roots)
-		if len(existing) == 0 {
-			skipped = append(skipped, map[string]any{"source": spec.ID, "reason": "未发现会话存储", "path": strings.Join(sourcePaths(spec, home, in.Roots), " | ")})
-			continue
-		}
-		var found []sessionDigest
-		switch spec.ID {
-		case "codex":
-			found, err = scanCodex(existing[0], start, end)
-		case "claude":
-			found, err = scanClaude(existing[0], start, end)
-		case "vscode-copilot":
-			found, err = scanVSCodeCopilot(existing, start, end)
-		case "opencode":
-			found, err = scanOpenCode(existing[0], start, end)
-		case "copilot":
-			found, err = scanCopilot(existing[0], start, end)
-		}
-		if err != nil {
-			skipped = append(skipped, map[string]any{"source": spec.ID, "reason": err.Error(), "path": strings.Join(existing, " | ")})
-			continue
-		}
-		digests = append(digests, found...)
-	}
-
 	// 通用可配置来源（内置预设 + 配置文件 + 内联规格）。
 	genericSpecs, configPath, err := loadGenericSources(in, home)
 	if err != nil {
 		return nil, err
 	}
-	for _, spec := range genericSpecs {
-		if selected != "all" && selected != spec.ID {
-			continue
+
+	// 逐自然日扫描：跨天的会话会分别归入各自活动日的素材，与「单日运行」的归日口径
+	// 完全一致。lookback_days>1 时，靠写入侧「来源+会话+日期」的稳定指纹幂等合并，
+	// 把前一天较晚发生、当天定时运行时还没出现的工作在次日补回，不会重复计入。
+	digests := make([]sessionDigest, 0)
+	skipped := make([]map[string]any, 0)
+	skipSeen := map[string]bool{}
+	for dayStart := start; dayStart.Before(end); dayStart = dayStart.AddDate(0, 0, 1) {
+		dayEnd := dayStart.AddDate(0, 0, 1)
+		if dayEnd.After(end) {
+			dayEnd = end
 		}
-		root := expandPath(spec.Root, home)
-		files := collectFiles(root, spec.Glob)
-		if len(files) == 0 {
-			if !pathExists(root) {
-				skipped = append(skipped, map[string]any{"source": spec.ID, "reason": "未发现会话存储", "path": root})
-			} else {
-				skipped = append(skipped, map[string]any{"source": spec.ID, "reason": "匹配路径下没有会话文件", "path": root})
+		dayDigests, daySkipped := scanSources(in, home, selected, genericSpecs, dayStart, dayEnd)
+		digests = append(digests, dayDigests...)
+		for _, item := range daySkipped {
+			key := fmt.Sprintf("%v|%v", item["source"], item["reason"])
+			if skipSeen[key] {
+				continue
 			}
-			continue
+			skipSeen[key] = true
+			skipped = append(skipped, item)
 		}
-		found, scanErr := scanGeneric(spec, home, start, end)
-		if scanErr != nil {
-			skipped = append(skipped, map[string]any{"source": spec.ID, "reason": scanErr.Error(), "path": root})
-			continue
-		}
-		digests = append(digests, found...)
 	}
 
 	// 隐私排除规则：命中路径前缀或关键词的会话整条跳过，绝不进入素材与日志库。
@@ -364,7 +340,7 @@ func scanCap(in input) (any, error) {
 			empty++
 			continue
 		}
-		key := d.Source + "|" + d.SessionID
+		key := d.Source + "|" + d.SessionID + "|" + d.Date
 		if seen[key] {
 			continue
 		}
@@ -406,6 +382,64 @@ func scanCap(in input) (any, error) {
 	}
 	result["artifacts"] = []map[string]any{artifact}
 	return result, nil
+}
+
+// scanSources 扫描一个自然日窗口内的全部会话来源（内置 + 通用可配置），返回素材与
+// 跳过原因。按日调用可保证跨天会话分别落到各自活动日。
+func scanSources(in input, home, selected string, genericSpecs []genericSource, start, end time.Time) ([]sessionDigest, []map[string]any) {
+	digests := make([]sessionDigest, 0)
+	skipped := make([]map[string]any, 0)
+	for _, spec := range allSpecs() {
+		if selected != "all" && selected != spec.ID {
+			continue
+		}
+		existing := existingSourcePaths(spec, home, in.Roots)
+		if len(existing) == 0 {
+			skipped = append(skipped, map[string]any{"source": spec.ID, "reason": "未发现会话存储", "path": strings.Join(sourcePaths(spec, home, in.Roots), " | ")})
+			continue
+		}
+		var found []sessionDigest
+		var scanErr error
+		switch spec.ID {
+		case "codex":
+			found, scanErr = scanCodex(existing[0], start, end)
+		case "claude":
+			found, scanErr = scanClaude(existing[0], start, end)
+		case "vscode-copilot":
+			found, scanErr = scanVSCodeCopilot(existing, start, end)
+		case "opencode":
+			found, scanErr = scanOpenCode(existing[0], start, end)
+		case "copilot":
+			found, scanErr = scanCopilot(existing[0], start, end)
+		}
+		if scanErr != nil {
+			skipped = append(skipped, map[string]any{"source": spec.ID, "reason": scanErr.Error(), "path": strings.Join(existing, " | ")})
+			continue
+		}
+		digests = append(digests, found...)
+	}
+	for _, spec := range genericSpecs {
+		if selected != "all" && selected != spec.ID {
+			continue
+		}
+		root := expandPath(spec.Root, home)
+		files := collectFiles(root, spec.Glob)
+		if len(files) == 0 {
+			if !pathExists(root) {
+				skipped = append(skipped, map[string]any{"source": spec.ID, "reason": "未发现会话存储", "path": root})
+			} else {
+				skipped = append(skipped, map[string]any{"source": spec.ID, "reason": "匹配路径下没有会话文件", "path": root})
+			}
+			continue
+		}
+		found, scanErr := scanGeneric(spec, home, start, end)
+		if scanErr != nil {
+			skipped = append(skipped, map[string]any{"source": spec.ID, "reason": scanErr.Error(), "path": root})
+			continue
+		}
+		digests = append(digests, found...)
+	}
+	return digests, skipped
 }
 
 // writeMaterial 把会话素材写成一份符合 session-digest schema 的 JSON 文件，并返回
@@ -755,6 +789,7 @@ func candidateEntries(digests []sessionDigest) []map[string]any {
 		item := map[string]any{
 			"source":     digest.Source,
 			"session_id": digest.SessionID,
+			"date":       digest.Date,
 			"project":    digest.Project,
 			"category":   "其他",
 			"started_at": digest.StartedAt,
@@ -779,6 +814,24 @@ func candidateEntries(digests []sessionDigest) []map[string]any {
 		entries = append(entries, item)
 	}
 	return entries
+}
+
+// resolveWindow 解析目标窗口：显式 from/to/date 优先；三者都为空时按 lookback_days
+// 取 [今天-(n-1), 今天]，默认 n=1（即仅今天），n=2 时为「昨天+今天」。
+func resolveWindow(in input) (string, string, string) {
+	from := strings.TrimSpace(in.From)
+	to := strings.TrimSpace(in.To)
+	date := strings.TrimSpace(in.Date)
+	if from == "" && to == "" && date == "" {
+		days := in.LookbackDays
+		if days < 1 {
+			days = 1
+		}
+		now := time.Now()
+		to = now.Format(dateLayout)
+		from = now.AddDate(0, 0, -(days - 1)).Format(dateLayout)
+	}
+	return from, to, date
 }
 
 func resolveRange(from, to, date string) (time.Time, time.Time, string, string, error) {

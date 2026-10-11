@@ -13,6 +13,31 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+func TestResolveWindowLookback(t *testing.T) {
+	now := time.Now()
+
+	from, to, date := resolveWindow(input{})
+	if date != "" || from != now.Format(dateLayout) || to != now.Format(dateLayout) {
+		t.Fatalf("默认应仅覆盖今天: from=%s to=%s date=%s", from, to, date)
+	}
+
+	from, to, _ = resolveWindow(input{LookbackDays: 2})
+	if to != now.Format(dateLayout) || from != now.AddDate(0, 0, -1).Format(dateLayout) {
+		t.Fatalf("lookback=2 应为昨天+今天: from=%s to=%s", from, to)
+	}
+
+	from, _, _ = resolveWindow(input{LookbackDays: 3})
+	if from != now.AddDate(0, 0, -2).Format(dateLayout) {
+		t.Fatalf("lookback=3 起点应为前天: from=%s", from)
+	}
+
+	// 显式 date 优先，lookback_days 不生效。
+	from, to, date = resolveWindow(input{Date: "2026-01-02", LookbackDays: 5})
+	if date != "2026-01-02" || from != "" || to != "" {
+		t.Fatalf("显式 date 应优先: from=%s to=%s date=%s", from, to, date)
+	}
+}
+
 func call(t *testing.T, method string, params string) map[string]any {
 	t.Helper()
 	result, rpcError := handle(jsonrpc.Request{Method: method, Params: []byte(params)})

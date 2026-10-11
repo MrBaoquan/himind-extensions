@@ -4,8 +4,8 @@
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
   "description": "探测本机 AI 客户端的会话存储，把指定日期的会话整理成日志素材；内置 Codex、Claude、OpenCode、Copilot 与 VS Code Copilot Chat，并支持声明式通用来源接入更多客户端。",
-  "release_notes": "0.6.2：修复跨多日长会话只在创建日被采集的问题，改为按活跃日归集（OpenCode/Copilot/VS Code/Codex/通用来源）；沿用 0.6.1 隐私排除规则与本机处理。",
-  "version": "0.6.2",
+  "release_notes": "0.6.3：新增 lookback_days 滚动补采，未指定日期时可按「昨天+今天」逐日扫描；跨天会话仍按活动日分别归集，供次日自动补回前一天较晚的工作。",
+  "version": "0.6.3",
   "distribution_targets": ["workbench", "github"],
   "entry": "bin/work-log-collector.exe",
   "runtime": "process-jsonrpc-stdio",
@@ -51,6 +51,7 @@
           "from": {"type": "string"},
           "to": {"type": "string"},
           "date": {"type": "string"},
+          "lookback_days": {"type": "integer", "minimum": 1, "maximum": 31, "description": "未指定 date/from/to 时默认回看的自然日数，1=仅今天，2=昨天+今天；配合写入幂等合并补回前一天尾部"},
           "session_id": {"type": "string"},
           "home": {"type": "string"},
           "roots": {

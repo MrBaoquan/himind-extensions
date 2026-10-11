@@ -12,6 +12,7 @@
         "properties": {
           "source": {"type": "string", "minLength": 1},
           "session_id": {"type": "string", "minLength": 1},
+          "date": {"type": "string", "description": "会话活动日 YYYY-MM-DD，原样回带自素材；带上后可与确定性素材按「来源+会话+日期」精确合并"},
           "project": {"type": "string"},
           "feature": {"type": "string", "maxLength": 40},
           "exhibit": {"type": "string", "maxLength": 40, "description": "项目下的具体展项；判定不了就留空"},

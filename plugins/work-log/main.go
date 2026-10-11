@@ -373,16 +373,30 @@ func resolveEntries(in input) []entry {
 	if len(base) == 0 || len(overrides) == 0 {
 		return overrides
 	}
-	index := make(map[string]entry, len(base))
+	merged := make([]entry, 0, len(overrides))
+	// 两级匹配：先按「来源+会话+日期」精确匹配（一次运行可覆盖多个自然日），
+	// 再退化为「来源+会话」兜底（AI 输出未带日期时仍能并回确定性素材）。
+	indexFull := make(map[string]entry, len(base))
+	indexLoose := make(map[string]entry, len(base))
 	for _, item := range base {
 		if key := sessionEntryKey(item); key != "" {
-			index[key] = item
+			indexFull[key] = item
+		}
+		if key := sessionLooseKey(item); key != "" {
+			if _, ok := indexLoose[key]; !ok {
+				indexLoose[key] = item
+			}
 		}
 	}
-	merged := make([]entry, 0, len(overrides))
 	for _, item := range overrides {
 		if key := sessionEntryKey(item); key != "" {
-			if baseItem, ok := index[key]; ok {
+			if baseItem, ok := indexFull[key]; ok {
+				merged = append(merged, mergeBaseEntry(baseItem, item))
+				continue
+			}
+		}
+		if key := sessionLooseKey(item); key != "" {
+			if baseItem, ok := indexLoose[key]; ok {
 				merged = append(merged, mergeBaseEntry(baseItem, item))
 				continue
 			}
@@ -416,13 +430,26 @@ func entriesFromStep(in input, stepID string) []entry {
 	return entries
 }
 
-// sessionEntryKey 用「来源+会话」作为同一次会话的稳定键；没有会话 id 时不参与合并。
-func sessionEntryKey(item entry) string {
+// sessionLooseKey 用「来源+会话」作为弱键（不含日期），用于 AI 输出未带日期时的兜底合并。
+func sessionLooseKey(item entry) string {
 	session := strings.TrimSpace(item.SessionID)
 	if session == "" {
 		return ""
 	}
 	return strings.ToLower(strings.TrimSpace(item.Source)) + "|" + session
+}
+
+// sessionEntryKey 用「来源+会话+日期」作为同一次会话的稳定键；没有会话 id 时不参与合并。
+// 带上日期，可让跨天的同一次会话分别与各自活动日的素材合并，滚动补采时不会串日。
+func sessionEntryKey(item entry) string {
+	key := sessionLooseKey(item)
+	if key == "" {
+		return ""
+	}
+	if d := strings.TrimSpace(item.Date); d != "" {
+		return key + "|" + d
+	}
+	return key
 }
 
 // mergeBaseEntry 以素材条目为底，叠加 AI 总结的人类可读字段；确定性字段（工时、起止时间、
@@ -517,74 +544,99 @@ func upsert(in input) (any, error) {
 	unlock := lockRoot(root)
 	defer unlock()
 
-	day, err := readDay(root, date)
-	if err != nil {
-		return nil, err
-	}
-	// 不再支持整日清空：早期曾用 mode=replace 先清空当天再写入，风险是连同手工条目
-	// 一起抹掉。写入一律按 entry_id 幂等合并；需要删除请用 work-log.entry.delete。
-	now := time.Now().Format(time.RFC3339)
-	lockedSkipped := 0
+	// 按条目自带的日期分组：一次运行可能同时补齐多个自然日（例如「昨天+今天」的滚动补采），
+	// 每条日志都落回它真正的活动日文件，而不是全部塞进运行当天。缺日期的条目回退到运行日。
+	groups := make(map[string][]entry)
+	dates := make([]string, 0)
 	for _, raw := range incoming {
-		item := normalizeEntry(raw, date, now)
-		existing := -1
-		for index := range day.Entries {
-			if day.Entries[index].EntryID == item.EntryID {
-				existing = index
-				break
-			}
+		itemDate := strings.TrimSpace(raw.Date)
+		if !validDate(itemDate) {
+			itemDate = date
 		}
-		if existing >= 0 {
-			// 手工锁定的条目不再被自动写入/合并改写（防覆盖）；只有显式 overwrite 才允许整条替换。
-			if day.Entries[existing].Locked && !in.Overwrite {
-				lockedSkipped++
-				continue
-			}
-			// 合并语义：保留首次创建时间，逐字段以新值覆盖，空字段不冲掉旧值。
-			// overwrite=true 时改为整条替换，让编辑可以真正清空字段。
-			item.CreatedAt = day.Entries[existing].CreatedAt
-			if in.Overwrite {
-				day.Entries[existing] = item
-			} else {
-				day.Entries[existing] = mergeEntry(day.Entries[existing], item)
-			}
-		} else {
-			day.Entries = append(day.Entries, item)
+		if _, ok := groups[itemDate]; !ok {
+			dates = append(dates, itemDate)
 		}
+		groups[itemDate] = append(groups[itemDate], raw)
 	}
-	sortEntries(day.Entries)
-	day.Date = date
-	day.SchemaVersion = schemaVersion
+	sort.Strings(dates)
+
+	now := time.Now().Format(time.RFC3339)
 	resolve := in.ResolveProjects == nil || *in.ResolveProjects
-	if _, err := applyProjectRegistry(root, day.Entries, resolve); err != nil {
-		return nil, err
-	}
-	// 用登记表补上稳定的项目/展项 ID（工作台同步进来的项目也会在这里被命中）。
-	if resolve {
-		if pf, err := readProjects(root); err == nil {
-			enrichEntryLinks(pf, day.Entries)
+	lockedSkipped := 0
+	total := 0
+	written := make([]entry, 0)
+	artifacts := make([]map[string]any, 0, len(dates))
+	for _, dayDate := range dates {
+		day, err := readDay(root, dayDate)
+		if err != nil {
+			return nil, err
 		}
-	}
-	if err := writeDay(root, day); err != nil {
-		return nil, err
-	}
-	path := dayPath(root, date)
-	digest, err := sha256OfFile(path)
-	if err != nil {
-		return nil, errors.New("日志摘要计算失败")
+		// 不再支持整日清空：早期曾用 mode=replace 先清空当天再写入，风险是连同手工条目
+		// 一起抹掉。写入一律按 entry_id 幂等合并；需要删除请用 work-log.entry.delete。
+		for _, raw := range groups[dayDate] {
+			item := normalizeEntry(raw, dayDate, now)
+			existing := -1
+			for index := range day.Entries {
+				if day.Entries[index].EntryID == item.EntryID {
+					existing = index
+					break
+				}
+			}
+			if existing >= 0 {
+				// 手工锁定的条目不再被自动写入/合并改写（防覆盖）；只有显式 overwrite 才允许整条替换。
+				if day.Entries[existing].Locked && !in.Overwrite {
+					lockedSkipped++
+					continue
+				}
+				// 合并语义：保留首次创建时间，逐字段以新值覆盖，空字段不冲掉旧值。
+				// overwrite=true 时改为整条替换，让编辑可以真正清空字段。
+				item.CreatedAt = day.Entries[existing].CreatedAt
+				if in.Overwrite {
+					day.Entries[existing] = item
+				} else {
+					day.Entries[existing] = mergeEntry(day.Entries[existing], item)
+				}
+			} else {
+				day.Entries = append(day.Entries, item)
+			}
+		}
+		sortEntries(day.Entries)
+		day.Date = dayDate
+		day.SchemaVersion = schemaVersion
+		if _, err := applyProjectRegistry(root, day.Entries, resolve); err != nil {
+			return nil, err
+		}
+		// 用登记表补上稳定的项目/展项 ID（工作台同步进来的项目也会在这里被命中）。
+		if resolve {
+			if pf, err := readProjects(root); err == nil {
+				enrichEntryLinks(pf, day.Entries)
+			}
+		}
+		if err := writeDay(root, day); err != nil {
+			return nil, err
+		}
+		path := dayPath(root, dayDate)
+		digest, err := sha256OfFile(path)
+		if err != nil {
+			return nil, errors.New("日志摘要计算失败")
+		}
+		total += len(day.Entries)
+		written = append(written, day.Entries...)
+		artifacts = append(artifacts, map[string]any{
+			"artifact_id":   "work-log-entry",
+			"artifact_type": "work_log_entry",
+			"name":          "工作日志 " + dayDate,
+			"uri":           fileURIPath(path),
+			"sha256":        digest,
+		})
 	}
 	return map[string]any{
 		"date":           date,
-		"count":          len(day.Entries),
-		"entries":        day.Entries,
+		"dates":          dates,
+		"count":          total,
+		"entries":        written,
 		"locked_skipped": lockedSkipped,
-		"artifacts": []map[string]any{{
-			"artifact_id":   "work-log-entry",
-			"artifact_type": "work_log_entry",
-			"name":          "工作日志 " + date,
-			"uri":           fileURIPath(path),
-			"sha256":        digest,
-		}},
+		"artifacts":      artifacts,
 	}, nil
 }
 

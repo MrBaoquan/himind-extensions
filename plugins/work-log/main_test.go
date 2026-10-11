@@ -785,6 +785,66 @@ func TestUpsertMergesAISummaryOntoDeterministicBase(t *testing.T) {
 	}
 }
 
+func TestUpsertWritesEntriesToTheirOwnDates(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	// 运行日 2026-10-11，但条目自带活动日：应各回各自日期，而不是全塞进运行日。
+	params := `{"log_root":` + quote(root) + `,"date":"2026-10-11","entries":[
+		{"source":"opencode","session_id":"a","date":"2026-10-10","title":"昨天的工作","minutes":30},
+		{"source":"opencode","session_id":"b","date":"2026-10-11","title":"今天的工作","minutes":20}
+	]}`
+	result := call(t, "work-log.entry.upsert", params)
+	if dates := toStrings(result["dates"]); len(dates) != 2 {
+		t.Fatalf("应返回两个落点日期，实际 %v", dates)
+	}
+	yesterday := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-10"}`)
+	if n := len(yesterday["entries"].([]any)); n != 1 {
+		t.Fatalf("2026-10-10 应写入 1 条，实际 %d", n)
+	}
+	today := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-11"}`)
+	if n := len(today["entries"].([]any)); n != 1 {
+		t.Fatalf("2026-10-11 应写入 1 条，实际 %d", n)
+	}
+	if _, err := os.Stat(filepath.Join(root, "logs", "2026", "2026-10-10.json")); err != nil {
+		t.Fatalf("昨天文件未落盘: %v", err)
+	}
+}
+
+func TestUpsertRoutesCrossDaySessionByDate(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	// 同一次会话跨天：base 与 AI 都带 date，应按「来源+会话+日期」各并各自活动日，不串日。
+	params := `{"log_root":` + quote(root) + `,"date":"2026-10-11",
+		"entries_step":"WL-SUMMARIZE","base_step":"WL-COLLECT",
+		"workflow_context":{"steps":{
+			"WL-SUMMARIZE":{"entries":[
+				{"source":"opencode","session_id":"s1","date":"2026-10-10","title":"昨夜收尾","summary":"完成昨夜遗留的修复。"},
+				{"source":"opencode","session_id":"s1","date":"2026-10-11","title":"今晨继续","summary":"接着今晨处理打包。"}
+			]},
+			"WL-COLLECT":{"entries":[
+				{"source":"opencode","session_id":"s1","date":"2026-10-10","project":"项目看板","minutes":40,"minutes_source":"measured"},
+				{"source":"opencode","session_id":"s1","date":"2026-10-11","project":"项目看板","minutes":25,"minutes_source":"measured"}
+			]}
+		}}}`
+	call(t, "work-log.entry.upsert", params)
+	y := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-10"}`)
+	ye := y["entries"].([]any)
+	if len(ye) != 1 {
+		t.Fatalf("2026-10-10 应 1 条，实际 %d", len(ye))
+	}
+	if got := ye[0].(map[string]any); got["minutes"].(float64) != 40 || got["title"] != "昨夜收尾" {
+		t.Fatalf("10-10 归位错误: %v", got)
+	}
+	td := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-11"}`)
+	tde := td["entries"].([]any)
+	if len(tde) != 1 {
+		t.Fatalf("2026-10-11 应 1 条，实际 %d", len(tde))
+	}
+	if got := tde[0].(map[string]any); got["minutes"].(float64) != 25 || got["title"] != "今晨继续" {
+		t.Fatalf("10-11 归位错误: %v", got)
+	}
+}
+
 func toStrings(value any) []string {
 	raw, ok := value.([]any)
 	if !ok {
