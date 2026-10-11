@@ -1,11 +1,11 @@
 {
   "schema_version": "workflow_package.v1",
   "id": "com.himind.workflow.daily-work-log",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "distribution_targets": ["workbench", "github"],
   "name": "每日工作日志",
   "description": "采集本机 AI 会话素材，按仓库路径/项目/展项稳定归类并用内置 AI 总结成清晰的工作日志条目（按项目→功能聚合），写入全局工作日志，生成日报归档，并跨期补算周报/月报（自然周期去重）。",
-  "release_notes": "0.7.4：新增滚动补采，采集默认回看「昨天+今天」，写入按条目活动日归位，20:00 后仍在进行的工作次日可自动补回；周/月报补算覆盖刷新。",
+  "release_notes": "0.7.5：修复采集步骤未声明依赖导致调度运行时被跳过、当天不产生新日志的问题；采集显式接在项目同步之后，定时运行会正常采集与总结。",
   "min_agent_version": "0.3.47",
   "local_requirements": {
     "platform": "windows",
@@ -113,6 +113,7 @@
       "capability_id": "work-log.session.scan",
       "execution_mode": "long_running",
       "risk_level": "read_only",
+      "depends_on": ["WL-PROJECTS"],
       "input": {
         "timeout_seconds": 300,
         "max_prompts": 12,
