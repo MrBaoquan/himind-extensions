@@ -1011,11 +1011,11 @@ func TestProjectMapPathPreview(t *testing.T) {
 	root := t.TempDir()
 	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"甲项目"}`)
 	call(t, "work-log.project.path.set", `{"log_root":`+quote(root)+`,"project_name":"甲项目","paths":[{"path":"F:/work/jia","kind":"repo"}]}`)
-	mapped := call(t, "work-log.project.mapPath", `{"log_root":`+quote(root)+`,"path":"F:/work/jia/app"}`)
+	mapped := call(t, "work-log.project.path.map", `{"log_root":`+quote(root)+`,"path":"F:/work/jia/app"}`)
 	if mapped["matched"] != true || mapped["project"] != "甲项目" || mapped["match_type"] != "project_path" {
 		t.Fatalf("路径预览异常: %v", mapped)
 	}
-	if none := call(t, "work-log.project.mapPath", `{"log_root":`+quote(root)+`,"path":"F:/elsewhere"}`); none["matched"] != false {
+	if none := call(t, "work-log.project.path.map", `{"log_root":`+quote(root)+`,"path":"F:/elsewhere"}`); none["matched"] != false {
 		t.Fatalf("不应命中: %v", none)
 	}
 }

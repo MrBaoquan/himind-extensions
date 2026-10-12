@@ -260,7 +260,7 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 	case "work-log.project.path.set":
 		result, err := projectPathSetCap(in)
 		return rpcResult(result, err)
-	case "work-log.project.mapPath":
+	case "work-log.project.path.map":
 		result, err := projectMapPathCap(in)
 		return rpcResult(result, err)
 	case "work-log.project.claim":

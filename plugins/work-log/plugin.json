@@ -4,8 +4,9 @@
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
   "description": "以按日工作日志为核心：条目按仓库路径/项目/展项稳定归类，含功能与工时；报告按 项目→功能→工时 聚合，含月报、项目进展与月度工时表；周报/月报按自然周期自动补算并去重；支持条目导出/导入、整库备份与一键恢复、重扫对账预览与手工锁定防覆盖。",
-  "release_notes": "0.13.1：写入按条目活动日归位，一次运行可同时补齐多天（配合滚动补采把前一天 20:00 后的工作补回），并让 AI 总结按「来源+会话+日期」精确合并。",
-  "version": "0.13.1",
+  "release_notes": "0.13.2：能力 ID 按 ADR 0119 收敛 —— work-log.project.mapPath 更名为 work-log.project.path.map，并声明 capability_namespace=work-log。",
+  "version": "0.13.2",
+  "capability_namespace": "work-log",
   "distribution_targets": ["workbench", "github"],
   "entry": "bin/work-log.exe",
   "runtime": "process-jsonrpc-stdio",
@@ -291,7 +292,7 @@
       "risk_level": "local_write"
     },
     {
-      "id": "work-log.project.mapPath",
+      "id": "work-log.project.path.map",
       "description": "预览一个路径会命中哪个项目/展项（只读）",
       "availability": "local",
       "input_schema": {
