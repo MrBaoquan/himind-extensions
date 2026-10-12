@@ -18,6 +18,7 @@ import (
 
 	catalogtool "github.com/MrBaoquan/himind-extensions/tooling/catalog"
 	"github.com/MrBaoquan/himind-extensions/tooling/distribution"
+	"github.com/MrBaoquan/himind-extensions/tooling/expertproject"
 	"github.com/MrBaoquan/himind-extensions/tooling/skillproject"
 	"github.com/MrBaoquan/himind-extensions/tooling/workflowproject"
 	validator "github.com/MrBaoquan/himind-extensions/tools/cmd/himind-plugin-validate"
@@ -88,7 +89,7 @@ func RepoCheck(root string) error {
 	seenPaths := map[string]string{}
 	seenTargets := map[string][]distribution.Target{}
 	for _, extension := range value.Extensions {
-		if extension.Type != "plugin" && extension.Type != "skill" && extension.Type != "workflow" {
+		if extension.Type != "plugin" && extension.Type != "skill" && extension.Type != "workflow" && extension.Type != "expert" {
 			return fmt.Errorf("unsupported extension type %q", extension.Type)
 		}
 		path, err := safePath(root, extension.Path)
@@ -111,7 +112,7 @@ func RepoCheck(root string) error {
 		seenIDs[identity.ID] = extension.Path
 		seenKinds[identity.ID] = extension.Type
 		seenPaths[extension.Path] = identity.ID
-		targets, err := declaredTargets(identity, repoDefaults)
+		targets, err := declaredTargetsFor(extension.Type, identity, repoDefaults)
 		if err != nil {
 			return fmt.Errorf("%s: %w", extension.Path, err)
 		}
@@ -133,6 +134,13 @@ func RepoCheck(root string) error {
 			if err := skillproject.Validate(path); err != nil {
 				return err
 			}
+		} else if extension.Type == "expert" {
+			if strings.TrimSpace(identity.Author) == "" || len(identity.Categories) == 0 || strings.TrimSpace(identity.ReleaseNotes) == "" {
+				return fmt.Errorf("%s must declare name, author, categories, version and release_notes", extension.Path)
+			}
+			if err := expertproject.Validate(path); err != nil {
+				return err
+			}
 		} else {
 			if strings.TrimSpace(identity.ReleaseNotes) == "" {
 				return fmt.Errorf("%s must declare release_notes", extension.Path)
@@ -149,6 +157,9 @@ func RepoCheck(root string) error {
 		return err
 	}
 	if err := ensureCatalogComplete(root, "workflows", "workflow.json", seenPaths); err != nil {
+		return err
+	}
+	if err := ensureCatalogComplete(root, "experts", "expert.json", seenPaths); err != nil {
 		return err
 	}
 	if err := validateCatalog(root, seenKinds); err != nil {
@@ -232,6 +243,21 @@ func canonicalPacks(packs []catalogtool.FeaturePack) (string, error) {
 // 清单必须显式声明，不从仓库默认值静默继承：落点决定制品发到哪里，作者
 // 每次都要自己确认，避免新增扩展时「没写就等于默认」。仓库默认值只用于
 // 脚手架和对照检查，未声明时在这里直接报错。
+// declaredTargetsFor 解析受支持的分发落点。
+//
+// 插件、技能、工作流必须在清单里显式声明 distribution_targets：缺字段靠默认值兜底
+// 会让「这份扩展发到哪」在评审时不可见。
+//
+// 专家是例外：Agent 从工作台专家目录（/api/agent/experts/catalog）取专家包，制品不进
+// GitHub Release 与 .himind/catalog.json；而 expert.json 的 schema 是 deny_unknown_fields，
+// 加不进 distribution_targets。所以专家按默认落点（工作台）处理，报告里照样打印出来。
+func declaredTargetsFor(kind string, identity manifestIdentity, repoDefaults []distribution.Target) ([]distribution.Target, error) {
+	if kind == "expert" {
+		return distribution.Default(), nil
+	}
+	return declaredTargets(identity, repoDefaults)
+}
+
 func declaredTargets(identity manifestIdentity, repoDefaults []distribution.Target) ([]distribution.Target, error) {
 	if identity.DistributionTargets == nil {
 		return nil, fmt.Errorf("must declare distribution_targets, repository default is [%s]", distribution.Describe(repoDefaults))
@@ -282,6 +308,8 @@ func readManifest(root, kind string) (manifestIdentity, error) {
 		name = "skill.json"
 	} else if kind == "workflow" {
 		name = "workflow.json"
+	} else if kind == "expert" {
+		name = "expert.json"
 	}
 	data, err := os.ReadFile(filepath.Join(root, name))
 	if err != nil {

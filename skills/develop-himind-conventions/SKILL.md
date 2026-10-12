@@ -73,6 +73,7 @@ description: 插件、技能、工作流三类扩展的创作规范：选型边�
 2. 缺字段仓库校验直接报错，不允许靠默认值兜底。`extensions.json` 里的 `default_distribution_targets` 只是脚手架默认值，不参与运行时判断。
 3. 只声明 `workbench` 的扩展不创建 Release，也不写 Catalog——公开目录条目的定位信息就是 Release 资产。
 4. 只对单个项目、单个客户或单个交付现场有效的功能，不放进公共目录。这类扩展放独立仓库，按项目分发，避免公共市场出现装不上的条目。
+5. **专家是唯一例外**：专家走工作台专家目录分发（Agent 从 `/api/agent/experts/catalog` 取包），不进 GitHub Release 与 `.himind/catalog.json`；`expert.json` 的 schema 是 `deny_unknown_fields`，加不进 `distribution_targets`。所以专家按落点「工作台」处理，仓库校验不再要求它显式声明该字段，其余三类仍然必须声明。
 
 ## 七、风险与权限
 
