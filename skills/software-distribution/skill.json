@@ -3,21 +3,21 @@
   "name": "软件分发助手",
   "author": "马宝全",
   "categories": ["software-engineering", "collaboration-delivery", "testing-quality"],
-  "version": "1.3.3",
+  "version": "1.4.0",
   "distribution_targets": ["workbench", "github"],
   "scope": "organization",
   "description": "为 WPF 与 Unity 项目做分发接入检查、制品校验和更新验证。",
-  "release_notes": "1.3.3：说明收敛到一句，去掉冗余描述。",
+  "release_notes": "1.4.0：依赖的能力 ID 随软件分发工具 1.3.0 收敛到 distribution.*，最低版本抬到 1.3.0。",
   "min_agent_version": "0.3.37",
   "supported_clients": ["himind-ai", "codex", "github-copilot", "workbuddy"],
   "capabilities": [
-    {"id":"software.distribution.project.inspect","required":true,"min_version":"1.2.1","provider":"com.himind.software-distribution"},
-    {"id":"software.distribution.artifact.inspect","required":true,"min_version":"1.2.1","provider":"com.himind.software-distribution"},
-    {"id":"software.distribution.release.publish","required":false,"min_version":"1.1.0","provider":"builtin"},
-    {"id":"software.distribution.release.resolve","required":false,"min_version":"1.2.1","provider":"com.himind.software-distribution"}
+    {"id":"distribution.project.inspect","required":true,"min_version":"1.3.0","provider":"com.himind.software-distribution"},
+    {"id":"distribution.artifact.inspect","required":true,"min_version":"1.3.0","provider":"com.himind.software-distribution"},
+    {"id":"distribution.release.publish","required":false,"min_version":"1.1.0","provider":"builtin"},
+    {"id":"distribution.release.resolve","required":false,"min_version":"1.3.0","provider":"com.himind.software-distribution"}
   ],
   "plugin_dependencies": [
-    {"plugin_id":"com.himind.software-distribution","required":true,"min_version":"1.2.1"}
+    {"plugin_id":"com.himind.software-distribution","required":true,"min_version":"1.3.0"}
   ],
   "risk_summary": "read_only_by_default; publish_requires_user_confirmation_and_agent_oauth_scope",
   "contents": ["skill.json", "SKILL.md", "agents/openai.yaml"]

@@ -125,16 +125,16 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 		return nil, rpcError
 	}
 	switch request.Method {
-	case "software.distribution.project.inspect":
+	case "distribution.project.inspect":
 		result, err := inspectProject(in)
 		return rpcResult(result, err)
-	case "software.distribution.artifact.inspect":
+	case "distribution.artifact.inspect":
 		result, err := inspectArtifact(in)
 		return rpcResult(result, err)
-	case "software.distribution.release.resolve":
+	case "distribution.release.resolve":
 		result, err := resolveRelease(in)
 		return rpcResult(result, err)
-	case "software.distribution.channel.resolve":
+	case "distribution.channel.resolve":
 		result, err := resolveChannel(in)
 		return rpcResult(result, err)
 	default:

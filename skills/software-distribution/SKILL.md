@@ -20,27 +20,27 @@ description: 为 WPF 与 Unity 项目完成分发接入检查、制品校验、�
 
 ## 能力边界
 
-- `software.distribution.project.inspect`：在显式指定的本机目录中识别项目类型并给出接入建议，只读。
-- `software.distribution.artifact.inspect`：在显式指定的本机目录中检查制品，计算大小和 SHA-256，只读。
-- `software.distribution.release.publish`：由 Agent 内置 broker 使用短时用户委托身份创建产品、上传制品并发布，属于网络写操作。
-- `software.distribution.release.resolve`：调用 Agent 配置的组织分发服务解析接口验证发布，只读网络操作；独立模式不可用属于正常边界。
+- `distribution.project.inspect`：在显式指定的本机目录中识别项目类型并给出接入建议，只读。
+- `distribution.artifact.inspect`：在显式指定的本机目录中检查制品，计算大小和 SHA-256，只读。
+- `distribution.release.publish`：由 Agent 内置 broker 使用短时用户委托身份创建产品、上传制品并发布，属于网络写操作。
+- `distribution.release.resolve`：调用 Agent 配置的组织分发服务解析接口验证发布，只读网络操作；独立模式不可用属于正常边界。
 
 Skill 和插件都不得接收、读取、输出或保存 Token、Cookie、Agent credential、私钥。不得让用户把凭据写入项目配置。发布 broker 在 Agent 内部取得短时 OAuth 令牌，AI 和插件进程不可见。
 
 ## 接入流程
 
 1. 确认明确的项目或制品目录、应用类型、稳定 `product_id`、版本、渠道、平台和架构。稳定 ID 使用小写 ASCII，例如 `com.himind.media-resolver`。
-2. 直接调用 `software.distribution.project.inspect`；`workspace_root` 必须是用户指定的可访问本机目录，`project_path` 必须位于该目录内。不需要先调用 `workspace.current`，也不要求与 AI 会话目录相同。
+2. 直接调用 `distribution.project.inspect`；`workspace_root` 必须是用户指定的可访问本机目录，`project_path` 必须位于该目录内。不需要先调用 `workspace.current`，也不要求与 AI 会话目录相同。
 3. 检查项目是否已有分发客户端：
    - .NET/WPF 使用 `HiMind.Distribution`；Windows 文件替换使用 `HiMind.Distribution.Windows` 和独立 Updater。
    - Unity Windows 可复用 `netstandard2.0` 协议层，安装仍使用 Windows 平台适配器。
    - Unity Android 使用相同 resolve manifest；APK 安装、商店更新或 MDM 策略由 Android 适配层负责，不调用 Windows Updater。
 4. 应用配置必须包含分发服务 HTTPS 基址、`productId`、渠道、平台、架构和 `/api/software-distribution/v1/updates/resolve`。不得包含后台身份凭据。
 5. 构建不可变制品。Windows 目录包使用 `directory-zip`，Android 使用 `apk`，Addressables 使用 `unity-addressables`，其他单文件使用 `content`。
-6. 调用 `software.distribution.artifact.inspect`。只有返回 `ready=true`、`inspection_receipt`，且文件名、版本、目标、大小和 SHA-256 与预期一致时才能进入发布。预检收据短时有效，绑定调用主体、显式工作区和制品摘要，并且只能使用一次。
+6. 调用 `distribution.artifact.inspect`。只有返回 `ready=true`、`inspection_receipt`，且文件名、版本、目标、大小和 SHA-256 与预期一致时才能进入发布。预检收据短时有效，绑定调用主体、显式工作区和制品摘要，并且只能使用一次。
 7. 向用户展示发布摘要：产品、版本、渠道、平台、架构、包类型、文件、大小、SHA-256、是否强制、灰度比例。没有用户本轮明确确认时，不得调用发布能力，也不得自行把 `confirmed` 设为 `true`。
-8. 用户在当前任务中明确授权发布后，调用 `software.distribution.release.publish`，参数必须与检查结果完全一致，并传入 `inspection_receipt`、`expected_size`、`expected_sha256` 和 `confirmed=true`。禁止同版本替换不同内容；内容变化必须提升版本。
-9. 发布成功后调用 `software.distribution.release.resolve`，用低于新版本的 `current_version` 验证有更新，再用等于新版本的版本验证 `update=null`。
+8. 用户在当前任务中明确授权发布后，调用 `distribution.release.publish`，参数必须与检查结果完全一致，并传入 `inspection_receipt`、`expected_size`、`expected_sha256` 和 `confirmed=true`。禁止同版本替换不同内容；内容变化必须提升版本。
+9. 发布成功后调用 `distribution.release.resolve`，用低于新版本的 `current_version` 验证有更新，再用等于新版本的版本验证 `update=null`。
 10. 在目标项目运行真实客户端测试：下载短时 URL、校验大小和 SHA-256，并按平台执行安装或模拟替换。只有连接真实组织分发服务完成 resolve 与下载后，才能报告完整更新链路打通；独立模式应明确报告本地检查已通过。
 
 ## MediaResolver 验收

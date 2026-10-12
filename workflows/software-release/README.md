@@ -12,10 +12,10 @@
 
 | 步骤 | 类型 | 风险 | 说明 |
 | --- | --- | --- | --- |
-| SD-PROJECT 识别项目与分发接入状态 | capability | 只读 | `software.distribution.project.inspect`，输出项目类型与客户端接入建议 |
-| SD-ARTIFACT 校验制品并签发预检收据 | capability | 只读 | `software.distribution.artifact.inspect`，计算大小与 SHA-256，签发**一次性**收据 |
-| SD-PUBLISH 发布到组织渠道 | capability | R3（需审批） | `software.distribution.release.publish`，使用 Agent 内部短时委托身份 |
-| SD-RESOLVE 验证线上更新解析 | capability | R3（需审批） | `software.distribution.release.resolve`，验证旧版本有更新、当前版本无更新 |
+| SD-PROJECT 识别项目与分发接入状态 | capability | 只读 | `distribution.project.inspect`，输出项目类型与客户端接入建议 |
+| SD-ARTIFACT 校验制品并签发预检收据 | capability | 只读 | `distribution.artifact.inspect`，计算大小与 SHA-256，签发**一次性**收据 |
+| SD-PUBLISH 发布到组织渠道 | capability | R3（需审批） | `distribution.release.publish`，使用 Agent 内部短时委托身份 |
+| SD-RESOLVE 验证线上更新解析 | capability | R3（需审批） | `distribution.release.resolve`，验证旧版本有更新、当前版本无更新 |
 | SD-ACCEPT 目标端安装与验收 | manual | R3（需审批） | 真实设备安装/替换结果的人工确认，失败即组织回滚 |
 
 ## 入口与出口（segmented）
@@ -38,7 +38,7 @@
 ## 依赖与运行模式
 
 - 插件：`com.himind.software-distribution`（提供 inspect / resolve 能力）。
-- `software.distribution.release.publish` 属于 Dashboard 控制面能力，需要 **Connected 模式**与发布授权（`RELEASE_MANAGE_SCOPE`）。Independent 模式下该步骤不可用，Preflight 会阻断。
+- `distribution.release.publish` 属于 Dashboard 控制面能力，需要 **Connected 模式**与发布授权（`RELEASE_MANAGE_SCOPE`）。Independent 模式下该步骤不可用，Preflight 会阻断。
 - 凭据由 Agent 内置 broker 以短时委托身份获取，AI、插件与工作流输入都不接触 Token。
 
 ## 灰度与回滚

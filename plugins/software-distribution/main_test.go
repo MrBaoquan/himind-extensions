@@ -23,7 +23,7 @@ func TestArtifactInspectComputesMediaResolverMetadata(t *testing.T) {
 		"updater/HiMind.Distribution.Updater.exe": "updater",
 	})
 	params, _ := json.Marshal(input{WorkspaceRoot: root, ArtifactPath: artifact, ProductID: "com.himind.media-resolver", Version: "1.0.0", Channel: "stable", Platform: "windows", Architecture: "x64", PackageType: "directory-zip"})
-	value, rpcError := handle(jsonrpc.Request{Method: "software.distribution.artifact.inspect", Params: params})
+	value, rpcError := handle(jsonrpc.Request{Method: "distribution.artifact.inspect", Params: params})
 	if rpcError != nil {
 		t.Fatal(rpcError)
 	}
@@ -38,7 +38,7 @@ func TestArtifactInspectRejectsIncompleteMediaResolverPackage(t *testing.T) {
 	artifact := filepath.Join(root, "MediaResolver-v1.0.0-win-x64-portable.zip")
 	writeZIP(t, artifact, map[string]string{"MediaResolver.exe": "media-resolver"})
 	params, _ := json.Marshal(input{WorkspaceRoot: root, ArtifactPath: artifact, ProductID: "com.himind.media-resolver", Version: "1.0.0", Channel: "stable", Platform: "windows", Architecture: "x64", PackageType: "directory-zip"})
-	_, rpcError := handle(jsonrpc.Request{Method: "software.distribution.artifact.inspect", Params: params})
+	_, rpcError := handle(jsonrpc.Request{Method: "distribution.artifact.inspect", Params: params})
 	if rpcError == nil || !strings.Contains(rpcError.Message, "distribution.sample.json") {
 		t.Fatalf("unexpected error: %#v", rpcError)
 	}
@@ -61,7 +61,7 @@ func TestProjectInspectDistinguishesWPFAndFindsClientState(t *testing.T) {
 		t.Fatal(err)
 	}
 	params, _ := json.Marshal(input{WorkspaceRoot: root, ProjectPath: project, ProductID: "com.himind.media-resolver"})
-	value, rpcError := handle(jsonrpc.Request{Method: "software.distribution.project.inspect", Params: params})
+	value, rpcError := handle(jsonrpc.Request{Method: "distribution.project.inspect", Params: params})
 	if rpcError != nil {
 		t.Fatal(rpcError)
 	}
@@ -80,7 +80,7 @@ func TestProjectInspectDistinguishesWPFAndFindsClientState(t *testing.T) {
 func TestArtifactInspectRejectsWorkspaceEscape(t *testing.T) {
 	root := t.TempDir()
 	params, _ := json.Marshal(input{WorkspaceRoot: root, ArtifactPath: filepath.Join(root, "..", "outside.zip"), ProductID: "com.himind.media-resolver", Version: "1.0.0", Platform: "windows", Architecture: "x64", PackageType: "directory-zip"})
-	_, rpcError := handle(jsonrpc.Request{Method: "software.distribution.artifact.inspect", Params: params})
+	_, rpcError := handle(jsonrpc.Request{Method: "distribution.artifact.inspect", Params: params})
 	if rpcError == nil || !strings.Contains(rpcError.Message, "workspace_root") {
 		t.Fatalf("unexpected error: %#v", rpcError)
 	}
@@ -100,7 +100,7 @@ func TestArtifactInspectAcceptsExplicitExternalWorkspace(t *testing.T) {
 		Architecture:  "x64",
 		PackageType:   "directory-zip",
 	})
-	value, rpcError := handle(jsonrpc.Request{Method: "software.distribution.artifact.inspect", Params: params})
+	value, rpcError := handle(jsonrpc.Request{Method: "distribution.artifact.inspect", Params: params})
 	if rpcError != nil {
 		t.Fatal(rpcError)
 	}
@@ -125,7 +125,7 @@ func TestResolveUsesConfiguredDashboardAndNoCredentialInput(t *testing.T) {
 	defer server.Close()
 	t.Setenv("HIMIND_DASHBOARD_URL", server.URL)
 	params, _ := json.Marshal(input{ProductID: "com.himind.media-resolver", CurrentVersion: "1.0.0", Channel: "stable", Platform: "windows", Architecture: "x64"})
-	value, rpcError := handle(jsonrpc.Request{Method: "software.distribution.release.resolve", Params: params})
+	value, rpcError := handle(jsonrpc.Request{Method: "distribution.release.resolve", Params: params})
 	if rpcError != nil {
 		t.Fatal(rpcError)
 	}
@@ -142,7 +142,7 @@ func TestResolveRejectsMismatchedManifest(t *testing.T) {
 	defer server.Close()
 	t.Setenv("HIMIND_DASHBOARD_URL", server.URL)
 	params, _ := json.Marshal(input{ProductID: "com.himind.media-resolver", CurrentVersion: "1.0.0", Channel: "stable", Platform: "windows", Architecture: "x64"})
-	_, rpcError := handle(jsonrpc.Request{Method: "software.distribution.release.resolve", Params: params})
+	_, rpcError := handle(jsonrpc.Request{Method: "distribution.release.resolve", Params: params})
 	if rpcError == nil || !strings.Contains(rpcError.Message, "productId") {
 		t.Fatalf("unexpected error: %#v", rpcError)
 	}
