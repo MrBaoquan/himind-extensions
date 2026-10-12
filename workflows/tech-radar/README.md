@@ -97,7 +97,7 @@
 - **采集层降级**：无 GitHub token 时限流可降级（记录 `rate_limit`），历史台账缺失时按“全部新上榜”处理；
 - **通知未接入**：报告仍归档，需要时再补通知步骤，不影响证据链；
 - **防幻觉**：prompt 要求只引用快照里的 `entry_id`，越界即视为无解读；
-- **解读步骤失败即降级**：TR-INSIGHT 声明 `on_failure: "continue"`，AI 不可用或超时时该步记为 `skipped`（`error` 写明 `degraded after failure: …`，同时写入 `error` 事件），TR-REPORT 继续执行，产出 `degraded=true` 的规则稿报告。失败可见、流程不中断。
+- **解读步骤失败即停止**：TR-INSIGHT 声明 `on_failure: "fail"`，AI 不可用或超时时该步记为 `failed`，Run 立即失败并保留真实错误；不会把缺少 AI 解读的规则稿误报为完整日报。规则稿仍可通过单独的 `publish` 入口按需生成。
 
 ### 网络声明
 
@@ -150,7 +150,7 @@ himind-agent.exe schedule set '{"id":"daily-tech-radar","kind":"workflow","targe
 1. `workflow run workflows\tech-radar` 以 `entrypoint=collect`、`exitpoint=published`、`workspace_root=F:\WebProjects\项目看板` 启动，
    `TR-COLLECT` 通过严格 Artifact 校验（内容过 schema、`sha256` 与文件字节一致）并在 2 秒内完成；
 2. 产物落在 Agent 注入的扩展私有数据目录：`snapshots/2026-09-19.json`（Artifact 交付物）、`tech-radar-history.json`（扩展内部台账）；
-3. `TR-INSIGHT` 在 45 秒（测试用短超时）后被终止，Step 记为 `skipped` + `degraded after failure: …`；
-4. `TR-REPORT` 仍执行并成功：`2026-09-19/report.json`（`entry_count=12`、`degraded=true`、自带说明性 summary）、`insight.json = {}`、`index.json` 期次索引更新；Run 状态 `succeeded`、`error` 为空，`tech-radar-report` Artifact 通过严格校验；
+3. 当 `TR-INSIGHT` 在 45 秒（测试用短超时）后被终止，Step 记为 `failed` 并保留真实错误，Run 不再被误报为成功；
+4. 需要规则稿时可单独从 `publish` 入口运行 `TR-REPORT`，报告会显式标记 `degraded=true`；完整日报必须先有成功的 `TR-INSIGHT`；
 5. 未降级路径由单测覆盖：`TestRenderResolvesUpstreamSnapshotAndInsightFromWorkflowContext` 断言 `workflow_context` 里的解读会被渲染进报告且 `degraded=false`。
 6. 修正 prompt 后重跑：**全链路 17 秒完成**，`TR-COLLECT`/`TR-INSIGHT`/`TR-REPORT` 三步全部 `succeeded`，`degraded=false`，报告含 8 条带理由的解读、5 条 highlights 与 AI 总结，`insight.json` 已归档真实解读；`index.html` 里能看到 `class="reason"` 的推荐理由区块。

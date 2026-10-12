@@ -382,6 +382,63 @@ func TestRenderResolvesUpstreamSnapshotAndInsightFromWorkflowContext(t *testing.
 	}
 }
 
+func TestRenderUnwrapsCollectResultAndRejectsEmptySnapshot(t *testing.T) {
+	root := t.TempDir()
+	snapshotValue := map[string]any{
+		"generated_at": "2026-09-19T00:00:00Z",
+		"rule_version": ruleVersion,
+		"window_days":  7,
+		"topics":       []string{"ai-agent"},
+		"entries": []map[string]any{{
+			"entry_id": "acme/agent-kit", "full_name": "acme/agent-kit", "html_url": "https://github.com/acme/agent-kit",
+			"stars": 900, "is_new": true,
+		}},
+	}
+	wrapped := map[string]any{"snapshot": snapshotValue}
+	result, err := render(input{Snapshot: wrapped, ReportRoot: root, ReportDate: "2026-09-19"})
+	if err != nil {
+		t.Fatalf("wrapped collect result should render: %v", err)
+	}
+	if report := result.(map[string]any)["report"].(map[string]any); report["entry_count"] != 1 {
+		t.Fatalf("expected one entry after unwrapping, got %#v", report["entry_count"])
+	}
+	if _, err := render(input{Snapshot: map[string]any{"entries": []any{}}, ReportRoot: root, ReportDate: "2026-09-20"}); err == nil || !strings.Contains(err.Error(), "拒绝覆盖") {
+		t.Fatalf("empty snapshot must be rejected, got %v", err)
+	}
+}
+
+func TestRenderReusesLatestCollectedSnapshotWhenInputIsMissing(t *testing.T) {
+	root := t.TempDir()
+	snapshotValue := map[string]any{
+		"generated_at": "2026-09-19T00:00:00Z",
+		"rule_version": ruleVersion,
+		"window_days":  7,
+		"topics":       []string{"ai-agent"},
+		"entries": []map[string]any{{
+			"entry_id": "acme/agent-kit", "full_name": "acme/agent-kit", "html_url": "https://github.com/acme/agent-kit",
+			"stars": 900, "is_new": true,
+		}},
+	}
+	if err := os.MkdirAll(filepath.Join(root, "snapshots"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body, err := json.Marshal(snapshotValue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "snapshots", "2026-09-19.json"), body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result, err := render(input{ReportRoot: root, ReportDate: "2026-09-19"})
+	if err != nil {
+		t.Fatalf("report should reuse the collected snapshot: %v", err)
+	}
+	report := result.(map[string]any)["report"].(map[string]any)
+	if report["entry_count"] != 1 {
+		t.Fatalf("expected one entry from the archived snapshot, got %#v", report["entry_count"])
+	}
+}
+
 // 解读步骤被降级（on_failure=continue）时上下文里没有它的输出，报告按规则稿出。
 func TestRenderDegradesWhenTheInsightStepWasSkipped(t *testing.T) {
 	root := t.TempDir()

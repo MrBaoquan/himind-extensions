@@ -1,0 +1,322 @@
+{
+  "id": "com.himind.media-library",
+  "name": "媒体资源库",
+  "author": "马宝全",
+  "categories": [
+    "visual-design",
+    "video-post",
+    "audio-sound"
+  ],
+  "description": "检索免费素材库的图片、视频与音效，把选中的素材落到工作区并记录来源许可，也可为本机媒体目录建立索引。",
+  "release_notes": "1.0.0：首个版本，提供跨来源素材检索、落盘与来源记录、本机媒体索引；密钥在扩展视图里配置。",
+  "version": "1.0.0",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
+  "entry": "bin/media-library.exe",
+  "runtime": "process-jsonrpc-stdio",
+  "platforms": [
+    "windows-x64"
+  ],
+  "min_agent_version": "0.3.47",
+  "governance": "optional",
+  "capabilities": [
+    {
+      "id": "media-library.provider.list",
+      "description": "列出已配置的素材来源及其可用状态",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "media-library.provider.configure",
+      "description": "在扩展私有配置里保存或清除某个来源的密钥",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "enum": [
+              "pexels",
+              "unsplash",
+              "freesound"
+            ]
+          },
+          "key": {
+            "type": "string",
+            "maxLength": 400
+          }
+        },
+        "required": [
+          "provider"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "local_action"
+    },
+    {
+      "id": "media-library.search",
+      "description": "按关键词跨来源检索图片、视频与音效",
+      "availability": "local",
+      "timeout_seconds": 60,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "kinds": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "enum": [
+                "image",
+                "video",
+                "audio"
+              ]
+            }
+          },
+          "providers": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "string"
+            }
+          },
+          "per_source": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 40
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "orientation": {
+            "enum": [
+              "landscape",
+              "portrait",
+              "square"
+            ]
+          },
+          "min_width": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "min_duration_seconds": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3600
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "media-library.asset.fetch",
+      "description": "把选中的素材下载到工作区并记录来源许可",
+      "availability": "local",
+      "timeout_seconds": 600,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "dest_dir": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1024,
+            "maximum": 536870912
+          },
+          "overwrite": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 40,
+            "items": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "image",
+                    "video",
+                    "audio"
+                  ]
+                },
+                "title": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "author": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "license": {
+                  "type": "string",
+                  "maxLength": 400
+                },
+                "source_url": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "download_url": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "filename": {
+                  "type": "string",
+                  "maxLength": 160
+                }
+              },
+              "required": [
+                "download_url"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "workspace_root",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "local_action"
+    },
+    {
+      "id": "media-library.index.create",
+      "description": "为指定目录建立本机媒体索引",
+      "availability": "local",
+      "timeout_seconds": 300,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "roots": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 12,
+            "items": {
+              "type": "string"
+            }
+          },
+          "max_files": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20000
+          }
+        },
+        "required": [
+          "roots"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "media-library.index.search",
+      "description": "在本机媒体索引里按名称与类型检索",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "kinds": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "enum": [
+                "image",
+                "video",
+                "audio"
+              ]
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    }
+  ],
+  "plugin_dependencies": [],
+  "permissions": [
+    "filesystem.workspace.read",
+    "filesystem.workspace.write",
+    "network.web.read"
+  ],
+  "contributes": {
+    "views": [
+      {
+        "id": "media-library.browse",
+        "title": "媒体资源库 · 素材浏览",
+        "short_title": "媒体库",
+        "icon": "media",
+        "quick_access": true,
+        "order": 60,
+        "location": "plugin_navigation",
+        "entry": "ui/index.html"
+      }
+    ],
+    "commands": [
+      {
+        "id": "media-library.provider.list",
+        "title": "查看素材来源"
+      },
+      {
+        "id": "media-library.provider.configure",
+        "title": "配置素材来源"
+      },
+      {
+        "id": "media-library.search",
+        "title": "检索媒体素材"
+      },
+      {
+        "id": "media-library.asset.fetch",
+        "title": "取用媒体素材"
+      },
+      {
+        "id": "media-library.index.create",
+        "title": "建立媒体索引"
+      },
+      {
+        "id": "media-library.index.search",
+        "title": "检索本机媒体"
+      }
+    ]
+  }
+}

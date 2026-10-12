@@ -693,13 +693,21 @@ func render(in input) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	snapshotValue := in.Snapshot
+	snapshotValue := normalizeSnapshot(in.Snapshot)
 	if len(snapshotValue) == 0 {
 		snapshotValue = upstreamSnapshot(in)
 	}
 	if len(snapshotValue) == 0 {
-		return nil, errors.New("snapshot 不能为空：需要显式 snapshot 或 workflow_context 里的上游步骤输出")
+		// 能力被单独调用时没有 workflow_context。采集步骤已经把当天快照
+		// 写入扩展自己的归档目录，报告应复用它，而不是按空输入生成一份
+		// 看似成功的零条日报。
+		date := reportDate(in.ReportDate)
+		snapshotValue, err = readSnapshot(filepath.Join(root, "snapshots", date+".json"))
+		if err != nil {
+			return nil, fmt.Errorf("snapshot 不能为空：未找到 %s 的有效采集快照（请先运行采集）：%w", date, err)
+		}
 	}
+	snapshotValue = normalizeSnapshot(snapshotValue)
 	insight := in.Insight
 	if len(insight) == 0 {
 		insight = upstreamInsight(in)
@@ -721,6 +729,9 @@ func render(in input) (any, error) {
 	var snap snapshot
 	if err := json.Unmarshal(raw, &snap); err != nil {
 		return nil, errors.New("snapshot 结构无效")
+	}
+	if len(snap.Entries) == 0 {
+		return nil, errors.New("snapshot 没有任何采集条目：拒绝覆盖已有日报，请先完成一次有效采集")
 	}
 	date := reportDate(in.ReportDate)
 	directory := filepath.Join(root, date)
@@ -797,6 +808,48 @@ func render(in input) (any, error) {
 			"sha256": reportDigest,
 		}},
 	}, nil
+}
+
+// normalizeSnapshot accepts both the declared snapshot object and the
+// capability result wrapper {"snapshot": {...}}. The latter can occur when
+// collect and report are invoked separately from the workflow runner.
+func normalizeSnapshot(value map[string]any) map[string]any {
+	if len(value) == 0 {
+		return nil
+	}
+	if nested, ok := value["snapshot"].(map[string]any); ok {
+		if _, hasEntries := value["entries"]; !hasEntries {
+			return nested
+		}
+	}
+	return value
+}
+
+func readSnapshot(path string) (map[string]any, error) {
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var value map[string]any
+	if err := json.Unmarshal(body, &value); err != nil {
+		return nil, errors.New("快照不是合法 JSON")
+	}
+	value = normalizeSnapshot(value)
+	if len(value) == 0 {
+		return nil, errors.New("快照为空")
+	}
+	var snap snapshot
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return nil, errors.New("快照无法序列化")
+	}
+	if err := json.Unmarshal(raw, &snap); err != nil {
+		return nil, errors.New("快照结构无效")
+	}
+	if len(snap.Entries) == 0 {
+		return nil, errors.New("快照没有任何采集条目")
+	}
+	return value, nil
 }
 
 // 报告分三段：升温榜（自有历史算出的星数增量）、活跃基础盘（按领域）、新星。

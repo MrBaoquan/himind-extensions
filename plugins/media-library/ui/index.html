@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>媒体资源库</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="tabs" role="tablist">
+      <button type="button" id="tab-online" class="tab active" role="tab" aria-selected="true">在线素材</button>
+      <button type="button" id="tab-local" class="tab" role="tab" aria-selected="false">本机素材</button>
+    </div>
+    <button type="button" id="reload-sources" class="ghost" title="重新读取已配置的素材来源">刷新来源</button>
+  </header>
+
+  <section id="notice" class="notice" hidden></section>
+
+  <section id="panel-online" class="panel">
+    <form id="search-form" class="searchbar">
+      <input id="query" type="search" placeholder="描述你要找的画面或声音，例如：夜晚城市延时" autocomplete="off" />
+      <div class="kinds" role="group" aria-label="素材类型">
+        <label><input type="checkbox" class="kind" value="image" checked />图片</label>
+        <label><input type="checkbox" class="kind" value="video" checked />视频</label>
+        <label><input type="checkbox" class="kind" value="audio" checked />音效</label>
+      </div>
+      <button type="submit" id="search-button" class="primary">检索</button>
+    </form>
+    <div id="sources" class="sources" aria-label="素材来源"></div>
+
+    <details id="source-settings" class="settings">
+      <summary>来源设置</summary>
+      <div id="settings-rows" class="settings-rows"></div>
+      <p class="hint">密钥只保存在本插件自己的数据目录里，不写进工作区，也不会上传到 HiMind 工作台。没有密钥时检索仍会列出未配置的来源，不会静默失败。</p>
+    </details>
+    <div id="results" class="results"></div>
+  </section>
+
+  <section id="panel-local" class="panel" hidden>
+    <div class="searchbar">
+      <input id="index-roots" type="text" placeholder="要索引的目录，多个用分号分隔" autocomplete="off" />
+      <button type="button" id="index-button" class="ghost">建立索引</button>
+    </div>
+    <div class="searchbar">
+      <input id="local-query" type="search" placeholder="按文件名检索本机素材" autocomplete="off" />
+      <button type="button" id="local-search-button" class="primary">检索</button>
+    </div>
+    <div id="local-results" class="results"></div>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

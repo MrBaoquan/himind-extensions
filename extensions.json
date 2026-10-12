@@ -11,6 +11,7 @@
     {"type": "plugin", "id": "com.himind.software-distribution", "path": "plugins/software-distribution"},
     {"type": "plugin", "id": "com.himind.tech-radar", "path": "plugins/tech-radar"},
     {"type": "plugin", "id": "com.himind.wechat-miniprogram-tools", "path": "plugins/wechat-miniprogram-tools"},
+    {"type": "plugin", "id": "com.himind.media-library", "path": "plugins/media-library"},
     {"type": "plugin", "id": "com.himind.work-log", "path": "plugins/work-log"},
     {"type": "plugin", "id": "com.himind.work-log-collector", "path": "plugins/work-log-collector"},
     {"type": "skill", "id": "com.himind.skill.develop-himind-plugins", "path": "skills/develop-himind-plugins"},
