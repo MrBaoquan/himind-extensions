@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>媒体下载工具</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">HiMind 媒体下载</p>
+        <h1>媒体下载工具</h1>
+        <p class="lede">解析公开网页中的在线音视频、字幕和播放列表，保存到当前工作区。</p>
+      </div>
+      <button id="runtime-button" class="ghost" type="button">检查运行时</button>
+    </header>
+
+    <section class="card status-card">
+      <div class="section-head">
+        <h2>运行状态</h2>
+        <span id="runtime-state" class="badge muted">未检查</span>
+      </div>
+      <p id="runtime-detail" class="muted">先检查 yt-dlp 和 ffmpeg 是否可用。</p>
+      <div id="runtime-actions" class="actions" hidden>
+        <button id="install-button" type="button">安装固定版本 yt-dlp</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <h2>解析链接</h2>
+        <span class="muted">先解析，再选择下载方式</span>
+      </div>
+      <div class="row">
+        <input id="url" type="url" spellcheck="false" placeholder="https://example.com/video">
+        <button id="probe-button" type="button">解析</button>
+      </div>
+      <label class="check">
+        <input id="playlist" type="checkbox">
+        <span>按播放列表解析</span>
+      </label>
+    </section>
+
+    <section id="info-card" class="card" hidden>
+      <div class="section-head">
+        <h2 id="media-title">媒体信息</h2>
+        <span id="media-meta" class="muted"></span>
+      </div>
+      <div class="row wrap">
+        <label>清晰度
+          <select id="quality">
+            <option value="best">最佳</option>
+            <option value="1080p">1080p</option>
+            <option value="720p">720p</option>
+            <option value="480p">480p</option>
+          </select>
+        </label>
+        <label>格式
+          <select id="format"><option value="">自动选择</option></select>
+        </label>
+        <label class="check inline">
+          <input id="audio-only" type="checkbox">
+          <span>仅音频</span>
+        </label>
+      </div>
+      <div class="row">
+        <input id="dest-dir" type="text" value="media" placeholder="工作区内目录，例如 media">
+        <button id="start-button" type="button">开始下载</button>
+      </div>
+      <details id="subtitle-details">
+        <summary>字幕选项</summary>
+        <div id="subtitles" class="chips"></div>
+      </details>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <h2>下载任务</h2>
+        <button id="refresh-jobs" class="ghost" type="button">刷新</button>
+      </div>
+      <div id="jobs" class="jobs"></div>
+    </section>
+
+    <p id="notice" class="notice" hidden></p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

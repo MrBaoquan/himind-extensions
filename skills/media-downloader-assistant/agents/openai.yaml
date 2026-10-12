@@ -1,0 +1,4 @@
+interface:
+  display_name: "媒体下载助手"
+  short_description: "解析链接、选择格式并跟踪受控下载任务"
+  default_prompt: "使用 $media-downloader-assistant 处理用户的网页媒体下载请求；先检查运行时和解析链接，再在用户确认后创建下载任务并跟踪结果。"

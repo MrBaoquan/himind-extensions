@@ -1,0 +1,261 @@
+{
+  "id": "com.himind.media-downloader",
+  "name": "媒体下载工具",
+  "author": "超级管理员",
+  "categories": [
+    "video-post",
+    "audio-sound",
+    "data-automation"
+  ],
+  "description": "把网页中的在线音视频、字幕和播放列表下载到工作区，并记录来源信息。",
+  "release_notes": "0.1.0：首个版本，提供运行时检测、链接解析和受控下载任务。",
+  "version": "0.1.0",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
+  "entry": "bin/media-downloader.exe",
+  "runtime": "process-jsonrpc-stdio",
+  "platforms": [
+    "windows-x64"
+  ],
+  "min_agent_version": "0.3.47",
+  "governance": "optional",
+  "capability_namespace": "media.downloader",
+  "capabilities": [
+    {
+      "id": "media.downloader.runtime.status",
+      "description": "检查 yt-dlp 与 ffmpeg 运行时状态",
+      "availability": "local",
+      "timeout_seconds": 20,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "media.downloader.runtime.install",
+      "description": "下载并安装固定版本的 yt-dlp 运行时",
+      "availability": "local",
+      "timeout_seconds": 600,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "force": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "media.downloader.info.get",
+      "description": "解析媒体链接并返回格式、字幕与条目摘要",
+      "availability": "local",
+      "timeout_seconds": 90,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "playlist": {
+            "type": "boolean"
+          },
+          "max_items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "media.downloader.job.start",
+      "description": "创建受控下载任务并立即返回任务 ID",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "dest_dir": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "format_id": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "quality": {
+            "enum": [
+              "best",
+              "1080p",
+              "720p",
+              "480p"
+            ]
+          },
+          "audio_only": {
+            "type": "boolean"
+          },
+          "subtitles": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "maxLength": 50
+            }
+          },
+          "playlist": {
+            "type": "boolean"
+          },
+          "max_items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1024,
+            "maximum": 17179869184
+          },
+          "overwrite": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "media.downloader.job.status",
+      "description": "查询下载任务状态、进度与产物",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "media.downloader.job.cancel",
+      "description": "取消仍在执行的下载任务",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "media.downloader.job.list",
+      "description": "列出最近的下载任务",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    }
+  ],
+  "permissions": [
+    "filesystem.workspace.read",
+    "filesystem.workspace.write",
+    "network.web.read",
+    "network.package-registry",
+    "process.media-tool",
+    "process.python"
+  ],
+  "plugin_dependencies": [],
+  "contributes": {
+    "views": [
+      {
+        "id": "media.downloader.main",
+        "title": "媒体下载工具",
+        "short_title": "媒体下载",
+        "icon": "download",
+        "quick_access": true,
+        "order": 61,
+        "location": "plugin_navigation",
+        "entry": "ui/index.html"
+      }
+    ],
+    "commands": [
+      {
+        "id": "media.downloader.runtime.status",
+        "title": "检查下载运行时"
+      },
+      {
+        "id": "media.downloader.runtime.install",
+        "title": "安装下载运行时"
+      },
+      {
+        "id": "media.downloader.info.get",
+        "title": "解析媒体链接"
+      },
+      {
+        "id": "media.downloader.job.start",
+        "title": "开始下载"
+      },
+      {
+        "id": "media.downloader.job.status",
+        "title": "查看下载任务"
+      },
+      {
+        "id": "media.downloader.job.cancel",
+        "title": "取消下载任务"
+      }
+    ]
+  }
+}

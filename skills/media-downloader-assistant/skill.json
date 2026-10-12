@@ -1,0 +1,27 @@
+{
+  "id": "com.himind.media-downloader-assistant",
+  "name": "媒体下载助手",
+  "author": "超级管理员",
+  "categories": ["video-post", "audio-sound", "data-automation"],
+  "version": "0.1.0",
+  "distribution_targets": ["workbench", "github"],
+  "scope": "organization",
+  "description": "把用户的媒体下载意图转换为受控的解析、选择和任务跟踪步骤，适合网页音视频、字幕和播放列表下载场景。",
+  "release_notes": "0.1.0：首个版本，编排媒体下载工具的运行时检查、链接解析和下载任务。",
+  "min_agent_version": "0.3.47",
+  "supported_clients": ["agent-skills"],
+  "capabilities": [
+    {"id": "media.downloader.runtime.status", "required": true, "min_version": "0.1.0", "provider": "com.himind.media-downloader"},
+    {"id": "media.downloader.runtime.install", "required": false, "min_version": "0.1.0", "provider": "com.himind.media-downloader"},
+    {"id": "media.downloader.info.get", "required": true, "min_version": "0.1.0", "provider": "com.himind.media-downloader"},
+    {"id": "media.downloader.job.start", "required": true, "min_version": "0.1.0", "provider": "com.himind.media-downloader"},
+    {"id": "media.downloader.job.status", "required": true, "min_version": "0.1.0", "provider": "com.himind.media-downloader"},
+    {"id": "media.downloader.job.cancel", "required": false, "min_version": "0.1.0", "provider": "com.himind.media-downloader"},
+    {"id": "media.downloader.job.list", "required": false, "min_version": "0.1.0", "provider": "com.himind.media-downloader"}
+  ],
+  "plugin_dependencies": [
+    {"plugin_id": "com.himind.media-downloader", "required": true, "min_version": "0.1.0"}
+  ],
+  "risk_summary": "默认只读检查；安装运行时和创建下载任务需要用户确认；不接受任意命令、Cookie、DRM 或私密凭据。",
+  "contents": ["skill.json", "SKILL.md", "agents/openai.yaml"]
+}

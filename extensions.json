@@ -12,6 +12,7 @@
     {"type": "plugin", "id": "com.himind.tech-radar", "path": "plugins/tech-radar"},
     {"type": "plugin", "id": "com.himind.wechat-miniprogram-tools", "path": "plugins/wechat-miniprogram-tools"},
     {"type": "plugin", "id": "com.himind.media-library", "path": "plugins/media-library"},
+    {"type": "plugin", "id": "com.himind.media-downloader", "path": "plugins/media-downloader"},
     {"type": "plugin", "id": "com.himind.work-log", "path": "plugins/work-log"},
     {"type": "plugin", "id": "com.himind.work-log-collector", "path": "plugins/work-log-collector"},
     {"type": "skill", "id": "com.himind.skill.develop-himind-plugins", "path": "skills/develop-himind-plugins"},
@@ -23,6 +24,7 @@
     {"type": "skill", "id": "com.himind.skill.mcp-experience-feedback", "path": "skills/mcp-experience-feedback"},
     {"type": "skill", "id": "com.himind.skill.software-distribution", "path": "skills/software-distribution"},
     {"type": "skill", "id": "com.himind.skill.software-ui-spec", "path": "skills/software-ui-spec"},
+    {"type": "skill", "id": "com.himind.media-downloader-assistant", "path": "skills/media-downloader-assistant"},
     {"type": "skill", "id": "com.himind.skill.work-log", "path": "skills/work-log"},
     {"type": "skill", "id": "com.mrbaoquan.skill.unihper-unity-development", "path": "skills/unihper-unity-development"},
     {"type": "workflow", "id": "com.himind.workflow.software-release", "path": "workflows/software-release"},
@@ -54,3 +56,4 @@
     }
   ]
 }
+

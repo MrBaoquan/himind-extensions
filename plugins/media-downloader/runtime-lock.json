@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "runtime": "yt-dlp",
+  "version": "2026.08.19",
+  "pypi_version": "2026.8.19",
+  "pypi_package": "yt-dlp",
+  "asset": "yt-dlp.exe",
+  "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe",
+  "sha256": "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a",
+  "size": 17840399,
+  "license": {
+    "name": "GPL-3.0-or-later (combined PyInstaller release binary)",
+    "url": "https://github.com/yt-dlp/yt-dlp/blob/master/README.md#license"
+  },
+  "pypi_sha256": "1d57897e94c6665a0a6f9bc54b34e584284e32c034ffab3a7df25d8f7b24eedf"
+}
