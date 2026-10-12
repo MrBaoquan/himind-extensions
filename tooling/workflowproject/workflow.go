@@ -715,9 +715,11 @@ func validateSteps(steps []Step, stepIDs map[string]bool, manifest Manifest) err
 			if step.Runtime.ToolPolicy != "" && !matches(step.Runtime.ToolPolicy, "default", "none") {
 				return fmt.Errorf("workflow runtime step %s tool_policy must be default or none", step.ID)
 			}
-			if len(step.Runtime.InputArtifacts) > 0 && step.Runtime.ToolPolicy == "none" {
-				return fmt.Errorf("workflow runtime step %s cannot combine input_artifacts with tool_policy=none", step.ID)
-			}
+			// input_artifacts 与 tool_policy=none 是合法组合，不要禁止：none 表示不挂载
+			// 模型可见工具，此时平台把声明的 Artifact 作为**只读内容注入提示上下文**
+			// （见 Agent 侧 workflow::runtime 的字段契约），模型不需要再用文件工具去读。
+			// 历史上这里按「input_artifacts 必然是文件路径、必须靠工具读」假设拒绝过，
+			// 会让「无工具 + 上下文注入」这种更安全的形态无法表达。
 			seenArtifacts := map[string]bool{}
 			for _, artifactID := range step.Runtime.InputArtifacts {
 				if strings.TrimSpace(artifactID) == "" {
