@@ -13,6 +13,7 @@ description: 插件、技能、工作流三类扩展的创作规范：选型边�
 2. 确定性操作在插件开发助手、技能开发助手、工作流开发助手里执行；本规范不替代它们的校验和打包。
 3. 规则冲突时按此顺序取舍：目标产品已有约定 → 本规范 → 个人偏好。冲突要在交付说明里写出来，不静默选一边。
 4. 长度上限以校验器报错为准，建议值只作提示。拿不准就调用 `extension.environment.preflight`，它返回同一份规则与字段约束。
+5. 术语：**工作台（workbench）**＝项目看板的浏览器控制台与 `dashboard-api`/`ai-control` 控制面，三者是同一个系统。能力 ID 与分发目标只用 `workbench`；`dashboard` 仅是实现名，不进入能力 ID 与用户文案。
 
 ## 一、先选对类型
 
@@ -32,6 +33,10 @@ description: 插件、技能、工作流三类扩展的创作规范：选型边�
 4. 不用承诺词和岗位词：智能、自动、一键、全能、极致、管家、专家、大师。
 5. 用户可见文案用中文或通用缩写（Git、SVN、MCP、UNIHPer）；稳定 ID、目录名、frontmatter `name` 用小写 ASCII 连字符。
 6. 显示名分散在 `skill.json.name`、`SKILL.md` 的 H1、`agents/openai.yaml` 的 `display_name`、`workflow.json.name`、`ui/workflow-view.json.title`。改名必须一次改全，否则「我的能力」和 Workflow 详情会同时显示两套名字。
+7. **Capability ID** 遵循 ADR 0119：`边界[.资源路径].动作[.限定]`，全小写、层级用 `.`、词内复合用 `-`，2–5 段、≤ 48 字符；版本与本地/远程差异由 `version`、`availability` 等元数据表达，**不进 ID**。首段必须是领域注册表里的边界（`media`、`workbench`、`business`、`workspace`、`extension`…）。规则事实源是 `himind-agent/contracts/capability-naming-rules.json`，内核门禁与插件校验器读同一份；本规范只写判断口径，不重抄词表。
+8. **能力命名空间**：插件能力必须以 `plugin.json.capability_namespace` 声明的前缀开头。留空时按插件 ID 末段 slug 推导；有两种情况必须显式声明——多个插件共用同一命名空间（如 work-log 与 work-log-collector），或前缀是多段（如 `wechat.miniprogram`）。未声明时首段只允许内核领域注册表里的共享域（如 `extension.*`）或插件自身的 slug。
+9. **能力 ID 全局唯一，且不得占用内核内置 ID**。内核按「先到者胜」注册，后到的同名能力会被跳过，变成装了却调不到的幽灵能力——这是缺陷，不是风格问题。同名在创作期就会被 `extension.test` 拦下；运行期撞名只会隔离冲突的那条能力，插件其余能力照常可用，并在我能力里带出冲突原因。
+10. **改 ID 是破坏性变更**：已发布插件的 Capability ID 一改，调用方、技能 `capabilities` 和工作流依赖锁都会断。改名必须提升版本、同步全部引用，并按 ADR 0119 的别名策略处理调用侧。
 
 ## 三、说明与文案
 
@@ -75,6 +80,7 @@ description: 插件、技能、工作流三类扩展的创作规范：选型边�
 2. 最小权限：只申请真实用到的权限，不申请「以后可能用」的权限。
 3. 不读取或传递 Token、Cookie、私钥和 Agent credential；不直接改 Distribution 数据库；只在 `workspace_root` 内写文件；不接受任意 Shell、任意 URL 或越出工作区的路径。
 4. 高风险写操作先出计划再执行，需要审批的步骤设 `approval_required`，并走 Agent 审批中心。
+5. **命名边界与可见性必须一致**：`media.*` ⇒ `availability: local`；`workbench.*` ⇒ `availability: control_plane`。为两种形态复制两套实现、或让边界与可见性对不上，校验会拒绝。
 
 ## 八、版本、兼容与提审
 
@@ -89,6 +95,7 @@ description: 插件、技能、工作流三类扩展的创作规范：选型边�
 - 显示名是名词短语、类型词真实，且五个字段已经同步。
 - 用途说明、触发说明和更新说明各写一处，没有重复描述和空词。
 - 分类来自固定列表，没有自造分类。
+- 能力 ID 合规且全局唯一：首段在领域注册表或声明的命名空间内，没有重名、没有占用内核内置 ID。
 - 依赖只有运行时真实依赖，没把创作工具链写成业务依赖。
 - 分发目标与功能性质匹配：项目定制不进公共目录。
 - 权限最小，凭据不落盘，写入不越出 `workspace_root`。
