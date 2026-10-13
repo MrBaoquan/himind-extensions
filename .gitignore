@@ -12,6 +12,8 @@ extension-lock.json
 checksums.sha256
 
 # Local state
+# 本机 Agent 的媒体产物（生图/生视频落盘），属于运行期本地状态，不进扩展仓。
+.himind/media/
 .idea/
 .vscode/
 .DS_Store
