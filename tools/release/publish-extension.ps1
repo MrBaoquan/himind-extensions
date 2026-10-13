@@ -268,8 +268,19 @@ function Resolve-SourceTree {
 
 $releaseExists = $false
 if ($allowGithub) {
-    gh release view $tag --repo $Repository --json publishedAt 2>$null | Out-Null
-    $releaseExists = $LASTEXITCODE -eq 0
+    # 「这个 tag 还没发布」是正常分支，但 gh 会往 stderr 写 `release not found`；
+    # 脚本顶部开了 $ErrorActionPreference = Stop，PowerShell 5.1 会把这条 stderr
+    # 变成终止错误，于是「还不存在 → 继续发布」的路径根本走不到（首发必失败）。
+    # 只放宽这一处，按退出码判断。
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = Continue
+    try {
+        gh release view $tag --repo $Repository --json publishedAt 2>$null | Out-Null
+        $releaseExists = $LASTEXITCODE -eq 0
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorAction
+    }
 }
 
 if ($releaseExists) {
