@@ -14,6 +14,8 @@ checksums.sha256
 # Local state
 # 本机 Agent 的媒体产物（生图/生视频落盘），属于运行期本地状态，不进扩展仓。
 .himind/media/
+# 媒体下载插件的默认输出目录（运行期本地产物）。
+media/
 .idea/
 .vscode/
 .DS_Store
