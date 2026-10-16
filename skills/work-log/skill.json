@@ -3,11 +3,11 @@
   "name": "工作日志助手",
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
-  "version": "0.4.1",
+  "version": "0.5.0",
   "distribution_targets": ["workbench", "github"],
   "scope": "organization",
   "description": "把当前 AI 会话整理成结构化工作日志并写入全局日志库：条目带功能/模块与工时，报告按项目→功能聚合内容小结，以按日日志为核心、可按日历回看。",
-  "release_notes": "0.4.1：工作类型改为受控中文枚举，与工作日志插件的 category 枚举对齐。",
+  "release_notes": "0.5.0：补全正文已引用但清单缺失的能力声明（条目读取、项目归集、来源保存）。",
   "min_agent_version": "0.3.0",
   "supported_clients": ["himind-ai", "codex", "github-copilot", "workbuddy"],
   "capabilities": [
@@ -19,7 +19,10 @@
     {"id": "work-log.project.list", "required": false, "min_version": "0.2.0", "provider": "com.himind.work-log"},
     {"id": "work-log.project.upsert", "required": false, "min_version": "0.2.0", "provider": "com.himind.work-log"},
     {"id": "work-log.project.resolve", "required": false, "min_version": "0.2.0", "provider": "com.himind.work-log"},
-    {"id": "work-log.source.list", "required": false, "min_version": "0.2.0", "provider": "com.himind.work-log"}
+    {"id": "work-log.source.list", "required": false, "min_version": "0.2.0", "provider": "com.himind.work-log"},
+    {"id": "work-log.entry.read", "required": false, "min_version": "0.1.0", "provider": "com.himind.work-log"},
+    {"id": "work-log.project.assign", "required": false, "min_version": "0.1.0", "provider": "com.himind.work-log"},
+    {"id": "work-log.source.save", "required": false, "min_version": "0.1.0", "provider": "com.himind.work-log"}
   ],
   "plugin_dependencies": [
     {"plugin_id": "com.himind.work-log", "required": true, "min_version": "0.5.0"}

@@ -46,11 +46,12 @@
 ## 边界
 
 - **工作台降级**：`WL-PROJECTS` / `WL-EXHIBITS` 从项目看板（工作台）同步项目与展项，属于可选 Provider。未连接工作台时这两步自动跳过（`on_failure: continue`），工作流继续用本地登记表完成采集、总结与写入；这两步也不在必需 `capabilities` 里，因此不会阻塞启动前检查。
-- 采集器不写工作日志库：它至多把会话素材落一份临时 artifact（扩展私有数据目录）供 AI 总结步骤读取；写入统一由 `work-log.entry.upsert` 负责，保证日志库只有一个写入者。
+- 采集器不写工作日志库：它至多把会话素材落一份临时 artifact 供 AI 总结步骤读取（优先扩展私有数据目录，受限权限下依次回退到运行工作区 `<工作区>/.himind/material` 与系统临时目录，并把每个候选的真实错误带回运行记录）；写入统一由 `work-log.entry.upsert` 负责，保证日志库只有一个写入者。
 - OpenCode/Copilot 的 SQLite 会话库由采集器内置的纯 Go 驱动读取，无需外部 `sqlite3`；来源缺失时在 `skipped` 里如实标记，不伪造结果。
 - 工作日志条目的标题与小结来自内置 AI 的总结（`WL-SUMMARIZE`），工时与起止时间取采集的确定性素材；若 AI 步骤失败，本次运行会失败而不是写入原始素材。没有内置 AI 时可用 `com.himind.skill.work-log` 技能从会话导出后再写回。
 - 通用来源预设依赖各客户端本地格式，标注为实验性；路径或字段不匹配时在 `<日志根>/config/sources.json` 覆盖即可，无需改代码。
 - **隐私**：所有会话读取与总结均在本机完成，不上传任何会话内容。可在 `<日志根>/config/privacy.json` 配置 `exclude_paths` / `exclude_keywords`，命中的会话整条跳过（也可在启动表单临时传入）。
+- **受限沙箱**：由沙箱宿主（DSH 等运行时）拉起的 Agent，其插件子进程继承「只能写绑定工作区 + 私有临时目录」的受限令牌，Windows 上对工作区外的一切写入都会以 `Access is denied` 失败（DSH 的能力 SID 放行才是唯一出口）。此时日志库默认位置（`文档\HiMind\工作日志`）不可写，`work-log.entry.upsert` 会带着真实路径与 OS 错误结束——这是宿主限制，不是插件缺陷；采集步骤已改为把会话素材落进工作区，不再受它影响。要在这类环境跑通有两条路：① 用运行输入的 `log_root` 把日志库指到工作区内目录；② 由 Agent 侧把日志库路径放行（按「工作区能力 SID + 低完整性标签」铺常驻 ACE，与 Agent 预热工作区写权限是同一套机制），放行后默认日志库即可正常写入。
 - **平台**：面向 Windows（`platforms: windows-x64`）；会话存储路径与 VS Code 目录约定均为 Windows。
 
 Workflow 源码使用 `workflow.json` 作为执行契约，`ui/workflow-view.json` 作为声明式 UI。标准目录包括 `schemas/`、`artifacts/`、`connectors/`、`examples/` 和 `tests/contract/`。

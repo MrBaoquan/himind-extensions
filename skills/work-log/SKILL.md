@@ -50,7 +50,7 @@ description: 把当前 AI 会话整理成结构化工作日志并写入全局日
 - `project`：项目或主题名，尽量稳定可检索。写入时插件会按项目登记表归一：命中登记名或别名就归到规范项目，未知名称自动登记。可用 `work-log.project.list` 查看已有项目，优先复用已有名字。
 - `feature`：这条工作所属的功能 / 模块（如“日历视图”“项目登记表”），用于在项目下按功能归类与小计。能从会话里的目录、模块名判断就填；判断不了就留空，报告会归入“未分类功能”。
 - `category`：受控类型，只能从中文枚举里选一个：`开发` / `修复` / `设计` / `调研` / `文档` / `评审` / `会议` / `运维` / `其他`；不确定就用 `其他`，不要自造类型。
-- `source`：当前客户端标识，如 `codex`、`opencode`、`copilot`、`himind-ai`。
+- `source`：当前客户端标识（对齐 HiMind 标准客户端 ID），如 `codex`、`claude-code`、`claude-desktop`、`opencode`、`github-copilot`、`himind-ai`。
 - `session_id`：能拿到会话标识时填写，用于同日重复整理时幂等合并。
 - `started_at` / `ended_at`：只有明确时间才填，填 RFC3339 或能解析的时间。
 - `minutes` / `minutes_source`：这条工作的工时（分钟）与来源。能用会话时间戳估算就用 `measured`（按消息间隔算活跃时长）；只有起止时间用 `span`；只能按轮次估用 `estimated`；人工填写用 `manual`。不确定工时就留空，不要编造。
@@ -150,8 +150,8 @@ description: 把当前 AI 会话整理成结构化工作日志并写入全局日
 
 自动采集走 `com.himind.work-log-collector`，来源分两类：
 
-- 原生解析：Codex、Claude Code、OpenCode、Copilot。
-- 通用可配置来源：用声明式规格接入其他客户端，配置在 `<日志根>/config/sources.json`，可用 `work-log.source.list` / `work-log.source.save` 读取与保存（内置 Cursor、Gemini CLI、Cline、Continue、Windsurf、通义灵码、CodeBuddy、Kiro、WorkBuddy 等预设）。
+- 原生解析：Codex、Claude Code、Claude Desktop、OpenCode、GitHub Copilot（含 VS Code 会话）。
+- 通用可配置来源：用声明式规格接入其他客户端，配置在 `<日志根>/config/sources.json`，可用 `work-log.source.list` / `work-log.source.save` 读取与保存（内置 Cursor、Gemini CLI、Cline、Continue、Windsurf、通义灵码、CodeBuddy CLI、Kiro、WorkBuddy 等预设）。
 
 需要新增来源时，先看是否已有预设匹配；没有再用 `work-log.source.save` 增加一条规格（路径 + 格式 + 字段映射），不要改代码。
 

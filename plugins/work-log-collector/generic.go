@@ -82,7 +82,7 @@ func genericPresets() []genericSource {
 			Note:            "Cursor 本地 agent 记录，字段随版本变化，必要时在 sources.json 覆盖",
 		},
 		{
-			ID: "gemini", Label: "Gemini CLI", Preset: true, Experimental: true,
+			ID: "gemini-cli", Label: "Gemini CLI", Preset: true, Experimental: true,
 			Root: "~/.gemini", Glob: "**/chats/*.json", Format: "json",
 			SessionID: "sessionId", TimeFields: []string{"timestamp", "startTime", "start_time"},
 			PromptField: "prompt", AssistantField: "response", RecordsPath: "messages",
@@ -125,7 +125,7 @@ func genericPresets() []genericSource {
 			Note:            "通义灵码本地会话，结构随版本变化",
 		},
 		{
-			ID: "codebuddy", Label: "CodeBuddy", Preset: true, Experimental: true,
+			ID: "codebuddy-cli", Label: "CodeBuddy CLI", Preset: true, Experimental: true,
 			Root: "~/.codebuddy", Glob: "**/*.jsonl", Format: "jsonl",
 			SessionID: "sessionId", TimeFields: []string{"timestamp", "created_at"},
 			RoleField: "role", UserRoles: []string{"user"}, AssistantRoles: []string{"assistant"},

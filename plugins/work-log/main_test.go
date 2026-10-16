@@ -558,6 +558,9 @@ func TestReportGroupsByProjectAndFeatureWithMinutes(t *testing.T) {
 		"完成月历",
 		"完成：月历可用",
 		"记录工时：约 2.0 小时（实测 1.5 小时 / 估算 0.5 小时）",
+		"素材来源：Codex（2）",
+		"来源:Codex",
+		"（1 小时 30 分·实测·Codex）",
 	} {
 		if !contains(markdown, want) {
 			t.Fatalf("日报 Markdown 缺少 %q:\n%s", want, markdown)
@@ -614,6 +617,27 @@ func TestCalendarTotalsMinutes(t *testing.T) {
 	filtered := call(t, "work-log.archive.calendar", `{"log_root":`+quote(root)+`,"year":2026,"month":10,"project":"项目看板"}`)
 	if filtered["total_minutes"].(float64) != 90 {
 		t.Fatalf("按项目过滤工时异常: %v", filtered["total_minutes"])
+	}
+}
+
+func TestSourceClientLabelAndReportRendering(t *testing.T) {
+	for id, want := range map[string]string{
+		"codex":          "Codex",
+		"claude":         "Claude Code",
+		"claude-code":    "Claude Code",
+		"claude-desktop": "Claude Desktop",
+		"opencode":       "OpenCode",
+		"copilot":        "GitHub Copilot",
+		"github-copilot": "GitHub Copilot",
+		"vscode-copilot": "VS Code GitHub Copilot",
+		"vscode":         "VS Code GitHub Copilot",
+		"manual":         "手工",
+		"":               "手工",
+		"custom-cli":     "custom-cli",
+	} {
+		if got := sourceClientLabel(id); got != want {
+			t.Fatalf("sourceClientLabel(%q) = %q, want %q", id, got, want)
+		}
 	}
 }
 
@@ -1339,6 +1363,8 @@ func TestEphemeralProjectPath(t *testing.T) {
 		`C:\Users\me\.copilot\repos\copilot-worktrees\AndX\mrbaoquan-wt`,
 		`C:\Users\me\.copilot\chats\2026-09-20\fuzzy-adventure`,
 		`C:\Users\me\Documents\Codex\2026-09-29\x-decrypted-3`,
+		`C:\Users\me\AppData\Local\Claude-3p\local-agent-mode-sessions\de34d5bb\00000000\5183affa\outputs`,
+		`C:\Users\me\AppData\Roaming\Claude\local-agent-mode-sessions\de34d5bb\00000000\c58e56b0\host-cwd`,
 	}
 	for _, p := range ephemeral {
 		if !ephemeralProjectPath(p) {

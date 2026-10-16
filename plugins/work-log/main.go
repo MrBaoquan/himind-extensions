@@ -1637,10 +1637,12 @@ func logRoot(value string) (string, error) {
 	}
 	root, err := filepath.Abs(trimmed)
 	if err != nil {
-		return "", errors.New("log_root 无效")
+		return "", fmt.Errorf("log_root 无效（%s）：%w", trimmed, err)
 	}
 	if err := os.MkdirAll(root, 0o755); err != nil {
-		return "", errors.New("log_root 创建失败")
+		// 受限运行（沙箱只放行工作区）时写不了文档目录，必须把真实路径与系统错误带出来，
+		// 否则调用方只看到一句「创建失败」，无法判断是权限问题还是路径问题。
+		return "", fmt.Errorf("log_root 创建失败（%s）：%w", root, err)
 	}
 	if explicit {
 		rememberRoot(root)
@@ -1727,7 +1729,7 @@ func readDay(root, date string) (dayFile, error) {
 		return dayFile{Date: date, SchemaVersion: schemaVersion, Entries: []entry{}}, nil
 	}
 	if err != nil {
-		return dayFile{}, errors.New("日志文件读取失败")
+		return dayFile{}, fmt.Errorf("日志文件读取失败（%s）：%w", path, err)
 	}
 	var day dayFile
 	if err := json.Unmarshal(body, &day); err != nil {
@@ -1744,8 +1746,10 @@ func writeDay(root string, day dayFile) error {
 	if err != nil {
 		return errors.New("日志序列化失败")
 	}
-	if err := writeFileAtomic(dayPath(root, day.Date), append(payload, '\n')); err != nil {
-		return errors.New("日志写入失败")
+	// 写入失败必须带出真实路径与系统错误：受限运行下最常见的原因就是日志目录不在放行范围内。
+	path := dayPath(root, day.Date)
+	if err := writeFileAtomic(path, append(payload, '\n')); err != nil {
+		return fmt.Errorf("日志写入失败（%s）：%w", path, err)
 	}
 	return nil
 }
@@ -2006,6 +2010,46 @@ func hoursText(m int) string {
 	return fmt.Sprintf("%.1f 小时", float64(m)/60.0)
 }
 
+// sourceClientLabel 把来源标识（AI 客户端 ID）翻译成人读显示名。
+func sourceClientLabel(source string) string {
+	switch strings.ToLower(strings.TrimSpace(source)) {
+	case "codex":
+		return "Codex"
+	case "claude":
+		return "Claude Code"
+	case "claude-code":
+		return "Claude Code"
+	case "claude-desktop":
+		return "Claude Desktop"
+	case "opencode":
+		return "OpenCode"
+	case "copilot":
+		return "GitHub Copilot"
+	case "github-copilot":
+		return "GitHub Copilot"
+	case "vscode-copilot":
+		return "VS Code GitHub Copilot"
+	case "vscode":
+		return "VS Code GitHub Copilot"
+	case "cursor":
+		return "Cursor"
+	case "cline":
+		return "Cline"
+	case "windsurf":
+		return "Windsurf"
+	case "manual":
+		return "手工"
+	case "workbench":
+		return "看板"
+	default:
+		s := strings.TrimSpace(source)
+		if s == "" {
+			return "手工"
+		}
+		return s
+	}
+}
+
 // minutesSourceLabel 把来源标识翻译成人读标签。
 func minutesSourceLabel(source string) string {
 	switch source {
@@ -2029,7 +2073,7 @@ func overviewLines(entries []entry) string {
 	for _, item := range entries {
 		projects[fallbackValue(item.Project, "未归类")]++
 		categories[categoryLabel(item.Category)]++
-		sources[fallbackValue(item.Source, "manual")]++
+		sources[sourceClientLabel(item.Source)]++
 	}
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("- 记录条目：%d 条\n", len(entries)))
@@ -2064,6 +2108,7 @@ func timelineLines(entries []entry) string {
 			meta = append(meta, "展项:"+item.Exhibit)
 		}
 		meta = append(meta, "["+categoryLabel(item.Category)+"]")
+		meta = append(meta, "来源:"+sourceClientLabel(item.Source))
 		builder.WriteString("- " + strings.Join(meta, " · ") + " " + fallbackValue(item.Title, "(未命名)") + "\n")
 		if item.Summary != "" {
 			builder.WriteString("  " + item.Summary + "\n")
@@ -2171,7 +2216,9 @@ func featureBlocks(project string, items []entry, narratives map[string]string) 
 				line += "：" + item.Summary
 			}
 			if item.Minutes > 0 {
-				line += fmt.Sprintf("（%s·%s）", minutesText(item.Minutes), minutesSourceLabel(item.MinutesSource))
+				line += fmt.Sprintf("（%s·%s·%s）", minutesText(item.Minutes), minutesSourceLabel(item.MinutesSource), sourceClientLabel(item.Source))
+			} else if s := sourceClientLabel(item.Source); s != "" && s != "手工" {
+				line += fmt.Sprintf("（%s）", s)
 			}
 			builder.WriteString(line + "\n")
 		}
@@ -2238,6 +2285,7 @@ li{margin:2px 0}
 .item .head{display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
 .time{color:#94a3b8;font-variant-numeric:tabular-nums}
 .cat{padding:1px 6px;border-radius:4px;font-size:11px;background:#eef2ff;color:#4338ca}
+.src{padding:1px 6px;border-radius:4px;font-size:11px;background:#f3f4f6;color:#4b5563}
 .proj{color:#0f766e;font-size:12px}
 .feat{color:#7c3aed;font-size:12px}
 .mins{color:#0369a1;font-size:12px;font-variant-numeric:tabular-nums}
@@ -2271,6 +2319,7 @@ func timelineHTML(entries []entry) string {
 		if item.Feature != "" {
 			builder.WriteString(`<span class="feat">` + html.EscapeString(item.Feature) + `</span>`)
 		}
+		builder.WriteString(`<span class="src">` + html.EscapeString(sourceClientLabel(item.Source)) + `</span>`)
 		if item.Minutes > 0 {
 			builder.WriteString(`<span class="mins">` + html.EscapeString(minutesText(item.Minutes)) + ` · ` + html.EscapeString(minutesSourceLabel(item.MinutesSource)) + `</span>`)
 		}

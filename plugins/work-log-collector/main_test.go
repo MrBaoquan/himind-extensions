@@ -101,11 +101,49 @@ func TestSourcesDetectsByKind(t *testing.T) {
 	if byID["codex"]["exists"] != true || byID["codex"]["supported"] != true {
 		t.Fatalf("Codex 目录应被识别为可用: %#v", byID["codex"])
 	}
-	if byID["claude"]["exists"] != true {
-		t.Fatalf("Claude 目录应被识别为存在: %#v", byID["claude"])
+	if byID["claude-code"]["exists"] != true {
+		t.Fatalf("Claude Code 目录应被识别为存在: %#v", byID["claude-code"])
 	}
 	if byID["opencode"]["exists"] != false {
 		t.Fatalf("临时 home 不应有 OpenCode 库: %#v", byID["opencode"])
+	}
+}
+
+// TestScanLegacyClaudeAlias 验证历史写法 source=claude 仍归一到 claude-code。
+func TestScanLegacyClaudeAlias(t *testing.T) {
+	home := writeFixture(t)
+	out := call(t, "work-log.session.scan", `{"home":`+quote(home)+`,"date":"2026-10-09","limit":10,"source":"claude"}`)
+	if out["total"].(float64) != 1 {
+		t.Fatalf("source=claude 别名应只选到 claude-code 来源，实际 %v", out["total"])
+	}
+	session := out["sessions"].([]any)[0].(map[string]any)
+	if session["source"] != "claude-code" {
+		t.Fatalf("别名应归一到标准 ID claude-code: %#v", session["source"])
+	}
+}
+
+// TestNormalizeSourceID 验证历史来源 ID 全部归一到标准客户端 ID。
+func TestNormalizeSourceID(t *testing.T) {
+	cases := map[string]string{
+		"claude":         "claude-code",
+		"copilot":        "github-copilot",
+		"vscode-copilot": "vscode",
+		"claude-code":    "claude-code",
+		"github-copilot": "github-copilot",
+		"vscode":         "vscode",
+		"codex":          "codex",
+		"all":            "all",
+	}
+	for in, want := range cases {
+		if got := normalizeSourceID(in); got != want {
+			t.Fatalf("normalizeSourceID(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if got := legacySourceKey("github-copilot"); got != "copilot" {
+		t.Fatalf("github-copilot 的历史键应为 copilot，实际 %q", got)
+	}
+	if got := legacySourceKey("vscode"); got != "vscode-copilot" {
+		t.Fatalf("vscode 的历史键应为 vscode-copilot，实际 %q", got)
 	}
 }
 
@@ -122,7 +160,7 @@ func TestScanCodexAndClaude(t *testing.T) {
 		switch item["source"] {
 		case "codex":
 			codex = item
-		case "claude":
+		case "claude-code":
 			claude = item
 		}
 	}
@@ -239,6 +277,129 @@ func TestScanEmitsMaterialArtifact(t *testing.T) {
 	}
 	if _, ok := payload["total"]; !ok {
 		t.Fatalf("素材应符合 session-digest schema（含 total）: %v", payload)
+	}
+}
+
+func TestMaterialRootsPreferExplicitThenDataRootThenWorkspace(t *testing.T) {
+	dataRoot := t.TempDir()
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", dataRoot)
+	explicit := t.TempDir()
+	workspace := t.TempDir()
+
+	roots := materialRoots(input{MaterialRoot: explicit, WorkspaceRoot: workspace})
+	if len(roots) < 3 {
+		t.Fatalf("素材目录候选过少: %#v", roots)
+	}
+	if roots[0] != explicit {
+		t.Fatalf("显式 material_root 应排第一: %#v", roots)
+	}
+	if roots[1] != filepath.Join(dataRoot, "material") {
+		t.Fatalf("扩展私有数据目录应排第二: %#v", roots)
+	}
+	if roots[2] != filepath.Join(workspace, ".himind", "material") {
+		t.Fatalf("运行工作区应作为回退候选: %#v", roots)
+	}
+}
+
+func TestMaterialRootsIgnoreUnresolvedWorkspaceLiteral(t *testing.T) {
+	// 宿主没有解析 input.workspace_root 时，传下来的是字面量而不是真实路径；
+	// 按相对目录处理会把素材落到进程当前目录里，因此必须忽略。
+	for _, literal := range []string{"input.workspace_root", "${workspace_root}"} {
+		for _, root := range materialRoots(input{WorkspaceRoot: literal}) {
+			if strings.Contains(root, "workspace_root") {
+				t.Fatalf("未解析的工作区字面量不应进入候选: %#v", root)
+			}
+		}
+	}
+}
+
+func TestWriteMaterialFallsBackToWorkspace(t *testing.T) {
+	// 私有目录不可写（父路径是文件）时，素材应回退写到工作区，而不是直接失败。
+	blocker := filepath.Join(t.TempDir(), "blocked")
+	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+		t.Fatalf("准备阻塞路径失败: %v", err)
+	}
+	workspace := t.TempDir()
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", filepath.Join(blocker, "data"))
+	t.Setenv("LOCALAPPDATA", filepath.Join(blocker, "local"))
+
+	artifact, err := writeMaterial(
+		input{MaterialRoot: filepath.Join(blocker, "explicit"), WorkspaceRoot: workspace},
+		"2026-01-01", "2026-01-02", map[string]any{"sessions": []any{}},
+	)
+	if err != nil {
+		t.Fatalf("应回退到工作区写入: %v", err)
+	}
+	path := filepath.FromSlash(strings.TrimPrefix(artifact["uri"].(string), "file:///"))
+	want := filepath.Join(workspace, ".himind", "material", "session-digest-2026-01-01_2026-01-02.json")
+	if !strings.EqualFold(path, want) {
+		t.Fatalf("素材应写到工作区素材目录: %s", path)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("素材文件不存在: %v", err)
+	}
+}
+
+func TestWriteMaterialReportsEveryFailedRoot(t *testing.T) {
+	// 全部候选都不可写时必须带出每个目录的真实系统错误，而不是只回一句「写入失败」。
+	blocker := filepath.Join(t.TempDir(), "blocked")
+	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+		t.Fatalf("准备阻塞路径失败: %v", err)
+	}
+	tempRoot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tempRoot, "HiMindAgent"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("准备阻塞临时目录失败: %v", err)
+	}
+	workDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(workDir, ".himind"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("准备阻塞工作目录失败: %v", err)
+	}
+	explicit := filepath.Join(blocker, "explicit")
+	dataRoot := filepath.Join(blocker, "data")
+	t.Chdir(workDir)
+	t.Setenv("TEMP", tempRoot)
+	t.Setenv("TMP", tempRoot)
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", dataRoot)
+	t.Setenv("LOCALAPPDATA", filepath.Join(blocker, "local"))
+
+	_, err := writeMaterial(input{MaterialRoot: explicit}, "2026-01-01", "2026-01-02", map[string]any{})
+	if err == nil {
+		t.Fatalf("全部候选不可写时应返回错误")
+	}
+	message := err.Error()
+	if !strings.Contains(message, "会话素材写入失败") {
+		t.Fatalf("错误应说明素材写入失败: %v", err)
+	}
+	for _, want := range []string{explicit, filepath.Join(dataRoot, "material")} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("错误应逐个列出失败目录 %s: %v", want, err)
+		}
+	}
+}
+
+func TestMaterialRootsStripExtendedLengthPrefix(t *testing.T) {
+	// 宿主把工作区按 \\?\F:\... 传下来；带前缀的路径写出来会变成引擎不认的 file URI。
+	roots := materialRoots(input{MaterialRoot: `\\?\F:\ws\material`})
+	if len(roots) == 0 {
+		t.Fatalf("应至少给出一个候选目录")
+	}
+	if roots[0] != `F:\ws\material` {
+		t.Fatalf("应去掉扩展长度前缀: %#v", roots)
+	}
+	for _, root := range roots {
+		if strings.Contains(root, `?`) {
+			t.Fatalf("候选目录不应带扩展长度前缀: %#v", root)
+		}
+	}
+
+	workspace := t.TempDir()
+	artifact, err := writeMaterial(input{WorkspaceRoot: `\\?\` + workspace}, "2026-01-01", "2026-01-01", map[string]any{})
+	if err != nil {
+		t.Fatalf("写入失败: %v", err)
+	}
+	uri := artifact["uri"].(string)
+	if !strings.HasPrefix(uri, "file:///") || strings.Contains(uri, "?") {
+		t.Fatalf("artifact URI 必须是普通本地文件 URI: %s", uri)
 	}
 }
 
@@ -605,14 +766,14 @@ func TestScanVSCodeCopilot(t *testing.T) {
 		item := raw.(map[string]any)
 		byID[item["id"].(string)] = item
 	}
-	if byID["vscode-copilot"]["exists"] != true || byID["vscode-copilot"]["supported"] != true {
-		t.Fatalf("VS Code Copilot Chat 应被识别为可用: %#v", byID["vscode-copilot"])
+	if byID["vscode"]["exists"] != true || byID["vscode"]["supported"] != true {
+		t.Fatalf("VS Code GitHub Copilot 应被识别为可用: %#v", byID["vscode"])
 	}
-	if byID["vscode-copilot"]["files"].(float64) != 2 {
-		t.Fatalf("应统计到 2 个会话文件: %#v", byID["vscode-copilot"])
+	if byID["vscode"]["files"].(float64) != 2 {
+		t.Fatalf("应统计到 2 个会话文件: %#v", byID["vscode"])
 	}
 
-	out := call(t, "work-log.session.scan", `{"home":`+quote(home)+`,"date":"2026-10-09","limit":10,"source":"vscode-copilot"}`)
+	out := call(t, "work-log.session.scan", `{"home":`+quote(home)+`,"date":"2026-10-09","limit":10,"source":"vscode"}`)
 	if out["total"].(float64) != 2 {
 		t.Fatalf("应扫描到 2 个 VS Code 会话，实际 %v", out["total"])
 	}
@@ -625,8 +786,8 @@ func TestScanVSCodeCopilot(t *testing.T) {
 	if first == nil {
 		t.Fatalf("缺少 vs-1 会话: %#v", seen)
 	}
-	if first["source"] != "vscode-copilot" {
-		t.Fatalf("来源应标记为 vscode-copilot: %#v", first)
+	if first["source"] != "vscode" {
+		t.Fatalf("来源应标记为 vscode: %#v", first)
 	}
 	if first["project"] != "demo" {
 		t.Fatalf("应通过 workspace.json 解析出项目目录名 demo: %#v", first["project"])
@@ -746,8 +907,8 @@ func TestScanPrivacyExcludePath(t *testing.T) {
 		t.Fatalf("排除 codex 路径后应只剩 1 条，实际 %v", out["total"])
 	}
 	sessions := out["sessions"].([]any)
-	if sessions[0].(map[string]any)["source"] != "claude" {
-		t.Fatalf("保留的应是 claude 会话: %#v", sessions[0])
+	if sessions[0].(map[string]any)["source"] != "claude-code" {
+		t.Fatalf("保留的应是 claude-code 会话: %#v", sessions[0])
 	}
 }
 
@@ -759,8 +920,8 @@ func TestScanPrivacyExcludeKeyword(t *testing.T) {
 		t.Fatalf("排除关键词后应只剩 1 条，实际 %v", out["total"])
 	}
 	sessions := out["sessions"].([]any)
-	if sessions[0].(map[string]any)["source"] != "claude" {
-		t.Fatalf("保留的应是 claude 会话: %#v", sessions[0])
+	if sessions[0].(map[string]any)["source"] != "claude-code" {
+		t.Fatalf("保留的应是 claude-code 会话: %#v", sessions[0])
 	}
 }
 
@@ -967,5 +1128,282 @@ func TestScanCopilotCrossDaySession(t *testing.T) {
 	}
 	if len(digests[0].AssistantExcerpts) != 1 || !strings.Contains(digests[0].AssistantExcerpts[0], "第二天产出") {
 		t.Fatalf("应只取当天助手摘要，实际 %#v", digests[0].AssistantExcerpts)
+	}
+}
+
+// writeClaudeDesktopTranscript 写一份 Claude Code 格式的 JSONL 转写。
+func writeClaudeDesktopTranscript(t *testing.T, path string, lines []string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := strings.Join(lines, "\n")
+	if content != "" {
+		content += "\n"
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// claudeDesktopUserLine / claudeDesktopAssistantLine 生成一份转写记录。
+func claudeDesktopUserLine(when time.Time, origin, text string) string {
+	record := map[string]any{
+		"type": "user", "timestamp": when.Format(time.RFC3339Nano),
+		"origin":  map[string]any{"kind": origin},
+		"message": map[string]any{"role": "user", "content": text},
+	}
+	encoded, _ := json.Marshal(record)
+	return string(encoded)
+}
+
+func claudeDesktopAssistantLine(when time.Time, text string, tokensIn, tokensOut int) string {
+	record := map[string]any{
+		"type": "assistant", "timestamp": when.Format(time.RFC3339Nano),
+		"message": map[string]any{
+			"role":    "assistant",
+			"content": []any{map[string]any{"type": "text", "text": text}},
+			"usage":   map[string]any{"input_tokens": tokensIn, "output_tokens": tokensOut},
+		},
+	}
+	encoded, _ := json.Marshal(record)
+	return string(encoded)
+}
+
+// writeClaudeDesktopMeta 写一份会话元数据（local_<uuid>.json）。
+func writeClaudeDesktopMeta(t *testing.T, path string, fields map[string]any) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body, err := json.Marshal(fields)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// writeClaudeDesktopFixture 构造一个 Claude Desktop profile：一个 Code 标签页会话
+// （元数据 + ~/.claude/projects 转写）与一个 local agent mode 会话（元数据 + 短目录转写）。
+func writeClaudeDesktopFixture(t *testing.T, home string) {
+	t.Helper()
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	root := filepath.Join(home, "AppData", "Local", "Claude-3p")
+	work := filepath.Join(home, "WebProjects", "demo")
+	if err := os.MkdirAll(work, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Date(2026, 10, 9, 10, 0, 0, 0, time.Local)
+
+	// Code 标签页：cwd 是真实仓库，转写落在 ~/.claude/projects/<编码>/<cliSessionId>.jsonl。
+	codeDir := filepath.Join(root, "claude-code-sessions", "acct", "org")
+	codeCLI := "aaaaaaaa-0000-4000-8000-000000000001"
+	writeClaudeDesktopMeta(t, filepath.Join(codeDir, "local_bbbbbbbb-0000-4000-8000-000000000001.json"), map[string]any{
+		"sessionId":      "local_bbbbbbbb-0000-4000-8000-000000000001",
+		"cliSessionId":   codeCLI,
+		"cwd":            work,
+		"originCwd":      work,
+		"title":          "实现登录功能",
+		"model":          "claude-sonnet-4",
+		"createdAt":      start.UnixMilli(),
+		"lastActivityAt": start.Add(30 * time.Minute).UnixMilli(),
+		"completedTurns": 2,
+	})
+	writeClaudeDesktopTranscript(t, filepath.Join(home, ".claude", "projects", encodeClaudeProjectDir(work), codeCLI+".jsonl"), []string{
+		claudeDesktopUserLine(start, "human", "实现登录功能"),
+		claudeDesktopAssistantLine(start.Add(time.Minute), "已完成登录功能并补充测试", 120, 45),
+		// 工具结果不是真人输入，必须被过滤掉。
+		claudeDesktopUserLine(start.Add(2*time.Minute), "tool", "tool result payload"),
+	})
+
+	// local agent mode：用户挂载真实文件夹，cwd 是 VM 沙箱；转写落在会话短目录下。
+	agentDir := filepath.Join(root, "local-agent-mode-sessions", "acct", "org")
+	agentCLI := "cccccccc-0000-4000-8000-000000000002"
+	agentSession := "local_ab12cd34-0000-4000-8000-000000000002"
+	writeClaudeDesktopMeta(t, filepath.Join(agentDir, agentSession+".json"), map[string]any{
+		"sessionId":           agentSession,
+		"cliSessionId":        agentCLI,
+		"cwd":                 filepath.Join(agentDir, "ab12cd34", "outputs"),
+		"userSelectedFolders": []string{work},
+		"title":               "修复打包脚本",
+		"initialMessage":      "修复打包脚本",
+		"createdAt":           start.Add(time.Hour).UnixMilli(),
+		"lastActivityAt":      start.Add(90 * time.Minute).UnixMilli(),
+	})
+	writeClaudeDesktopTranscript(t, filepath.Join(agentDir, "ab12cd34", ".claude", "projects", "session", agentCLI+".jsonl"), []string{
+		claudeDesktopUserLine(start.Add(time.Hour), "human", "修复打包脚本"),
+		claudeDesktopAssistantLine(start.Add(70*time.Minute), "已修正版本号变量", 60, 20),
+	})
+}
+
+// TestScanClaudeDesktopSources 验证来源探测能发现 Claude Desktop profile 并统计会话数。
+func TestScanClaudeDesktopSources(t *testing.T) {
+	home := t.TempDir()
+	writeClaudeDesktopFixture(t, home)
+	out := call(t, "work-log.session.sources", `{"home":`+quote(home)+`}`)
+	byID := map[string]map[string]any{}
+	for _, raw := range out["sources"].([]any) {
+		item := raw.(map[string]any)
+		byID[item["id"].(string)] = item
+	}
+	source := byID["claude-desktop"]
+	if source == nil {
+		t.Fatalf("来源列表应包含 claude-desktop: %#v", byID)
+	}
+	if source["exists"] != true || source["supported"] != true {
+		t.Fatalf("Claude Desktop 应被识别为可用: %#v", source)
+	}
+	if source["files"].(float64) != 2 {
+		t.Fatalf("应统计到 2 个会话元数据文件: %#v", source["files"])
+	}
+}
+
+// TestScanClaudeDesktop 验证 Code 标签页与 local agent mode 会话都能被采集，正文与 token 正确。
+func TestScanClaudeDesktop(t *testing.T) {
+	home := t.TempDir()
+	writeClaudeDesktopFixture(t, home)
+	out := call(t, "work-log.session.scan", `{"home":`+quote(home)+`,"date":"2026-10-09","limit":10,"source":"claude-desktop"}`)
+	if out["total"].(float64) != 2 {
+		t.Fatalf("应扫描到 2 个 Claude Desktop 会话，实际 %v（skipped=%v）", out["total"], out["skipped"])
+	}
+	sessions := map[string]map[string]any{}
+	for _, raw := range out["sessions"].([]any) {
+		item := raw.(map[string]any)
+		sessions[item["session_id"].(string)] = item
+	}
+	code := sessions["local_bbbbbbbb-0000-4000-8000-000000000001"]
+	if code == nil {
+		t.Fatalf("缺少 Code 标签页会话: %#v", sessions)
+	}
+	if code["source"] != "claude-desktop" || code["title"] != "实现登录功能" {
+		t.Fatalf("Code 会话字段异常: %#v", code)
+	}
+	if code["project"] != "demo" || code["date"] != "2026-10-09" {
+		t.Fatalf("Code 会话项目/日期异常: %#v", code)
+	}
+	if code["tokens_input"].(float64) != 120 || code["tokens_output"].(float64) != 45 {
+		t.Fatalf("Code 会话 token 统计异常: %#v", code)
+	}
+	prompts := code["user_prompts"].([]any)
+	if len(prompts) != 1 || prompts[0] != "实现登录功能" {
+		t.Fatalf("应过滤工具结果、只取真人输入: %#v", prompts)
+	}
+	excerpts := code["assistant_excerpts"].([]any)
+	if len(excerpts) != 1 || !strings.Contains(excerpts[0].(string), "已完成登录功能") {
+		t.Fatalf("助手摘要异常: %#v", excerpts)
+	}
+
+	agent := sessions["local_ab12cd34-0000-4000-8000-000000000002"]
+	if agent == nil {
+		t.Fatalf("缺少 local agent mode 会话: %#v", sessions)
+	}
+	if agent["title"] != "修复打包脚本" || agent["project"] != "demo" {
+		t.Fatalf("agent 会话字段异常: %#v", agent)
+	}
+	if agentPrompts := agent["user_prompts"].([]any); len(agentPrompts) != 1 || agentPrompts[0] != "修复打包脚本" {
+		t.Fatalf("agent 会话用户提示异常: %#v", agent["user_prompts"])
+	}
+}
+
+// TestScanClaudeDesktopFallsBackToMetadata 验证转写缺失时用元数据兜底，仍能产出素材。
+func TestScanClaudeDesktopFallsBackToMetadata(t *testing.T) {
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	home := t.TempDir()
+	root := filepath.Join(home, "AppData", "Local", "Claude-3p")
+	agentDir := filepath.Join(root, "local-agent-mode-sessions", "acct", "org")
+	start := time.Date(2026, 10, 9, 9, 0, 0, 0, time.Local)
+	writeClaudeDesktopMeta(t, filepath.Join(agentDir, "local_deadbeef-0000-4000-8000-000000000003.json"), map[string]any{
+		"sessionId":           "local_deadbeef-0000-4000-8000-000000000003",
+		"cliSessionId":        "dddddddd-0000-4000-8000-000000000003",
+		"cwd":                 filepath.Join(agentDir, "deadbeef", "outputs"),
+		"userSelectedFolders": []string{filepath.Join(home, "WebProjects", "demo")},
+		"title":               "整理需求文档",
+		"initialMessage":      "把需求整理成文档",
+		"createdAt":           start.UnixMilli(),
+		"lastActivityAt":      start.Add(20 * time.Minute).UnixMilli(),
+	})
+
+	out := call(t, "work-log.session.scan", `{"home":`+quote(home)+`,"date":"2026-10-09","limit":10,"source":"claude-desktop"}`)
+	if out["total"].(float64) != 1 {
+		t.Fatalf("转写缺失时应按元数据兜底产出 1 条，实际 %v（skipped=%v）", out["total"], out["skipped"])
+	}
+	item := out["sessions"].([]any)[0].(map[string]any)
+	if item["title"] != "整理需求文档" {
+		t.Fatalf("应使用元数据标题: %#v", item["title"])
+	}
+	prompts := item["user_prompts"].([]any)
+	if len(prompts) != 1 || prompts[0] != "把需求整理成文档" {
+		t.Fatalf("应回退到 initialMessage: %#v", prompts)
+	}
+}
+
+// TestScanClaudeDesktopCrossDaySession 回归：桌面端长会话在创建日之外的活跃日也能采集，
+// 且只取当天的对话。
+func TestScanClaudeDesktopCrossDaySession(t *testing.T) {
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	home := t.TempDir()
+	root := filepath.Join(home, "AppData", "Local", "Claude-3p")
+	work := filepath.Join(home, "WebProjects", "demo")
+	codeDir := filepath.Join(root, "claude-code-sessions", "acct", "org")
+	cli := "eeeeeeee-0000-4000-8000-000000000004"
+	day1 := time.Date(2026, 9, 22, 10, 0, 0, 0, time.Local)
+	day2 := time.Date(2026, 9, 24, 10, 0, 0, 0, time.Local)
+	writeClaudeDesktopMeta(t, filepath.Join(codeDir, "local_ffffffff-0000-4000-8000-000000000004.json"), map[string]any{
+		"sessionId":      "local_ffffffff-0000-4000-8000-000000000004",
+		"cliSessionId":   cli,
+		"cwd":            work,
+		"originCwd":      work,
+		"title":          "跨日长会话",
+		"createdAt":      day1.UnixMilli(),
+		"lastActivityAt": day2.Add(time.Minute).UnixMilli(),
+		"completedTurns": 2,
+	})
+	writeClaudeDesktopTranscript(t, filepath.Join(home, ".claude", "projects", encodeClaudeProjectDir(work), cli+".jsonl"), []string{
+		claudeDesktopUserLine(day1, "human", "第一天需求"),
+		claudeDesktopUserLine(day2, "human", "第二天需求"),
+		claudeDesktopAssistantLine(day2.Add(time.Minute), "第二天产出", 10, 5),
+	})
+
+	digests, err := scanClaudeDesktop([]string{root}, home, day2, day2.AddDate(0, 0, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(digests) != 1 {
+		t.Fatalf("跨日桌面端会话在活跃日应被采集，实际 %d 条: %#v", len(digests), digests)
+	}
+	if digests[0].Date != "2026-09-24" {
+		t.Fatalf("归日应为活跃日 2026-09-24，实际 %q", digests[0].Date)
+	}
+	if len(digests[0].UserPrompts) != 1 || digests[0].UserPrompts[0] != "第二天需求" {
+		t.Fatalf("应只取当天用户提示，实际 %#v", digests[0].UserPrompts)
+	}
+	if len(digests[0].AssistantExcerpts) != 1 || !strings.Contains(digests[0].AssistantExcerpts[0], "第二天产出") {
+		t.Fatalf("应只取当天助手摘要，实际 %#v", digests[0].AssistantExcerpts)
+	}
+}
+
+// TestEncodeClaudeProjectDir 验证工作目录编码与 Claude Code 的目录名规则一致。
+func TestEncodeClaudeProjectDir(t *testing.T) {
+	cases := map[string]string{
+		`F:\WebProjects\demo`:      "F--WebProjects-demo",
+		`c:\Users\me\source-repos`: "c--Users-me-source-repos",
+		`/home/me/proj`:            "-home-me-proj",
+	}
+	for in, want := range cases {
+		if got := encodeClaudeProjectDir(in); got != want {
+			t.Fatalf("encodeClaudeProjectDir(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// TestClaudeDesktopShortID 验证 local agent mode 的会话短目录取自 sessionId 前缀。
+func TestClaudeDesktopShortID(t *testing.T) {
+	if got := claudeDesktopShortID("local_c58e56b0-45c5-4dde-9555-3b7e40e98b02"); got != "c58e56b0" {
+		t.Fatalf("短目录应为 c58e56b0，实际 %q", got)
+	}
+	if got := claudeDesktopShortID("local_withoutdash"); got != "" {
+		t.Fatalf("无短横线时应返回空，实际 %q", got)
 	}
 }

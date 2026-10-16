@@ -4,6 +4,8 @@
 // 采集器不写工作日志库：写入日志由 com.himind.work-log 插件统一负责，保证日志库只有
 // 一个写入者。它至多把会话素材落一份临时 artifact（扩展私有数据目录），交给工作流的
 // AI 总结步骤读取。SQLite 会话库（OpenCode/Copilot）由内置的纯 Go 驱动读取，无外部依赖。
+// 原生来源包括 Codex、Claude Code、Claude Desktop、OpenCode、Copilot 与 VS Code
+// Copilot Chat；其余客户端走声明式通用来源（见 generic.go）。
 package main
 
 import (
@@ -61,6 +63,9 @@ type input struct {
 	// MaterialRoot 是会话素材文件的写入目录；缺省落到扩展私有数据目录。素材只供工作流
 	// 的 AI 总结步骤读取，绝不写入工作日志库。
 	MaterialRoot string `json:"material_root"`
+	// WorkspaceRoot 是本次运行的工作区（工作流引擎注入 input.workspace_root）。插件宿主
+	// 可能以受限令牌运行，只放行工作区与临时目录；此时素材改落到 <工作区>/.himind/material。
+	WorkspaceRoot string `json:"workspace_root"`
 	// LookbackDays 是「未显式指定 date/from/to」时默认回看的自然日数：1=仅今天（默认），
 	// 2=昨天+今天。配合写入侧按「来源+会话+日期」的稳定指纹幂等合并，可把前一天较晚开始、
 	// 当天定时运行时还没发生的工作在次日补回。
@@ -103,10 +108,15 @@ type sourceSpec struct {
 func allSpecs() []sourceSpec {
 	return []sourceSpec{
 		{ID: "codex", Label: "Codex", Kind: "jsonl", DefaultRel: ".codex"},
-		{ID: "claude", Label: "Claude Code", Kind: "jsonl", DefaultRel: ".claude/projects"},
+		{ID: "claude-code", Label: "Claude Code", Kind: "jsonl", DefaultRel: ".claude/projects"},
+		{ID: "claude-desktop", Label: "Claude Desktop", Kind: "claude-desktop", DefaultRels: []string{
+			"AppData/Local/Claude-3p",
+			"AppData/Local/Claude",
+			"AppData/Roaming/Claude",
+		}},
 		{ID: "opencode", Label: "OpenCode", Kind: "sqlite", DefaultRel: ".local/share/opencode/opencode.db"},
-		{ID: "copilot", Label: "GitHub Copilot", Kind: "sqlite", DefaultRel: ".copilot/session-store.db"},
-		{ID: "vscode-copilot", Label: "VS Code Copilot Chat", Kind: "vscode-chat", DefaultRels: []string{
+		{ID: "github-copilot", Label: "GitHub Copilot", Kind: "sqlite", DefaultRel: ".copilot/session-store.db"},
+		{ID: "vscode", Label: "VS Code GitHub Copilot", Kind: "vscode-chat", DefaultRels: []string{
 			"AppData/Roaming/Code/User/workspaceStorage",
 			"AppData/Roaming/Code - Insiders/User/workspaceStorage",
 		}},
@@ -126,6 +136,7 @@ type sourceStatus struct {
 	Note         string `json:"note,omitempty"`
 }
 
+// resolveHome 解析用户主目录。
 func resolveHome(in input) (string, error) {
 	if h := strings.TrimSpace(in.Home); h != "" {
 		return h, nil
@@ -137,11 +148,43 @@ func resolveHome(in input) (string, error) {
 	return home, nil
 }
 
-// sourcePaths 解析来源的存储根：显式 roots 覆盖优先；否则用 DefaultRels（多根）或 DefaultRel（单根）。
+// legacySourceAliases 历史来源 ID → 标准客户端 ID（与 Agent 的客户端命名对齐）。
+// 旧配置、旧工作流入参与旧日志里可能还写着这些旧名。
+var legacySourceAliases = map[string]string{
+	"claude":         "claude-code",
+	"copilot":        "github-copilot",
+	"vscode-copilot": "vscode",
+}
+
+// normalizeSourceID 把来源 ID 归一到标准客户端 ID，供 source 过滤参数使用。
+func normalizeSourceID(id string) string {
+	trimmed := strings.ToLower(strings.TrimSpace(id))
+	if canonical, ok := legacySourceAliases[trimmed]; ok {
+		return canonical
+	}
+	return trimmed
+}
+
+// legacySourceKey 返回标准客户端 ID 对应的历史来源 ID（供 roots 覆盖键回退）。
+func legacySourceKey(canonical string) string {
+	for legacy, target := range legacySourceAliases {
+		if target == canonical {
+			return legacy
+		}
+	}
+	return ""
+}
+
+// sourcePaths 解析来源的存储根：显式 roots 覆盖优先（含历史别名键）；否则用 DefaultRels（多根）或 DefaultRel（单根）。
 func sourcePaths(spec sourceSpec, home string, roots map[string]string) []string {
 	if roots != nil {
 		if v := strings.TrimSpace(roots[spec.ID]); v != "" {
 			return []string{v}
+		}
+		if legacy := legacySourceKey(spec.ID); legacy != "" {
+			if v := strings.TrimSpace(roots[legacy]); v != "" {
+				return []string{v}
+			}
 		}
 	}
 	if len(spec.DefaultRels) > 0 {
@@ -182,8 +225,11 @@ func sourcesCap(in input) (any, error) {
 			status.Note = "未发现会话存储"
 		default:
 			status.Supported = true
-			if spec.Kind == "vscode-chat" {
+			switch spec.Kind {
+			case "vscode-chat":
 				status.Files = countVSCodeChatSessions(existing)
+			case "claude-desktop":
+				status.Files = countClaudeDesktopSessions(existing)
 			}
 		}
 		statuses = append(statuses, status)
@@ -289,6 +335,7 @@ func scanCap(in input) (any, error) {
 	if selected == "" {
 		selected = "all"
 	}
+	selected = normalizeSourceID(selected)
 
 	// 通用可配置来源（内置预设 + 配置文件 + 内联规格）。
 	genericSpecs, configPath, err := loadGenericSources(in, home)
@@ -403,13 +450,15 @@ func scanSources(in input, home, selected string, genericSpecs []genericSource, 
 		switch spec.ID {
 		case "codex":
 			found, scanErr = scanCodex(existing[0], start, end)
-		case "claude":
-			found, scanErr = scanClaude(existing[0], start, end)
-		case "vscode-copilot":
+		case "claude-code":
+			found, scanErr = scanClaudeCode(existing[0], start, end)
+		case "claude-desktop":
+			found, scanErr = scanClaudeDesktop(existing, home, start, end)
+		case "vscode":
 			found, scanErr = scanVSCodeCopilot(existing, start, end)
 		case "opencode":
 			found, scanErr = scanOpenCode(existing[0], start, end)
-		case "copilot":
+		case "github-copilot":
 			found, scanErr = scanCopilot(existing[0], start, end)
 		}
 		if scanErr != nil {
@@ -444,50 +493,111 @@ func scanSources(in input, home, selected string, genericSpecs []genericSource, 
 
 // writeMaterial 把会话素材写成一份符合 session-digest schema 的 JSON 文件，并返回
 // 供工作流引用的 artifact 描述（含 file:// URI 与 sha256）。
+//
+// 逐个候选目录真实写入，第一个成功者生效：插件宿主可能以受限令牌运行（沙箱只放行
+// 工作区与临时目录），固定目录未必可写；一次写入失败就整条工作流失败代价太大。
+// 全部候选都失败时把每个候选的真实系统错误带出来，避免只回一句「写入失败」。
 func writeMaterial(in input, from, to string, content map[string]any) (map[string]any, error) {
-	root, err := materialRoot(in)
-	if err != nil {
-		return nil, err
-	}
-	if err := os.MkdirAll(root, 0o755); err != nil {
-		return nil, errors.New("会话素材目录创建失败")
-	}
 	payload, err := json.MarshalIndent(content, "", "  ")
 	if err != nil {
 		return nil, errors.New("会话素材序列化失败")
 	}
-	path := filepath.Join(root, fmt.Sprintf("session-digest-%s_%s.json", from, to))
-	if err := os.WriteFile(path, payload, 0o644); err != nil {
-		return nil, errors.New("会话素材写入失败")
+	roots := materialRoots(in)
+	if len(roots) == 0 {
+		return nil, errors.New("会话素材写入失败：没有可用的素材目录")
 	}
-	sum := sha256.Sum256(payload)
-	return map[string]any{
-		"artifact_id":   "session-digest",
-		"artifact_type": "session_digest",
-		"name":          "会话素材 " + from + " ~ " + to,
-		"uri":           "file:///" + strings.ReplaceAll(path, "\\", "/"),
-		"sha256":        hex.EncodeToString(sum[:]),
-	}, nil
+	name := fmt.Sprintf("session-digest-%s_%s.json", from, to)
+	failures := make([]string, 0, len(roots))
+	for _, root := range roots {
+		if err := os.MkdirAll(root, 0o755); err != nil {
+			failures = append(failures, fmt.Sprintf("%s：目录创建失败（%v）", root, err))
+			continue
+		}
+		path := filepath.Join(root, name)
+		if err := os.WriteFile(path, payload, 0o644); err != nil {
+			failures = append(failures, fmt.Sprintf("%s：写入失败（%v）", path, err))
+			continue
+		}
+		sum := sha256.Sum256(payload)
+		return map[string]any{
+			"artifact_id":   "session-digest",
+			"artifact_type": "session_digest",
+			"name":          "会话素材 " + from + " ~ " + to,
+			"uri":           "file:///" + strings.ReplaceAll(normalizeLocalPath(path), "\\", "/"),
+			"sha256":        hex.EncodeToString(sum[:]),
+		}, nil
+	}
+	return nil, fmt.Errorf("会话素材写入失败：%s", strings.Join(failures, "；"))
 }
 
-// materialRoot 解析会话素材目录：显式入参 > 扩展私有数据目录 > 系统临时目录。
-func materialRoot(in input) (string, error) {
-	if value := strings.TrimSpace(in.MaterialRoot); value != "" {
-		abs, err := filepath.Abs(value)
+// materialRoots 按优先级列出会话素材目录候选：
+//  1. 显式 material_root（工作流或调试指定）
+//  2. 扩展私有数据目录（HIMIND_PLUGIN_DATA_ROOT，缺省 <LOCALAPPDATA>/HiMindAgent/extension-data/<id>）
+//  3. <workspace_root>/.himind/material（引擎注入的运行工作区）
+//  4. <HIMIND_AI_WORKSPACE>/.himind/material
+//  5. <进程当前目录>/.himind/material
+//  6. <系统临时目录>/HiMindAgent/<id>/material
+//
+// 前两项是历史行为，未受权限限制时素材仍落在扩展私有目录，行为不变。
+func materialRoots(in input) []string {
+	roots := make([]string, 0, 6)
+	add := func(path string) {
+		path = normalizeLocalPath(path)
+		if path == "" {
+			return
+		}
+		abs, err := filepath.Abs(path)
 		if err != nil {
-			return "", errors.New("material_root 无效")
+			return
 		}
-		return abs, nil
-	}
-	base := strings.TrimSpace(os.Getenv("HIMIND_PLUGIN_DATA_ROOT"))
-	if base == "" {
-		if local := strings.TrimSpace(os.Getenv("LOCALAPPDATA")); local != "" {
-			base = filepath.Join(local, "HiMindAgent", "extension-data", "com.himind.work-log-collector")
-		} else {
-			base = filepath.Join(os.TempDir(), "HiMindAgent", "extension-data", "com.himind.work-log-collector")
+		abs = normalizeLocalPath(abs)
+		for _, existing := range roots {
+			if strings.EqualFold(existing, abs) {
+				return
+			}
 		}
+		roots = append(roots, abs)
 	}
-	return filepath.Join(base, "material"), nil
+	// 只有绝对路径才算真实工作区：宿主没有解析 input.workspace_root 时传下来的是字面量，
+	// 不能按相对目录落到进程当前目录里。
+	addWorkspace := func(value string) {
+		value = strings.TrimSpace(value)
+		if value == "" || !filepath.IsAbs(value) {
+			return
+		}
+		add(filepath.Join(value, ".himind", "material"))
+	}
+
+	add(in.MaterialRoot)
+	if base := strings.TrimSpace(os.Getenv("HIMIND_PLUGIN_DATA_ROOT")); base != "" {
+		add(filepath.Join(base, "material"))
+	} else if local := strings.TrimSpace(os.Getenv("LOCALAPPDATA")); local != "" {
+		add(filepath.Join(local, "HiMindAgent", "extension-data", "com.himind.work-log-collector", "material"))
+	}
+	addWorkspace(in.WorkspaceRoot)
+	addWorkspace(os.Getenv("HIMIND_AI_WORKSPACE"))
+	if cwd, err := os.Getwd(); err == nil {
+		addWorkspace(cwd)
+	}
+	add(filepath.Join(os.TempDir(), "HiMindAgent", "com.himind.work-log-collector", "material"))
+	return roots
+}
+
+// normalizeLocalPath 去掉宿主传入的 Win32 扩展长度前缀（\\?\、\??\、\\?\UNC\）：
+// 宿主把工作区按 \\?\F:\... 形式传给插件，而工作流引擎要求素材 artifact 的 file URI
+// 是普通本地路径，带前缀会被判成「不是本地文件 URI」而让整步失败。
+func normalizeLocalPath(path string) string {
+	trimmed := strings.TrimSpace(path)
+	switch {
+	case strings.HasPrefix(trimmed, `\\?\UNC\`):
+		return `\\` + trimmed[len(`\\?\UNC\`):]
+	case strings.HasPrefix(trimmed, `\\?\`):
+		return trimmed[len(`\\?\`):]
+	case strings.HasPrefix(trimmed, `\??\`):
+		return trimmed[len(`\??\`):]
+	default:
+		return trimmed
+	}
 }
 
 // ---- 工时与功能推断 ----
@@ -1111,7 +1221,7 @@ func activityRange(times []time.Time, fallbackStart, fallbackEnd time.Time) (tim
 
 // ---- Claude Code 索引 ----
 
-type claudeIndex struct {
+type claudeCodeIndex struct {
 	Entries []struct {
 		SessionID    string `json:"sessionId"`
 		FullPath     string `json:"fullPath"`
@@ -1123,7 +1233,7 @@ type claudeIndex struct {
 	} `json:"entries"`
 }
 
-func scanClaude(root string, start, end time.Time) ([]sessionDigest, error) {
+func scanClaudeCode(root string, start, end time.Time) ([]sessionDigest, error) {
 	var digests []sessionDigest
 	walkErr := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -1139,7 +1249,7 @@ func scanClaude(root string, start, end time.Time) ([]sessionDigest, error) {
 		if err != nil {
 			return nil
 		}
-		var index claudeIndex
+		var index claudeCodeIndex
 		if json.Unmarshal(data, &index) != nil {
 			return nil
 		}
@@ -1158,7 +1268,7 @@ func scanClaude(root string, start, end time.Time) ([]sessionDigest, error) {
 				started = modified
 			}
 			digest := sessionDigest{
-				Source:      "claude",
+				Source:      "claude-code",
 				SessionID:   item.SessionID,
 				Project:     filepath.Base(filepath.Clean(item.ProjectPath)),
 				Directory:   item.ProjectPath,
@@ -1317,7 +1427,7 @@ func scanCopilot(db string, start, end time.Time) ([]sessionDigest, error) {
 		// 会话可能创建于更早、但当天仍在活跃：归日取窗口内的轮次时间。
 		started, ended := activityRange(turnTimes[id], created, updated)
 		digest := sessionDigest{
-			Source:            "copilot",
+			Source:            "github-copilot",
 			SessionID:         id,
 			Project:           firstNonEmpty(asString(row, "repository"), filepath.Base(asString(row, "cwd"))),
 			Directory:         asString(row, "cwd"),
@@ -1481,7 +1591,7 @@ func parseVSCodeChatFile(file, dir string, start, end time.Time) (sessionDigest,
 		return sessionDigest{}, false
 	}
 
-	digest := sessionDigest{Source: "vscode-copilot", SessionID: header.SessionID, Directory: dir, Ref: file}
+	digest := sessionDigest{Source: "vscode", SessionID: header.SessionID, Directory: dir, Ref: file}
 	if dir != "" {
 		digest.Project = filepath.Base(dir)
 	}
@@ -1839,9 +1949,9 @@ func dirExists(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-// sourceExists 按来源类型判断存储是否存在：目录型（JSONL / VS Code 会话）是目录，SQLite 源是文件。
+// sourceExists 按来源类型判断存储是否存在：目录型（JSONL / VS Code / Claude Desktop 会话）是目录，SQLite 源是文件。
 func sourceExists(spec sourceSpec, path string) bool {
-	if spec.Kind == "jsonl" || spec.Kind == "vscode-chat" {
+	if spec.Kind == "jsonl" || spec.Kind == "vscode-chat" || spec.Kind == "claude-desktop" {
 		return dirExists(path)
 	}
 	return fileExists(path)

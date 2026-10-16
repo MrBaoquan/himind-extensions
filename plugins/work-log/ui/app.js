@@ -108,6 +108,30 @@
     manual: '人工',
   };
 
+  // SOURCE_LABELS 把条目来源（AI 客户端 ID）翻译成显示名，与 Go 侧 sourceClientLabel 对齐。
+  const SOURCE_LABELS = {
+    codex: 'Codex',
+    claude: 'Claude Code',
+    'claude-code': 'Claude Code',
+    'claude-desktop': 'Claude Desktop',
+    opencode: 'OpenCode',
+    copilot: 'GitHub Copilot',
+    'github-copilot': 'GitHub Copilot',
+    'vscode-copilot': 'VS Code GitHub Copilot',
+    vscode: 'VS Code GitHub Copilot',
+    cursor: 'Cursor',
+    cline: 'Cline',
+    windsurf: 'Windsurf',
+    manual: '手工',
+    workbench: '看板',
+  };
+
+  function sourceLabel(source) {
+    const id = text(source);
+    if (!id) return '手工';
+    return SOURCE_LABELS[id] || id;
+  }
+
   // ---------- 通用工具 ----------
 
   function text(value, fallback) {
@@ -621,6 +645,9 @@
       head.push('<span class="mins">' + escapeHTML(hoursShort(item.minutes)) + 'h</span>');
     }
     head.push('<span class="cat">' + escapeHTML(catLabel(item.category)) + '</span>');
+    if (text(item.source) && text(item.source) !== 'manual') {
+      head.push('<span class="src" title="记录来源的 AI 客户端">' + escapeHTML(sourceLabel(item.source)) + '</span>');
+    }
     const span = formatSpan(item);
     if (span) head.push('<span class="time">' + escapeHTML(span) + '</span>');
     if (entryID) {
@@ -694,6 +721,9 @@
       const source = MINUTES_SOURCE_LABELS[item.minutes_source] || text(item.minutes_source, '工时');
       detail.push('<p class="entry-meta">工时 ' + escapeHTML(minutesLabel(item.minutes)) + ' · 来源 ' + escapeHTML(source) + '</p>');
     }
+    if (text(item.source)) {
+      detail.push('<p class="entry-meta">记录来源：' + escapeHTML(sourceLabel(item.source)) + (text(item.session_id) ? ' · 会话 ' + escapeHTML(text(item.session_id)) : '') + '</p>');
+    }
     head.push('<div class="entry-detail">' + detail.join('') + '</div>');
     head.push('</div>');
     return head.join('');
@@ -725,7 +755,7 @@
     const needle = text(query).toLowerCase();
     if (!needle) return entries || [];
     return (entries || []).filter((item) => {
-      const hay = [item.title, item.summary, item.feature, item.project, item.exhibit, catLabel(item.category)].concat(item.tags || []);
+      const hay = [item.title, item.summary, item.feature, item.project, item.exhibit, catLabel(item.category), sourceLabel(item.source)].concat(item.tags || []);
       return hay.some((value) => text(value).toLowerCase().indexOf(needle) >= 0);
     });
   }

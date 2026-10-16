@@ -438,6 +438,10 @@ func ephemeralProjectPath(p string) bool {
 		".copilot/chats/",
 		".copilot/workspaces/",
 		"documents/codex/",
+		// Claude Desktop 的会话目录：local agent mode 的 cwd 指向客户端沙箱，不是项目路径。
+		"appdata/local/claude-3p/",
+		"appdata/local/claude/",
+		"appdata/roaming/claude/",
 	}
 	for _, s := range scratch {
 		if strings.Contains(key, s) {
