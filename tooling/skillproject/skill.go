@@ -32,20 +32,23 @@ type PluginDependency struct {
 }
 
 type Manifest struct {
-	ID                 string                 `json:"id"`
-	Name               string                 `json:"name"`
-	Author             string                 `json:"author"`
-	Categories         []string               `json:"categories"`
-	Version            string                 `json:"version"`
-	Scope              string                 `json:"scope"`
-	Description        string                 `json:"description"`
-	ReleaseNotes       string                 `json:"release_notes"`
-	MinAgentVersion    string                 `json:"min_agent_version"`
-	SupportedClients   []string               `json:"supported_clients"`
-	Capabilities       []CapabilityDependency `json:"capabilities"`
-	PluginDependencies []PluginDependency     `json:"plugin_dependencies"`
-	RiskSummary        string                 `json:"risk_summary"`
-	Contents           []string               `json:"contents"`
+	ID               string   `json:"id"`
+	Name             string   `json:"name"`
+	Author           string   `json:"author"`
+	Categories       []string `json:"categories"`
+	Version          string   `json:"version"`
+	Scope            string   `json:"scope"`
+	Description      string   `json:"description"`
+	ReleaseNotes     string   `json:"release_notes"`
+	MinAgentVersion  string   `json:"min_agent_version"`
+	SupportedClients []string `json:"supported_clients"`
+	// 分发目标是硬约束（规范 §六），仓库检查要求每个扩展显式声明。
+	// 脚手架以前不写它，产出物直接过不了仓库检查。
+	DistributionTargets []string               `json:"distribution_targets"`
+	Capabilities        []CapabilityDependency `json:"capabilities"`
+	PluginDependencies  []PluginDependency     `json:"plugin_dependencies"`
+	RiskSummary         string                 `json:"risk_summary"`
+	Contents            []string               `json:"contents"`
 }
 
 type CreateConfig struct {
@@ -100,7 +103,7 @@ func Create(config CreateConfig) (string, error) {
 	} else if !os.IsNotExist(err) {
 		return "", err
 	}
-	manifest := Manifest{ID: config.ID, Name: config.Name, Author: strings.TrimSpace(config.Author), Categories: append([]string(nil), config.Categories...), Version: config.Version, Scope: "organization", Description: config.Description, ReleaseNotes: strings.TrimSpace(config.ReleaseNotes), MinAgentVersion: config.MinAgentVersion, SupportedClients: config.Clients, Capabilities: []CapabilityDependency{}, PluginDependencies: []PluginDependency{}, RiskSummary: "read_only", Contents: []string{"skill.json", "SKILL.md", "agents/openai.yaml"}}
+	manifest := Manifest{ID: config.ID, Name: config.Name, Author: strings.TrimSpace(config.Author), Categories: append([]string(nil), config.Categories...), Version: config.Version, Scope: "organization", Description: config.Description, ReleaseNotes: strings.TrimSpace(config.ReleaseNotes), MinAgentVersion: config.MinAgentVersion, SupportedClients: config.Clients, DistributionTargets: []string{"workbench", "github"}, Capabilities: []CapabilityDependency{}, PluginDependencies: []PluginDependency{}, RiskSummary: "read_only", Contents: []string{"skill.json", "SKILL.md", "agents/openai.yaml"}}
 	if err := validateManifest(manifest); err != nil {
 		return "", err
 	}
@@ -151,6 +154,10 @@ func Validate(path string) error {
 		return err
 	}
 	if err := validateSkillDocument(files); err != nil {
+		return err
+	}
+	// 正文引用的能力必须都已声明 —— 见 references.go 里的说明。
+	if err := validateCapabilityReferences(manifest, files); err != nil {
 		return err
 	}
 	return validateChecksums(files)
@@ -222,6 +229,11 @@ func readDirectory(root string) (Manifest, map[string][]byte, error) {
 	if err := validateSkillDocument(files); err != nil {
 		return Manifest{}, nil, err
 	}
+	// 目录形态也要查引用一致性：Validate(dir) 走的就是这条路径，
+	// 只在归档分支加检查会让「工程目录通过、打包后才报错」。
+	if err := validateCapabilityReferences(manifest, files); err != nil {
+		return Manifest{}, nil, err
+	}
 	return manifest, files, nil
 }
 
@@ -278,6 +290,13 @@ func validateManifest(manifest Manifest) error {
 		return err
 	}
 	if err := metaguide.Check(metaguide.DisplayName, manifest.Name); err != nil {
+		return err
+	}
+	// 显示名禁用词（规范 §二4 / §三4）。长度校验拦不住它 ——「智能」只有两个字。
+	if hits := metaguide.BannedIn(manifest.Name); len(hits) > 0 {
+		return fmt.Errorf("skill name contains disallowed words: %s", strings.Join(hits, ", "))
+	}
+	if err := validateCapabilityShape(manifest); err != nil {
 		return err
 	}
 	if err := metaguide.Check(metaguide.Description, manifest.Description); err != nil {

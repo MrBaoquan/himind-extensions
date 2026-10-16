@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/MrBaoquan/himind-extensions/tooling/metaguide"
+	validator "github.com/MrBaoquan/himind-extensions/tools/cmd/himind-plugin-validate"
 )
 
 type Config struct {
@@ -29,21 +30,28 @@ type Result struct {
 }
 
 type Manifest struct {
-	ID           string        `json:"id"`
-	Name         string        `json:"name"`
-	Author       string        `json:"author"`
-	Categories   []string      `json:"categories"`
-	Description  string        `json:"description"`
-	ReleaseNotes string        `json:"release_notes"`
-	Version      string        `json:"version"`
-	Entry        string        `json:"entry"`
-	Runtime      string        `json:"runtime"`
-	Platforms    []string      `json:"platforms"`
-	MinAgent     string        `json:"min_agent_version"`
-	Governance   string        `json:"governance"`
-	Capabilities []Capability  `json:"capabilities"`
-	Permissions  []string      `json:"permissions"`
-	Contributes  Contributions `json:"contributes"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Author       string   `json:"author"`
+	Categories   []string `json:"categories"`
+	Description  string   `json:"description"`
+	ReleaseNotes string   `json:"release_notes"`
+	Version      string   `json:"version"`
+	Entry        string   `json:"entry"`
+	Runtime      string   `json:"runtime"`
+	Platforms    []string `json:"platforms"`
+	MinAgent     string   `json:"min_agent_version"`
+	Governance   string   `json:"governance"`
+	// 多段能力前缀必须显式声明（规范 §二8）。脚手架以前**完全不写这个字段**，
+	// 而它自己又会把 `media-toolkit` 派生成 `media.toolkit.run` —— 于是脚手架
+	// 亲手产出不合规的清单，使用者照抄就跟着违规。
+	CapabilityNamespace string `json:"capability_namespace,omitempty"`
+	// 分发目标是硬约束（规范 §六），只有 workbench / github 两个取值，
+	// 且仓库检查要求每个扩展显式声明。脚手架以前同样不写 —— 产出物直接过不了仓库检查。
+	DistributionTargets []string      `json:"distribution_targets"`
+	Capabilities        []Capability  `json:"capabilities"`
+	Permissions         []string      `json:"permissions"`
+	Contributes         Contributions `json:"contributes"`
 }
 
 type Capability struct {
@@ -126,6 +134,11 @@ func Create(config Config) (Result, error) {
 		return Result{}, err
 	}
 	manifest := buildManifest(name, displayName, config.Description, config.Author, config.Categories, config.ReleaseNotes, template)
+	for _, capability := range manifest.Capabilities {
+		if err := metaguide.CheckCapabilityIDShape(capability.ID); err != nil {
+			return Result{}, fmt.Errorf("generated capability ID %q is invalid: %w; use 1–4 lowercase words separated by '-'", capability.ID, err)
+		}
+	}
 	data, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return Result{}, err
@@ -152,12 +165,17 @@ func Create(config Config) (Result, error) {
 	if err := os.MkdirAll(filepath.Join(root, "bin"), 0755); err != nil {
 		return Result{}, err
 	}
+	// 产出后自校验：脚手架是模板的唯一来源，它一旦产出不合规的清单，
+	// 使用者照抄就跟着违规。宁可在这里失败，也不要交出一个装不上的工程。
+	if err := validator.ValidateDirectory(root); err != nil {
+		return Result{}, fmt.Errorf("scaffolded project failed validation: %w", err)
+	}
 	return Result{Root: root, PluginID: manifest.ID, Capability: manifest.Capabilities[0].ID}, nil
 }
 
 func buildManifest(name, displayName, description, author string, categories []string, releaseNotes, template string) Manifest {
 	id := "com.himind." + strings.ReplaceAll(name, "_", "-")
-	capabilityID := strings.ReplaceAll(name, "-", ".") + ".run"
+	capabilityID := strings.NewReplacer("-", ".", "_", ".").Replace(name) + ".run"
 	capability := Capability{ID: capabilityID, Description: "请用中文说明该插件能力的用途、输入和输出。", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"value": map[string]any{"type": "string"}}, "additionalProperties": false}, RiskLevel: "read_only", Availability: "local"}
 	if template == "job-worker" {
 		capability.Description = "请用中文说明该长任务能力的用途、进度和结果。"
@@ -167,9 +185,15 @@ func buildManifest(name, displayName, description, author string, categories []s
 	if template == "ui-tool" {
 		// 插件的视图落点只有 plugin_navigation 与 host_panel 两种，Agent 安装时
 		// 会按这两值校验。脚手架曾经写 "tools"，产出物在 Agent 侧直接装不上。
-		contributes.Views = []View{{ID: strings.ReplaceAll(name, "-", ".") + ".main", Title: displayName, Location: "plugin_navigation", Entry: "ui/index.html"}}
+		contributes.Views = []View{{ID: strings.NewReplacer("-", ".", "_", ".").Replace(name) + ".main", Title: displayName, Location: "plugin_navigation", Entry: "ui/index.html"}}
 	}
-	return Manifest{ID: id, Name: displayName, Author: strings.TrimSpace(author), Categories: append([]string(nil), categories...), Description: strings.TrimSpace(description), ReleaseNotes: strings.TrimSpace(releaseNotes), Version: "0.1.0", Entry: "bin/" + name + ".exe", Runtime: "process-jsonrpc-stdio", Platforms: []string{"windows-x64"}, MinAgent: "0.3.0", Governance: "optional", Capabilities: []Capability{capability}, Permissions: []string{}, Contributes: contributes}
+	// 名字里带连字符时能力 ID 会变成多段前缀（media-toolkit → media.toolkit.run），
+	// 这种前缀必须显式声明命名空间，否则内核注册时可能与别的插件撞名而静默失效。
+	namespace := metaguide.SuggestedNamespace(id, []string{capabilityID})
+	// 分发目标按仓库默认（extensions.json 的 default_distribution_targets）写入：
+	// 声明是上限，Agent 侧只能在范围内收窄，不能扩权 —— 所以默认给全两个比漏写更好。
+	targets := []string{"workbench", "github"}
+	return Manifest{ID: id, Name: displayName, Author: strings.TrimSpace(author), Categories: append([]string(nil), categories...), Description: strings.TrimSpace(description), ReleaseNotes: strings.TrimSpace(releaseNotes), Version: "0.1.0", Entry: "bin/" + name + ".exe", Runtime: "process-jsonrpc-stdio", Platforms: []string{"windows-x64"}, MinAgent: "0.3.0", Governance: "optional", CapabilityNamespace: namespace, DistributionTargets: targets, Capabilities: []Capability{capability}, Permissions: []string{}, Contributes: contributes}
 }
 
 func uiTemplate(displayName string) string {

@@ -82,3 +82,54 @@ func TestValidateRejectsArchiveTraversal(t *testing.T) {
 		t.Fatal("expected traversal path to fail validation")
 	}
 }
+
+// 正文引用了但清单没声明的能力 —— 实测踩过：我自己的技能引用了
+// iostudio.motion.validate 却漏声明，校验/打包/候选测试全绿。
+func TestValidateRejectsUndeclaredCapabilityReference(t *testing.T) {
+	files := map[string][]byte{
+		"skill.json": []byte(`{
+			"id":"com.himind.skill.demo","name":"示例助手","author":"测试用户",
+			"categories":["software-engineering"],"version":"1.0.0","scope":"organization",
+			"description":"示例。","release_notes":"首次。","min_agent_version":"0.3.47",
+			"distribution_targets":["workbench"],
+			"supported_clients":["agent-skills"],
+			"capabilities":[{"id":"media.toolkit.probe","provider":"com.himind.media-toolkit"}],
+			"plugin_dependencies":[{"plugin_id":"com.himind.media-toolkit","required":true,"min_version":"1.0.0"}],
+			"contents":["skill.json","SKILL.md"]
+		}`),
+		"SKILL.md": []byte("# 示例助手\n\n先跑 `media.toolkit.probe`，再用 `media.toolkit.scene.score` 看图。\n"),
+	}
+	manifest, err := parseManifest(files["skill.json"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := validateCapabilityReferences(manifest, files); err == nil {
+		t.Fatal("引用了未声明的 media.toolkit.scene.score 应被拒绝")
+	}
+	// 声明之后应当通过
+	manifest.Capabilities = append(manifest.Capabilities, CapabilityDependency{
+		ID: "media.toolkit.scene.score", Provider: "com.himind.media-toolkit"})
+	if err := validateCapabilityReferences(manifest, files); err != nil {
+		t.Fatalf("补齐声明后应通过: %v", err)
+	}
+}
+
+// 能力 ID 形态与 provider：技能侧此前完全没有对应检查。
+func TestValidateCapabilityShape(t *testing.T) {
+	bad := []CapabilityDependency{
+		{ID: "", Provider: "com.himind.x"},
+		{ID: "Media.Toolkit.Probe", Provider: "com.himind.x"}, // 大写
+		{ID: "media_toolkit_probe", Provider: "com.himind.x"}, // 下划线
+		{ID: "probe", Provider: "com.himind.x"},               // 只有一段
+		{ID: "media.toolkit.probe"},                           // 缺 provider
+	}
+	for _, capability := range bad {
+		if err := validateCapabilityShape(Manifest{Capabilities: []CapabilityDependency{capability}}); err == nil {
+			t.Errorf("%+v 应被拒绝", capability)
+		}
+	}
+	good := CapabilityDependency{ID: "media.toolkit.frames.contact-sheet", Provider: "com.himind.media-toolkit"}
+	if err := validateCapabilityShape(Manifest{Capabilities: []CapabilityDependency{good}}); err != nil {
+		t.Errorf("合规能力应通过: %v", err)
+	}
+}

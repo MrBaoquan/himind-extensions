@@ -61,31 +61,35 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 	case "extension.plugin.build":
 		return pluginBuild(in)
 	case "extension.plugin.package":
-		if err := ensureWithin(in.WorkspaceRoot, in.Path); err != nil {
+		projectPath, err := resolveWithin(in.WorkspaceRoot, in.Path)
+		if err != nil {
 			return nil, jsonrpc.InvalidParams(err.Error())
 		}
-		if err := ensureWithin(in.WorkspaceRoot, in.Output); err != nil {
+		outputPath, err := resolveWithin(in.WorkspaceRoot, in.Output)
+		if err != nil {
 			return nil, jsonrpc.InvalidParams(err.Error())
 		}
-		if err := pluginpack.Package(in.Path, in.Output); err != nil {
+		if err := pluginpack.Package(projectPath, outputPath); err != nil {
 			return nil, jsonrpc.InternalError(err.Error())
 		}
-		return map[string]any{"ok": true, "output": in.Output}, nil
+		return map[string]any{"ok": true, "output": outputPath}, nil
 	case "extension.skill.scaffold":
 		return skillScaffold(in)
 	case "extension.skill.validate":
 		return validatePath(in.WorkspaceRoot, in.Path, skillproject.Validate)
 	case "extension.skill.package":
-		if err := ensureWithin(in.WorkspaceRoot, in.Path); err != nil {
+		projectPath, err := resolveWithin(in.WorkspaceRoot, in.Path)
+		if err != nil {
 			return nil, jsonrpc.InvalidParams(err.Error())
 		}
-		if err := ensureWithin(in.WorkspaceRoot, in.Output); err != nil {
+		outputPath, err := resolveWithin(in.WorkspaceRoot, in.Output)
+		if err != nil {
 			return nil, jsonrpc.InvalidParams(err.Error())
 		}
-		if err := skillproject.Package(in.Path, in.Output); err != nil {
+		if err := skillproject.Package(projectPath, outputPath); err != nil {
 			return nil, jsonrpc.InternalError(err.Error())
 		}
-		return map[string]any{"ok": true, "output": in.Output}, nil
+		return map[string]any{"ok": true, "output": outputPath}, nil
 	case "extension.workflow.scaffold":
 		return workflowScaffold(in)
 	case "extension.workflow.validate":
@@ -93,16 +97,18 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 	case "extension.workflow.build":
 		return workflowBuild(in)
 	case "extension.workflow.package":
-		if err := ensureWithin(in.WorkspaceRoot, in.Path); err != nil {
+		projectPath, err := resolveWithin(in.WorkspaceRoot, in.Path)
+		if err != nil {
 			return nil, jsonrpc.InvalidParams(err.Error())
 		}
-		if err := ensureWithin(in.WorkspaceRoot, in.Output); err != nil {
+		outputPath, err := resolveWithin(in.WorkspaceRoot, in.Output)
+		if err != nil {
 			return nil, jsonrpc.InvalidParams(err.Error())
 		}
-		if err := workflowproject.Package(in.Path, in.Output); err != nil {
+		if err := workflowproject.Package(projectPath, outputPath); err != nil {
 			return nil, jsonrpc.InternalError(err.Error())
 		}
-		return map[string]any{"ok": true, "output": in.Output}, nil
+		return map[string]any{"ok": true, "output": outputPath}, nil
 	default:
 		return nil, jsonrpc.InvalidParams("unsupported extension development capability")
 	}
@@ -125,6 +131,9 @@ func preflight(kind string) map[string]any {
 		// 只写在常量里，没有任何环节会把它送出去（曾长期如此）。
 		"authoring_rules":   metaguide.Rules,
 		"field_constraints": metaguide.Fields(),
+	}
+	if kind == "plugin" {
+		result["capability_id_rules"] = metaguide.CapabilityIDRules()
 	}
 	addBlocker := func(code, stage, message, remediation string, retryable bool) {
 		result["blockers"] = append(result["blockers"].([]map[string]any), map[string]any{
@@ -181,10 +190,11 @@ func preflight(kind string) map[string]any {
 }
 
 func pluginScaffold(in input) (any, *jsonrpc.Error) {
-	if err := ensureWithin(in.WorkspaceRoot, in.OutputDir); err != nil {
+	outputDir, err := resolveWithin(in.WorkspaceRoot, in.OutputDir)
+	if err != nil {
 		return nil, jsonrpc.InvalidParams(err.Error())
 	}
-	result, err := pluginproject.Create(pluginproject.Config{Name: in.Name, DisplayName: in.DisplayName, Description: in.Description, Author: in.Author, Categories: in.Categories, ReleaseNotes: in.ReleaseNotes, Template: in.Template, OutputDir: in.OutputDir})
+	result, err := pluginproject.Create(pluginproject.Config{Name: in.Name, DisplayName: in.DisplayName, Description: in.Description, Author: in.Author, Categories: in.Categories, ReleaseNotes: in.ReleaseNotes, Template: in.Template, OutputDir: outputDir})
 	if err != nil {
 		return nil, jsonrpc.InternalError(err.Error())
 	}
@@ -192,10 +202,11 @@ func pluginScaffold(in input) (any, *jsonrpc.Error) {
 }
 
 func skillScaffold(in input) (any, *jsonrpc.Error) {
-	if err := ensureWithin(in.WorkspaceRoot, in.OutputDir); err != nil {
+	outputDir, err := resolveWithin(in.WorkspaceRoot, in.OutputDir)
+	if err != nil {
 		return nil, jsonrpc.InvalidParams(err.Error())
 	}
-	root, err := skillproject.Create(skillproject.CreateConfig{Slug: in.Slug, ID: in.ID, Name: in.Name, Version: in.Version, Description: in.Description, Author: in.Author, Categories: in.Categories, ReleaseNotes: in.ReleaseNotes, MinAgentVersion: in.MinAgentVersion, Clients: in.SupportedClients, OutputDir: in.OutputDir})
+	root, err := skillproject.Create(skillproject.CreateConfig{Slug: in.Slug, ID: in.ID, Name: in.Name, Version: in.Version, Description: in.Description, Author: in.Author, Categories: in.Categories, ReleaseNotes: in.ReleaseNotes, MinAgentVersion: in.MinAgentVersion, Clients: in.SupportedClients, OutputDir: outputDir})
 	if err != nil {
 		return nil, jsonrpc.InternalError(err.Error())
 	}
@@ -203,7 +214,8 @@ func skillScaffold(in input) (any, *jsonrpc.Error) {
 }
 
 func workflowScaffold(in input) (any, *jsonrpc.Error) {
-	if err := ensureWithin(in.WorkspaceRoot, in.OutputDir); err != nil {
+	outputDir, err := resolveWithin(in.WorkspaceRoot, in.OutputDir)
+	if err != nil {
 		return nil, jsonrpc.InvalidParams(err.Error())
 	}
 	result, err := workflowproject.Create(workflowproject.Config{
@@ -217,7 +229,7 @@ func workflowScaffold(in input) (any, *jsonrpc.Error) {
 		ReleaseNotes:    in.ReleaseNotes,
 		Categories:      in.Categories,
 		Template:        in.Template,
-		OutputDir:       in.OutputDir,
+		OutputDir:       outputDir,
 	})
 	if err != nil {
 		return nil, jsonrpc.InternalError(err.Error())
@@ -226,16 +238,17 @@ func workflowScaffold(in input) (any, *jsonrpc.Error) {
 }
 
 func workflowBuild(in input) (any, *jsonrpc.Error) {
-	if err := ensureWithin(in.WorkspaceRoot, in.Path); err != nil {
+	projectPath, err := resolveWithin(in.WorkspaceRoot, in.Path)
+	if err != nil {
 		return nil, jsonrpc.InvalidParams(err.Error())
 	}
-	manifest, err := workflowproject.Build(in.Path)
+	manifest, err := workflowproject.Build(projectPath)
 	if err != nil {
 		return nil, jsonrpc.InternalError(err.Error())
 	}
 	return map[string]any{
 		"ok":          true,
-		"path":        in.Path,
+		"path":        projectPath,
 		"workflow_id": manifest.ID,
 		"version":     manifest.Version,
 		"step_count":  len(manifest.Steps),
@@ -243,24 +256,28 @@ func workflowBuild(in input) (any, *jsonrpc.Error) {
 }
 
 func pluginBuild(in input) (any, *jsonrpc.Error) {
-	if err := ensureWithin(in.WorkspaceRoot, in.Path); err != nil {
+	projectPath, err := resolveWithin(in.WorkspaceRoot, in.Path)
+	if err != nil {
 		return nil, jsonrpc.InvalidParams(err.Error())
 	}
-	manifest, err := validator.ReadManifest(in.Path)
+	manifest, err := validator.ReadManifest(projectPath)
 	if err != nil {
 		return nil, jsonrpc.InternalError(err.Error())
 	}
 	if filepath.IsAbs(manifest.Entry) || strings.Contains(filepath.ToSlash(manifest.Entry), "../") {
 		return nil, jsonrpc.InvalidParams("plugin entry must remain inside the project")
 	}
-	if result, runErr := runGo(in.Path, "test", "./..."); runErr != nil {
+	if result, runErr := runGo(projectPath, "test", "./..."); runErr != nil {
 		return nil, jsonrpc.InternalError(result)
 	}
-	entry := filepath.Join(in.Path, filepath.FromSlash(manifest.Entry))
+	entry, err := resolveWithin(projectPath, filepath.Join(projectPath, filepath.FromSlash(manifest.Entry)))
+	if err != nil {
+		return nil, jsonrpc.InvalidParams("plugin entry must resolve inside the project: " + err.Error())
+	}
 	if err := os.MkdirAll(filepath.Dir(entry), 0755); err != nil {
 		return nil, jsonrpc.InternalError(err.Error())
 	}
-	result, runErr := runGo(in.Path, "build", "-o", entry, ".")
+	result, runErr := runGo(projectPath, "build", "-o", entry, ".")
 	if runErr != nil {
 		return nil, jsonrpc.InternalError(result)
 	}
@@ -268,34 +285,71 @@ func pluginBuild(in input) (any, *jsonrpc.Error) {
 }
 
 func validatePath(workspace, target string, validate func(string) error) (any, *jsonrpc.Error) {
-	if err := ensureWithin(workspace, target); err != nil {
+	resolved, err := resolveWithin(workspace, target)
+	if err != nil {
 		return nil, jsonrpc.InvalidParams(err.Error())
 	}
-	if err := validate(target); err != nil {
+	if err := validate(resolved); err != nil {
 		return nil, jsonrpc.InternalError(err.Error())
 	}
-	return map[string]any{"ok": true, "path": target}, nil
+	return map[string]any{"ok": true, "path": resolved}, nil
 }
 
-func ensureWithin(workspace, target string) error {
+func resolveWithin(workspace, target string) (string, error) {
 	workspace = strings.TrimSpace(workspace)
 	target = strings.TrimSpace(target)
 	if workspace == "" || target == "" {
-		return fmt.Errorf("workspace_root and target path are required")
+		return "", fmt.Errorf("workspace_root and target path are required")
 	}
 	workspaceAbs, err := filepath.Abs(workspace)
 	if err != nil {
-		return err
+		return "", err
+	}
+	workspaceResolved, err := resolveExistingPath(workspaceAbs)
+	if err != nil {
+		return "", err
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(workspaceResolved, target)
 	}
 	targetAbs, err := filepath.Abs(target)
 	if err != nil {
-		return err
+		return "", err
 	}
-	relative, err := filepath.Rel(workspaceAbs, targetAbs)
+	targetResolved, err := resolveExistingPath(targetAbs)
+	if err != nil {
+		return "", err
+	}
+	relative, err := filepath.Rel(workspaceResolved, targetResolved)
 	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(os.PathSeparator)) || filepath.IsAbs(relative) {
-		return fmt.Errorf("path must remain inside workspace_root")
+		return "", fmt.Errorf("resolved path must remain inside workspace_root")
 	}
-	return nil
+	return targetResolved, nil
+}
+
+// resolveExistingPath evaluates symlinks in the existing portion of a path while
+// preserving the missing suffix, so a new output path can be checked safely too.
+func resolveExistingPath(path string) (string, error) {
+	probe := filepath.Clean(path)
+	var suffix []string
+	for {
+		resolved, err := filepath.EvalSymlinks(probe)
+		if err == nil {
+			for index := len(suffix) - 1; index >= 0; index-- {
+				resolved = filepath.Join(resolved, suffix[index])
+			}
+			return filepath.Clean(resolved), nil
+		}
+		if !os.IsNotExist(err) {
+			return "", err
+		}
+		parent := filepath.Dir(probe)
+		if parent == probe {
+			return "", err
+		}
+		suffix = append(suffix, filepath.Base(probe))
+		probe = parent
+	}
 }
 
 func runGo(directory string, args ...string) (string, error) {

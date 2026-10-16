@@ -12,7 +12,6 @@ import (
 	"github.com/MrBaoquan/himind-extensions/sdk/jsonrpc"
 	"github.com/MrBaoquan/himind-extensions/tooling/metaguide"
 	"github.com/MrBaoquan/himind-extensions/tooling/pluginproject"
-	"github.com/MrBaoquan/himind-extensions/tooling/workflowproject"
 	validator "github.com/MrBaoquan/himind-extensions/tools/cmd/himind-plugin-validate"
 )
 
@@ -42,12 +41,24 @@ func TestPreflightReturnsAuthoringGuidance(t *testing.T) {
 		if !ok || len(fields) == 0 {
 			t.Fatalf("preflight %s must return the field constraints, got %T", kind, result["field_constraints"])
 		}
+		if kind == "plugin" {
+			rules, ok := result["capability_id_rules"].([]string)
+			if !ok || len(rules) == 0 {
+				t.Fatalf("plugin preflight must return ADR 0119 capability ID rules, got %T", result["capability_id_rules"])
+			}
+			joined := strings.Join(rules, " ")
+			for _, required := range []string{"48", "capability_namespace", "下划线", "父段已经表达的语义"} {
+				if !strings.Contains(joined, required) {
+					t.Errorf("plugin preflight capability ID rules omit %q: %v", required, rules)
+				}
+			}
+		}
 	}
 }
 
 func TestSkillWorkflowInBlankWorkspace(t *testing.T) {
 	workspace := t.TempDir()
-	outputDir := filepath.Join(workspace, "skills")
+	outputDir := "skills"
 	result := invoke(t, "extension.skill.scaffold", map[string]any{
 		"workspace_root": workspace,
 		"output_dir":     outputDir,
@@ -61,12 +72,12 @@ func TestSkillWorkflowInBlankWorkspace(t *testing.T) {
 	root := result.(map[string]any)["root"].(string)
 	invoke(t, "extension.skill.validate", map[string]any{
 		"workspace_root": workspace,
-		"path":           root,
+		"path":           filepath.Join("skills", filepath.Base(root)),
 	})
-	packagePath := filepath.Join(workspace, "dist", "blank-skill.hmskill")
+	packagePath := filepath.Join("dist", "blank-skill.hmskill")
 	invoke(t, "extension.skill.package", map[string]any{
 		"workspace_root": workspace,
-		"path":           root,
+		"path":           filepath.Join("skills", filepath.Base(root)),
 		"output":         packagePath,
 	})
 	invoke(t, "extension.skill.validate", map[string]any{
@@ -77,8 +88,8 @@ func TestSkillWorkflowInBlankWorkspace(t *testing.T) {
 
 func TestPluginWorkflowInBlankWorkspace(t *testing.T) {
 	workspace := t.TempDir()
-	outputDir := filepath.Join(workspace, "plugins")
-	result := invoke(t, "extension.plugin.scaffold", map[string]any{
+	outputDir := "plugins"
+	invoke(t, "extension.plugin.scaffold", map[string]any{
 		"workspace_root": workspace,
 		"output_dir":     outputDir,
 		"name":           "blank-plugin",
@@ -89,7 +100,7 @@ func TestPluginWorkflowInBlankWorkspace(t *testing.T) {
 		"release_notes":  "新增空白目录插件开发流程。",
 		"template":       "readonly-tool",
 	})
-	root := result.(pluginproject.Result).Root
+	root := filepath.Join("plugins", "blank-plugin")
 	invoke(t, "extension.plugin.validate", map[string]any{
 		"workspace_root": workspace,
 		"path":           root,
@@ -98,7 +109,7 @@ func TestPluginWorkflowInBlankWorkspace(t *testing.T) {
 		"workspace_root": workspace,
 		"path":           root,
 	})
-	packagePath := filepath.Join(workspace, "dist", "blank-plugin.hmpkg")
+	packagePath := filepath.Join("dist", "blank-plugin.hmpkg")
 	invoke(t, "extension.plugin.package", map[string]any{
 		"workspace_root": workspace,
 		"path":           root,
@@ -112,8 +123,8 @@ func TestPluginWorkflowInBlankWorkspace(t *testing.T) {
 
 func TestWorkflowInBlankWorkspace(t *testing.T) {
 	workspace := t.TempDir()
-	outputDir := filepath.Join(workspace, "workflows")
-	result := invoke(t, "extension.workflow.scaffold", map[string]any{
+	outputDir := "workflows"
+	invoke(t, "extension.workflow.scaffold", map[string]any{
 		"workspace_root":    workspace,
 		"output_dir":        outputDir,
 		"slug":              "blank-workflow",
@@ -125,8 +136,8 @@ func TestWorkflowInBlankWorkspace(t *testing.T) {
 		"min_agent_version": "0.3.47",
 		"release_notes":     "新增空白目录工作流开发流程。",
 		"template":          "segmented",
-	}).(workflowproject.Result)
-	root := result.Root
+	})
+	root := filepath.Join("workflows", "blank-workflow")
 	invoke(t, "extension.workflow.validate", map[string]any{
 		"workspace_root": workspace,
 		"path":           root,
@@ -135,7 +146,7 @@ func TestWorkflowInBlankWorkspace(t *testing.T) {
 		"workspace_root": workspace,
 		"path":           root,
 	})
-	packagePath := filepath.Join(workspace, "dist", "blank-workflow.hmwf")
+	packagePath := filepath.Join("dist", "blank-workflow.hmwf")
 	invoke(t, "extension.workflow.package", map[string]any{
 		"workspace_root": workspace,
 		"path":           root,
@@ -163,15 +174,31 @@ func TestWorkflowPreflightDoesNotRequireGo(t *testing.T) {
 
 func TestRejectsPathsOutsideWorkspace(t *testing.T) {
 	workspace := t.TempDir()
-	request, err := jsonrpc.NewRequest(1, "extension.skill.validate", map[string]any{
-		"workspace_root": workspace,
-		"path":           filepath.Join(workspace, "..", "outside"),
-	})
-	if err != nil {
-		t.Fatal(err)
+	for _, target := range []string{"../outside", filepath.Join(workspace, "..", "outside")} {
+		request, err := jsonrpc.NewRequest(1, "extension.skill.validate", map[string]any{
+			"workspace_root": workspace,
+			"path":           target,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, rpcError := handle(request); rpcError == nil {
+			t.Errorf("expected path %q outside workspace to be rejected", target)
+		}
 	}
-	if _, rpcError := handle(request); rpcError == nil {
-		t.Fatal("expected path outside workspace to be rejected")
+
+	if message := failureMessage(t, "extension.plugin.scaffold", map[string]any{
+		"workspace_root": workspace,
+		"output_dir":     "../outside",
+		"name":           "outside-plugin",
+		"display_name":   "越界插件工具",
+		"description":    "测试越界路径拒绝。",
+		"author":         "测试用户",
+		"categories":     []string{"software-engineering"},
+		"release_notes":  "验证越界路径拒绝。",
+		"template":       "readonly-tool",
+	}); !strings.Contains(message, "remain inside workspace_root") {
+		t.Fatalf("relative path escaping the workspace should explain the boundary, got %q", message)
 	}
 }
 

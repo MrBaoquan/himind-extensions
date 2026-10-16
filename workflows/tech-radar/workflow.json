@@ -1,11 +1,11 @@
 {
   "schema_version": "workflow_package.v1",
   "id": "com.himind.workflow.tech-radar",
-  "version": "0.4.7",
+  "version": "0.4.9",
   "distribution_targets": ["workbench", "github"],
   "name": "科技雷达日报",
   "description": "按领域采集公开科技仓库，用历史快照算星数增量，由内置 AI 给出解读，产出按天归档的网页报告。",
-  "release_notes": "将 AI 解读改为无工具的定时执行模式；解读失败时停止本次日报，避免把不完整报告标记为成功。",
+  "release_notes": "补全 README 已引用但清单缺失的能力声明（归档列举与读取、打开链接）。",
   "min_agent_version": "0.3.47",
   "local_requirements": {
     "platform": "windows",
@@ -58,7 +58,10 @@
   ],
   "capabilities": [
     "tech-radar.collect",
-    "tech-radar.report"
+    "tech-radar.report",
+    "tech-radar.archive.list",
+    "tech-radar.archive.read",
+    "tech-radar.link.open"
   ],
   "dependencies": {
     "skills": [],

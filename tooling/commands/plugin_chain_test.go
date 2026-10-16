@@ -108,7 +108,18 @@ func TestRepositoryPluginsSurviveTheReleasePipeline(t *testing.T) {
 				t.Fatal(err)
 			}
 			staging := filepath.Join(t.TempDir(), "staging")
-			runGoCommand(t, root, "build", "-o", filepath.Join(staging, filepath.FromSlash(manifest.Entry)), "./plugins/"+item.Name())
+			// 两种工程形态都要能构建：
+			//   · 插件自带 go.mod（脚手架从第一个提交起就产出的形态）—— 从插件目录构建。
+			//     扩展开发规范要求"工程不依赖创建它的仓库，可从空白目录独立测试和构建"，
+			//     自带 go.mod 正是为了满足这条。
+			//   · 没有 go.mod —— 属于本仓库 module 的子包，从仓库根构建。
+			// 以前这里只按后者构建，于是脚手架产出的插件在本仓库里一律构建失败。
+			entry := filepath.Join(staging, filepath.FromSlash(manifest.Entry))
+			if _, err := os.Stat(filepath.Join(source, "go.mod")); err == nil {
+				runGoCommand(t, source, "build", "-o", entry, ".")
+			} else {
+				runGoCommand(t, root, "build", "-o", entry, "./plugins/"+item.Name())
+			}
 
 			if _, err := stagePlugin(source, staging, ""); err != nil {
 				t.Fatal(err)

@@ -112,3 +112,30 @@ func TestValidateRejectsDuplicateStepAndMissingSchema(t *testing.T) {
 		t.Fatal("expected missing artifact schema to fail")
 	}
 }
+
+// 工作流文档引用了但清单没声明的能力 —— 实测 tech-radar 的 README 引用了
+// archive.list / archive.read / link.open 三条却没声明。
+func TestValidateCapabilityReferencesRejectsUndeclared(t *testing.T) {
+	manifest := Manifest{Capabilities: []string{"tech-radar.collect"}}
+	documents := map[string][]byte{
+		"README.md": []byte("视图通过 `tech-radar.archive.list` 取数，链接走 `tech-radar.link.open`。\n"),
+	}
+	if err := validateCapabilityReferences(manifest, documents); err == nil {
+		t.Fatal("引用了未声明的能力应被拒绝")
+	}
+	manifest.Capabilities = append(manifest.Capabilities, "tech-radar.archive.list", "tech-radar.link.open")
+	if err := validateCapabilityReferences(manifest, documents); err != nil {
+		t.Fatalf("补齐声明后应通过: %v", err)
+	}
+}
+
+func TestValidateCapabilityShapeRejectsBadIDs(t *testing.T) {
+	for _, id := range []string{"", "Tech.Radar", "tech_radar"} {
+		if err := validateCapabilityShape(Manifest{Capabilities: []string{id}}); err == nil {
+			t.Errorf("%q 应被拒绝", id)
+		}
+	}
+	if err := validateCapabilityShape(Manifest{Capabilities: []string{"tech-radar.archive.list"}}); err != nil {
+		t.Errorf("合规 ID 应通过: %v", err)
+	}
+}

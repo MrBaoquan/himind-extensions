@@ -30,9 +30,12 @@ type manifest struct {
 	Platforms    []string      `json:"platforms"`
 	MinAgent     string        `json:"min_agent_version"`
 	Governance   string        `json:"governance"`
-	Capabilities []capability  `json:"capabilities"`
-	Permissions  []string      `json:"permissions"`
-	Contributes  contributions `json:"contributes"`
+	// CapabilityNamespace 声明能力前缀。以前这个字段**没有出现在本结构体里**，
+	// 于是「多段前缀必须声明命名空间」这条规范没有任何执行点 —— 校验器连读都不读它。
+	CapabilityNamespace string        `json:"capability_namespace"`
+	Capabilities        []capability  `json:"capabilities"`
+	Permissions         []string      `json:"permissions"`
+	Contributes         contributions `json:"contributes"`
 }
 
 type capability struct {
@@ -248,6 +251,13 @@ func ParseManifest(data []byte) (manifest, error) {
 	if err := metaguide.Check(metaguide.DisplayName, item.Name); err != nil {
 		return item, err
 	}
+	// 显示名禁用词（规范 §二4 / §三4）。字数校验拦不住它 ——「智能」只有两个字，
+	// 长度必然合规，所以「媒体智能」这类名字在加这条之前能一路走到提审。
+	if hits := metaguide.BannedIn(item.Name); len(hits) > 0 {
+		return item, fmt.Errorf(
+			"name contains disallowed words %s; see authoring_rules for the full list",
+			strings.Join(hits, ", "))
+	}
 	if err := metaguide.Check(metaguide.Description, item.Description); err != nil {
 		return item, err
 	}
@@ -272,11 +282,13 @@ func ParseManifest(data []byte) (manifest, error) {
 		return item, fmt.Errorf("unsupported governance: %s", item.Governance)
 	}
 	capabilityIDs := map[string]bool{}
+	var allCapabilityIDs []string
 	for _, capability := range item.Capabilities {
 		if strings.TrimSpace(capability.ID) == "" || capabilityIDs[capability.ID] {
 			return item, fmt.Errorf("capability IDs must be non-empty and unique")
 		}
 		capabilityIDs[capability.ID] = true
+		allCapabilityIDs = append(allCapabilityIDs, capability.ID)
 		if !riskLevels[capability.RiskLevel] {
 			return item, fmt.Errorf("unsupported risk_level for %s: %s", capability.ID, capability.RiskLevel)
 		}
@@ -292,6 +304,11 @@ func ParseManifest(data []byte) (manifest, error) {
 		if err := metaguide.Check(metaguide.CapabilityDescription, capability.Description); err != nil {
 			return item, err
 		}
+	}
+	// 命名空间自洽（规范 §二8）。内核按「先到者胜」注册，前缀没声明清楚时，
+	// 后装插件的同名能力会被静默跳过 —— 装了却调不到，且没有任何报错。
+	if err := metaguide.CheckNamespace(item.ID, item.CapabilityNamespace, allCapabilityIDs); err != nil {
+		return item, err
 	}
 	viewIDs := map[string]bool{}
 	for _, view := range item.Contributes.Views {

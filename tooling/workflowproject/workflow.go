@@ -183,10 +183,12 @@ type Manifest struct {
 	LocalRequirements map[string]any `json:"local_requirements,omitempty"`
 	OptionalProviders []string       `json:"optional_providers,omitempty"`
 	Capabilities      []string       `json:"capabilities,omitempty"`
-	Dependencies      Dependencies   `json:"dependencies"`
-	Candidate         *Candidate     `json:"candidate,omitempty"`
-	ExecutionPolicy   string         `json:"execution_policy,omitempty"`
-	Entrypoints       []Endpoint     `json:"entrypoints,omitempty"`
+	// 分发目标是硬约束（规范 §六），仓库检查要求每个扩展显式声明。
+	DistributionTargets []string     `json:"distribution_targets"`
+	Dependencies        Dependencies `json:"dependencies"`
+	Candidate           *Candidate   `json:"candidate,omitempty"`
+	ExecutionPolicy     string       `json:"execution_policy,omitempty"`
+	Entrypoints         []Endpoint   `json:"entrypoints,omitempty"`
 	// DefaultEntrypoint/DefaultExitpoint 允许调用方不选分段就启动；显式传值优先。
 	DefaultEntrypoint string     `json:"default_entrypoint,omitempty"`
 	Exits             []Endpoint `json:"exits,omitempty"`
@@ -348,7 +350,26 @@ func Validate(root string) error {
 		_, ok := files[filepath.ToSlash(relative)]
 		return ok
 	}
-	return validateManifest(manifest, exists)
+	if err := validateManifest(manifest, exists); err != nil {
+		return err
+	}
+	if err := validateCapabilityShape(manifest); err != nil {
+		return err
+	}
+	return validateCapabilityReferences(manifest, workflowDocuments(files))
+}
+
+// workflowDocuments 返回参与引用扫描的文档：除清单与校验和之外的全部内容文件。
+// 视图描述（ui/workflow-view.json）与 README 都常引用能力，所以都要扫。
+func workflowDocuments(files map[string][]byte) map[string][]byte {
+	documents := make(map[string][]byte, len(files))
+	for name, content := range files {
+		if name == ManifestFile || name == ChecksumsFile {
+			continue
+		}
+		documents[name] = content
+	}
+	return documents
 }
 
 func Package(root, output string) error {
@@ -419,6 +440,14 @@ func readManifestFromDirectory(root string) (Manifest, error) {
 		return ok
 	}
 	if err := validateManifest(manifest, exists); err != nil {
+		return Manifest{}, err
+	}
+	// 目录形态也要查：Validate(dir) 走这条路径，只在归档分支加会让
+	// 「工程目录通过、打包后才报错」。
+	if err := validateCapabilityShape(manifest); err != nil {
+		return Manifest{}, err
+	}
+	if err := validateCapabilityReferences(manifest, workflowDocuments(files)); err != nil {
 		return Manifest{}, err
 	}
 	return manifest, nil
@@ -540,6 +569,10 @@ func validateManifest(manifest Manifest, fileExists func(string) bool) error {
 	}
 	if err := metaguide.Check(metaguide.DisplayName, manifest.Name); err != nil {
 		return err
+	}
+	// 显示名禁用词（规范 §二4 / §三4）：长度校验拦不住「智能」这种两字词。
+	if hits := metaguide.BannedIn(manifest.Name); len(hits) > 0 {
+		return fmt.Errorf("workflow name contains disallowed words: %s", strings.Join(hits, ", "))
 	}
 	if err := metaguide.Check(metaguide.Description, manifest.Description); err != nil {
 		return err
@@ -972,16 +1005,17 @@ func matches(value string, allowed ...string) bool {
 
 func buildManifest(config Config) Manifest {
 	manifest := Manifest{
-		SchemaVersion:     "workflow_package.v1",
-		ID:                config.ID,
-		Version:           config.Version,
-		Name:              config.Name,
-		Description:       config.Description,
-		ReleaseNotes:      config.ReleaseNotes,
-		MinAgentVersion:   config.MinAgentVersion,
-		LocalRequirements: map[string]any{},
-		Dependencies:      Dependencies{Skills: []DependencyRef{}, Plugins: []DependencyRef{}, Connectors: []string{}, Runtimes: []string{}},
-		ExecutionPolicy:   "strict",
+		SchemaVersion:       "workflow_package.v1",
+		ID:                  config.ID,
+		Version:             config.Version,
+		Name:                config.Name,
+		Description:         config.Description,
+		ReleaseNotes:        config.ReleaseNotes,
+		MinAgentVersion:     config.MinAgentVersion,
+		LocalRequirements:   map[string]any{},
+		DistributionTargets: []string{"workbench", "github"},
+		Dependencies:        Dependencies{Skills: []DependencyRef{}, Plugins: []DependencyRef{}, Connectors: []string{}, Runtimes: []string{}},
+		ExecutionPolicy:     "strict",
 		Steps: []Step{{
 			ID:            "START",
 			Title:         "开始",
