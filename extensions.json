@@ -4,43 +4,180 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "default_distribution_targets": ["workbench", "github"],
+  "default_distribution_targets": [
+    "workbench",
+    "github"
+  ],
   "default_branch": "main",
   "extensions": [
-    {"type": "plugin", "id": "com.himind.extension-development-tools", "path": "plugins/extension-development-tools"},
-    {"type": "plugin", "id": "com.himind.software-distribution", "path": "plugins/software-distribution"},
-    {"type": "plugin", "id": "com.himind.tech-radar", "path": "plugins/tech-radar"},
-    {"type": "plugin", "id": "com.himind.wechat-miniprogram-tools", "path": "plugins/wechat-miniprogram-tools"},
-    {"type": "plugin", "id": "com.himind.media-library", "path": "plugins/media-library"},
-    {"type": "plugin", "id": "com.himind.media-downloader", "path": "plugins/media-downloader"},
-    {"type": "plugin", "id": "com.himind.work-log", "path": "plugins/work-log"},
-    {"type": "plugin", "id": "com.himind.work-log-collector", "path": "plugins/work-log-collector"},
-    {"type": "skill", "id": "com.himind.skill.develop-himind-plugins", "path": "skills/develop-himind-plugins"},
-    {"type": "skill", "id": "com.himind.skill.develop-himind-skills", "path": "skills/develop-himind-skills"},
-    {"type": "skill", "id": "com.himind.skill.develop-himind-workflows", "path": "skills/develop-himind-workflows"},
-    {"type": "skill", "id": "com.himind.skill.develop-himind-conventions", "path": "skills/develop-himind-conventions"},
-    {"type": "skill", "id": "com.himind.skill.dev-workflow-orchestrator", "path": "skills/dev-workflow-orchestrator"},
-    {"type": "skill", "id": "com.himind.skill.git-svn-commit-summary", "path": "skills/git-svn-commit-summary"},
-    {"type": "skill", "id": "com.himind.skill.mcp-experience-feedback", "path": "skills/mcp-experience-feedback"},
-    {"type": "skill", "id": "com.himind.skill.software-distribution", "path": "skills/software-distribution"},
-    {"type": "skill", "id": "com.himind.skill.software-ui-spec", "path": "skills/software-ui-spec"},
-    {"type": "skill", "id": "com.himind.media-downloader-assistant", "path": "skills/media-downloader-assistant"},
-    {"type": "skill", "id": "com.himind.skill.work-log", "path": "skills/work-log"},
-    {"type": "skill", "id": "com.mrbaoquan.skill.unihper-unity-development", "path": "skills/unihper-unity-development"},
-    {"type": "workflow", "id": "com.himind.workflow.software-release", "path": "workflows/software-release"},
-    {"type": "workflow", "id": "com.himind.workflow.tech-radar", "path": "workflows/tech-radar"},
-    {"type": "workflow", "id": "com.himind.workflow.daily-work-log", "path": "workflows/daily-work-log"},
-    {"type": "expert", "id": "com.himind.expert.software-engineer", "path": "experts/software-engineer"},
-    {"type": "expert", "id": "com.himind.expert.project-architect", "path": "experts/project-architect"},
-    {"type": "expert", "id": "com.himind.expert.senior-system-architect", "path": "experts/senior-system-architect"},
-    {"type": "expert", "id": "com.himind.expert.senior-ui-designer", "path": "experts/senior-ui-designer"},
-    {"type": "expert", "id": "com.himind.expert.senior-test-engineer", "path": "experts/senior-test-engineer"}
+    {
+      "type": "plugin",
+      "id": "com.himind.extension-development-tools",
+      "path": "plugins/extension-development-tools"
+    },
+    {
+      "type": "plugin",
+      "id": "com.himind.software-distribution",
+      "path": "plugins/software-distribution"
+    },
+    {
+      "type": "plugin",
+      "id": "com.himind.tech-radar",
+      "path": "plugins/tech-radar"
+    },
+    {
+      "type": "plugin",
+      "id": "com.himind.wechat-miniprogram-tools",
+      "path": "plugins/wechat-miniprogram-tools"
+    },
+    {
+      "type": "plugin",
+      "id": "com.himind.media-library",
+      "path": "plugins/media-library"
+    },
+    {
+      "type": "plugin",
+      "id": "com.himind.media-downloader",
+      "path": "plugins/media-downloader"
+    },
+    {
+      "type": "plugin",
+      "id": "com.himind.media-toolkit",
+      "path": "plugins/media-toolkit"
+    },
+    {
+      "type": "plugin",
+      "id": "com.himind.iostudio",
+      "path": "plugins/iostudio"
+    },
+    {
+      "type": "plugin",
+      "id": "com.himind.work-log",
+      "path": "plugins/work-log"
+    },
+    {
+      "type": "plugin",
+      "id": "com.himind.work-log-collector",
+      "path": "plugins/work-log-collector"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.develop-himind-plugins",
+      "path": "skills/develop-himind-plugins"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.develop-himind-skills",
+      "path": "skills/develop-himind-skills"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.develop-himind-workflows",
+      "path": "skills/develop-himind-workflows"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.develop-himind-conventions",
+      "path": "skills/develop-himind-conventions"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.dev-workflow-orchestrator",
+      "path": "skills/dev-workflow-orchestrator"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.git-svn-commit-summary",
+      "path": "skills/git-svn-commit-summary"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.mcp-experience-feedback",
+      "path": "skills/mcp-experience-feedback"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.software-distribution",
+      "path": "skills/software-distribution"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.software-ui-spec",
+      "path": "skills/software-ui-spec"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.media-downloader-assistant",
+      "path": "skills/media-downloader-assistant"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.work-log",
+      "path": "skills/work-log"
+    },
+    {
+      "type": "skill",
+      "id": "com.mrbaoquan.skill.unihper-unity-development",
+      "path": "skills/unihper-unity-development"
+    },
+    {
+      "type": "workflow",
+      "id": "com.himind.workflow.software-release",
+      "path": "workflows/software-release"
+    },
+    {
+      "type": "workflow",
+      "id": "com.himind.workflow.tech-radar",
+      "path": "workflows/tech-radar"
+    },
+    {
+      "type": "workflow",
+      "id": "com.himind.workflow.daily-work-log",
+      "path": "workflows/daily-work-log"
+    },
+    {
+      "type": "expert",
+      "id": "com.himind.expert.software-engineer",
+      "path": "experts/software-engineer"
+    },
+    {
+      "type": "expert",
+      "id": "com.himind.expert.project-architect",
+      "path": "experts/project-architect"
+    },
+    {
+      "type": "expert",
+      "id": "com.himind.expert.senior-system-architect",
+      "path": "experts/senior-system-architect"
+    },
+    {
+      "type": "expert",
+      "id": "com.himind.expert.senior-ui-designer",
+      "path": "experts/senior-ui-designer"
+    },
+    {
+      "type": "expert",
+      "id": "com.himind.expert.senior-test-engineer",
+      "path": "experts/senior-test-engineer"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.video-motion-authoring",
+      "path": "skills/video-motion-authoring"
+    },
+    {
+      "type": "plugin",
+      "id": "com.himind.media-ai",
+      "path": "plugins/media-ai"
+    }
   ],
   "feature_packs": [
     {
       "id": "com.himind.feature.extension-authoring",
       "name": "扩展创作",
-      "plugin_ids": ["com.himind.extension-development-tools"],
+      "plugin_ids": [
+        "com.himind.extension-development-tools"
+      ],
       "skill_ids": [
         "com.himind.skill.develop-himind-plugins",
         "com.himind.skill.develop-himind-skills",
@@ -51,9 +188,13 @@
     {
       "id": "com.himind.feature.work-log",
       "name": "工作日志",
-      "plugin_ids": ["com.himind.work-log", "com.himind.work-log-collector"],
-      "skill_ids": ["com.himind.skill.work-log"]
+      "plugin_ids": [
+        "com.himind.work-log",
+        "com.himind.work-log-collector"
+      ],
+      "skill_ids": [
+        "com.himind.skill.work-log"
+      ]
     }
   ]
 }
-

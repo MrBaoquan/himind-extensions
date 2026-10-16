@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>媒体工具集</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">HiMind 媒体工具集</p>
+        <h1>媒体工具集</h1>
+        <p class="lede">选素材 → 选要做什么 → 运行 → 看进度与结果。转码、压缩、抽音频、图片转视频、画面与响度分析、缩略图网格。</p>
+      </div>
+      <div class="hero-side">
+        <span id="runtime-badge" class="badge muted">未检查</span>
+        <button id="runtime-button" class="ghost" type="button">检查运行时</button>
+      </div>
+    </header>
+
+    <p id="notice" class="notice" hidden></p>
+
+    <!-- 素材 -->
+    <section class="card">
+      <div class="section-head">
+        <h2>素材</h2>
+        <span class="muted">从工作区里选一个文件</span>
+      </div>
+      <div class="row">
+        <select id="file-select"><option value="">正在读取工作区…</option></select>
+        <button id="reload-files" class="ghost" type="button">刷新</button>
+      </div>
+      <p class="hint" id="workspace-hint">工作区：<span id="workspace-root" class="mono">—</span></p>
+      <div class="row">
+        <input id="media-path" type="text" spellcheck="false" placeholder="或直接填写相对路径，例如 clip/demo.mp4">
+        <button id="probe-button" type="button">读取信息</button>
+      </div>
+      <div id="media-info" class="info-table" hidden></div>
+    </section>
+
+    <!-- 任务 -->
+    <section class="card">
+      <div class="section-head">
+        <h2>要做什么</h2>
+        <span class="muted">常见需求已给好默认值</span>
+      </div>
+      <nav class="tabs" id="tabs">
+        <button class="tab is-active" type="button" data-tab="convert">转换</button>
+        <button class="tab" type="button" data-tab="audio">抽音频</button>
+        <button class="tab" type="button" data-tab="images">图片转视频</button>
+        <button class="tab" type="button" data-tab="analyze">分析</button>
+        <button class="tab" type="button" data-tab="preview">预览</button>
+      </nav>
+
+      <!-- 转换 -->
+      <div class="panel is-active" data-panel="convert">
+        <div class="grid2">
+          <label>方式
+            <select id="convert-mode">
+              <option value="compress">压缩（体积优先，适合分发）</option>
+              <option value="transcode">转码（指定编码与码率）</option>
+            </select>
+          </label>
+          <label>目标宽度
+            <input id="convert-width" type="number" min="0" step="2" value="1280">
+          </label>
+          <label>质量 CRF <span class="muted" id="convert-crf-hint">越小越清晰</span>
+            <input id="convert-crf" type="number" min="0" max="51" step="1" value="28">
+          </label>
+          <label>帧率上限 <span class="muted">留空保持</span>
+            <input id="convert-fps" type="number" min="1" max="120" step="1" placeholder="保持">
+          </label>
+        </div>
+        <label class="field">输出文件
+          <input id="convert-out" type="text" spellcheck="false" placeholder="留空则自动命名，例如 clip/demo-compressed.mp4">
+        </label>
+      </div>
+
+      <!-- 抽音频 -->
+      <div class="panel" data-panel="audio">
+        <div class="grid2">
+          <label>格式
+            <select id="audio-format">
+              <option value="mp3">MP3</option>
+              <option value="m4a">M4A (AAC)</option>
+              <option value="wav">WAV</option>
+            </select>
+          </label>
+          <label>码率
+            <select id="audio-bitrate">
+              <option value="128k">128 kbps</option>
+              <option value="192k" selected>192 kbps</option>
+              <option value="320k">320 kbps</option>
+            </select>
+          </label>
+          <label>起始（毫秒，可留空）
+            <input id="audio-start" type="number" min="0" step="100" placeholder="0">
+          </label>
+          <label>结束（毫秒，可留空）
+            <input id="audio-end" type="number" min="0" step="100" placeholder="整段">
+          </label>
+        </div>
+        <label class="field">输出文件
+          <input id="audio-out" type="text" spellcheck="false" placeholder="留空则自动命名，例如 clip/demo.mp3">
+        </label>
+      </div>
+
+      <!-- 图片转视频 -->
+      <div class="panel" data-panel="images">
+        <div class="grid2">
+          <label>帧率
+            <input id="images-fps" type="number" min="1" max="120" step="1" value="30">
+          </label>
+          <label>时长（毫秒，仅单图用）
+            <input id="images-duration" type="number" min="100" step="500" value="5000">
+          </label>
+          <label>宽度
+            <input id="images-width" type="number" min="0" step="2" value="1920">
+          </label>
+          <label>高度 <span class="muted">留空按比例</span>
+            <input id="images-height" type="number" min="0" step="2" placeholder="自动">
+          </label>
+        </div>
+        <p class="hint">序列帧请填通配符路径，例如 <span class="mono">frames/shot_%04d.png</span>；单张图会循环该时长。</p>
+        <label class="field">输出文件
+          <input id="images-out" type="text" spellcheck="false" placeholder="留空则自动命名，例如 clip/from-images.mp4">
+        </label>
+      </div>
+
+      <!-- 分析 -->
+      <div class="panel" data-panel="analyze">
+        <div class="grid2">
+          <label>分析内容
+            <select id="analyze-kind">
+              <option value="scene">画面活动强度（找节奏与段落）</option>
+              <option value="loudness">音频响度（找冲击与静场）</option>
+            </select>
+          </label>
+          <label>采样点上限
+            <input id="analyze-points" type="number" min="100" max="200000" step="100" value="2000">
+          </label>
+        </div>
+        <p class="hint">画面活动分数的<strong>绝对值没有普适阈值</strong>，请看曲线相对自身中位数的起伏。</p>
+        <div id="chart-wrap" class="chart-wrap" hidden>
+          <canvas id="chart" width="900" height="240"></canvas>
+          <p id="chart-summary" class="hint"></p>
+        </div>
+      </div>
+
+      <!-- 预览 -->
+      <div class="panel" data-panel="preview">
+        <div class="grid2">
+          <label>列数
+            <input id="sheet-columns" type="number" min="1" max="20" step="1" value="6">
+          </label>
+          <label>行数
+            <input id="sheet-rows" type="number" min="1" max="20" step="1" value="4">
+          </label>
+          <label>每格宽度
+            <input id="sheet-tile" type="number" min="16" max="1920" step="16" value="320">
+          </label>
+          <label>采样间隔（毫秒，留空自动铺满）
+            <input id="sheet-interval" type="number" min="0" step="500" placeholder="自动">
+          </label>
+        </div>
+        <div class="row">
+          <input id="extract-times" type="text" spellcheck="false" placeholder="抽帧时刻（毫秒，逗号分隔），例如 1000,5000,12000">
+          <button id="extract-button" class="ghost" type="button">抽取帧</button>
+        </div>
+        <div id="preview-grid" class="preview-grid" hidden></div>
+      </div>
+
+      <div class="actions">
+        <button id="plan-button" class="ghost" type="button">预览参数</button>
+        <button id="run-button" type="button">开始</button>
+      </div>
+      <pre id="plan-output" class="plan" hidden></pre>
+    </section>
+
+    <!-- 作业 -->
+    <section class="card">
+      <div class="section-head">
+        <h2>处理进度</h2>
+        <button id="refresh-jobs" class="ghost small" type="button">刷新</button>
+      </div>
+      <div id="current-job" class="job" hidden>
+        <div class="job-head">
+          <strong id="job-title">—</strong>
+          <span id="job-state" class="badge muted">—</span>
+        </div>
+        <div class="bar"><div id="job-bar" class="bar-fill" style="width:0%"></div></div>
+        <div class="job-meta">
+          <span id="job-percent">0%</span>
+          <span id="job-speed" class="muted"></span>
+          <span id="job-output" class="mono muted"></span>
+        </div>
+        <div class="actions">
+          <button id="cancel-button" class="ghost" type="button">取消</button>
+        </div>
+      </div>
+      <div id="job-history" class="history"></div>
+    </section>
+
+    <footer class="foot">
+      <span class="muted">需要本机有 ffmpeg（含 ffprobe）。没有时只有「检查运行时」可用。</span>
+    </footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

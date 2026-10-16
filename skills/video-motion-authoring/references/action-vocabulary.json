@@ -1,0 +1,917 @@
+{
+  "schema_version": 1,
+  "summary": "把「视频里发生了什么」翻译成「平台该做哪个动作」的判据表。",
+  "form_explained": {
+    "pose": "有姿态角色的动作。写成 spec 的 presets + cues（一个动作可被多个节拍按不同强度复用）。",
+    "gate": "纯环境动作，没有姿态角色。**只写成 spec 的 gates**（开关窗口），不要写成 preset —— 没有 channels 的预设会被预检判为 preset.no_channels。"
+  },
+  "how_to_use": [
+    "先调用 iostudio.devices 取目标设备的真实动作与通道，再用本表选动作。",
+    "本表只给**语义角色**（role），不给具体通道。通道名必须来自 devices 的实际声明 —— 猜通道名会导致输出被静默丢弃。",
+    "先按 signal 找到候选段落，再看拼图确认画面里到底发生了什么，两者一致才采用。",
+    "任何一段都要能说出它是被哪条 signal 与哪几格画面支持的；说不出就别配。"
+  ],
+  "signal_reading": {
+    "why_relative": "画面变化分数（scene.score）的**绝对值没有普适阈值**。实测一条真实影片（大量叠化转场）逐帧最高分只有 9.0，按常规阈值 10 会得到 0 个切点 —— 阈值式硬切检测对真实内容并不可靠。因此一律用**相对该片自身**的分布来判断，不要用固定数字。",
+    "scene": {
+      "source": "media.toolkit.scene.score",
+      "low": "持续低于该片中位数 → 静态/对话/静场",
+      "mid": "在中位数附近起伏 → 稳定运动（行进、巡航、稳定跟拍）",
+      "high": "出现远高于中位数的尖峰 → 冲击、爆点、快速切换、剧烈运动",
+      "sustained_high": "连续多秒高位 → 持续激烈段落（追逐、战斗、高速运动）"
+    },
+    "loudness": {
+      "source": "media.toolkit.audio.loudness",
+      "spike": "瞬时响度骤升 → 撞击、爆炸、重音、音效重拍（是判断「事件时刻」最可靠的信号）",
+      "quiet": "显著低于该片中位数 → 静场、留白、悬念（适合弱动作或完全静止）",
+      "sustained": "长时间稳定响亮 → 音乐段/连续动作段"
+    },
+    "contact_sheet": {
+      "source": "media.toolkit.frames.contact-sheet",
+      "purpose": "画面里到底在发生什么。signal 只能告诉你「哪里激烈」，不能告诉你「是什么在激烈」—— 必须看图确认是撞击、起飞还是爆炸。",
+      "tip": "看不出内容时，用 frames.extract 在候选时刻附近抽帧放大看。"
+    },
+    "transcript": {
+      "source": "media.ai.transcribe",
+      "why": "画面与响度只能告诉你「哪里激烈」，歌词与对白能告诉你「在讲什么」。实测一段音乐片用前两条信号都找不到段落结构（曲线平在中位、峰值仅 9.0），歌词却给出稳定的 4-5 秒一句的节律 —— 编排时最缺的时点依据。",
+      "use": "用 content_segments 的句边界作为段落与节拍边界；先通读 full_text 判断情绪走向，它常能纠正仅凭信号得出的误判（如把安静的对白当成静场）。",
+      "gotcha": "必须显式指定 language（zh/en/ja…）。自动检测对歌曲不可靠 —— 实测把中文歌判成 en，只得到占位标注。看 content_segments 而不是 segments。"
+    }
+  },
+  "neutral_conventions": {
+    "attitude": "姿态类（pitch/roll/yaw/heave/surge/sway/angle）关键帧以 0.5 为中性位；数值含义见各动作。",
+    "notice": "实际中性值由设备/轨道决定（spec 的 neutral 字段）。若目标设备的 heave 中性为 0（下限位），需把 0.5 附近的值平移到该设备的工作区间，不能照抄。",
+    "gate": "环境类（wind/water/hot/vibrate/light/scent…）是开关量，用 gates 表达开窗，不要用曲线。"
+  },
+  "roles": {
+    "pitch": "前后俯仰",
+    "roll": "左右侧倾",
+    "yaw": "左右回转",
+    "heave": "上下升降（主力动作通道，绝大多数情绪的落点）",
+    "surge": "前后平移",
+    "sway": "左右横移",
+    "angle": "转台旋转",
+    "vibrate": "震动",
+    "wind": "风扇/吹风",
+    "water": "喷水",
+    "fog": "烟雾",
+    "snow": "雪",
+    "hot": "热风",
+    "light": "灯光",
+    "lightning": "闪电",
+    "scent": "气味",
+    "shoot": "射击（游戏动作）",
+    "action": "动作（游戏动作）",
+    "motion_enable": "运动使能（安全联锁，见 safety）",
+    "reset": "复位",
+    "emergency_stop": "急停"
+  },
+  "actions": [
+    {
+      "id": "calm_idle",
+      "name": "待机呼吸",
+      "category": "段落",
+      "when": [
+        "静场、对话、字幕、片头片尾",
+        "低声压持续",
+        "画面几乎静止"
+      ],
+      "signal": {
+        "scene": "low",
+        "loudness": "quiet"
+      },
+      "duration_ms": 4000,
+      "intensity": {
+        "default": 0.15,
+        "range": [
+          0.05,
+          0.3
+        ],
+        "meaning": "幅度；开场宜小，避免观众一上来就被推"
+      },
+      "roles": [
+        {
+          "role": "heave",
+          "keyframes": [
+            [
+              0,
+              0.04
+            ],
+            [
+              1000,
+              0.08
+            ],
+            [
+              2000,
+              0.04
+            ],
+            [
+              3000,
+              0.01
+            ],
+            [
+              4000,
+              0.04
+            ]
+          ]
+        }
+      ],
+      "scenarios": [
+        "cinema",
+        "ydl",
+        "fx4d"
+      ],
+      "form": "pose"
+    },
+    {
+      "id": "slow_rise",
+      "name": "缓升",
+      "category": "段落",
+      "when": [
+        "镜头缓推或升起",
+        "音压渐强",
+        "开场或进入主段落之前"
+      ],
+      "signal": {
+        "scene": "low",
+        "loudness": "渐强"
+      },
+      "duration_ms": 3000,
+      "intensity": {
+        "default": 1.0,
+        "range": [
+          0.6,
+          1.2
+        ],
+        "meaning": "峰值高度"
+      },
+      "roles": [
+        {
+          "role": "heave",
+          "keyframes": [
+            [
+              0,
+              0.02
+            ],
+            [
+              1200,
+              0.82
+            ],
+            [
+              2200,
+              0.55
+            ],
+            [
+              3000,
+              0.5
+            ]
+          ]
+        }
+      ],
+      "scenarios": [
+        "cinema",
+        "ydl",
+        "fx4d"
+      ],
+      "form": "pose"
+    },
+    {
+      "id": "vehicle_travel",
+      "name": "载具行进",
+      "category": "段落",
+      "when": [
+        "连续运动镜头（行驶、飞行、奔跑）",
+        "画面活动稳定在中位",
+        "音乐或环境声连续"
+      ],
+      "signal": {
+        "scene": "mid 持续",
+        "loudness": "sustained"
+      },
+      "duration_ms": 8000,
+      "intensity": {
+        "default": 0.9,
+        "range": [
+          0.4,
+          1.1
+        ],
+        "meaning": "起伏幅度；长段落宜偏低以免疲劳"
+      },
+      "roles": [
+        {
+          "role": "heave",
+          "keyframes": [
+            [
+              0,
+              0.5
+            ],
+            [
+              1500,
+              0.68
+            ],
+            [
+              3000,
+              0.45
+            ],
+            [
+              4500,
+              0.62
+            ],
+            [
+              6000,
+              0.42
+            ],
+            [
+              8000,
+              0.5
+            ]
+          ]
+        }
+      ],
+      "scenarios": [
+        "cinema",
+        "ydl",
+        "fx4d"
+      ],
+      "form": "pose"
+    },
+    {
+      "id": "pursuit_chase",
+      "name": "追击",
+      "category": "段落",
+      "when": [
+        "快速剪辑或持续高速运动",
+        "画面活动连续高位",
+        "音乐密度高"
+      ],
+      "signal": {
+        "scene": "sustained_high",
+        "loudness": "sustained"
+      },
+      "duration_ms": 6000,
+      "intensity": {
+        "default": 0.9,
+        "range": [
+          0.5,
+          1.2
+        ],
+        "meaning": "起伏与侧倾幅度"
+      },
+      "roles": [
+        {
+          "role": "heave",
+          "keyframes": [
+            [
+              0,
+              0.5
+            ],
+            [
+              1000,
+              0.75
+            ],
+            [
+              2000,
+              0.4
+            ],
+            [
+              3000,
+              0.7
+            ],
+            [
+              4000,
+              0.45
+            ],
+            [
+              6000,
+              0.5
+            ]
+          ]
+        },
+        {
+          "role": "roll",
+          "keyframes": [
+            [
+              0,
+              0.5
+            ],
+            [
+              1500,
+              0.68
+            ],
+            [
+              3500,
+              0.32
+            ],
+            [
+              6000,
+              0.5
+            ]
+          ]
+        }
+      ],
+      "gate_suggest": {
+        "wind": "段落全程"
+      },
+      "scenarios": [
+        "cinema",
+        "ydl",
+        "fx4d"
+      ],
+      "form": "pose"
+    },
+    {
+      "id": "impact_hit",
+      "name": "受击",
+      "category": "事件",
+      "when": [
+        "撞击、被打中、碰撞",
+        "响度出现明显尖峰",
+        "画面突然一顿或抖动"
+      ],
+      "signal": {
+        "scene": "突增后回落",
+        "loudness": "spike"
+      },
+      "duration_ms": 2000,
+      "intensity": {
+        "default": 1.0,
+        "range": [
+          0.6,
+          1.3
+        ],
+        "meaning": "下坠深度与回弹高度"
+      },
+      "roles": [
+        {
+          "role": "heave",
+          "keyframes": [
+            [
+              0,
+              0.5
+            ],
+            [
+              400,
+              0.05
+            ],
+            [
+              1100,
+              0.72
+            ],
+            [
+              2000,
+              0.3
+            ]
+          ]
+        }
+      ],
+      "gate_suggest": {
+        "vibrate": "0-1200ms"
+      },
+      "safety": {
+        "note": "下坠段速率大，务必确认目标通道配了 SlewRate，否则会一步跳到底把执行机构顶到报错。"
+      },
+      "scenarios": [
+        "cinema",
+        "ydl",
+        "fx4d"
+      ],
+      "form": "pose"
+    },
+    {
+      "id": "explosion",
+      "name": "爆炸",
+      "category": "事件",
+      "when": [
+        "爆炸、爆点、大冲击",
+        "响度出现全片最强尖峰之一",
+        "画面强闪光"
+      ],
+      "signal": {
+        "scene": "极强尖峰",
+        "loudness": "极强 spike"
+      },
+      "duration_ms": 3000,
+      "intensity": {
+        "default": 1.2,
+        "range": [
+          0.8,
+          1.4
+        ],
+        "meaning": "冲击强度"
+      },
+      "roles": [
+        {
+          "role": "heave",
+          "keyframes": [
+            [
+              0,
+              0.5
+            ],
+            [
+              300,
+              0.15
+            ],
+            [
+              900,
+              0.95
+            ],
+            [
+              1800,
+              0.4
+            ],
+            [
+              3000,
+              0.5
+            ]
+          ]
+        }
+      ],
+      "gate_suggest": {
+        "vibrate": "0-2000ms",
+        "light": "300-1200ms"
+      },
+      "safety": {
+        "note": "全片最强烈的动作，建议同时是强度最高的段落；确认设备量程与速率上限后再提高强度。"
+      },
+      "scenarios": [
+        "cinema",
+        "fx4d"
+      ],
+      "form": "pose"
+    },
+    {
+      "id": "acceleration_boost",
+      "name": "冲刺加速",
+      "category": "段落",
+      "when": [
+        "起步、冲刺、起飞、弹射",
+        "音压快速上扬",
+        "画面加速"
+      ],
+      "signal": {
+        "scene": "high 上扬",
+        "loudness": "渐强后 spike"
+      },
+      "duration_ms": 5000,
+      "intensity": {
+        "default": 1.0,
+        "range": [
+          0.7,
+          1.3
+        ],
+        "meaning": "两次上顶的高度"
+      },
+      "roles": [
+        {
+          "role": "heave",
+          "keyframes": [
+            [
+              0,
+              0.2
+            ],
+            [
+              900,
+              0.95
+            ],
+            [
+              1900,
+              0.25
+            ],
+            [
+              2900,
+              0.9
+            ],
+            [
+              3900,
+              0.3
+            ],
+            [
+              5000,
+              0.4
+            ]
+          ]
+        }
+      ],
+      "gate_suggest": {
+        "wind": "全程"
+      },
+      "scenarios": [
+        "cinema",
+        "ydl",
+        "fx4d"
+      ],
+      "form": "pose"
+    },
+    {
+      "id": "sudden_drop",
+      "name": "急坠",
+      "category": "事件",
+      "when": [
+        "坠落、跳下、失重后落地",
+        "响度先静后尖峰"
+      ],
+      "signal": {
+        "scene": "由低突增",
+        "loudness": "先 quiet 后 spike"
+      },
+      "duration_ms": 2500,
+      "intensity": {
+        "default": 1.0,
+        "range": [
+          0.6,
+          1.3
+        ],
+        "meaning": "下坠深度"
+      },
+      "roles": [
+        {
+          "role": "heave",
+          "keyframes": [
+            [
+              0,
+              0.75
+            ],
+            [
+              600,
+              0.3
+            ],
+            [
+              1200,
+              0.08
+            ],
+            [
+              2000,
+              0.35
+            ],
+            [
+              2500,
+              0.5
+            ]
+          ]
+        }
+      ],
+      "safety": {
+        "note": "与 impact_hit 同类：下坠段是速率敏感段，务必确认 SlewRate 已配。"
+      },
+      "scenarios": [
+        "cinema",
+        "fx4d"
+      ],
+      "form": "pose"
+    },
+    {
+      "id": "sharp_turn",
+      "name": "急转",
+      "category": "事件",
+      "when": [
+        "急转、漂移、侧向甩动",
+        "画面侧向快速位移"
+      ],
+      "signal": {
+        "scene": "high",
+        "loudness": "spike 或 sustained"
+      },
+      "duration_ms": 2500,
+      "intensity": {
+        "default": 0.9,
+        "range": [
+          0.5,
+          1.2
+        ],
+        "meaning": "侧倾与摆动幅度"
+      },
+      "roles": [
+        {
+          "role": "roll",
+          "keyframes": [
+            [
+              0,
+              0.5
+            ],
+            [
+              700,
+              0.15
+            ],
+            [
+              1600,
+              0.8
+            ],
+            [
+              2500,
+              0.5
+            ]
+          ]
+        },
+        {
+          "role": "sway",
+          "keyframes": [
+            [
+              0,
+              0.5
+            ],
+            [
+              700,
+              0.2
+            ],
+            [
+              1600,
+              0.78
+            ],
+            [
+              2500,
+              0.5
+            ]
+          ]
+        }
+      ],
+      "scenarios": [
+        "cinema",
+        "fx4d"
+      ],
+      "form": "pose"
+    },
+    {
+      "id": "camera_shake",
+      "name": "镜头晃动",
+      "category": "事件",
+      "when": [
+        "手持晃动、地震、剧烈颠簸",
+        "画面活动高位但无明显切换"
+      ],
+      "signal": {
+        "scene": "sustained_high 无尖峰",
+        "loudness": "sustained"
+      },
+      "duration_ms": 3000,
+      "intensity": {
+        "default": 0.7,
+        "range": [
+          0.3,
+          1.0
+        ],
+        "meaning": "震动强度"
+      },
+      "roles": [],
+      "gate_suggest": {
+        "vibrate": "匹配晃动时长"
+      },
+      "note": "纯环境动作：只开震动，平台不做位移。适合「画面乱但人没在移动」的段落。",
+      "scenarios": [
+        "cinema",
+        "ydl",
+        "fx4d"
+      ],
+      "form": "gate"
+    },
+    {
+      "id": "water_splash",
+      "name": "水花",
+      "category": "环境",
+      "when": [
+        "入水、水花、雨淋、水幕"
+      ],
+      "signal": {
+        "scene": "mid 或 high",
+        "loudness": "spike"
+      },
+      "duration_ms": 6000,
+      "intensity": {
+        "default": 0.9,
+        "range": [
+          0.5,
+          1.2
+        ],
+        "meaning": "动作幅度；喷水本身是开关量"
+      },
+      "roles": [
+        {
+          "role": "heave",
+          "keyframes": [
+            [
+              0,
+              0.3
+            ],
+            [
+              1500,
+              0.12
+            ],
+            [
+              3500,
+              0.22
+            ],
+            [
+              6000,
+              0.18
+            ]
+          ]
+        }
+      ],
+      "gate_suggest": {
+        "water": "与水花同步",
+        "wind": "与水花同步"
+      },
+      "scenarios": [
+        "cinema",
+        "ydl",
+        "fx4d"
+      ],
+      "form": "pose"
+    },
+    {
+      "id": "wind_blow",
+      "name": "强风",
+      "category": "环境",
+      "when": [
+        "大风、疾风、吹拂、风沙"
+      ],
+      "signal": {
+        "scene": "任意",
+        "loudness": "sustained"
+      },
+      "duration_ms": 8000,
+      "intensity": {
+        "default": 0.8,
+        "range": [
+          0.4,
+          1.0
+        ],
+        "meaning": "风扇强度（开关量按开/关给）"
+      },
+      "roles": [],
+      "gate_suggest": {
+        "wind": "匹配段落"
+      },
+      "note": "纯环境动作。若画面同时有明显位移，再叠一个姿态动作。",
+      "scenarios": [
+        "cinema",
+        "ydl",
+        "fx4d"
+      ],
+      "form": "gate"
+    },
+    {
+      "id": "heat_wave",
+      "name": "热浪",
+      "category": "环境",
+      "when": [
+        "火焰、高温、蒸汽、锅炉"
+      ],
+      "signal": {
+        "scene": "mid",
+        "loudness": "sustained"
+      },
+      "duration_ms": 8000,
+      "intensity": {
+        "default": 0.8,
+        "range": [
+          0.4,
+          1.0
+        ],
+        "meaning": "热风开关"
+      },
+      "roles": [],
+      "gate_suggest": {
+        "hot": "匹配段落"
+      },
+      "scenarios": [
+        "cinema",
+        "ydl",
+        "fx4d"
+      ],
+      "form": "gate"
+    },
+    {
+      "id": "light_flash",
+      "name": "闪光",
+      "category": "环境",
+      "when": [
+        "闪电、闪光、爆闪",
+        "画面亮度瞬变"
+      ],
+      "signal": {
+        "scene": "尖峰",
+        "loudness": "spike"
+      },
+      "duration_ms": 1500,
+      "intensity": {
+        "default": 1.0,
+        "range": [
+          0.6,
+          1.2
+        ],
+        "meaning": "灯光强度"
+      },
+      "roles": [],
+      "gate_suggest": {
+        "light": "短窗口（数百毫秒）",
+        "lightning": "按需"
+      },
+      "scenarios": [
+        "cinema",
+        "fx4d"
+      ],
+      "form": "gate"
+    },
+    {
+      "id": "shoot_burst",
+      "name": "射击",
+      "category": "游戏动作",
+      "when": [
+        "枪击、连发、机关触发",
+        "响度出现密集短促尖峰"
+      ],
+      "signal": {
+        "scene": "high",
+        "loudness": "密集 spike"
+      },
+      "duration_ms": 600,
+      "intensity": {
+        "default": 1.0,
+        "range": [
+          0.5,
+          1.0
+        ],
+        "meaning": "开关量（有/无）"
+      },
+      "roles": [],
+      "gate_suggest": {
+        "shoot": "每个尖峰一个短窗口（数百毫秒）"
+      },
+      "note": "游戏体感专用：每个响度尖峰对应一次触发，不要连成一条长时间开窗。",
+      "scenarios": [
+        "ydl"
+      ],
+      "form": "gate"
+    },
+    {
+      "id": "settle_down",
+      "name": "结算回落",
+      "category": "段落",
+      "when": [
+        "片尾、结算、镜头缓慢下沉",
+        "音压渐弱"
+      ],
+      "signal": {
+        "scene": "low 或递减",
+        "loudness": "渐弱"
+      },
+      "duration_ms": 6000,
+      "intensity": {
+        "default": 1.0,
+        "range": [
+          0.6,
+          1.0
+        ],
+        "meaning": "回落幅度"
+      },
+      "roles": [
+        {
+          "role": "heave",
+          "keyframes": [
+            [
+              0,
+              0.4
+            ],
+            [
+              2500,
+              0.15
+            ],
+            [
+              6000,
+              0.02
+            ]
+          ]
+        }
+      ],
+      "gate_suggest": {
+        "scent": "回落段开窗（若有）"
+      },
+      "scenarios": [
+        "cinema",
+        "ydl",
+        "fx4d"
+      ],
+      "form": "pose"
+    }
+  ],
+  "safety": {
+    "why": "平台动作是物理运动。配错不是「效果不对」，而是可能让执行机构报错甚至伤人。",
+    "rules": [
+      "只配目标设备**真实声明**的动作通道。通道名靠猜 = 输出被静默丢弃（不报错、只是设备不动）。",
+      "大幅跳变前先确认该通道配了速率上限（SlewRate）。实测：未配限速时 0↔1.0 会一步跳满 1000mm。",
+      "首次输出不受限速保护（native 会为每个通道建立基线），所以**开场不要放强动作**。",
+      "若目标场景使用安全联锁（如影院平台），编排需带 motion_enable 先行置位、emergency_stop 不得与运动重叠；用 iostudio.motion.validate 的结果确认。",
+      "出厂演示文件里的强度值是给演示用的，不等于现场安全值。现场首个版本建议整体降档（0.5-0.7）跑一遍。"
+    ]
+  },
+  "review_gate": {
+    "why": "AI 是粗排，不是终稿。",
+    "what_ai_can": "段落划分、事件时点、动作选型、强度初值。",
+    "what_ai_cannot": [
+      "帧级精确对齐（信号分辨率约 0.1s 量级，且转场判断对柔切不敏感）",
+      "判断现场机械的实际可用行程与观众体感",
+      "替代安全评审"
+    ],
+    "must_do": "构建前先把 spec 给作者过目（用 iostudio.motion.plan 出一种不留产物的方案），确认段落划分与强度档位后再落地。"
+  }
+}

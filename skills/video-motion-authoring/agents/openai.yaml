@@ -1,0 +1,4 @@
+interface:
+  display_name: "视频动作编排助手"
+  short_description: "把视频推断成平台动作并生成可预检的动作文件"
+  default_prompt: "用 $video-motion-authoring 把这部影片编成平台动作：先看画面与声音判断该配什么动作，生成演出规格并预检，构建前把段落划分与强度档位给我过目。"

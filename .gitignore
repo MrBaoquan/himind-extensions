@@ -16,8 +16,8 @@ checksums.sha256
 .himind/media/
 # 工作流会话素材（采集器在扩展私有目录不可写时改写到 <工作区>/.himind/material），运行期本地状态。
 .himind/material/
-# 媒体下载插件的默认输出目录（运行期本地产物）。
-media/
+# 媒体下载插件的默认输出目录（运行期本地产物）。只锚定仓库根目录：插件内部的 internal/media 源码包不能被这条规则吞掉。
+/media/
 .idea/
 .vscode/
 .DS_Store

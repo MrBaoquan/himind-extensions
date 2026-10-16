@@ -1,0 +1,261 @@
+{
+  "id": "com.himind.iostudio",
+  "name": "IOStudio 工具",
+  "author": "马宝全",
+  "categories": [
+    "system-device",
+    "video-post"
+  ],
+  "description": "驱动 IOStudio 设备调试工作台：查设备动作通道、构建与预检动作文件、执行协议测试场景。",
+  "release_notes": "1.1.0：显示名改为「IOStudio 工具」（原「工作台」与平台自有术语撞名），并补齐命令，使能力可在命令面板检索。",
+  "version": "1.1.0",
+  "entry": "bin/iostudio.exe",
+  "runtime": "process-jsonrpc-stdio",
+  "platforms": [
+    "windows-x64"
+  ],
+  "min_agent_version": "0.3.47",
+  "governance": "optional",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
+  "capabilities": [
+    {
+      "id": "iostudio.runtime.status",
+      "description": "查看 IOStudio 命令行是否就绪及所用设备表",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "cli_path": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "iostudio.devices",
+      "description": "列出设备及其可用动作与输出通道",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "cli_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "device": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "iostudio.motion.plan",
+      "description": "只构建与预检、不保留动作文件",
+      "availability": "local",
+      "timeout_seconds": 900,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "cli_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "spec_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "skip_validate": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "spec_path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "iostudio.motion.build",
+      "description": "把演出规格构建成动作文件并预检",
+      "availability": "local",
+      "timeout_seconds": 900,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "cli_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "spec_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "out_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "skip_validate": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "spec_path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "iostudio.motion.validate",
+      "description": "预检动作文件并返回问题清单",
+      "availability": "local",
+      "timeout_seconds": 300,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "cli_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "motion_path": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "workspace_root",
+          "motion_path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "iostudio.motion.tracks",
+      "description": "读取动作文件的轨道到通道映射",
+      "availability": "local",
+      "timeout_seconds": 120,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "cli_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "motion_path": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "workspace_root",
+          "motion_path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "iostudio.protocol.test",
+      "description": "执行协议测试场景并返回逐步结果",
+      "availability": "local",
+      "timeout_seconds": 900,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "cli_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "scenario_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "report_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "keep_report": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "scenario_path"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "permissions": [],
+  "contributes": {
+    "views": [],
+    "commands": [
+      {
+        "id": "iostudio.runtime.status",
+        "title": "检查 IOStudio"
+      },
+      {
+        "id": "iostudio.devices",
+        "title": "查询设备动作通道"
+      },
+      {
+        "id": "iostudio.motion.plan",
+        "title": "预览动作构建参数"
+      },
+      {
+        "id": "iostudio.motion.build",
+        "title": "构建动作文件"
+      },
+      {
+        "id": "iostudio.motion.validate",
+        "title": "预检动作文件"
+      },
+      {
+        "id": "iostudio.motion.tracks",
+        "title": "读取轨道映射"
+      },
+      {
+        "id": "iostudio.protocol.test",
+        "title": "执行协议测试"
+      }
+    ]
+  }
+}

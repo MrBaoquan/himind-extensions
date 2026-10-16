@@ -1,0 +1,204 @@
+{
+  "id": "com.himind.media-ai",
+  "name": "媒体理解工具",
+  "author": "马宝全",
+  "categories": [
+    "audio-sound",
+    "video-post"
+  ],
+  "description": "按需下载模型理解媒体内容：先把语音与歌词转写成带时间戳的文本，用于定位动作时点。",
+  "release_notes": "1.2.0：显示名改为「媒体理解工具」（原「媒体智能」用了规范禁用词），并补齐命令，使能力可在命令面板检索。",
+  "version": "1.2.0",
+  "entry": "bin/media-ai.exe",
+  "runtime": "process-jsonrpc-stdio",
+  "platforms": [
+    "windows-x64"
+  ],
+  "min_agent_version": "0.3.47",
+  "governance": "optional",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
+  "capabilities": [
+    {
+      "id": "media.ai.runtime.status",
+      "description": "查看模型运行时是否就绪、缺什么",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.ai.runtime.install",
+      "description": "按锁定版本获取模型运行时与所需模型",
+      "availability": "local",
+      "timeout_seconds": 7200,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "models": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "string",
+              "maxLength": 40
+            }
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.ai.models",
+      "description": "列出可选模型及本机安装状态",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.ai.transcribe",
+      "description": "转写视频语音与歌词，返回可跟踪的作业",
+      "availability": "local",
+      "timeout_seconds": 120,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "language": {
+            "type": "string",
+            "maxLength": 16
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "start_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end_ms": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "workspace_root",
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.ai.job.status",
+      "description": "查询推理作业的阶段与结果",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.ai.job.cancel",
+      "description": "取消正在进行的推理作业",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.ai.job.list",
+      "description": "列出最近的推理作业",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "permissions": [],
+  "contributes": {
+    "views": [],
+    "commands": [
+      {
+        "id": "media.ai.runtime.status",
+        "title": "检查模型运行时"
+      },
+      {
+        "id": "media.ai.runtime.install",
+        "title": "获取模型运行时"
+      },
+      {
+        "id": "media.ai.models",
+        "title": "查看可用模型"
+      },
+      {
+        "id": "media.ai.transcribe",
+        "title": "转写语音与歌词"
+      },
+      {
+        "id": "media.ai.job.status",
+        "title": "查看推理进度"
+      },
+      {
+        "id": "media.ai.job.cancel",
+        "title": "取消推理作业"
+      }
+    ]
+  },
+  "capability_namespace": "media.ai"
+}

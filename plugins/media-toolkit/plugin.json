@@ -1,0 +1,468 @@
+{
+  "id": "com.himind.media-toolkit",
+  "name": "媒体处理工具",
+  "author": "马宝全",
+  "categories": [
+    "video-post",
+    "audio-sound"
+  ],
+  "description": "对视频与音频做确定性处理与测量：探测、转码压缩、抽帧拼图、画面活动与响度曲线。不依赖模型。",
+  "release_notes": "1.3.0：显示名改为「媒体处理工具」，与「媒体下载工具」等对齐类型词。",
+  "version": "1.3.0",
+  "entry": "bin/media-toolkit.exe",
+  "runtime": "process-jsonrpc-stdio",
+  "platforms": [
+    "windows-x64"
+  ],
+  "min_agent_version": "0.3.47",
+  "governance": "optional",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
+  "capabilities": [
+    {
+      "id": "media.toolkit.runtime.status",
+      "description": "查看 ffmpeg 是否就绪、可用能力与内置预设",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.toolkit.probe",
+      "description": "读取媒体的时长、帧率、分辨率与轨道信息",
+      "availability": "local",
+      "timeout_seconds": 60,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "workspace_root",
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.toolkit.recipe.plan",
+      "description": "只把处理步骤编译成 ffmpeg 参数，不执行",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "recipe": {
+            "$comment": "声明式处理步骤，见插件 README 的 recipe 结构说明",
+            "type": "object"
+          }
+        },
+        "required": [
+          "recipe"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.toolkit.recipe.run",
+      "description": "执行媒体处理并返回可跟踪的作业",
+      "availability": "local",
+      "timeout_seconds": 60,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "kind": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "recipe": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "recipe"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.toolkit.job.status",
+      "description": "查询作业的进度、产物与错误",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.toolkit.job.cancel",
+      "description": "取消正在运行的作业",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.toolkit.job.list",
+      "description": "列出最近的媒体处理作业",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.toolkit.scene.score",
+      "description": "抽取逐帧画面活动强度曲线",
+      "availability": "local",
+      "timeout_seconds": 1800,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "threshold": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "max_points": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200000
+          }
+        },
+        "required": [
+          "workspace_root",
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.toolkit.audio.loudness",
+      "description": "抽取响度曲线与整体响度",
+      "availability": "local",
+      "timeout_seconds": 1800,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "max_points": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200000
+          }
+        },
+        "required": [
+          "workspace_root",
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.toolkit.frames.contact-sheet",
+      "description": "把整段视频拼成一张缩略图网格",
+      "availability": "local",
+      "timeout_seconds": 1800,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "output": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "columns": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "interval_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tile_width": {
+            "type": "integer",
+            "minimum": 16,
+            "maximum": 1920
+          },
+          "quality": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31
+          }
+        },
+        "required": [
+          "workspace_root",
+          "path",
+          "output"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.toolkit.frames.extract",
+      "description": "在指定时刻抽取画面帧",
+      "availability": "local",
+      "timeout_seconds": 900,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "output_dir": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "times_ms": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 7680
+          },
+          "format": {
+            "enum": [
+              "jpg",
+              "jpeg",
+              "png"
+            ]
+          }
+        },
+        "required": [
+          "workspace_root",
+          "path",
+          "output_dir",
+          "times_ms"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.toolkit.files.list",
+      "description": "列出工作区里的媒体文件",
+      "availability": "local",
+      "timeout_seconds": 60,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "kind": {
+            "enum": [
+              "video",
+              "audio",
+              "image"
+            ]
+          },
+          "max_depth": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "workspace_root"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.toolkit.preview.image",
+      "description": "把工作区内的图片读成可显示的预览",
+      "availability": "local",
+      "timeout_seconds": 60,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1024
+          }
+        },
+        "required": [
+          "workspace_root",
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "permissions": [],
+  "contributes": {
+    "views": [
+      {
+        "id": "media.toolkit.main",
+        "title": "媒体处理工具",
+        "short_title": "媒体处理",
+        "icon": "media",
+        "quick_access": true,
+        "order": 62,
+        "location": "plugin_navigation",
+        "entry": "ui/index.html"
+      }
+    ],
+    "commands": [
+      {
+        "id": "media.toolkit.runtime.status",
+        "title": "检查媒体运行时"
+      },
+      {
+        "id": "media.toolkit.files.list",
+        "title": "列出工作区素材"
+      },
+      {
+        "id": "media.toolkit.probe",
+        "title": "读取媒体信息"
+      },
+      {
+        "id": "media.toolkit.recipe.plan",
+        "title": "预览处理参数"
+      },
+      {
+        "id": "media.toolkit.recipe.run",
+        "title": "执行媒体处理"
+      },
+      {
+        "id": "media.toolkit.job.status",
+        "title": "查看处理进度"
+      },
+      {
+        "id": "media.toolkit.job.cancel",
+        "title": "取消媒体处理"
+      },
+      {
+        "id": "media.toolkit.scene.score",
+        "title": "分析画面活动"
+      },
+      {
+        "id": "media.toolkit.audio.loudness",
+        "title": "分析音频响度"
+      },
+      {
+        "id": "media.toolkit.frames.contact-sheet",
+        "title": "生成缩略图网格"
+      },
+      {
+        "id": "media.toolkit.frames.extract",
+        "title": "抽取画面帧"
+      }
+    ]
+  },
+  "capability_namespace": "media.toolkit"
+}

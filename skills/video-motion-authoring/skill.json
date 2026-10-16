@@ -1,0 +1,150 @@
+{
+  "id": "com.himind.skill.video-motion-authoring",
+  "name": "视频动作编排助手",
+  "author": "马宝全",
+  "categories": [
+    "video-post",
+    "system-device"
+  ],
+  "version": "1.4.0",
+  "scope": "organization",
+  "description": "根据视频画面与声音推断该配的平台动作，生成演出规格、构建动作文件并预检，用于影院动感平台、体感游戏与 4D 特效厅的动作编排。",
+  "release_notes": "1.4.0：显示名补类型词为「视频动作编排助手」，与其他技能（如「媒体下载助手」）对齐。",
+  "min_agent_version": "0.3.47",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
+  "supported_clients": [
+    "agent-skills"
+  ],
+  "capabilities": [
+    {
+      "id": "media.toolkit.runtime.status",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "com.himind.media-toolkit"
+    },
+    {
+      "id": "media.toolkit.probe",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "com.himind.media-toolkit"
+    },
+    {
+      "id": "media.toolkit.scene.score",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "com.himind.media-toolkit"
+    },
+    {
+      "id": "media.toolkit.audio.loudness",
+      "required": false,
+      "min_version": "1.0.0",
+      "provider": "com.himind.media-toolkit"
+    },
+    {
+      "id": "media.toolkit.frames.contact-sheet",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "com.himind.media-toolkit"
+    },
+    {
+      "id": "media.toolkit.frames.extract",
+      "required": false,
+      "min_version": "1.0.0",
+      "provider": "com.himind.media-toolkit"
+    },
+    {
+      "id": "iostudio.runtime.status",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "com.himind.iostudio"
+    },
+    {
+      "id": "iostudio.devices",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "com.himind.iostudio"
+    },
+    {
+      "id": "iostudio.motion.plan",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "com.himind.iostudio"
+    },
+    {
+      "id": "iostudio.motion.build",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "com.himind.iostudio"
+    },
+    {
+      "id": "iostudio.motion.tracks",
+      "required": false,
+      "min_version": "1.0.0",
+      "provider": "com.himind.iostudio"
+    },
+    {
+      "id": "media.ai.runtime.status",
+      "required": false,
+      "min_version": "1.0.0",
+      "provider": "com.himind.media-ai"
+    },
+    {
+      "id": "media.ai.transcribe",
+      "required": false,
+      "min_version": "1.0.0",
+      "provider": "com.himind.media-ai"
+    },
+    {
+      "id": "media.ai.job.status",
+      "required": false,
+      "min_version": "1.0.0",
+      "provider": "com.himind.media-ai"
+    },
+    {
+      "id": "media.ai.runtime.install",
+      "required": false,
+      "min_version": "1.0.0",
+      "provider": "com.himind.media-ai"
+    },
+    {
+      "id": "iostudio.motion.validate",
+      "required": false,
+      "min_version": "1.0.0",
+      "provider": "com.himind.iostudio"
+    },
+    {
+      "id": "media.toolkit.recipe.run",
+      "required": false,
+      "min_version": "1.1.0",
+      "provider": "com.himind.media-toolkit"
+    }
+  ],
+  "plugin_dependencies": [
+    {
+      "plugin_id": "com.himind.media-toolkit",
+      "required": true,
+      "min_version": "1.0.0"
+    },
+    {
+      "plugin_id": "com.himind.iostudio",
+      "required": true,
+      "min_version": "1.0.0"
+    },
+    {
+      "plugin_id": "com.himind.media-ai",
+      "required": false,
+      "min_version": "1.0.0"
+    }
+  ],
+  "risk_summary": "local_write",
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml",
+    "references/action-vocabulary.json",
+    "references/show-spec.md"
+  ]
+}

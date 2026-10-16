@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "runtime": "whisper.cpp",
+  "release": "b5454",
+  "note": "二进制与模型都是**外部获取**的：插件不把它们打进包（体积与许可都不合适），而是在首次使用时按本文件锁定的版本与摘要下载并校验。urls 按顺序尝试 —— 实测 huggingface.co 在部分网络下不可达而 hf-mirror.com 可达，github 亦如此，所以镜像是一等公民而不是补丁。",
+  "archive": {
+    "asset": "whisper-blas-bin-x64.zip",
+    "size": 21715607,
+    "sha256": "b1158bd10edf92c9799149a6fc5d3e58da3f495241d6fb3423088130e88ffbf3",
+    "urls": [
+      "https://github.com/ggerganov/whisper.cpp/releases/download/b5454/whisper-blas-bin-x64.zip",
+      "https://ghfast.top/https://github.com/ggerganov/whisper.cpp/releases/download/b5454/whisper-blas-bin-x64.zip"
+    ],
+    "license": {
+      "name": "MIT",
+      "url": "https://github.com/ggerganov/whisper.cpp/blob/master/LICENSE"
+    },
+    "entry": "Release/whisper-cli.exe"
+  },
+  "models": [
+    {
+      "id": "tiny",
+      "file": "ggml-tiny.bin",
+      "size": 77691713,
+      "sha256": "be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21",
+      "multilingual": true,
+      "note": "最快、最省空间，用于快速试跑与粗定位；中文识别质量有限。"
+    },
+    {
+      "id": "small",
+      "file": "ggml-small.bin",
+      "size": 487601967,
+      "sha256": "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b",
+      "multilingual": true,
+      "note": "推荐默认。实测中文歌词可稳定转出，226 秒音频约 95 秒完成（单线程）。"
+    }
+  ],
+  "model_url_template": "https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/{file}",
+  "model_urls_fallback": [
+    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/{file}"
+  ],
+  "license_note": "模型权重由 OpenAI 以 MIT 许可发布；本项目只做获取与校验，不随包分发。"
+}
