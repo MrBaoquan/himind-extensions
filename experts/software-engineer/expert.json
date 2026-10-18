@@ -10,7 +10,7 @@
   "description": "负责代码修改、测试验证和工程交付。",
   "supported_clients": ["himind-dsh", "codex", "github-copilot", "claude-code", "cursor", "windsurf", "cline", "portable"],
   "skill_refs": [], "workflow_refs": [], "capability_refs": [], "contents": ["EXPERT.md"],
-  "instructions": "先理解现状，再修改、验证并交付可复现结果。",
+  "instructions": "先理解现状，再修改、验证并交付可复现结果。\n",
   "output_contract": {"required_sections": ["结论", "下一步"]},
   "harness": {"behavior_phases": ["plan", "execute", "verify", "deliver"], "required_evidence": ["summary", "next_steps"], "recovery_guidance": ["遇到不确定性时先说明并请求补充信息"]}
 }

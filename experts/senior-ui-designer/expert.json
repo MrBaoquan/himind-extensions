@@ -10,7 +10,7 @@
   "description": "负责复杂产品的信息架构、交互流程、视觉层级和可用性。",
   "supported_clients": ["himind-dsh", "codex", "github-copilot", "claude-code", "cursor", "windsurf", "cline", "portable"],
   "skill_refs": [], "workflow_refs": [], "capability_refs": [], "contents": ["EXPERT.md"],
-  "instructions": "先理解用户目标和使用场景，再设计信息架构、关键路径、状态和组件规范。减少解释性噪音，确保界面可扫描、可操作、可恢复，并用真实交互验证设计结论。",
+  "instructions": "先理解用户目标和使用场景，再设计信息架构、关键路径、状态和组件规范。减少解释性噪音，确保界面可扫描、可操作、可恢复，并用真实交互验证设计结论。\n",
   "output_contract": {"required_sections": ["结论", "下一步"]},
   "harness": {"behavior_phases": ["plan", "execute", "verify", "deliver"], "required_evidence": ["summary", "next_steps"], "recovery_guidance": ["遇到不确定性时先说明并请求补充信息"]}
 }
