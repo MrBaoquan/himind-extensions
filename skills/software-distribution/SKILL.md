@@ -7,7 +7,7 @@ description: 为 WPF 与 Unity 项目完成分发接入检查、制品校验、�
 
 本 Skill 通过外部 AI 工具的 `himind-agent-mcp` 编排 Agent 能力。它只负责软件分发接入、制品校验和发布流程，不直接修改插件或 Skill 源码。
 
-软件分发采用单一分层链路：Skill 负责编排；官方软件分发插件负责项目、制品和 Manifest 领域规则；Agent 内核负责预检收据、OAuth broker 和同一文件句柄上传。`workspace_root` 是本次明确指定的项目或制品目录，可以位于 AI 会话当前目录之外；扩展创作的工作区约束只由对应开发助手执行。
+软件分发采用单一分层链路：Skill 负责编排；Agent 内置的软件分发插件负责项目、制品和 Manifest 领域规则；Agent 内核负责预检收据、OAuth broker、GitHub 发布和同一文件句柄上传。软件分发插件随 Agent 发布，不需要单独安装。`workspace_root` 是本次明确指定的项目或制品目录，可以位于 AI 会话当前目录之外；扩展创作的工作区约束只由对应开发助手执行。
 
 ## 扩展创作闭环
 
@@ -15,7 +15,7 @@ description: 为 WPF 与 Unity 项目完成分发接入检查、制品校验、�
 
 1. 外部 AI 工具通过 `himind-agent-mcp` 的 `tools/list` / `tools/call` 发现并调用 Agent Capability。
 2. 插件任务使用 `插件开发助手`，Skill 任务使用 `技能开发助手`。
-3. 两个开发助手通过 MCP 调用 `extension.*` 能力，由 `com.himind.extension-development-tools` 执行脚手架、校验、构建和打包。
+3. 两个开发助手通过 MCP 调用 `extension.*` 能力，由 Agent 内置的扩展开发工具（`com.himind.extension-development-tools`）执行脚手架、校验、构建和打包。
 4. 候选包完成测试后，再由本 Skill 编排软件分发发布；不要复制三件套的源码修改、构建或提交流程。
 
 ## 能力边界

@@ -2,37 +2,108 @@
   "id": "com.himind.skill.develop-himind-skills",
   "name": "技能开发助手",
   "author": "马宝全",
-  "categories": ["software-engineering"],
+  "categories": [
+    "software-engineering"
+  ],
   "version": "1.8.3",
-  "distribution_targets": ["workbench", "github"],
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
   "scope": "organization",
   "description": "使用中文规范创建、校验、跨客户端测试、打包并受控提交 HiMind 技能。",
   "release_notes": "1.8.3：命名与文案规则改为引用扩展开发规范。",
   "min_agent_version": "0.3.37",
-  "supported_clients": ["agent-skills"],
-  "capabilities": [
-    {"id": "extension.authoring.identity", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.authoring.preflight", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.workspace.current", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.workspace.bind", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.workspace.clear", "required": false, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.revision.create", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.environment.preflight", "required": true, "min_version": "1.3.1", "provider": "com.himind.extension-development-tools"},
-    {"id": "extension.skill.scaffold", "required": true, "min_version": "1.3.1", "provider": "com.himind.extension-development-tools"},
-    {"id": "extension.skill.validate", "required": true, "min_version": "1.3.1", "provider": "com.himind.extension-development-tools"},
-    {"id": "extension.skill.package", "required": true, "min_version": "1.3.1", "provider": "com.himind.extension-development-tools"},
-    {"id": "extension.skill.candidate.save", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.test", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.skill.submission.submit", "required": false, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.skill.submission.status", "required": false, "min_version": "1.0.0", "provider": "agent"}
+  "supported_clients": [
+    "agent-skills"
   ],
-  "plugin_dependencies": [
+  "capabilities": [
     {
-      "plugin_id": "com.himind.extension-development-tools",
+      "id": "extension.authoring.identity",
       "required": true,
-      "min_version": "1.3.1"
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.authoring.preflight",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.workspace.current",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.workspace.bind",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.workspace.clear",
+      "required": false,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.revision.create",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.environment.preflight",
+      "required": true,
+      "min_version": "1.3.1",
+      "provider": "com.himind.extension-development-tools"
+    },
+    {
+      "id": "extension.skill.scaffold",
+      "required": true,
+      "min_version": "1.3.1",
+      "provider": "com.himind.extension-development-tools"
+    },
+    {
+      "id": "extension.skill.validate",
+      "required": true,
+      "min_version": "1.3.1",
+      "provider": "com.himind.extension-development-tools"
+    },
+    {
+      "id": "extension.skill.package",
+      "required": true,
+      "min_version": "1.3.1",
+      "provider": "com.himind.extension-development-tools"
+    },
+    {
+      "id": "extension.skill.candidate.save",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.test",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.skill.submission.submit",
+      "required": false,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.skill.submission.status",
+      "required": false,
+      "min_version": "1.0.0",
+      "provider": "agent"
     }
   ],
+  "plugin_dependencies": [],
   "risk_summary": "local_write; submission_requires_confirmation; publication_requires_admin_review",
   "contents": [
     "skill.json",

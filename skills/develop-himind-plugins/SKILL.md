@@ -51,7 +51,7 @@ description: 开发 HiMind Agent 插件：设计 Capability、编写 plugin.json
 
 ## 协作修订
 
-外部 AI 工具也可以迭代三件套自身。先将 AI 会话工作区切换到对应的三件套工程目录，再按本流程修改源码或文档；调用 `extension.revision.create` 时传入 `kind: plugin`、稳定 `id` 和当前 `version`，Agent 会创建下一个补丁版本并清除旧测试、确认和提审状态。三件套的确定性文件/构建操作仍由 `com.himind.extension-development-tools` 执行，Agent 的 `extension.test` 才是候选闭环门禁。
+外部 AI 工具也可以迭代三件套自身。先将 AI 会话工作区切换到对应的三件套工程目录，再按本流程修改源码或文档；调用 `extension.revision.create` 时传入 `kind: plugin`、稳定 `id` 和当前 `version`，Agent 会创建下一个补丁版本并清除旧测试、确认和提审状态。三件套的确定性文件/构建操作由 Agent 内置的扩展开发工具（`com.himind.extension-development-tools`）执行，Agent 的 `extension.test` 才是候选闭环门禁。
 
 1. 其他同事接手已上架插件时，仅在 Connected 模式下调用 `extension.plugin.submission.status` 定位产品、当前版本、提交 ID 和自己的协作角色；本地工程开发不依赖该状态。
 2. 开发者自行取得并管理源码工作副本。基于已发布版本修改时提升语义版本，更新 `release_notes`，重新完成校验、构建和打包。

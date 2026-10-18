@@ -1,12 +1,12 @@
 {
   "schema_version": "workflow_package.v1",
   "id": "com.himind.workflow.software-release",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "distribution_targets": ["workbench", "github"],
   "name": "软件发布",
   "description": "对已构建制品完成接入检查、制品校验、渠道发布与更新验证，发布凭据不经过 AI。",
-  "release_notes": "1.1.0：依赖的软件分发工具与能力 ID 收敛到 distribution.*（插件 1.3.0）。",
-  "min_agent_version": "0.3.47",
+  "release_notes": "1.1.1：软件分发能力已内置进 Agent，移除外部插件依赖；组织渠道与 GitHub 发布候选能力保持不变。",
+  "min_agent_version": "0.3.75",
   "local_requirements": {
     "platform": "windows",
     "workspace": "directory",
@@ -84,18 +84,20 @@
       "produces": ["channel_resolution"]
     }
   ],
+  "capability_alternatives": {
+    "distribution.release.publish": ["distribution.release.publish.github"]
+  },
   "capabilities": [
     "distribution.project.inspect",
     "distribution.artifact.inspect",
     "distribution.release.publish",
+    "distribution.release.publish.github",
     "distribution.release.resolve",
     "distribution.channel.resolve"
   ],
   "dependencies": {
     "skills": [],
-    "plugins": [
-      "com.himind.software-distribution"
-    ],
+    "plugins": [],
     "connectors": [],
     "runtimes": []
   },
@@ -152,7 +154,8 @@
       "kind": "capability",
       "capability_id": "distribution.channel.resolve",
       "execution_mode": "sync",
-      "risk_level": "read_only"
+      "risk_level": "R3",
+      "approval_required": true
     }
   ],
   "artifacts": [

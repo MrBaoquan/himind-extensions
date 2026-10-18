@@ -2,9 +2,19 @@
 
 马宝全维护的 HiMind Agent 插件、Skill 与 Workflow 源码仓库。仓库统一版本控制和协作入口，每个扩展仍独立版本化、构建、测试和发布。
 
-扩展创作工具链是一个共享的 `com.himind.extension-development-tools` 工具插件，加上插件开发助手、技能开发助手、工作流开发助手和扩展开发规范四个 Skill。三类创作共用 Workspace、Candidate、Extension Lock、测试报告和提审生命周期，但保留各自的确定性校验与运行语义。
+扩展创作工具链已内置进 Agent：`com.himind.extension-development-tools` 作为内置插件随 Agent 发布，外部同 ID 插件已退役；插件开发助手、技能开发助手、工作流开发助手和扩展开发规范四个 Skill 仍由本仓发布。三类创作共用 Workspace、Candidate、Extension Lock、测试报告和提审生命周期，但保留各自的确定性校验与运行语义。
 
 稳定 ID、目录名、显示名称、用途说明、触发说明和更新说明都有长度上限，脚手架和校验超限即拒绝，阈值以 `tooling/metaguide` 为准。类型专属的字段清单和流程写在各自的开发助手里；跨类型的命名、分类、依赖和分发规则统一由 `skills/develop-himind-conventions`（扩展开发规范）承载，`extension.environment.preflight` 会把同一份规则和字段约束一起返回给创作方。
+
+## 内置插件与外部扩展
+
+每个插件 ID 只有一个家，不能同时存在「内置」和「外置」两套实现：
+
+- **内置插件**：源码在 HiMind-Agent，随 Agent 发布，注册表可见但不可卸载；外部同 ID 副本不会被加载，安装入口会拒绝。当前的扩展开发工具 `com.himind.extension-development-tools` 和软件分发工具 `com.himind.software-distribution` 都属于这一类。
+- **外部扩展**：源码在本仓或项目扩展仓，按本仓的构建、签名和发布流程独立演进。只有真正需要独立发布节奏、独立维护者或项目私有交付的能力才放在这里。
+- **创作用 Skill**：插件开发助手、技能开发助手、工作流开发助手和扩展开发规范仍由本仓发布；它们调用 Agent 内置的 `extension.*` 能力，不再依赖外部工具插件。
+
+注册表条目按语义分为三类：`plugin`（本地能力包）、`connector`（凭据、本机进程等特权集成）和 `provider`（控制面契约适配）。插件列表只展示 `plugin` 与 `connector`，避免把纯控制面 provider 当成可安装插件。
 
 ## 目录
 
@@ -118,7 +128,7 @@ go run ./tools/cmd/himind-agent-workspace-sync -commit (git rev-parse HEAD)
   {
     "id": "com.himind.feature.extension-authoring",
     "name": "扩展创作",
-    "plugin_ids": ["com.himind.extension-development-tools"],
+    "plugin_ids": [],
     "skill_ids": [
       "com.himind.skill.develop-himind-plugins",
       "com.himind.skill.develop-himind-skills",

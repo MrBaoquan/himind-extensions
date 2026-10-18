@@ -2,40 +2,127 @@
   "id": "com.himind.skill.develop-himind-workflows",
   "name": "工作流开发助手",
   "author": "马宝全",
-  "categories": ["software-engineering", "collaboration-delivery"],
+  "categories": [
+    "software-engineering",
+    "collaboration-delivery"
+  ],
   "version": "1.0.3",
-  "distribution_targets": ["workbench", "github"],
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
   "scope": "organization",
   "description": "设计、创建、校验、契约测试、打包并受控提交 HiMind 工作流。",
   "release_notes": "1.0.3：命名与文案规则改为引用扩展开发规范，预检表述改用扩展创作工具链。",
   "min_agent_version": "0.3.47",
-  "supported_clients": ["agent-skills"],
-  "capabilities": [
-    {"id": "extension.authoring.identity", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.authoring.preflight", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.workspace.current", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.workspace.bind", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.workspace.clear", "required": false, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.revision.create", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.environment.preflight", "required": true, "min_version": "1.4.0", "provider": "com.himind.extension-development-tools"},
-    {"id": "extension.workflow.scaffold", "required": true, "min_version": "1.4.0", "provider": "com.himind.extension-development-tools"},
-    {"id": "extension.workflow.validate", "required": true, "min_version": "1.4.0", "provider": "com.himind.extension-development-tools"},
-    {"id": "extension.workflow.build", "required": true, "min_version": "1.4.0", "provider": "com.himind.extension-development-tools"},
-    {"id": "extension.workflow.package", "required": true, "min_version": "1.4.0", "provider": "com.himind.extension-development-tools"},
-    {"id": "extension.workflow.candidate.save", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.workflow.candidate.test", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.workflow.candidate.confirm", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.test", "required": true, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.workflow.submission.submit", "required": false, "min_version": "1.0.0", "provider": "agent"},
-    {"id": "extension.workflow.submission.status", "required": false, "min_version": "1.0.0", "provider": "agent"}
+  "supported_clients": [
+    "agent-skills"
   ],
-  "plugin_dependencies": [
+  "capabilities": [
     {
-      "plugin_id": "com.himind.extension-development-tools",
+      "id": "extension.authoring.identity",
       "required": true,
-      "min_version": "1.4.0"
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.authoring.preflight",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.workspace.current",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.workspace.bind",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.workspace.clear",
+      "required": false,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.revision.create",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.environment.preflight",
+      "required": true,
+      "min_version": "1.4.0",
+      "provider": "com.himind.extension-development-tools"
+    },
+    {
+      "id": "extension.workflow.scaffold",
+      "required": true,
+      "min_version": "1.4.0",
+      "provider": "com.himind.extension-development-tools"
+    },
+    {
+      "id": "extension.workflow.validate",
+      "required": true,
+      "min_version": "1.4.0",
+      "provider": "com.himind.extension-development-tools"
+    },
+    {
+      "id": "extension.workflow.build",
+      "required": true,
+      "min_version": "1.4.0",
+      "provider": "com.himind.extension-development-tools"
+    },
+    {
+      "id": "extension.workflow.package",
+      "required": true,
+      "min_version": "1.4.0",
+      "provider": "com.himind.extension-development-tools"
+    },
+    {
+      "id": "extension.workflow.candidate.save",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.workflow.candidate.test",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.workflow.candidate.confirm",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.test",
+      "required": true,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.workflow.submission.submit",
+      "required": false,
+      "min_version": "1.0.0",
+      "provider": "agent"
+    },
+    {
+      "id": "extension.workflow.submission.status",
+      "required": false,
+      "min_version": "1.0.0",
+      "provider": "agent"
     }
   ],
+  "plugin_dependencies": [],
   "risk_summary": "local_write; workflow_contract; candidate_freeze; submission_requires_confirmation; publication_requires_admin_review",
   "contents": [
     "skill.json",

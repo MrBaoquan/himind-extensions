@@ -56,7 +56,7 @@ description: 插件、技能、工作流三类扩展的创作规范：选型边�
 ## 五、依赖
 
 1. 优先依赖稳定 Capability ID；只有必须绑定某个具体实现或资源时才写 `plugin_dependencies`，并给出真实的 `min_version`。
-2. 只声明运行时真实依赖。`com.himind.extension-development-tools` 和四个创作技能是创作期工具，不是业务扩展的运行时依赖；写进业务扩展会迫使使用者安装整条创作工具链。
+2. 只声明运行时真实依赖。`com.himind.extension-development-tools` 是随 Agent 发布的内置插件，四个创作技能是创作期工具，都不是业务扩展的运行时依赖；不要写进业务扩展的 `plugin_dependencies`。
 3. 缺失依赖要报 `blocked` 并给出补救步骤，不自动安装，也不为了通过测试伪造 Capability 或平台状态。
 4. 工作流的依赖分 `skills`、`plugins`、`connectors`、`runtimes` 四类；凭据只通过 `credential_handles` 引用，不把真实值写进输入。
 

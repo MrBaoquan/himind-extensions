@@ -12,16 +12,6 @@
   "extensions": [
     {
       "type": "plugin",
-      "id": "com.himind.extension-development-tools",
-      "path": "plugins/extension-development-tools"
-    },
-    {
-      "type": "plugin",
-      "id": "com.himind.software-distribution",
-      "path": "plugins/software-distribution"
-    },
-    {
-      "type": "plugin",
       "id": "com.himind.tech-radar",
       "path": "plugins/tech-radar"
     },
@@ -175,9 +165,7 @@
     {
       "id": "com.himind.feature.extension-authoring",
       "name": "扩展创作",
-      "plugin_ids": [
-        "com.himind.extension-development-tools"
-      ],
+      "plugin_ids": [],
       "skill_ids": [
         "com.himind.skill.develop-himind-plugins",
         "com.himind.skill.develop-himind-skills",

@@ -17,6 +17,7 @@
 | SD-PUBLISH 发布到组织渠道 | capability | R3（需审批） | `distribution.release.publish`，使用 Agent 内部短时委托身份 |
 | SD-RESOLVE 验证线上更新解析 | capability | R3（需审批） | `distribution.release.resolve`，验证旧版本有更新、当前版本无更新 |
 | SD-ACCEPT 目标端安装与验收 | manual | R3（需审批） | 真实设备安装/替换结果的人工确认，失败即组织回滚 |
+| SD-CHANNEL 解析 GitHub 更新 | capability | R3（需审批） | `distribution.channel.resolve` 读取 GitHub 渠道文档，按 R3 风险走审批门禁 |
 
 ## 入口与出口（segmented）
 
@@ -37,9 +38,9 @@
 
 ## 依赖与运行模式
 
-- 插件：`com.himind.software-distribution`（提供 inspect / resolve 能力）。
-- `distribution.release.publish` 属于 Dashboard 控制面能力，需要 **Connected 模式**与发布授权（`RELEASE_MANAGE_SCOPE`）。Independent 模式下该步骤不可用，Preflight 会阻断。
-- 凭据由 Agent 内置 broker 以短时委托身份获取，AI、插件与工作流输入都不接触 Token。
+- 插件：`com.himind.software-distribution` 已内置进 Agent（提供 inspect / resolve 能力），不需要单独安装；外部同 ID 插件不会被加载或安装。
+- `distribution.release.publish` 优先走组织渠道：Connected 模式下由 Agent 内置 broker 使用短时委托身份发布。Independent 模式下会自动改用候选能力 `distribution.release.publish.github`，前提是本机已绑定 GitHub 账号且目标仓库在白名单内。
+- GitHub 只发布 Release 资产，不包含工作台审核和不可变制品签名；结论必须明确区分「组织发布」和「仓库级发布」。凭据由 Agent 持有，AI、插件与工作流输入都不接触 Token。
 
 ## 灰度与回滚
 

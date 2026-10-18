@@ -339,11 +339,23 @@ func ensureCatalogComplete(root, directory, manifest string, paths map[string]st
 		if !entry.IsDir() {
 			continue
 		}
+		// 以点或下划线开头的目录是仓库自用的脚手架/共享资源，不当作扩展工程。
+		if strings.HasPrefix(entry.Name(), ".") || strings.HasPrefix(entry.Name(), "_") {
+			continue
+		}
 		relative := filepath.ToSlash(filepath.Join(directory, entry.Name()))
-		if _, err := os.Stat(filepath.Join(root, relative, manifest)); err == nil {
-			if _, ok := paths[relative]; !ok {
-				return fmt.Errorf("%s is missing from extensions.json", relative)
+		manifestPath := filepath.Join(root, relative, manifest)
+		if _, err := os.Stat(manifestPath); err != nil {
+			if os.IsNotExist(err) {
+				// 构建产物或删除源码后留下的空壳目录必须显式清理；否则 Go 的
+				// ./... 测试仍会把它当作扩展扫描，最终以“文件不存在”这种
+				// 远离根因的报错失败。
+				return fmt.Errorf("%s exists but is missing %s; remove the stale directory or add the manifest", relative, manifest)
 			}
+			return err
+		}
+		if _, ok := paths[relative]; !ok {
+			return fmt.Errorf("%s is missing from extensions.json", relative)
 		}
 	}
 	return nil
