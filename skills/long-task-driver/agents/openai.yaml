@@ -1,0 +1,4 @@
+interface:
+  display_name: "长任务推进助手"
+  short_description: "把讨论收敛成任务契约并跨会话持续推进"
+  default_prompt: "使用 $long-task-driver 把当前讨论整理成长任务契约并推进。"

@@ -156,6 +156,11 @@
       "path": "skills/video-motion-authoring"
     },
     {
+      "type": "skill",
+      "id": "com.himind.skill.long-task-driver",
+      "path": "skills/long-task-driver"
+    },
+    {
       "type": "plugin",
       "id": "com.himind.media-ai",
       "path": "plugins/media-ai"
