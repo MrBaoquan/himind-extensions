@@ -27,6 +27,7 @@ func TestPayloadFilesIsExclusionBased(t *testing.T) {
 		"dist/bundle.js",
 		"target/debug/out",
 		"test-output/report.json",
+		".cache/webpack/0.pack",
 		".github/workflows/validate.yml",
 		".git/config",
 		"package-lock.json",

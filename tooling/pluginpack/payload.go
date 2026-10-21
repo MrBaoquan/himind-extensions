@@ -48,7 +48,7 @@ func PayloadFiles(root string) ([]string, error) {
 // prevents large UI plugins from timing out while being archived.
 func shouldSkipPackageDirectory(name string) bool {
 	switch strings.ToLower(name) {
-	case ".git", ".github", "node_modules", "dist", "target", "test-output":
+	case ".git", ".github", ".cache", "node_modules", "dist", "target", "test-output":
 		return true
 	default:
 		return false
