@@ -91,6 +91,48 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 			return nil, rpcError(err)
 		}
 		return value, nil
+	case "media.downloader.job.retry":
+		var input JobStatusInput
+		if rpcError := jsonrpc.DecodeParams(request, &input); rpcError != nil {
+			return nil, rpcError
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		value, err := retryJob(ctx, input.JobID)
+		if err != nil {
+			return nil, rpcError(err)
+		}
+		return value, nil
+	case "media.downloader.job.remove":
+		var input JobStatusInput
+		if rpcError := jsonrpc.DecodeParams(request, &input); rpcError != nil {
+			return nil, rpcError
+		}
+		value, err := removeJob(input.JobID)
+		if err != nil {
+			return nil, rpcError(err)
+		}
+		return value, nil
+	case "media.downloader.job.cleanup":
+		var input JobCleanupInput
+		if rpcError := decodeOptionalParams(request, &input); rpcError != nil {
+			return nil, rpcError
+		}
+		value, err := cleanupJobRecords(input)
+		if err != nil {
+			return nil, rpcError(err)
+		}
+		return value, nil
+	case "media.downloader.job.log":
+		var input JobLogInput
+		if rpcError := jsonrpc.DecodeParams(request, &input); rpcError != nil {
+			return nil, rpcError
+		}
+		value, err := getJobLog(input)
+		if err != nil {
+			return nil, rpcError(err)
+		}
+		return value, nil
 	case "media.downloader.job.list":
 		var input JobListInput
 		if rpcError := decodeOptionalParams(request, &input); rpcError != nil {

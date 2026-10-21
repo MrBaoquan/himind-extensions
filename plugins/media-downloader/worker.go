@@ -109,7 +109,11 @@ func runWorker(jobID string) error {
 	if len(outputs) == 0 {
 		return failJob(jobID, fmt.Errorf("下载器已结束，但没有检测到新的媒体文件"))
 	}
+	var outputBytes int64
 	for _, output := range outputs {
+		if info, statErr := os.Stat(output); statErr == nil {
+			outputBytes += info.Size()
+		}
 		if err := writeSourceSidecar(record, output, version, ffmpegPath); err != nil {
 			return failJob(jobID, err)
 		}
@@ -118,6 +122,7 @@ func runWorker(jobID string) error {
 		item.Status = "completed"
 		item.Progress = 100
 		item.Outputs = outputs
+		item.OutputBytes = outputBytes
 		item.Error = ""
 		item.FinishedAt = time.Now().UTC().Format(time.RFC3339)
 	})
@@ -126,17 +131,21 @@ func runWorker(jobID string) error {
 
 func workerInput(record JobRecord) JobStartInput {
 	return JobStartInput{
-		WorkspaceRoot: record.WorkspaceRoot,
-		URL:           record.URL,
-		DestDir:       record.DestDir,
-		FormatID:      record.FormatID,
-		Quality:       record.Quality,
-		AudioOnly:     record.AudioOnly,
-		Subtitles:     record.Subtitles,
-		Playlist:      record.Playlist,
-		MaxItems:      record.MaxItems,
-		MaxBytes:      record.MaxBytes,
-		Overwrite:     record.Overwrite,
+		WorkspaceRoot:   record.WorkspaceRoot,
+		URL:             record.URL,
+		DestDir:         record.DestDir,
+		FormatID:        record.FormatID,
+		Quality:         record.Quality,
+		AudioOnly:       record.AudioOnly,
+		Subtitles:       record.Subtitles,
+		Playlist:        record.Playlist,
+		MaxItems:        record.MaxItems,
+		MaxBytes:        record.MaxBytes,
+		Overwrite:       record.Overwrite,
+		Title:           record.Title,
+		Thumbnail:       record.Thumbnail,
+		Extractor:       record.Extractor,
+		DurationSeconds: record.DurationSeconds,
 	}
 }
 
@@ -230,7 +239,7 @@ func snapshotFiles(root string) (map[string]fileFingerprint, error) {
 	return result, err
 }
 
-func changedFiles(before, after map[string]fileFingerprint, workspaceRoot string) []string {
+func changedFiles(before, after map[string]fileFingerprint, destinationRoot string) []string {
 	paths := make([]string, 0)
 	for path, fingerprint := range after {
 		old, existed := before[path]
@@ -242,7 +251,7 @@ func changedFiles(before, after map[string]fileFingerprint, workspaceRoot string
 	result := paths[:0]
 	for _, path := range paths {
 		absolute, err := filepath.Abs(path)
-		if err != nil || !withinRoot(workspaceRoot, absolute) {
+		if err != nil || !withinRoot(destinationRoot, absolute) {
 			continue
 		}
 		result = append(result, absolute)

@@ -1,6 +1,6 @@
 # 媒体下载工具
 
-把公开网页中的在线音视频、字幕和播放列表下载到用户指定的工作区，并记录来源、格式、摘要和 yt-dlp 版本。
+把公开网页中的在线音视频、字幕和播放列表下载到系统下载文件夹或用户指定的本机目录，并记录来源、格式、摘要和 yt-dlp 版本。
 
 ## 能力
 
@@ -10,7 +10,9 @@
 - `media.downloader.job.start`：创建受控下载任务。
 - `media.downloader.job.status`：查询任务进度和产物。
 - `media.downloader.job.cancel`：取消任务。
-- `media.downloader.job.list`：列出最近任务。
+- `media.downloader.job.list`：分页、筛选并汇总任务记录。
+- `media.downloader.job.cleanup`：按状态和保留天数批量清理已结束记录，支持 dry-run。
+- `media.downloader.job.retry`、`media.downloader.job.remove`、`media.downloader.job.log`：重试、删除记录与读取诊断日志。
 
 ## 运行时策略
 
@@ -25,5 +27,7 @@
 - 只接受 `http` / `https` URL，拒绝本机、私网、链路本地和云元数据地址。
 - 不接受 Cookie、浏览器凭据、代理凭据、DRM 或登录绕过参数。
 - 不执行任意 Shell、任意 yt-dlp 参数或任意外部下载器。
-- 输出目录必须位于调用方指定的工作区内。
+- 默认保存到系统下载文件夹；也可以选择其他本机目录。相对目录仍限制在工作区内。
+- 当 Agent 沙箱不允许写入目标目录时，会自动回退到插件目录下的 `.himind-downloads`，任务记录会保留实际保存路径。
 - 默认不下载播放列表；启用时限制条目数、文件大小和并发行为。
+- 记录清理只删除任务元数据与日志，不删除已下载的媒体文件。

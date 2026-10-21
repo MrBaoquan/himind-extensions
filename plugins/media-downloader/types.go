@@ -1,15 +1,19 @@
 package main
 
 type RuntimeStatus struct {
-	State           string   `json:"state"`
-	Source          string   `json:"source,omitempty"`
-	Path            string   `json:"path,omitempty"`
-	Version         string   `json:"version,omitempty"`
-	ExpectedVersion string   `json:"expected_version"`
-	FFmpegPath      string   `json:"ffmpeg_path,omitempty"`
-	FFmpegVersion   string   `json:"ffmpeg_version,omitempty"`
-	Capabilities    []string `json:"capabilities"`
-	Message         string   `json:"message,omitempty"`
+	State             string   `json:"state"`
+	Source            string   `json:"source,omitempty"`
+	Path              string   `json:"path,omitempty"`
+	Version           string   `json:"version,omitempty"`
+	ExpectedVersion   string   `json:"expected_version"`
+	FFmpegPath        string   `json:"ffmpeg_path,omitempty"`
+	FFmpegVersion     string   `json:"ffmpeg_version,omitempty"`
+	DataRoot          string   `json:"data_root,omitempty"`
+	DataRootWritable  bool     `json:"data_root_writable"`
+	DownloadsDir      string   `json:"downloads_dir,omitempty"`
+	DownloadsWritable bool     `json:"downloads_writable"`
+	Capabilities      []string `json:"capabilities"`
+	Message           string   `json:"message,omitempty"`
 }
 
 type RuntimeInstallResult struct {
@@ -66,25 +70,85 @@ type MediaInfo struct {
 }
 
 type JobStartInput struct {
-	WorkspaceRoot string   `json:"workspace_root"`
-	URL           string   `json:"url"`
-	DestDir       string   `json:"dest_dir,omitempty"`
-	FormatID      string   `json:"format_id,omitempty"`
-	Quality       string   `json:"quality,omitempty"`
-	AudioOnly     bool     `json:"audio_only,omitempty"`
-	Subtitles     []string `json:"subtitles,omitempty"`
-	Playlist      bool     `json:"playlist,omitempty"`
-	MaxItems      int      `json:"max_items,omitempty"`
-	MaxBytes      int64    `json:"max_bytes,omitempty"`
-	Overwrite     bool     `json:"overwrite,omitempty"`
+	WorkspaceRoot   string   `json:"workspace_root"`
+	URL             string   `json:"url"`
+	DestDir         string   `json:"dest_dir,omitempty"`
+	FormatID        string   `json:"format_id,omitempty"`
+	Quality         string   `json:"quality,omitempty"`
+	AudioOnly       bool     `json:"audio_only,omitempty"`
+	Subtitles       []string `json:"subtitles,omitempty"`
+	Playlist        bool     `json:"playlist,omitempty"`
+	MaxItems        int      `json:"max_items,omitempty"`
+	MaxBytes        int64    `json:"max_bytes,omitempty"`
+	Overwrite       bool     `json:"overwrite,omitempty"`
+	Title           string   `json:"title,omitempty"`
+	Thumbnail       string   `json:"thumbnail,omitempty"`
+	Extractor       string   `json:"extractor,omitempty"`
+	DurationSeconds float64  `json:"duration_seconds,omitempty"`
 }
 
 type JobStatusInput struct {
 	JobID string `json:"job_id"`
 }
 
+type JobLogInput struct {
+	JobID    string `json:"job_id"`
+	MaxBytes int    `json:"max_bytes,omitempty"`
+}
+
+type JobCleanupInput struct {
+	Statuses      []string `json:"statuses,omitempty"`
+	OlderThanDays int      `json:"older_than_days,omitempty"`
+	Limit         int      `json:"limit,omitempty"`
+	DryRun        bool     `json:"dry_run,omitempty"`
+}
+
+type JobCleanupResult struct {
+	Matched   int  `json:"matched"`
+	Removed   int  `json:"removed"`
+	Failed    int  `json:"failed"`
+	Remaining int  `json:"remaining"`
+	DryRun    bool `json:"dry_run"`
+}
+
+type JobLogResult struct {
+	JobID     string `json:"job_id"`
+	Path      string `json:"path"`
+	Tail      string `json:"tail"`
+	Truncated bool   `json:"truncated"`
+	Size      int64  `json:"size"`
+}
+
 type JobListInput struct {
-	Limit int `json:"limit,omitempty"`
+	Limit    int      `json:"limit,omitempty"`
+	Offset   int      `json:"offset,omitempty"`
+	Query    string   `json:"query,omitempty"`
+	Statuses []string `json:"statuses,omitempty"`
+	Since    string   `json:"since,omitempty"`
+	Until    string   `json:"until,omitempty"`
+	Sort     string   `json:"sort,omitempty"`
+}
+
+type JobSummary struct {
+	Total           int   `json:"total"`
+	Queued          int   `json:"queued"`
+	Running         int   `json:"running"`
+	Canceling       int   `json:"canceling"`
+	Completed       int   `json:"completed"`
+	Failed          int   `json:"failed"`
+	Canceled        int   `json:"canceled"`
+	Active          int   `json:"active"`
+	DownloadedBytes int64 `json:"downloaded_bytes"`
+	OutputBytes     int64 `json:"output_bytes"`
+}
+
+type JobListResult struct {
+	Items   []JobRecord `json:"items"`
+	Total   int         `json:"total"`
+	Count   int         `json:"count"`
+	Offset  int         `json:"offset"`
+	Limit   int         `json:"limit"`
+	Summary JobSummary  `json:"summary"`
 }
 
 type JobRecord struct {
@@ -92,6 +156,9 @@ type JobRecord struct {
 	Status          string   `json:"status"`
 	URL             string   `json:"url"`
 	Title           string   `json:"title,omitempty"`
+	Thumbnail       string   `json:"thumbnail,omitempty"`
+	Extractor       string   `json:"extractor,omitempty"`
+	DurationSeconds float64  `json:"duration_seconds,omitempty"`
 	WorkspaceRoot   string   `json:"workspace_root"`
 	DestDir         string   `json:"dest_dir"`
 	FormatID        string   `json:"format_id,omitempty"`
@@ -109,6 +176,7 @@ type JobRecord struct {
 	Progress        float64  `json:"progress"`
 	DownloadedBytes int64    `json:"downloaded_bytes,omitempty"`
 	TotalBytes      int64    `json:"total_bytes,omitempty"`
+	OutputBytes     int64    `json:"output_bytes,omitempty"`
 	Speed           string   `json:"speed,omitempty"`
 	ETA             string   `json:"eta,omitempty"`
 	Outputs         []string `json:"outputs,omitempty"`

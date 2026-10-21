@@ -3,11 +3,11 @@
   "name": "媒体下载助手",
   "author": "超级管理员",
   "categories": ["video-post", "audio-sound", "data-automation"],
-  "version": "0.1.0",
+  "version": "0.1.1",
   "distribution_targets": ["workbench", "github"],
   "scope": "organization",
   "description": "把用户的媒体下载意图转换为受控的解析、选择和任务跟踪步骤，适合网页音视频、字幕和播放列表下载场景。",
-  "release_notes": "0.1.0：首个版本，编排媒体下载工具的运行时检查、链接解析和下载任务。",
+  "release_notes": "0.1.1：适配默认系统下载文件夹和自定义保存目录。",
   "min_agent_version": "0.3.47",
   "supported_clients": ["agent-skills"],
   "capabilities": [

@@ -7,9 +7,9 @@
     "audio-sound",
     "data-automation"
   ],
-  "description": "把网页中的在线音视频、字幕和播放列表下载到工作区，并记录来源信息。",
-  "release_notes": "0.1.0：首个版本，提供运行时检测、链接解析和受控下载任务。",
-  "version": "0.1.0",
+  "description": "把网页中的在线音视频、字幕和播放列表下载到系统下载文件夹或指定目录，并记录来源信息。",
+  "release_notes": "0.2.2：修复搜索框嵌套边框与高度对齐，保持下载管理表格收敛。",
+  "version": "0.2.2",
   "distribution_targets": [
     "workbench",
     "github"
@@ -99,7 +99,7 @@
           },
           "dest_dir": {
             "type": "string",
-            "maxLength": 200
+            "maxLength": 1000
           },
           "format_id": {
             "type": "string",
@@ -139,6 +139,23 @@
           },
           "overwrite": {
             "type": "boolean"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "thumbnail": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "extractor": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "duration_seconds": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000000
           }
         },
         "required": [
@@ -201,9 +218,154 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 200
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "statuses": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "running",
+                "canceling",
+                "completed",
+                "failed",
+                "canceled"
+              ]
+            }
+          },
+          "since": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "until": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "created_desc",
+              "created_asc",
+              "size_desc",
+              "progress_desc",
+              "title_asc"
+            ]
           }
         },
         "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "media.downloader.job.retry",
+      "description": "沿用原任务参数重新创建下载任务",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "media.downloader.job.remove",
+      "description": "删除已结束任务的记录与日志，不删除媒体文件",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "media.downloader.job.cleanup",
+      "description": "按受控条件批量清理已结束任务的记录与日志",
+      "availability": "local",
+      "timeout_seconds": 60,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "statuses": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "failed",
+                "canceled"
+              ]
+            }
+          },
+          "older_than_days": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3650
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "dry_run": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "media.downloader.job.log",
+      "description": "读取任务日志尾部用于诊断",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1024,
+            "maximum": 262144
+          }
+        },
+        "required": [
+          "job_id"
+        ],
         "additionalProperties": false
       },
       "risk_level": "read_only"
@@ -212,6 +374,7 @@
   "permissions": [
     "filesystem.workspace.read",
     "filesystem.workspace.write",
+    "filesystem.downloads.write",
     "network.web.read",
     "network.package-registry",
     "process.media-tool",
@@ -228,7 +391,7 @@
         "quick_access": true,
         "order": 61,
         "location": "plugin_navigation",
-        "entry": "ui/index.html"
+        "entry": "ui/download.html"
       }
     ],
     "commands": [
@@ -255,6 +418,10 @@
       {
         "id": "media.downloader.job.cancel",
         "title": "取消下载任务"
+      },
+      {
+        "id": "media.downloader.job.cleanup",
+        "title": "清理下载记录"
       }
     ]
   }

@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>媒体下载 · 任务中心</title>
+  <meta name="himind-ui-build" content="2026-10-19.7">
+  <link rel="stylesheet" href="style.css?v=20261019.7">
+</head>
+<body>
+  <svg class="icon-sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-overview" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></symbol>
+    <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.14.36.36.7.67.97.3.27.67.42 1.06.43H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51.6z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4-4"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.9-4M4 5v5h5"/><path d="M4 13a8 8 0 0 0 14.9 4M20 19v-5h-5"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1"/></symbol>
+    <symbol id="i-paste" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M9 10h6M9 14h6M9 18h4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4 4L19 7"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9 2.5 17.4A2 2 0 0 0 4.2 20.4h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h5l2 2H19.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-retry" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
+    <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/><path d="M4 11.5v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h7M15 18h5"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="13" cy="18" r="2"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.5c0 4.7 3.2 8 7.5 9.5 4.3-1.5 7.5-4.8 7.5-9.5V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></symbol>
+    <symbol id="i-log" viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+  </svg>
+
+  <div id="sidebar-scrim" class="sidebar-scrim" hidden></div>
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar">
+      <div class="brand">
+        <span class="brand-mark"><svg class="icon"><use href="#i-download"></use></svg></span>
+        <div class="brand-copy">
+          <strong>媒体下载</strong>
+          <small>Media Downloader</small>
+        </div>
+      </div>
+
+      <nav class="nav" aria-label="主导航">
+        <button class="nav-item active" type="button" data-view="overview" aria-current="page">
+          <svg class="icon"><use href="#i-overview"></use></svg><span>概览</span>
+        </button>
+        <button class="nav-item" type="button" data-view="download">
+          <svg class="icon"><use href="#i-download"></use></svg><span>新建下载</span>
+        </button>
+        <button class="nav-item" type="button" data-view="tasks">
+          <svg class="icon"><use href="#i-list"></use></svg><span>下载管理</span><span id="nav-active-count" class="nav-badge" hidden>0</span>
+        </button>
+        <button class="nav-item" type="button" data-view="runtime">
+          <svg class="icon"><use href="#i-cpu"></use></svg><span>运行时与诊断</span>
+        </button>
+        <button class="nav-item" type="button" data-view="settings">
+          <svg class="icon"><use href="#i-settings"></use></svg><span>设置</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="side-runtime" id="side-runtime">
+          <span id="side-runtime-dot" class="dot muted"></span>
+          <div class="side-runtime-copy">
+            <strong id="side-runtime-label">运行时未检查</strong>
+            <span id="side-runtime-version">yt-dlp · ffmpeg</span>
+          </div>
+          <button id="side-runtime-action" class="icon-btn tiny" type="button" title="检查运行时" aria-label="检查运行时">
+            <svg class="icon"><use href="#i-refresh"></use></svg>
+          </button>
+        </div>
+        <div class="workspace-chip" title="当前插件视图绑定的工作区">
+          <svg class="icon"><use href="#i-folder"></use></svg>
+          <div><span>工作区</span><strong id="workspace-label">未绑定</strong></div>
+        </div>
+        <div class="version-line">媒体下载 0.2.2 · UI 2026.10.19.7</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="page-head">
+        <div class="page-heading">
+          <button id="sidebar-toggle" class="icon-btn mobile-menu" type="button" aria-label="打开导航">
+            <svg class="icon"><use href="#i-menu"></use></svg>
+          </button>
+          <div>
+            <h1 id="page-title">概览</h1>
+            <p id="page-subtitle">下载队列、运行状态与最近完成的集中视图。</p>
+          </div>
+        </div>
+        <div class="page-actions">
+          <label class="search-field page-search">
+            <svg class="icon"><use href="#i-search"></use></svg>
+            <input id="global-search" type="search" placeholder="搜索任务…" autocomplete="off" aria-label="搜索任务">
+            <kbd>Ctrl K</kbd>
+          </label>
+          <button id="refresh-all" class="icon-btn" type="button" title="刷新全部数据" aria-label="刷新全部数据">
+            <svg class="icon"><use href="#i-refresh"></use></svg>
+          </button>
+          <button id="new-download" class="btn primary" type="button">
+            <svg class="icon"><use href="#i-plus"></use></svg><span>新建下载</span>
+          </button>
+        </div>
+      </header>
+
+      <div id="update-banner" class="update-banner" hidden role="status" aria-live="polite"></div>
+
+      <section id="view-overview" class="view active" role="tabpanel" aria-label="概览">
+        <div class="stats-grid">
+          <article class="stat-card">
+            <span class="stat-icon accent"><svg class="icon"><use href="#i-play"></use></svg></span>
+            <div class="stat-copy"><span>下载中</span><strong id="stat-active">0</strong><small>队列、下载与取消中</small></div>
+          </article>
+          <article class="stat-card">
+            <span class="stat-icon success"><svg class="icon"><use href="#i-check"></use></svg></span>
+            <div class="stat-copy"><span>已完成</span><strong id="stat-completed">0</strong><small id="stat-completed-hint">累计完成记录</small></div>
+          </article>
+          <article class="stat-card">
+            <span class="stat-icon danger"><svg class="icon"><use href="#i-alert"></use></svg></span>
+            <div class="stat-copy"><span>失败待处理</span><strong id="stat-failed">0</strong><small>可重试或查看日志</small></div>
+          </article>
+          <article class="stat-card">
+            <span class="stat-icon violet"><svg class="icon"><use href="#i-database"></use></svg></span>
+            <div class="stat-copy"><span>已落盘</span><strong id="stat-output">0 B</strong><small>按已完成任务统计</small></div>
+          </article>
+        </div>
+
+        <div class="overview-grid">
+          <section class="panel queue-panel">
+            <header class="panel-head">
+              <div><h2>当前队列</h2><p>实时进度、速度与剩余时间。</p></div>
+              <button class="link-btn" type="button" data-goto="tasks">打开下载管理</button>
+            </header>
+            <div id="overview-active" class="queue-list"></div>
+            <div id="overview-active-empty" class="empty compact" hidden>
+              <span class="empty-icon"><svg class="icon"><use href="#i-check"></use></svg></span>
+              <strong>队列为空</strong>
+              <p>所有下载任务都已处理完毕。</p>
+            </div>
+          </section>
+
+          <div class="stack">
+            <section class="panel health-panel">
+              <header class="panel-head">
+                <div><h2>运行时健康</h2><p>下载器与音视频处理能力。</p></div>
+                <button class="link-btn" type="button" data-goto="runtime">详情</button>
+              </header>
+              <div id="overview-runtime-body" class="health-body">
+                <div class="health-row"><span class="dot muted"></span><div><strong>尚未检查</strong><span>进入运行时页面检查 yt-dlp 与 ffmpeg。</span></div></div>
+              </div>
+              <div class="health-actions">
+                <button id="overview-install" class="btn subtle small" type="button" hidden>安装运行时</button>
+                <button id="overview-recheck" class="btn ghost small" type="button">重新检查</button>
+              </div>
+            </section>
+
+            <section class="panel storage-panel">
+              <header class="panel-head"><div><h2>存储与目录</h2><p>当前工作区的落盘概况。</p></div></header>
+              <dl class="kv-list">
+                <div><dt>工作区</dt><dd id="overview-workspace" class="mono truncate">未绑定</dd></div>
+                <div><dt>默认目录</dt><dd id="overview-dest" class="mono">media</dd></div>
+                <div><dt>下载记录</dt><dd id="overview-records">0 条</dd></div>
+              </dl>
+            </section>
+          </div>
+        </div>
+
+        <section class="panel recent-panel">
+          <header class="panel-head">
+            <div><h2>最近完成</h2><p>快速回顾最近落盘的媒体文件。</p></div>
+            <button class="link-btn" type="button" data-goto="tasks">全部记录</button>
+          </header>
+          <div id="overview-recent" class="recent-list"></div>
+        </section>
+      </section>
+
+      <section id="view-download" class="view" role="tabpanel" aria-label="新建下载" hidden>
+        <div class="download-layout download-layout-simple">
+          <section class="panel composer">
+            <header class="panel-head">
+              <div><h2>新建下载</h2><p>粘贴链接，解析媒体后再确认保存位置和格式。</p></div>
+              <div class="composer-status">
+                <span id="composer-badge" class="status-badge neutral" hidden></span>
+                <span id="composer-stage" class="stage-chip">第 1 步 · 粘贴链接</span>
+              </div>
+            </header>
+
+            <ol id="composer-steps" class="composer-steps" aria-label="下载步骤">
+              <li class="active" data-step="1"><b>1</b><span>粘贴链接</span></li>
+              <li data-step="2"><b>2</b><span>解析媒体</span></li>
+              <li data-step="3"><b>3</b><span>确认下载</span></li>
+            </ol>
+
+            <div class="url-block">
+              <label class="field-label" for="url">媒体链接</label>
+              <div class="input-row">
+                <div class="input-shell">
+                  <svg class="icon"><use href="#i-link"></use></svg>
+                  <input id="url" type="url" spellcheck="false" placeholder="粘贴视频、音频或播放列表链接" autocomplete="off">
+                </div>
+                <button id="paste-url" class="btn" type="button"><svg class="icon"><use href="#i-paste"></use></svg><span>粘贴</span></button>
+                <button id="probe-button" class="btn primary" type="button"><svg class="icon"><use href="#i-search"></use></svg><span>解析链接</span></button>
+              </div>
+              <label class="check-row compact-check">
+                <input id="playlist" type="checkbox">
+                <span>按播放列表解析</span>
+                <small>默认只解析当前条目；启用后会展示条目列表。</small>
+              </label>
+            </div>
+
+            <div id="probe-state" class="inline-state" hidden></div>
+
+            <div id="download-step-options" class="download-step-options" hidden>
+              <div id="info-card" class="media-card" hidden>
+                <div id="media-cover" class="media-cover"><svg class="icon"><use href="#i-play"></use></svg></div>
+                <div class="media-copy">
+                  <div class="media-title-row"><h3 id="media-title">媒体信息</h3><span id="media-kind" class="tag">视频</span></div>
+                  <p id="media-meta" class="media-meta"></p>
+                  <div id="media-tags" class="tag-row"></div>
+                </div>
+              </div>
+
+              <details id="media-entries-wrap" class="entries-wrap" hidden>
+                <summary id="media-entries-summary">播放列表条目</summary>
+                <div id="media-entries" class="entries-list"></div>
+              </details>
+
+              <div class="divider"></div>
+              <div class="section-title"><h3>保存位置与格式</h3><span>解析完成后可调整</span></div>
+              <div class="option-grid">
+                <label class="field"><span>清晰度</span>
+                  <select id="quality">
+                    <option value="best">最佳可用</option>
+                    <option value="1080p">1080p</option>
+                    <option value="720p">720p</option>
+                    <option value="480p">480p</option>
+                  </select>
+                </label>
+                <label class="field"><span>格式</span>
+                  <select id="format"><option value="">自动选择</option></select>
+                </label>
+                <label class="field field-wide"><span>保存目录</span>
+                  <div class="path-input">
+                    <input id="dest-dir" type="text" value="" placeholder="留空使用系统下载文件夹" spellcheck="false">
+                    <button id="pick-dest" class="btn small" type="button"><svg class="icon"><use href="#i-folder"></use></svg><span>选择目录</span></button>
+                  </div>
+                  <small class="field-hint">默认保存到系统下载文件夹，也可以选择其他本机目录。</small>
+                </label>
+                <label class="field"><span>播放列表上限</span>
+                  <input id="max-items" type="number" min="1" max="200" value="50">
+                </label>
+                <label class="field"><span>单任务大小上限</span>
+                  <select id="max-bytes">
+                    <option value="536870912">512 MB</option>
+                    <option value="1073741824">1 GB</option>
+                    <option value="2147483648" selected>2 GB</option>
+                    <option value="8589934592">8 GB</option>
+                    <option value="17179869184">16 GB</option>
+                  </select>
+                </label>
+                <div class="field"><span>字幕</span><div id="subtitles" class="chips"><span class="chip muted-chip">暂无字幕</span></div></div>
+              </div>
+              <div class="option-toggles">
+                <label class="check-row"><input id="audio-only" type="checkbox"><span>仅音频</span><small>需要 ffmpeg</small></label>
+                <label class="check-row"><input id="overwrite" type="checkbox"><span>覆盖同名文件</span></label>
+              </div>
+
+              <div class="composer-summary" aria-label="任务摘要">
+                <div id="summary-media" class="summary-media">尚未解析媒体链接</div>
+                <dl class="inline-summary-list">
+                  <div><dt>清晰度</dt><dd id="summary-quality">最佳可用</dd></div>
+                  <div><dt>格式</dt><dd id="summary-format">自动选择</dd></div>
+                  <div><dt>目录</dt><dd id="summary-dest" class="mono" title="">系统下载文件夹</dd></div>
+                  <div><dt>条目</dt><dd id="summary-items">当前条目</dd></div>
+                  <div><dt>字幕</dt><dd id="summary-subs">无</dd></div>
+                </dl>
+              </div>
+
+              <footer class="composer-foot">
+                <div id="start-hint" class="hint">确认保存位置后即可开始下载。</div>
+                <div class="button-row">
+                  <button id="reset-composer" class="btn" type="button">重新输入</button>
+                  <button id="start-button" class="btn primary large" type="button" disabled>开始下载</button>
+                </div>
+              </footer>
+            </div>
+
+            <details class="guard-details">
+              <summary><svg class="icon"><use href="#i-shield"></use></svg><span>安全说明</span></summary>
+              <ul class="guard-list">
+                <li><svg class="icon"><use href="#i-shield"></use></svg>仅接受公开的 http / https 链接</li>
+                <li><svg class="icon"><use href="#i-folder"></use></svg>默认保存到系统下载文件夹，也可以指定本机目录</li>
+                <li><svg class="icon"><use href="#i-x"></use></svg>不接受 Cookie、代理凭据或 DRM 绕过</li>
+              </ul>
+            </details>
+          </section>
+        </div>
+      </section>
+
+      <section id="view-tasks" class="view" role="tabpanel" aria-label="下载管理" hidden>
+        <section class="panel tasks-panel">
+          <header class="tasks-head">
+            <div><h2>下载管理</h2><p id="tasks-subtitle">查看正在下载、已完成与失败的记录，快速定位下载文件。</p></div>
+            <div class="tasks-tools">
+              <label class="search-field">
+                <svg class="icon"><use href="#i-search"></use></svg>
+                <input id="task-search" type="search" placeholder="标题、链接、目录或任务 ID" autocomplete="off" aria-label="搜索下载记录">
+              </label>
+              <select id="task-range" aria-label="时间范围">
+                <option value="all">全部时间</option>
+                <option value="today">今天</option>
+                <option value="7d">最近 7 天</option>
+                <option value="30d">最近 30 天</option>
+              </select>
+              <select id="task-sort" aria-label="排序方式">
+                <option value="created_desc">最新创建</option>
+                <option value="created_asc">最早创建</option>
+                <option value="size_desc">文件大小</option>
+                <option value="progress_desc">下载进度</option>
+                <option value="title_asc">标题排序</option>
+              </select>
+              <span id="tasks-health-badge" class="status-badge neutral" hidden></span>
+              <button id="export-tasks" class="btn" type="button"><svg class="icon"><use href="#i-file"></use></svg><span>导出</span></button>
+            </div>
+          </header>
+
+          <div class="filter-row">
+            <div id="status-filters" class="segmented" role="tablist" aria-label="状态筛选">
+              <button class="active" type="button" data-status="all" role="tab" aria-selected="true">全部 <span id="count-all">0</span></button>
+              <button type="button" data-status="active" role="tab" aria-selected="false">下载中 <span id="count-active">0</span></button>
+              <button type="button" data-status="completed" role="tab" aria-selected="false">已完成 <span id="count-completed">0</span></button>
+              <button type="button" data-status="failed" role="tab" aria-selected="false">失败 <span id="count-failed">0</span></button>
+              <button type="button" data-status="canceled" role="tab" aria-selected="false">已取消 <span id="count-canceled">0</span></button>
+            </div>
+            <button id="tasks-refresh" class="icon-btn" type="button" title="刷新下载记录" aria-label="刷新下载记录">
+              <svg class="icon"><use href="#i-refresh"></use></svg>
+            </button>
+          </div>
+
+          <div id="bulk-bar" class="bulk-bar" hidden>
+            <span id="bulk-count">已选 0 项</span>
+            <button class="btn small" type="button" data-bulk="cancel"><svg class="icon"><use href="#i-x"></use></svg>取消</button>
+            <button class="btn small" type="button" data-bulk="retry"><svg class="icon"><use href="#i-retry"></use></svg>重试</button>
+            <button class="btn small danger" type="button" data-bulk="remove"><svg class="icon"><use href="#i-trash"></use></svg>删除记录</button>
+            <button class="link-btn" type="button" data-bulk="clear">清除选择</button>
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th class="col-check"><input id="select-all" type="checkbox" aria-label="全选当前页"></th>
+                  <th class="col-task">下载内容</th>
+                  <th class="col-progress">状态 / 进度</th>
+                  <th class="col-actions"><span class="sr-only">操作</span></th>
+                </tr>
+              </thead>
+              <tbody id="tasks-body"></tbody>
+            </table>
+            <div id="tasks-empty" class="empty" hidden>
+              <span class="empty-icon"><svg class="icon"><use href="#i-list"></use></svg></span>
+              <strong>没有匹配的下载记录</strong>
+              <p>调整筛选条件，或新建一个下载任务。</p>
+              <button class="btn primary small" type="button" data-goto="download">新建下载</button>
+            </div>
+          </div>
+
+          <footer class="pager">
+            <div id="page-info" class="meta">—</div>
+            <div class="pager-controls">
+              <select id="page-size" aria-label="每页数量">
+                <option value="25">25 / 页</option>
+                <option value="50" selected>50 / 页</option>
+                <option value="100">100 / 页</option>
+                <option value="200">200 / 页</option>
+              </select>
+              <button id="prev-page" class="icon-btn small" type="button" title="上一页" aria-label="上一页"><svg class="icon"><use href="#i-chevron-left"></use></svg></button>
+              <span id="page-number">1 / 1</span>
+              <button id="next-page" class="icon-btn small" type="button" title="下一页" aria-label="下一页"><svg class="icon"><use href="#i-chevron-right"></use></svg></button>
+            </div>
+          </footer>
+        </section>
+      </section>
+
+      <section id="view-runtime" class="view" role="tabpanel" aria-label="运行时与诊断" hidden>
+        <section class="panel runtime-hero">
+          <div id="runtime-orb" class="runtime-orb muted"><svg class="icon"><use href="#i-cpu"></use></svg></div>
+          <div class="runtime-hero-copy">
+            <span class="eyebrow">运行时</span>
+            <h2 id="runtime-title">尚未检查</h2>
+            <p id="runtime-message">检查 yt-dlp 与 ffmpeg 是否可用。安装器只下载固定版本并校验 SHA-256。</p>
+          </div>
+          <div class="runtime-actions">
+            <button id="runtime-recheck" class="btn" type="button"><svg class="icon"><use href="#i-refresh"></use></svg><span>重新检查</span></button>
+            <button id="runtime-install-btn" class="btn primary" type="button" hidden><svg class="icon"><use href="#i-download"></use></svg><span>安装固定版本</span></button>
+          </div>
+        </section>
+
+        <div class="runtime-grid">
+          <article class="panel service-card">
+            <header class="panel-head"><div class="service-title"><span class="service-icon accent"><svg class="icon"><use href="#i-download"></use></svg></span><div><h2>yt-dlp</h2><p>链接解析与媒体下载</p></div></div><span id="ytdlp-status" class="status-badge neutral">未知</span></header>
+            <dl class="kv-list">
+              <div><dt>版本</dt><dd id="ytdlp-version">—</dd></div>
+              <div><dt>期望版本</dt><dd id="ytdlp-expected">—</dd></div>
+              <div><dt>来源</dt><dd id="ytdlp-source">—</dd></div>
+              <div><dt>路径</dt><dd id="ytdlp-path" class="mono truncate">—</dd></div>
+            </dl>
+          </article>
+          <article class="panel service-card">
+            <header class="panel-head"><div class="service-title"><span class="service-icon success"><svg class="icon"><use href="#i-sliders"></use></svg></span><div><h2>ffmpeg</h2><p>音视频合并与转码</p></div></div><span id="ffmpeg-status" class="status-badge neutral">未知</span></header>
+            <dl class="kv-list">
+              <div><dt>版本</dt><dd id="ffmpeg-version">—</dd></div>
+              <div><dt>路径</dt><dd id="ffmpeg-path" class="mono truncate">—</dd></div>
+              <div><dt>能力</dt><dd id="ffmpeg-capability">音频提取与格式合并</dd></div>
+            </dl>
+          </article>
+        </div>
+
+        <section class="panel diagnostics-panel">
+          <header class="panel-head"><div><h2>诊断信息</h2><p>复制以下内容用于排查运行时与环境问题。</p></div><button id="copy-diagnostics" class="btn small" type="button"><svg class="icon"><use href="#i-copy"></use></svg><span>复制诊断</span></button></header>
+          <pre id="diagnostics-output" class="diagnostics-output">尚未获取运行时状态。</pre>
+        </section>
+      </section>
+
+      <section id="view-settings" class="view" role="tabpanel" aria-label="设置" hidden>
+        <div class="settings-layout">
+          <section class="panel settings-card">
+            <header class="panel-head"><div><h2>下载默认值</h2><p>新建任务时自动带入，减少重复操作。</p></div></header>
+            <div class="form-grid">
+              <label class="field field-wide"><span>默认保存目录</span>
+                <div class="path-input">
+                  <input id="setting-dest" type="text" value="" placeholder="留空使用系统下载文件夹" spellcheck="false">
+                  <button id="setting-pick-dest" class="btn small" type="button"><svg class="icon"><use href="#i-folder"></use></svg><span>选择目录</span></button>
+                </div>
+                <small id="setting-dest-hint" class="field-hint">留空时使用系统下载文件夹。</small>
+              </label>
+              <label class="field"><span>默认清晰度</span><select id="setting-quality"><option value="best">最佳可用</option><option value="1080p">1080p</option><option value="720p">720p</option><option value="480p">480p</option></select></label>
+              <label class="field"><span>默认大小上限</span><select id="setting-max-bytes"><option value="536870912">512 MB</option><option value="1073741824">1 GB</option><option value="2147483648">2 GB</option><option value="8589934592">8 GB</option><option value="17179869184">16 GB</option></select></label>
+              <label class="field"><span>默认播放列表上限</span><input id="setting-max-items" type="number" min="1" max="200" value="50"></label>
+            </div>
+          </section>
+
+          <section class="panel settings-card">
+            <header class="panel-head"><div><h2>界面与刷新</h2><p>仅影响当前设备上的插件视图。</p></div></header>
+            <div class="form-grid">
+              <label class="field"><span>主题</span><select id="setting-theme"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
+              <label class="field"><span>每页记录数</span><select id="setting-page-size"><option value="25">25</option><option value="50">50</option><option value="100">100</option><option value="200">200</option></select></label>
+              <label class="field"><span>活动任务刷新间隔</span><select id="setting-poll"><option value="1500">1.5 秒</option><option value="2500">2.5 秒</option><option value="5000">5 秒</option><option value="10000">10 秒</option></select></label>
+              <label class="field"><span>表格密度</span><select id="setting-density"><option value="comfortable">舒适</option><option value="compact">紧凑</option></select></label>
+            </div>
+          </section>
+
+          <section class="panel settings-card">
+            <header class="panel-head"><div><h2>数据与维护</h2><p>记录清理不会删除已下载的媒体文件。</p></div></header>
+            <div class="setting-actions">
+              <button id="settings-export" class="btn" type="button"><svg class="icon"><use href="#i-file"></use></svg><span>导出全部记录</span></button>
+              <button id="settings-clear-finished" class="btn danger" type="button"><svg class="icon"><use href="#i-trash"></use></svg><span>清理已结束记录</span></button>
+              <button id="settings-reset" class="btn" type="button"><svg class="icon"><use href="#i-refresh"></use></svg><span>恢复默认设置</span></button>
+            </div>
+            <div class="settings-note"><svg class="icon"><use href="#i-info"></use></svg><span>插件仅保存任务元数据与日志；媒体文件始终位于工作区内的目标目录。</span></div>
+          </section>
+
+          <div class="settings-save-bar">
+            <div><strong>保存当前设置</strong><span>设置只影响本机视图与新建任务的默认值，不会修改已有任务。</span></div>
+            <button id="settings-save" class="btn primary" type="button"><svg class="icon"><use href="#i-check"></use></svg><span>保存设置</span></button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="drawer-layer" class="drawer-layer" hidden>
+    <div class="drawer-scrim" data-close-drawer></div>
+    <aside id="detail-drawer" class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+      <header class="drawer-head">
+        <div><span id="drawer-status" class="status-badge neutral">任务</span><h2 id="drawer-title">任务详情</h2><p id="drawer-subtitle"></p></div>
+        <button id="drawer-close" class="icon-btn" type="button" aria-label="关闭详情"><svg class="icon"><use href="#i-x"></use></svg></button>
+      </header>
+      <div id="drawer-body" class="drawer-body"></div>
+    </aside>
+  </div>
+
+  <div id="confirm-layer" class="modal-layer" hidden>
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+      <h3 id="confirm-title">确认操作</h3>
+      <p id="confirm-message"></p>
+      <div class="dialog-actions"><button id="confirm-cancel" class="btn" type="button">取消</button><button id="confirm-ok" class="btn danger" type="button">确认</button></div>
+    </div>
+  </div>
+
+  <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
+  <script src="app.js?v=20261019.7"></script>
+</body>
+</html>

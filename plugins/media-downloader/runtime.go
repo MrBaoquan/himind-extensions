@@ -65,12 +65,20 @@ func readRuntimeLock() (runtimeLock, error) {
 	return lock, nil
 }
 
+func managedRuntimePathIn(root, version string) string {
+	return filepath.Join(root, "yt-dlp", version, "yt-dlp.exe")
+}
+
+func managedVenvRuntimePathIn(root, version string) string {
+	return filepath.Join(root, "yt-dlp", version, "venv", "Scripts", "yt-dlp.exe")
+}
+
 func managedRuntimePath(version string) (string, error) {
 	root, err := runtimesRoot()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(root, "yt-dlp", version, "yt-dlp.exe"), nil
+	return managedRuntimePathIn(root, version), nil
 }
 
 func managedVenvRuntimePath(version string) (string, error) {
@@ -78,7 +86,7 @@ func managedVenvRuntimePath(version string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(root, "yt-dlp", version, "venv", "Scripts", "yt-dlp.exe"), nil
+	return managedVenvRuntimePathIn(root, version), nil
 }
 
 func locateYtDlp() (runtimeLocation, error) {
@@ -86,18 +94,26 @@ func locateYtDlp() (runtimeLocation, error) {
 	if err != nil {
 		return runtimeLocation{}, err
 	}
-	if managed, err := managedRuntimePath(lock.Version); err == nil && fileExists(managed) {
-		return runtimeLocation{Path: managed, Source: "managed", Version: lock.Version}, nil
-	}
-	if venv, err := managedVenvRuntimePath(lock.Version); err == nil && fileExists(venv) {
-		return runtimeLocation{Path: venv, Source: "managed-venv", Version: lock.Version}, nil
+	checkedRoots := make([]string, 0)
+	if roots, err := runtimesRoots(); err == nil {
+		checkedRoots = append(checkedRoots, roots...)
+		for _, root := range roots {
+			if managed := managedRuntimePathIn(root, lock.Version); fileExists(managed) {
+				return runtimeLocation{Path: managed, Source: "managed", Version: lock.Version}, nil
+			}
+			if venv := managedVenvRuntimePathIn(root, lock.Version); fileExists(venv) {
+				return runtimeLocation{Path: venv, Source: "managed-venv", Version: lock.Version}, nil
+			}
+		}
+	} else {
+		checkedRoots = append(checkedRoots, "runtimesRoots error: "+err.Error())
 	}
 	for _, name := range []string{"yt-dlp.exe", "yt-dlp"} {
 		if path, err := exec.LookPath(name); err == nil {
 			return runtimeLocation{Path: path, Source: "path", Version: lock.Version}, nil
 		}
 	}
-	return runtimeLocation{}, errors.New("未找到 yt-dlp，请先调用 media.downloader.runtime.install")
+	return runtimeLocation{}, fmt.Errorf("未找到 yt-dlp，请先调用 media.downloader.runtime.install（已检查: %s）", strings.Join(checkedRoots, "; "))
 }
 
 func runtimeVersion(ctx context.Context, path string) (string, error) {
@@ -141,9 +157,19 @@ func ffmpegStatus(ctx context.Context) (string, string) {
 func buildRuntimeStatus(ctx context.Context) RuntimeStatus {
 	lock, err := readRuntimeLock()
 	if err != nil {
-		return RuntimeStatus{State: "error", Capabilities: []string{}, Message: err.Error()}
+		return RuntimeStatus{State: "error", DownloadsDir: defaultDownloadsDir(), Capabilities: []string{}, Message: err.Error()}
 	}
-	result := RuntimeStatus{State: "missing", ExpectedVersion: lock.Version, Capabilities: []string{}}
+	dataRoot, _ := pluginDataRoot()
+	downloadsDir := defaultDownloadsDir()
+	result := RuntimeStatus{
+		State:             "missing",
+		ExpectedVersion:   lock.Version,
+		DataRoot:          dataRoot,
+		DataRootWritable:  dataRoot != "" && canWriteDirectory(dataRoot),
+		DownloadsDir:      downloadsDir,
+		DownloadsWritable: downloadsDir != "" && canWriteDirectory(downloadsDir),
+		Capabilities:      []string{},
+	}
 	location, err := locateYtDlp()
 	if err != nil {
 		result.Message = err.Error()
