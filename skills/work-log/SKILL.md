@@ -146,6 +146,114 @@ description: 把当前 AI 会话整理成结构化工作日志并写入全局日
 
 当用户说“把某堆工作归到某项目”“统一项目叫法”时，用别名合并或 `work-log.project.assign` 处理，不要逐条重写。
 
+## 当前工作台与计划
+
+当用户问「现在在做什么」「哪些项目在推进」「优先级」「下一步」「今天怎么安排」时，先读当前工作台，不要只翻历史日志：
+
+```json
+{"id": "work-log.project.board", "arguments": {}}
+```
+
+工作台返回项目状态（`planned` / `in_progress` / `blocked` / `review` / `done` / `paused`）、优先级、目标日期、下一步、阻塞、最近活动和近 7 天工时。默认只把最近 14 天有日志的项目视为「正在推进」（`is_current:true`）；更早的项目是 `is_other:true`，不要把它们当作未完成工作汇报。阶段（`stage`）和进度（`progress`）由最近日志与下一步智能推断，`progress_source` 标明是手工、按下一步还是阶段推断；回答时说明这是推断值。
+
+### 当前工作口径
+
+`work-log.project.board` 默认只把最近 14 天有日志的项目视为「正在推进」（`is_current:true`）。更早的项目会进入 `recent` 或 `history`，不要把它们当作当前工作。
+
+每个项目还会返回：
+
+- `stage` / `stage_label` / `stage_confidence`：根据最近日志、下一步和工作状态推断的阶段（规划、设计、开发、联调、测试、验收、交付、维护）。
+- `progress` / `progress_source` / `progress_confidence`：完成进度。`progress_source` 为 `manual` 时是用户手工设置；`next_steps` 表示按下一步完成度推断；`stage` 表示按阶段 + 近期活动推断。
+- `activity_bucket`：`current` / `recent` / `done` / `history`。
+
+回答「现在在做什么」时，只列 `is_current:true` 的项目；回答「以前做过什么」或需要全量时再查 `work-log.project.list`。推断的阶段和进度要明确标注为「推断」，不要当成用户确认的事实。
+
+### 更新项目工作状态
+
+用户明确要求「把 A 标记完成」「A 改成 P0」「下一步加 X」时，调用：
+
+```json
+{
+  "id": "work-log.project.work.update",
+  "arguments": {
+    "project_id": "<项目 ID>",
+    "patch": {
+      "state": "in_progress",
+      "priority": "P1",
+      "goal": "完成当前工作台第一版",
+      "next_steps": [{"text": "实现计划保存"}],
+      "blockers": ["等待设计确认"]
+    }
+  }
+}
+```
+
+规则：
+
+- `patch` 只改显式传入的字段。
+- `state=done` 会记录完成时间；从 `done` 改回其它状态会清空完成时间与完成摘要。
+- 不根据日志文本自动判定完成；日志里出现「完成」只作为建议，必须向用户确认。
+- 完成项目后可以再用 `work-log.entry.upsert` 写一条完成日志。
+
+### 工作项与每日计划
+
+- `work-log.item.list`：查看待排工作项。
+- `work-log.item.upsert`：新增工作项，字段含 `estimate_minutes`、`remaining_minutes`、`due_date`、`priority`。
+- `work-log.item.update`：字段级更新，例如 `{"status":"done"}`。
+- `work-log.plan.get`：读取某天计划。
+- `work-log.plan.save`：保存计划与时间块；插件会校验时间重叠和容量。
+- `work-log.plan.validate`：只校验不写盘。
+
+时间块使用 `start` / `end` 的 `HH:MM`，类型为 `focus` / `meeting` / `admin` / `break` / `buffer` / `personal`。计划是意图，日志仍然是事实；不要用计划代替实际日志。
+
+## AI 日程规划
+
+当用户说「帮我安排今天」「今天先做什么」「这周怎么排」时，按下面的闭环执行：
+
+1. 读取 `work-log.project.board`，拿到当前项目状态、优先级、下一步和本周投入。
+2. 读取 `work-log.item.list`（`include_done:false`），拿到待排工作项、预计耗时、剩余耗时和截止日期。
+3. 读取 `work-log.plan.get`，保留已有时间块和 `locked:true` 的块。
+4. 先给用户一段简短计划说明，再给出时间块方案；不要直接写库。
+5. 用户确认后调用 `work-log.plan.validate`，通过后再调用 `work-log.plan.save`。
+
+规划约束（默认值，用户有特殊要求时以用户为准）：
+
+- 今日聚焦最多 3 个工作项，优先 P0/P1、临近截止和阻塞他人的事项。
+- 只承诺可用容量的 70%-80%，保留 15%-25% 缓冲。
+- 单个专注块不超过 90 分钟；大任务拆成多个块。
+- 会议前后预留准备/收尾时间；不移动 `locked:true` 的时间块。
+- 同一天时间块不能重叠；`work-log.plan.save` 会做确定性校验。
+- 预计耗时优先使用工作项的 `remaining_minutes`；没有时用 `estimate_minutes`。
+- 不要编造工作项或日志；缺少信息时先问用户。
+
+计划 JSON 结构：
+
+```json
+{
+  "date": "2026-10-19",
+  "mode": "balanced",
+  "capacity": {"work_minutes": 480},
+  "blocks": [
+    {"kind": "focus", "work_item_id": "wi-xxx", "start": "09:30", "end": "11:00"},
+    {"kind": "break", "title": "休息", "start": "11:00", "end": "11:15"},
+    {"kind": "meeting", "title": "周会", "start": "13:00", "end": "14:00"},
+    {"kind": "buffer", "title": "缓冲", "start": "16:00", "end": "16:30"}
+  ]
+}
+```
+
+保存后把 `plan.capacity.remaining_minutes` 和风险告诉用户：如果为负，说明今天排不下，应减少承诺或调整截止时间。
+需要一键生成可执行排期时，优先调用 `work-log.plan.auto`（仅支持当天；历史/未来日期请手动调整）。它会：
+
+- 只使用当前/待开始项目下的未完成工作项；如果项目还没有工作项，会把「最近工作但未标记结束」的当前项目直接作为可排期项，标题优先用它的下一步，默认时长按优先级为 P0 90 分钟 / P1 60 分钟 / P2 45 分钟 / P3 30 分钟；
+- 按项目状态、项目优先级、工作项优先级、截止日期和剩余耗时排序；
+- 保留会议、个人事务和锁定块；
+- 默认只承诺约 80% 的可用时间，留出缓冲；
+- 自动拆分超过 90 分钟的工作项，并在长块之间插入短休。
+
+调用后把生成的时间块、已排/未排分钟数和风险告诉用户。用户仍可手工调整。
+计划的实际完成情况以**当日结束后的日志**为准。查看历史计划时调用 `work-log.plan.review`，它会返回每个专注块的实际状态（完成/部分完成/未完成）和完成率；当天计划只返回 `pending`，不要提前把计划块说成已完成。
+
 ## 采集来源
 
 自动采集走 `com.himind.work-log-collector`，来源分两类：

@@ -308,6 +308,19 @@ type sessionDigest struct {
 	Truncated         bool     `json:"truncated,omitempty"`
 }
 
+// stampRFC3339 把会话时间点写成 RFC3339，并统一换算到本机时区。
+//
+// 各客户端原始记录用的时区不一样：Codex、Claude、GitHub Copilot 写的是 UTC（后缀 Z），
+// OpenCode、VS Code 写的是本地偏移。若原样透传，素材里就会出现「同一天的记录一半是 UTC
+// 时钟、一半是本地时钟」，读的人（以及读素材的 AI）都会把 UTC 那半当成本地时间，
+// 从而整体偏差一个时区。这里统一成本机时区，与 digest.Date 的本地归日口径保持一致。
+func stampRFC3339(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Local().Format(time.RFC3339)
+}
+
 func scanCap(in input) (any, error) {
 	home, err := resolveHome(in)
 	if err != nil {
@@ -1167,8 +1180,8 @@ func parseCodexFile(file string, start, end time.Time) (sessionDigest, bool, err
 	if len(winTimes) == 0 && !inRange(created, start, end) {
 		return sessionDigest{}, false, nil
 	}
-	digest.StartedAt = started.Format(time.RFC3339)
-	digest.EndedAt = ended.Format(time.RFC3339)
+	digest.StartedAt = stampRFC3339(started)
+	digest.EndedAt = stampRFC3339(ended)
 	digest.Date = started.Local().Format(dateLayout)
 	digest.UserPrompts = userPrompts
 	digest.AssistantExcerpts = assistantExcerpts
@@ -1274,13 +1287,13 @@ func scanClaudeCode(root string, start, end time.Time) ([]sessionDigest, error) 
 				Directory:   item.ProjectPath,
 				Title:       firstLine(item.FirstPrompt, 80),
 				Date:        started.Local().Format(dateLayout),
-				StartedAt:   started.Format(time.RFC3339),
+				StartedAt:   stampRFC3339(started),
 				TurnCount:   item.MessageCount,
 				UserPrompts: nonEmpty([]string{item.FirstPrompt}),
 				Ref:         path,
 			}
 			if !ended.IsZero() {
-				digest.EndedAt = ended.Format(time.RFC3339)
+				digest.EndedAt = stampRFC3339(ended)
 			}
 			digest.Minutes, digest.MinutesSource = resolveMinutes(nil, started, ended, digest.TurnCount)
 			if digest.SessionID == "" {
@@ -1363,7 +1376,7 @@ func scanOpenCode(db string, start, end time.Time) ([]sessionDigest, error) {
 			Directory:         asString(row, "directory"),
 			Title:             asString(row, "title"),
 			Date:              started.Local().Format(dateLayout),
-			StartedAt:         started.Format(time.RFC3339),
+			StartedAt:         stampRFC3339(started),
 			UserPrompts:       prompts[id],
 			AssistantExcerpts: excerpts[id],
 			Cost:              asFloat(row, "cost"),
@@ -1372,7 +1385,7 @@ func scanOpenCode(db string, start, end time.Time) ([]sessionDigest, error) {
 			Ref:               db + "#" + id,
 		}
 		if !ended.IsZero() {
-			digest.EndedAt = ended.Format(time.RFC3339)
+			digest.EndedAt = stampRFC3339(ended)
 		}
 		digest.TurnCount = len(digest.UserPrompts)
 		digest.Minutes, digest.MinutesSource = resolveMinutes(msgTimes[id], started, ended, digest.TurnCount)
@@ -1433,13 +1446,13 @@ func scanCopilot(db string, start, end time.Time) ([]sessionDigest, error) {
 			Directory:         asString(row, "cwd"),
 			Title:             title,
 			Date:              started.Local().Format(dateLayout),
-			StartedAt:         started.Format(time.RFC3339),
+			StartedAt:         stampRFC3339(started),
 			UserPrompts:       prompts[id],
 			AssistantExcerpts: excerpts[id],
 			Ref:               db + "#" + id,
 		}
 		if !ended.IsZero() {
-			digest.EndedAt = ended.Format(time.RFC3339)
+			digest.EndedAt = stampRFC3339(ended)
 		}
 		digest.TurnCount = len(digest.UserPrompts)
 		digest.Minutes, digest.MinutesSource = resolveMinutes(turnTimes[id], started, ended, digest.TurnCount)
@@ -1625,9 +1638,9 @@ func parseVSCodeChatFile(file, dir string, start, end time.Time) (sessionDigest,
 	if len(times) == 0 && !inRange(created, start, end) {
 		return sessionDigest{}, false
 	}
-	digest.StartedAt = started.Format(time.RFC3339)
+	digest.StartedAt = stampRFC3339(started)
 	if !ended.IsZero() {
-		digest.EndedAt = ended.Format(time.RFC3339)
+		digest.EndedAt = stampRFC3339(ended)
 	}
 	digest.Date = started.Local().Format(dateLayout)
 	digest.TurnCount = len(digest.UserPrompts)

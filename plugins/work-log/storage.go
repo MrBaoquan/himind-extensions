@@ -40,7 +40,10 @@ func writeFileAtomic(path string, payload []byte) error {
 	}
 	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp-*")
 	if err != nil {
-		return err
+		// 某些受限运行环境（例如只放行目标文件写入、不允许新建隐藏临时文件）
+		// 会在这里返回 Access is denied。此时退回直接写目标，优先保证日志可落盘；
+		// 正常环境仍走临时文件 + 原子替换。
+		return os.WriteFile(path, payload, 0o644)
 	}
 	tmpName := tmp.Name()
 	// rename 成功后该路径已不存在，Remove 是无害的兜底；失败路径则清理残留。

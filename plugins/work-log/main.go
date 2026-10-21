@@ -100,11 +100,13 @@ type input struct {
 	Aliases     []string `json:"aliases"`
 	Description string   `json:"description"`
 	Status      string   `json:"status"`
+	Priority    string   `json:"priority"`
 	Color       string   `json:"color"`
 	// Kind 是项目类型：交付项目（场馆/展馆，含展项）/ 平台产品（自研，1 项目=1 路径，无展项）/ 通用沉淀。
 	Kind             string `json:"kind"`
 	CurrentProject   string `json:"current_project"`
 	IncludeStats     *bool  `json:"include_stats"`
+	RecentDays       *int   `json:"recent_days"`
 	ResolveProjects  *bool  `json:"resolve_projects"`
 	RegisterProjects *bool  `json:"register_projects"`
 	// 路径映射：项目/展项可通过本机目录/仓库路径稳定识别（路径优先于名称）。
@@ -151,6 +153,15 @@ type input struct {
 	// 来源配置（通用可配置来源）：sources 为声明式来源规格数组。
 	Sources  []map[string]any `json:"sources"`
 	SourceID string           `json:"source_id"`
+	// 工作项：work_item 为单条写入；List/Update/Delete 复用 project/status/priority/query 等过滤字段。
+	WorkItem    *workItem  `json:"work_item"`
+	WorkItems   []workItem `json:"work_items"`
+	WorkItemID  string     `json:"work_item_id"`
+	WorkItemIDs []string   `json:"work_item_ids"`
+	IncludeDone *bool      `json:"include_done"`
+	// 项目工作状态更新使用 Patch（与 entry.patch 共用字段名，能力入口不同）。
+	// 每日计划：plan 为完整计划对象；date/from/to 复用现有日期字段。
+	Plan *dailyPlan `json:"plan"`
 }
 
 // ref 是条目引用的外部事实（提交、工单、链接等）。
@@ -322,6 +333,42 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 		return rpcResult(result, err)
 	case "work-log.report.aggregate":
 		result, err := aggregateReports(in)
+		return rpcResult(result, err)
+	case "work-log.project.board":
+		result, err := projectBoardCap(in)
+		return rpcResult(result, err)
+	case "work-log.project.work.update":
+		result, err := projectWorkUpdateCap(in)
+		return rpcResult(result, err)
+	case "work-log.item.list":
+		result, err := workItemListCap(in)
+		return rpcResult(result, err)
+	case "work-log.item.upsert":
+		result, err := workItemUpsertCap(in)
+		return rpcResult(result, err)
+	case "work-log.item.update":
+		result, err := workItemUpdateCap(in)
+		return rpcResult(result, err)
+	case "work-log.item.delete":
+		result, err := workItemDeleteCap(in)
+		return rpcResult(result, err)
+	case "work-log.plan.get":
+		result, err := planGetCap(in)
+		return rpcResult(result, err)
+	case "work-log.plan.auto":
+		result, err := autoPlanCap(in)
+		return rpcResult(result, err)
+	case "work-log.plan.save":
+		result, err := planSaveCap(in)
+		return rpcResult(result, err)
+	case "work-log.plan.validate":
+		result, err := planValidateCap(in)
+		return rpcResult(result, err)
+	case "work-log.plan.review":
+		result, err := planReviewCap(in)
+		return rpcResult(result, err)
+	case "work-log.plan.list":
+		result, err := planListCap(in)
 		return rpcResult(result, err)
 	case "work-log.link.open":
 		result, err := openLink(in)
@@ -2401,9 +2448,9 @@ func timeSpan(item entry) string {
 	if end == "" {
 		return shortTime(start)
 	}
-	startTime, startErr := time.Parse(time.RFC3339, start)
-	endTime, endErr := time.Parse(time.RFC3339, end)
-	if startErr == nil && endErr == nil {
+	startTime, startOK := parseStamp(start)
+	endTime, endOK := parseStamp(end)
+	if startOK && endOK {
 		startLocal := startTime.Local()
 		endLocal := endTime.Local()
 		if startLocal.Format("2006-01-02") == endLocal.Format("2006-01-02") {
@@ -2417,13 +2464,13 @@ func timeSpan(item entry) string {
 	return shortTime(start) + "–" + shortTime(end)
 }
 
-// shortTime 把 RFC3339 时间戳渲染成 HH:MM；无法解析时原样返回。
+// shortTime 把时间戳渲染成本机时区的 HH:MM；无法解析时原样返回。
 func shortTime(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return ""
 	}
-	if parsed, err := time.Parse(time.RFC3339, value); err == nil {
+	if parsed, ok := parseStamp(value); ok {
 		return parsed.Local().Format("15:04")
 	}
 	return value
@@ -2617,9 +2664,55 @@ func sortedKeys(set map[string]struct{}) []string {
 	return keys
 }
 
+// parseStamp 把条目里的时间戳解析成真实时刻。除标准 RFC3339 外，还容忍不带
+// 时区的本地写法（如 2026-10-20 09:30），这类历史/手工数据按本机时区理解。
+func parseStamp(value string) (time.Time, bool) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return time.Time{}, false
+	}
+	if parsed, err := time.Parse(time.RFC3339, trimmed); err == nil {
+		return parsed, true
+	}
+	for _, layout := range []string{
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
+		"2006-01-02 15:04",
+		"2006-01-02T15:04",
+	} {
+		if parsed, err := time.ParseInLocation(layout, trimmed, time.Local); err == nil {
+			return parsed, true
+		}
+	}
+	return time.Time{}, false
+}
+
+// compareStamps 按真实时刻比较两个时间戳：采集器记录的时区并不统一（Codex、Copilot
+// 写 UTC，OpenCode 写本地偏移），直接比字符串会把先后顺序排错，所以能解析时按时刻比。
+// 只要有一侧不是可解析的时间戳（空值、手工写的 HH:MM），就返回 ok=false 让调用方
+// 退回字符串比较，保持既有行为。
+func compareStamps(left, right string) (int, bool) {
+	leftTime, leftOK := parseStamp(left)
+	rightTime, rightOK := parseStamp(right)
+	if !leftOK || !rightOK {
+		return 0, false
+	}
+	switch {
+	case leftTime.Before(rightTime):
+		return -1, true
+	case leftTime.After(rightTime):
+		return 1, true
+	}
+	return 0, true
+}
+
 func sortEntries(entries []entry) {
 	sort.SliceStable(entries, func(left, right int) bool {
-		if entries[left].StartedAt != entries[right].StartedAt {
+		if order, ok := compareStamps(entries[left].StartedAt, entries[right].StartedAt); ok {
+			if order != 0 {
+				return order < 0
+			}
+		} else if entries[left].StartedAt != entries[right].StartedAt {
 			return entries[left].StartedAt < entries[right].StartedAt
 		}
 		return entries[left].Title < entries[right].Title

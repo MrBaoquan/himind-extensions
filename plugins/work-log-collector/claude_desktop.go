@@ -184,7 +184,7 @@ func claudeDesktopDigest(meta claudeDesktopSession, file, home string, start, en
 		Directory:         dir,
 		Title:             firstLine(meta.Title, 80),
 		Date:              started.Local().Format(dateLayout),
-		StartedAt:         started.Format(time.RFC3339),
+		StartedAt:         stampRFC3339(started),
 		UserPrompts:       prompts,
 		AssistantExcerpts: excerpts,
 		TokensInput:       tokensIn,
@@ -211,7 +211,7 @@ func claudeDesktopDigest(meta claudeDesktopSession, file, home string, start, en
 		digest.TurnCount = len(digest.UserPrompts)
 	}
 	if !ended.IsZero() {
-		digest.EndedAt = ended.Format(time.RFC3339)
+		digest.EndedAt = stampRFC3339(ended)
 	}
 	digest.Minutes, digest.MinutesSource = resolveMinutes(times, started, ended, digest.TurnCount)
 	return digest, true

@@ -1,4 +1,4 @@
 interface:
   display_name: "工作日志助手"
-  short_description: "把当前 AI 会话整理成结构化工作日志"
-  default_prompt: "使用 $work-log 整理今天的工作日志：从当前会话提炼事实，按字段结构化成条目并调用 work-log.entry.upsert 写入全局日志库；需要时再生成日报。"
+  short_description: "整理工作日志，维护当前工作台与每日计划"
+  default_prompt: "使用 $work-log：用户要记录时把当前会话整理成条目并写入；用户要查看当前工作时读取 work-log.project.board；用户要安排今天时结合项目、工作项和日历生成计划，经确认后用 work-log.plan.save 保存。"

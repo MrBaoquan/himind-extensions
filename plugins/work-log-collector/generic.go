@@ -645,9 +645,9 @@ func scanGeneric(spec genericSource, home string, start, end time.Time) ([]sessi
 			continue
 		}
 		g.digest.Date = g.started.Local().Format(dateLayout)
-		g.digest.StartedAt = g.started.Format(time.RFC3339)
+		g.digest.StartedAt = stampRFC3339(g.started)
 		if !g.ended.IsZero() {
-			g.digest.EndedAt = g.ended.Format(time.RFC3339)
+			g.digest.EndedAt = stampRFC3339(g.ended)
 		}
 		g.digest.UserPrompts = g.userTexts
 		g.digest.AssistantExcerpts = g.asstTexts

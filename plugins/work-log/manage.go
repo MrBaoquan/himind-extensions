@@ -695,6 +695,18 @@ func migrateProjectsFile(pf *projectsFile) error {
 		if p.Aliases == nil {
 			p.Aliases = []string{}
 		}
+		if p.Work.NextSteps == nil {
+			p.Work.NextSteps = []nextStep{}
+		}
+		if p.Work.Blockers == nil {
+			p.Work.Blockers = []string{}
+		}
+		for j := range p.Work.NextSteps {
+			step := &p.Work.NextSteps[j]
+			if strings.TrimSpace(step.Text) != "" && strings.TrimSpace(step.ID) == "" {
+				step.ID = nextStepID(p.ID, step.Text)
+			}
+		}
 		for j := range p.Exhibits {
 			ex := &p.Exhibits[j]
 			if strings.TrimSpace(ex.Name) != "" && strings.TrimSpace(ex.ID) == "" {
@@ -841,6 +853,10 @@ func earlierString(a, b string) bool {
 	if bt == "" {
 		return true
 	}
+	// 时间戳按真实时刻比较（跨时区也正确）；非时间戳（日期串等）仍走字符串比较。
+	if order, ok := compareStamps(at, bt); ok {
+		return order < 0
+	}
 	return at < bt
 }
 
@@ -851,6 +867,9 @@ func laterString(a, b string) bool {
 	}
 	if bt == "" {
 		return true
+	}
+	if order, ok := compareStamps(at, bt); ok {
+		return order > 0
 	}
 	return at > bt
 }

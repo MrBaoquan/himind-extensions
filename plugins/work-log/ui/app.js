@@ -25,6 +25,52 @@
     other: '其他',
   };
   const CATEGORY_OPTIONS = ['开发', '修复', '设计', '调研', '文档', '评审', '会议', '运维', '其他'];
+  const WORK_STATE_LABELS = {
+    planned: '待开始',
+    in_progress: '进行中',
+    blocked: '受阻',
+    review: '待验收',
+    done: '已完成',
+    paused: '已暂停',
+    dormant: '已搁置',
+  };
+  const WORK_STATE_ORDER = ['in_progress', 'blocked', 'review', 'planned', 'paused', 'dormant', 'done'];
+  const PRIORITY_LABELS = { P0: 'P0 · 最高', P1: 'P1 · 高', P2: 'P2 · 中', P3: 'P3 · 低' };
+  const WORK_ITEM_STATUS_LABELS = {
+    todo: '待办',
+    in_progress: '进行中',
+    blocked: '受阻',
+    done: '已完成',
+    cancelled: '取消',
+  };
+  const PLAN_BLOCK_KIND_LABELS = {
+    focus: '专注',
+    meeting: '会议',
+    admin: '行政',
+    break: '休息',
+    buffer: '缓冲',
+    personal: '个人事务',
+  };
+  const CONFIDENCE_LABELS = { high: '高', medium: '中', low: '低' };
+
+  function confidenceLabel(value) {
+    return CONFIDENCE_LABELS[text(value)] || '';
+  }
+  const PLAN_BLOCK_STATUS_LABELS = {
+    planned: '计划中',
+    active: '进行中',
+    done: '已完成',
+    skipped: '已跳过',
+    moved: '已顺延',
+  };
+
+  function workStateLabel(value) {
+    return WORK_STATE_LABELS[text(value)] || text(value) || '未设置';
+  }
+
+  function priorityLabel(value) {
+    return PRIORITY_LABELS[text(value)] || text(value) || 'P2';
+  }
 
   function catLabel(value) {
     const raw = text(value);
@@ -46,11 +92,12 @@
   // 8 小时对齐的目标工时（分钟）。
   const ALIGN_TARGET_MINUTES = 8 * 60;
   const ALIGN_STEP_MINUTES = 30;
+  const BOARD_REFRESH_MS = 60000;
 
-  const VIEWS = ['calendar', 'report', 'matrix', 'projects'];
+  const VIEWS = ['workbench', 'plan', 'calendar', 'report', 'matrix', 'projects'];
 
   const state = {
-    view: 'calendar',
+    view: 'workbench',
     calendar: null,
     year: 0,
     month: 0,
@@ -97,6 +144,25 @@
     registryPage: 1,
     registryPageSize: 12,
     registryExpanded: {},
+    // 当前工作台
+    board: null,
+    boardLoading: false,
+    boardRefreshing: false,
+    showDone: false,
+    showOther: false,
+    workbenchMode: 'recent',
+    workbenchModeResolved: false,
+    workEditing: null,
+    workEditingSteps: [],
+    // 计划
+    planDate: '',
+    plan: null,
+    planReview: null,
+    planLoading: false,
+    workItems: [],
+    workItemCache: [],
+    workItemEditing: null,
+    planEditingBlock: null,
   };
 
   const el = (id) => document.getElementById(id);
@@ -168,16 +234,53 @@
     return text(date).slice(0, 7);
   }
 
+  // stampToLocal 把时间戳换算成「本机时区」的 Date；不是时间戳时返回 null。
+  //
+  // 采集器按 RFC3339 记录真实时刻，但不同客户端给出的时区并不一致：
+  // Codex / Claude Desktop / GitHub Copilot 的会话里是 UTC（后缀 Z），
+  // OpenCode / VS Code 是本地偏移（+08:00），手工录入还可能只有 HH:MM。
+  // 因此展示前必须按时间戳自带的偏移换算成本机时间，绝不能直接截取字符串里的时分，
+  // 否则 UTC 记录会整体偏掉一个时区（本机 +08:00 时就是少显示 8 小时）。
+  function stampToLocal(value) {
+    const raw = text(value);
+    if (!raw) return null;
+    // 只有时分（手工录入）时没有时区可换算，交给调用方原样展示。
+    if (/^\d{1,2}:\d{2}$/.test(raw)) return null;
+    // 纯日期按本机零点处理，避免被 Date 当成 UTC 零点而跨到前一天。
+    const dateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateOnly) return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+    // 不带偏移的日期时间按本机时间理解（服务端/手工写入的本地写法）。
+    const naive = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.(\d+))?$/);
+    if (naive) {
+      return new Date(
+        Number(naive[1]),
+        Number(naive[2]) - 1,
+        Number(naive[3]),
+        Number(naive[4]),
+        Number(naive[5]),
+        Number(naive[6] || 0),
+        Number('0.' + (naive[7] || '0')) * 1000,
+      );
+    }
+    const parsed = new Date(raw);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  // formatTime 把时间戳渲染成本机时区的 HH:MM。
   function formatTime(value) {
     const raw = text(value);
     if (!raw) return '';
-    const match = raw.match(/^\d{4}-\d{2}-\d{2}[T ](\d{2}):(\d{2})/);
-    if (match) return match[1] + ':' + match[2];
+    const local = stampToLocal(raw);
+    if (local) return pad2(local.getHours()) + ':' + pad2(local.getMinutes());
+    const match = raw.match(/^(\d{1,2}):(\d{2})/);
+    if (match) return pad2(match[1]) + ':' + match[2];
     return raw;
   }
 
-  // dayOfStamp 取 ISO 时间戳的日期部分（用于判断会话是否跨天）。
+  // dayOfStamp 取时间戳在「本机时区」下的日期部分（用于判断会话是否跨天）。
   function dayOfStamp(value) {
+    const local = stampToLocal(value);
+    if (local) return formatDate(local);
     const match = text(value).match(/^(\d{4}-\d{2}-\d{2})/);
     return match ? match[1] : '';
   }
@@ -1686,7 +1789,1004 @@
     }
   }
 
-  // ---------- 项目 ----------
+  // ---------- 当前工作台 ----------
+
+  async function loadBoard(options) {
+    const silent = !!(options && options.silent) && !!state.board;
+    if (silent && state.boardRefreshing) return;
+    state.boardRefreshing = true;
+    if (!silent) {
+      state.boardLoading = true;
+      if (state.view === 'workbench') renderWorkbench();
+    }
+    try {
+      const data = await bridgeInvoke('work-log.project.board', {});
+      state.board = data || { projects: [], summary: {}, attention: [], focus: [] };
+      if (!state.workbenchModeResolved) {
+        const currentCount = (state.board.current || []).length;
+        const plannedCount = (state.board.planned || []).length;
+        if (currentCount === 0 && plannedCount > 0) state.workbenchMode = 'planned';
+        state.workbenchModeResolved = true;
+      }
+    } catch (error) {
+      if (silent && error && error.code === 'bridge_unavailable') {
+        // 后台静默刷新失败时保留现有内容，不打断用户。
+      } else if (error && error.code === 'bridge_unavailable') {
+        state.board = { projects: [], summary: {}, attention: [], focus: [], error: 'bridge_unavailable' };
+      } else if (!silent) {
+        notify('读取当前工作台失败：' + String((error && error.message) || error), 'error');
+        state.board = { projects: [], summary: {}, attention: [], focus: [], error: String((error && error.message) || error) };
+      }
+    } finally {
+      state.boardRefreshing = false;
+      state.boardLoading = false;
+      if (state.view === 'workbench') renderWorkbench();
+    }
+  }
+
+  let boardAutoRefreshTimer = null;
+
+  function startBoardAutoRefresh() {
+    if (boardAutoRefreshTimer) {
+      clearInterval(boardAutoRefreshTimer);
+      boardAutoRefreshTimer = null;
+    }
+    boardAutoRefreshTimer = setInterval(() => {
+      if (document.hidden || state.view !== 'workbench') return;
+      loadBoard({ silent: true });
+    }, BOARD_REFRESH_MS);
+  }
+
+  function boardProjects() {
+    return (state.board && state.board.projects) || [];
+  }
+
+  function nextStepsHtml(item, limit) {
+    const steps = Array.isArray(item.next_steps) ? item.next_steps : [];
+    if (!steps.length) return '<div class="wb-empty-line">还没有下一步</div>';
+    const open = steps.filter((step) => !step.done);
+    const visible = (open.length ? open : steps).slice(0, limit || 2);
+    const remaining = Math.max(0, open.length - visible.length);
+    return (
+      '<div class="wb-steps">' +
+      visible
+        .map(
+          (step) =>
+            '<label class="wb-step' + (step.done ? ' done' : '') + '"><input type="checkbox" data-wb-step="' +
+            escapeHTML(step.id) +
+            '" data-project-id="' +
+            escapeHTML(item.id) +
+            '"' +
+            (step.done ? ' checked' : '') +
+            ' /><span>' +
+            escapeHTML(step.text) +
+            (step.due ? '<em>@' + escapeHTML(step.due) + '</em>' : '') +
+            '</span></label>',
+        )
+        .join('') +
+      (remaining > 0 ? '<span class="wb-more">还有 ' + escapeHTML(remaining) + ' 项</span>' : '') +
+      '</div>'
+    );
+  }
+
+  function relativeActivityLabel(item) {
+    const days = Number(item.days_since_activity);
+    if (!isFinite(days) || days < 0) return '暂无日志';
+    if (days === 0) return '今天';
+    if (days === 1) return '昨天';
+    if (days <= 7) return days + ' 天前';
+    return text(item.last_date);
+  }
+
+  function projectRow(item, compact) {
+    const stateValue = text(item.state, 'planned');
+    const priority = text(item.priority, 'P2');
+    const stage = text(item.stage, 'unknown');
+    const stageLabel = text(item.stage_label, '未判断');
+    const progress = Number(item.progress) || 0;
+    const inferred = text(item.progress_source) !== 'manual';
+    const done = stateValue === 'done';
+    const planned = stateValue === 'planned';
+    const running = stateValue === 'in_progress' && item.is_current === true;
+    const displayStage = done
+      ? '已完成'
+      : stateValue === 'blocked'
+        ? '受阻'
+        : stateValue === 'paused' || stateValue === 'dormant'
+          ? '搁置'
+          : stageLabel;
+    const stageClass = done
+      ? 'done'
+      : stateValue === 'blocked'
+        ? 'blocked'
+        : stateValue === 'paused' || stateValue === 'dormant'
+          ? 'dormant'
+          : stage;
+    const steps = item.next_steps || [];
+    const next = steps.find((step) => !step.done);
+    const nextText = next ? text(next.text) : '暂无下一步';
+    const stepDone = steps.filter((step) => step.done).length;
+    const stageConfidence = confidenceLabel(item.stage_confidence);
+    const progressConfidence = confidenceLabel(item.progress_confidence);
+    const stageTitle =
+      '阶段：' +
+      (done ? '已完成' : stateValue === 'blocked' ? '受阻' : stateValue === 'paused' || stateValue === 'dormant' ? '搁置' : stageLabel) +
+      (stateValue === 'blocked' && stageLabel !== '受阻' ? '（推断阶段：' + stageLabel + '）' : '') +
+      (stageConfidence ? ' · 置信度 ' + stageConfidence : '');
+    let progressTitle = '手工设置';
+    if (text(item.progress_source) === 'next_steps') {
+      progressTitle = '依据：下一步完成 ' + stepDone + '/' + steps.length;
+    } else if (text(item.progress_source) === 'stage') {
+      progressTitle = '依据：阶段判断';
+    } else if (text(item.progress_source) === 'state') {
+      progressTitle = '依据：项目已完成';
+    }
+    if (progressConfidence) progressTitle += ' · 置信度 ' + progressConfidence;
+    const warning = [];
+    if (stateValue === 'blocked') warning.push('受阻');
+    if (item.overdue) warning.push('逾期');
+    if (item.stale) warning.push(text(item.days_since_activity) + ' 天无日志');
+    const meta = [relativeActivityLabel(item)];
+    if (Number(item.minutes_7d) > 0) meta.push('本周 ' + hoursShort(item.minutes_7d) + 'h');
+    if (text(item.target_date)) meta.push('目标 ' + text(item.target_date));
+    return (
+      '<article class="wb-row' +
+      (compact ? ' compact' : '') +
+      ' state-' +
+      escapeHTML(stateValue) +
+      '"><span class="priority-bar p-' +
+      escapeHTML(priority) +
+      '"></span><div class="wb-row-main"><div class="wb-row-title">' +
+      (running ? '<span class="wb-spinner" role="status" aria-label="正在推进" title="正在推进"></span>' : '') +
+      '<button class="link-btn wb-row-name" type="button" data-wb-open="' +
+      escapeHTML(item.name) +
+      '" title="打开项目详情">' +
+      escapeHTML(item.name) +
+      '</button><span class="stage-pill stage-' +
+      escapeHTML(stageClass) +
+      '" title="' +
+      escapeHTML(stageTitle) +
+      '">' +
+      escapeHTML(displayStage) +
+      '</span><span class="priority-pill p-' +
+      escapeHTML(priority) +
+      '">' +
+      escapeHTML(priority) +
+      '</span>' +
+      (warning.length ? '<span class="wb-warn">' + escapeHTML(warning.join(' · ')) + '</span>' : '') +
+      '</div><div class="wb-row-progress"><div class="wb-progress"><i style="width:' +
+      escapeHTML(String(planned ? 0 : progress)) +
+      '%"></i></div><span class="wb-progress-label" title="' +
+      escapeHTML(progressTitle) +
+      '">' +
+      (planned ? '待开始' : done ? '100%' : (inferred ? '推断 ' : '') + escapeHTML(String(progress)) + '%') +
+      '</span></div><div class="wb-row-next"><span>下一步</span>' +
+      escapeHTML(nextText) +
+      '</div></div><div class="wb-row-side"><div class="wb-row-meta">' +
+      meta.map((value) => '<span>' + escapeHTML(value) + '</span>').join('') +
+      '</div><div class="wb-row-actions"><button class="btn subtle" type="button" data-wb-edit="' +
+      escapeHTML(item.id) +
+      '">编辑</button>' +
+      (planned
+        ? '<button class="btn subtle" type="button" data-wb-start="' + escapeHTML(item.id) + '">开始</button>'
+        : done
+          ? ''
+          : '<button class="btn subtle" type="button" data-wb-complete="' + escapeHTML(item.id) + '">完成</button>') +
+      '</div></div></article>'
+    );
+  }
+
+  function renderWorkbench() {
+    const current = el('wb-current');
+    const done = el('wb-done');
+    const doneWrap = el('wb-done-wrap');
+    const summary = el('wb-summary');
+    const attention = el('wb-attention');
+    if (!current || !done || !doneWrap || !summary || !attention) return;
+    if (state.boardLoading && !state.board) {
+      current.innerHTML = skeleton();
+      done.innerHTML = '';
+      return;
+    }
+    const board = state.board || { projects: [], summary: {}, attention: [] };
+    if (board.error === 'bridge_unavailable') {
+      current.innerHTML = emptyBlock('请从 HiMind Agent 打开本视图', ['当前工作台需要宿主桥接才能读取项目和日志。']);
+      done.innerHTML = '';
+      summary.innerHTML = '';
+      attention.innerHTML = '';
+      return;
+    }
+    const recentDays = Number(board.recent_days) || 14;
+    const subtitle = el('wb-subtitle');
+    if (subtitle) subtitle.textContent = '最近 ' + recentDays + ' 天有推进的项目 · 每 ' + (BOARD_REFRESH_MS / 1000) + ' 秒自动刷新';
+    const query = text(state.query).toLowerCase();
+    const all = boardProjects().filter(
+      (item) =>
+        !query ||
+        text(item.name).toLowerCase().indexOf(query) >= 0 ||
+        text(item.description).toLowerCase().indexOf(query) >= 0,
+    );
+    const matchesQuery = (item) =>
+      !query ||
+      text(item.name).toLowerCase().indexOf(query) >= 0 ||
+      text(item.description).toLowerCase().indexOf(query) >= 0;
+    const currentItems = (board.current || all.filter((item) => item.is_current === true)).filter(matchesQuery);
+    const plannedItems = (board.planned || all.filter((item) => item.activity_bucket === 'planned')).filter(matchesQuery);
+    const doneItems = (board.done || all.filter((item) => item.is_done_recent === true)).filter(matchesQuery);
+    const mode = state.workbenchMode === 'planned' ? 'planned' : 'recent';
+    const listItems = mode === 'planned' ? plannedItems : currentItems;
+    const sm = board.summary || {};
+    summary.innerHTML =
+      '<strong>' + escapeHTML(sm.current || currentItems.length) + ' 个正在推进</strong>' +
+      (plannedItems.length > 0 ? '<span>' + escapeHTML(plannedItems.length) + ' 个待开始</span>' : '') +
+      '<span>本周 ' + escapeHTML(hoursShort(sm.minutes_this_week || 0) || '0') + 'h</span>' +
+      (Number(sm.blocked_current || 0) > 0 ? '<span class="wb-warn">' + escapeHTML(sm.blocked_current) + ' 个受阻</span>' : '');
+    const rows = Array.isArray(board.attention) ? board.attention : [];
+    attention.innerHTML = rows.length
+      ? '<div class="wb-attention-line"><strong>需要关注</strong>' +
+        rows
+          .map((row) => {
+            const reasons = (row.reasons || []).map((reason) => {
+              if (reason === 'blocked') return '受阻';
+              if (reason === 'stale') return text(row.days) + ' 天无日志';
+              if (reason === 'overdue') return '已逾期';
+              return reason;
+            });
+            return (
+              '<button class="link-btn" type="button" data-wb-open="' +
+              escapeHTML(row.name) +
+              '">' +
+              escapeHTML(row.name) +
+              ' · ' +
+              escapeHTML(reasons.join(' · ')) +
+              '</button>'
+            );
+          })
+          .join('') +
+        '</div>'
+      : '';
+    current.innerHTML = listItems.length
+      ? listItems.map((item) => projectRow(item, false)).join('')
+      : mode === 'planned'
+        ? emptyBlock('还没有待开始的项目', [
+            '在项目编辑里把状态设为「待开始」，或从历史项目中选择一个重新开始。',
+          ])
+        : emptyBlock('最近 ' + recentDays + ' 天没有推进中的项目', [
+            '记录一条工作日志后，对应项目会自动进入这里。',
+            '可以切换到「待开始」查看计划中的项目。',
+          ]);
+    done.innerHTML = doneItems.length ? doneItems.map((item) => projectRow(item, true)).join('') : '';
+    doneWrap.hidden = doneItems.length === 0;
+    const doneCount = el('wb-done-count');
+    if (doneCount) doneCount.textContent = doneItems.length ? '（' + doneItems.length + '）' : '';
+    if (el('wb-list-title')) el('wb-list-title').textContent = mode === 'planned' ? '待开始' : '最近活动';
+    if (el('wb-current-note')) {
+      el('wb-current-note').textContent =
+        mode === 'planned' ? '已计划但尚未开始' : '最近 ' + recentDays + ' 天有推进';
+    }
+    if (el('wb-recent-count')) el('wb-recent-count').textContent = String(currentItems.length);
+    if (el('wb-planned-count')) el('wb-planned-count').textContent = String(plannedItems.length);
+    document.querySelectorAll('#wb-modes [data-wb-mode]').forEach((button) => {
+      const on = button.getAttribute('data-wb-mode') === mode;
+      button.classList.toggle('active', on);
+      button.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    if (el('wb-all-projects')) {
+      const total = (board.projects || []).length;
+      el('wb-all-projects').textContent = total > 0 ? '查看全部项目（' + total + '）' : '查看全部项目';
+    }
+    bindWorkbench();
+  }
+  function bindWorkbench() {
+    const node = el('workbench-view');
+    if (!node) return;
+
+    node.querySelectorAll('#wb-modes [data-wb-mode]').forEach((button) => {
+      button.addEventListener('click', () => {
+        state.workbenchMode = button.getAttribute('data-wb-mode') === 'planned' ? 'planned' : 'recent';
+        state.workbenchModeResolved = true;
+        renderWorkbench();
+      });
+    });
+    node.querySelectorAll('[data-wb-start]').forEach((button) => {
+      button.addEventListener('click', () =>
+        updateProjectWork(button.getAttribute('data-wb-start'), { state: 'in_progress' }),
+      );
+    });
+    node.querySelectorAll('[data-wb-step]').forEach((checkbox) => {
+      checkbox.addEventListener('change', () => {
+        const projectID = checkbox.getAttribute('data-project-id');
+        const stepID = checkbox.getAttribute('data-wb-step');
+        const item = boardProjects().find((p) => text(p.id) === projectID);
+        if (!item) return;
+        const steps = (item.next_steps || []).map((step) => {
+          if (text(step.id) !== stepID) return step;
+          return Object.assign({}, step, { done: checkbox.checked });
+        });
+        updateProjectWork(projectID, { next_steps: steps });
+      });
+    });
+    node.querySelectorAll('[data-wb-edit]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const item = boardProjects().find((p) => text(p.id) === button.getAttribute('data-wb-edit'));
+        if (item) openWorkModal(item, false);
+      });
+    });
+    node.querySelectorAll('[data-wb-complete]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const item = boardProjects().find((p) => text(p.id) === button.getAttribute('data-wb-complete'));
+        if (item) openWorkModal(item, true);
+      });
+    });
+    node.querySelectorAll('[data-wb-open]').forEach((button) => {
+      button.addEventListener('click', () => openProjectFromBoard(button.getAttribute('data-wb-open')));
+    });
+  }
+
+  async function updateProjectWork(projectID, patch) {
+    try {
+      await bridgeInvoke('work-log.project.work.update', { project_id: projectID, patch: patch });
+      if (patch.state === 'in_progress' && state.workbenchMode === 'planned') {
+        state.workbenchMode = 'recent';
+        state.workbenchModeResolved = true;
+      }
+      notify('项目状态已更新。');
+      await loadBoard();
+      loadProjects().catch(() => {});
+      if (state.view === 'projects' && state.activeProject) {
+        loadProjects()
+          .then(() => selectProject(state.activeProject))
+          .catch(() => {});
+      }
+    } catch (error) {
+      notify('更新项目状态失败：' + String((error && error.message) || error), 'error');
+      await loadBoard();
+    }
+  }
+
+  function openProjectFromBoard(name) {
+    state.activeProject = text(name);
+    switchView('projects');
+    loadProjects()
+      .then(() => selectProject(state.activeProject))
+      .catch((error) => notify('读取项目失败：' + String((error && error.message) || error), 'error'));
+  }
+
+  function formatNextStepsText(steps) {
+    return (steps || [])
+      .map((step) => (step.done ? '[x] ' : '[ ] ') + text(step.text) + (step.due ? ' @' + step.due : ''))
+      .join('\n');
+  }
+
+  function parseNextStepsText(raw, existing) {
+    const byText = {};
+    (existing || []).forEach((step) => {
+      byText[text(step.text)] = step;
+    });
+    return text(raw)
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        let done = false;
+        let body = line;
+        const checked = line.match(/^\[(x|X| )?\]\s*(.*)$/);
+        if (checked) {
+          done = text(checked[1]).toLowerCase() === 'x';
+          body = checked[2];
+        }
+        let due = '';
+        const dueMatch = body.match(/\s*@(\d{4}-\d{2}-\d{2})\s*$/);
+        if (dueMatch) {
+          due = dueMatch[1];
+          body = body.slice(0, dueMatch.index).trim();
+        }
+        const old = byText[body];
+        return {
+          id: old ? text(old.id) : '',
+          text: body,
+          done: done,
+          due: due || (old ? text(old.due) : ''),
+          source: old ? text(old.source, 'manual') : 'manual',
+          created_at: old ? text(old.created_at) : '',
+          completed_at: done ? (old ? text(old.completed_at) : '') : '',
+        };
+      })
+      .filter((step) => step.text);
+  }
+
+  function normalizeStepDraft(step) {
+    return {
+      id: text(step.id),
+      text: text(step.text),
+      done: !!step.done,
+      due: text(step.due),
+      source: text(step.source, 'manual'),
+      created_at: text(step.created_at),
+      completed_at: text(step.completed_at),
+    };
+  }
+
+  function parseStepInput(raw) {
+    let value = text(raw);
+    if (!value) return null;
+    let due = '';
+    const match = value.match(/\s*@(\d{4}-\d{2}-\d{2})\s*$/);
+    if (match) {
+      due = match[1];
+      value = value.slice(0, match.index).trim();
+    }
+    if (!value) return null;
+    return { id: '', text: value, done: false, due: due, source: 'manual', created_at: '', completed_at: '' };
+  }
+
+  function renderWorkSteps() {
+    const list = el('w-next-list');
+    if (!list) return;
+    const steps = state.workEditingSteps || [];
+    if (!steps.length) {
+      list.innerHTML = '<div class="wb-empty-line">还没有下一步</div>';
+      return;
+    }
+    list.innerHTML = steps
+      .map(
+        (step, index) =>
+          '<div class="wb-next-row"><label class="wb-step' +
+          (step.done ? ' done' : '') +
+          '"><input type="checkbox" data-w-next-toggle="' +
+          index +
+          '"' +
+          (step.done ? ' checked' : '') +
+          ' /><span>' +
+          escapeHTML(step.text) +
+          (step.due ? '<em>@' + escapeHTML(step.due) + '</em>' : '') +
+          '</span></label><button class="link-btn wb-next-remove" type="button" data-w-next-remove="' +
+          index +
+          '" aria-label="删除下一步">×</button></div>',
+      )
+      .join('');
+  }
+
+  function updateCompleteBox() {
+    const box = el('w-complete-box');
+    if (!box) return;
+    box.hidden = el('w-state').value !== 'done';
+  }
+
+  function addWorkStep() {
+    const input = el('w-next-input');
+    if (!input) return;
+    const step = parseStepInput(input.value);
+    if (!step) return;
+    state.workEditingSteps = (state.workEditingSteps || []).concat([step]);
+    input.value = '';
+    renderWorkSteps();
+    input.focus();
+  }
+
+  function openWorkModal(item, complete) {
+    if (!item) return;
+    state.workEditing = { item: item, complete: !!complete };
+    state.workEditingSteps = (item.next_steps || []).map(normalizeStepDraft);
+    el('w-project-id').value = text(item.id);
+    el('w-project-name').value = text(item.name);
+    el('w-state').value = complete ? 'done' : text(item.state, 'planned');
+    el('w-priority').value = text(item.priority, 'P2');
+    el('w-progress').value = Number(item.manual_progress) || 0;
+    el('w-target').value = text(item.target_date);
+    el('w-goal').value = text(item.goal);
+    el('w-blockers').value = (item.blockers || []).join('\n');
+    el('w-completion').value = text(item.completion_summary);
+    el('w-write-log').checked = true;
+    el('w-next-input').value = '';
+    renderWorkSteps();
+    updateCompleteBox();
+    el('w-more').open = false;
+    el('work-title').textContent = complete ? '标记项目完成' : '更新项目';
+    el('work-hint').textContent = complete
+      ? '完成时间记为今天；可同时写一条完成日志。'
+      : '先改状态、优先级或下一步；其他设置收在下面。';
+    el('work-backdrop').hidden = false;
+    setTimeout(() => (complete ? el('w-completion').focus() : el('w-next-input').focus()), 30);
+  }
+
+  function closeWorkModal() {
+    el('work-backdrop').hidden = true;
+    state.workEditing = null;
+    state.workEditingSteps = [];
+  }
+
+  async function submitWorkForm(event) {
+    event.preventDefault();
+    if (!state.workEditing) return;
+    const item = state.workEditing.item;
+    const patch = {
+      state: el('w-state').value,
+      priority: el('w-priority').value,
+      progress: Number(el('w-progress').value) || 0,
+      goal: el('w-goal').value,
+      target_date: el('w-target').value,
+      next_steps: (state.workEditingSteps || [])
+        .filter((step) => text(step.text))
+        .map((step) => ({
+          id: text(step.id),
+          text: text(step.text),
+          done: !!step.done,
+          due: text(step.due),
+          source: text(step.source, 'manual'),
+          created_at: text(step.created_at),
+          completed_at: step.done ? text(step.completed_at) : '',
+        })),
+      blockers: text(el('w-blockers').value)
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean),
+      completion_summary: el('w-completion').value,
+    };
+    try {
+      await bridgeInvoke('work-log.project.work.update', { project_id: item.id, patch: patch });
+      if (patch.state === 'done' && el('w-write-log').checked) {
+        const summary = text(patch.completion_summary, '项目已完成');
+        await bridgeInvoke('work-log.entry.upsert', {
+          date: today(),
+          entry: {
+            source: 'manual',
+            project: text(item.name),
+            category: '开发',
+            title: '完成项目：' + text(item.name),
+            summary: summary,
+            outcomes: patch.goal ? [patch.goal] : [],
+            next: [],
+            minutes: 0,
+            minutes_source: 'manual',
+          },
+        });
+      }
+      closeWorkModal();
+      notify(patch.state === 'done' ? '项目已标记完成。' : '项目工作状态已保存。');
+      await loadBoard();
+      await loadProjects();
+      if (state.view === 'projects' && state.activeProject) {
+        await selectProject(state.activeProject);
+      }
+    } catch (error) {
+      notify('保存项目状态失败：' + String((error && error.message) || error), 'error');
+    }
+  }
+
+  // ---------- 计划 ----------
+
+  function planDateLabel(date) {
+    const d = parseDate(date);
+    if (!d) return text(date);
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+    return date + ' 周' + weekdays[d.getDay()];
+  }
+
+  function ensurePlanDate() {
+    if (!state.planDate) state.planDate = today();
+    return state.planDate;
+  }
+
+  async function loadPlan(date) {
+    state.planDate = date || ensurePlanDate();
+    state.planLoading = true;
+    if (state.view === 'plan') renderPlan();
+    try {
+      const [planResult, itemResult, reviewResult] = await Promise.all([
+        bridgeInvoke('work-log.plan.get', { date: state.planDate }),
+        bridgeInvoke('work-log.item.list', { include_done: true }),
+        bridgeInvoke('work-log.plan.review', { date: state.planDate }),
+      ]);
+      state.plan = (planResult && planResult.plan) || null;
+      state.workItemCache = (itemResult && itemResult.items) || [];
+      state.planReview = (reviewResult && reviewResult.review) || null;
+    } catch (error) {
+      if (error && error.code === 'bridge_unavailable') {
+        state.plan = null;
+        state.planReview = null;
+        state.workItemCache = [];
+      } else {
+        notify('读取计划失败：' + String((error && error.message) || error), 'error');
+        state.plan = null;
+        state.planReview = null;
+        state.workItemCache = [];
+      }
+    } finally {
+      state.planLoading = false;
+      if (state.view === 'plan') renderPlan();
+    }
+  }
+
+  function planCapacityHtml(plan) {
+    const cap = (plan && plan.capacity) || {};
+    const work = Number(cap.work_minutes) || 0;
+    const meeting = Number(cap.meeting_minutes) || 0;
+    const brk = Number(cap.break_minutes) || 0;
+    const buffer = Number(cap.buffer_minutes) || 0;
+    const committed = Number(cap.committed_minutes) || 0;
+    const available = Number(cap.available_minutes) || 0;
+    const remaining = Number(cap.remaining_minutes) || 0;
+    const pct = available > 0 ? Math.min(100, Math.round((committed / available) * 100)) : 0;
+    return (
+      '<div class="plan-capacity-main"><div class="plan-capacity-labels"><strong>已排 ' +
+      escapeHTML(hoursShort(committed) || '0') +
+      'h / 可用 ' +
+      escapeHTML(hoursShort(available) || '0') +
+      'h</strong><span class="' +
+      (remaining < 0 ? 'wb-warn' : 'meta') +
+      '">' +
+      (remaining < 0 ? '超出 ' + escapeHTML(hoursShort(-remaining)) + 'h' : '剩余 ' + escapeHTML(hoursShort(remaining) || '0') + 'h') +
+      '</span></div><div class="plan-capacity-bar"><i style="width:' +
+      pct +
+      '%"></i></div><div class="plan-capacity-chips"><span>工作 ' +
+      escapeHTML(hoursShort(work) || '0') +
+      'h</span><span>会议 ' +
+      escapeHTML(hoursShort(meeting) || '0') +
+      'h</span><span>休息 ' +
+      escapeHTML(hoursShort(brk) || '0') +
+      'h</span><span>缓冲 ' +
+      escapeHTML(hoursShort(buffer) || '0') +
+      'h</span></div></div>'
+    );
+  }
+
+  function renderPlan() {
+    const node = el('plan-blocks');
+    const backlog = el('plan-backlog-list');
+    const capacity = el('plan-capacity');
+    if (!node || !backlog || !capacity) return;
+    const date = ensurePlanDate();
+    if (el('plan-date')) el('plan-date').value = date;
+    if (el('plan-title')) el('plan-title').textContent = planDateLabel(date);
+    const isToday = date === today();
+    if (el('plan-auto')) {
+      el('plan-auto').hidden = !isToday;
+      el('plan-auto').title = isToday ? '按当前项目和待开始工作项生成今日计划' : '一键智能排期仅支持今天';
+    }
+    if (state.planLoading) {
+      node.innerHTML = skeleton();
+      backlog.innerHTML = '';
+      capacity.innerHTML = '';
+      return;
+    }
+    const plan = state.plan;
+    if (!plan) {
+      node.innerHTML = emptyBlock('暂时读不到计划', ['请确认从 HiMind Agent 打开本视图，或先保存一次计划。']);
+      backlog.innerHTML = '';
+      capacity.innerHTML = '';
+      return;
+    }
+    const cap = plan.capacity || {};
+    const review = state.planReview || null;
+    const reviewDone = !!(review && review.finalized);
+    if (el('plan-badges')) {
+      el('plan-badges').innerHTML =
+        '<span class="badge">' + (plan.revision > 0 ? '第 ' + escapeHTML(plan.revision) + ' 版' : '草稿') + '</span>' +
+        '<span class="badge">' + escapeHTML((plan.blocks || []).length) + ' 个时间块</span>' +
+        (reviewDone
+          ? '<span class="badge" title="实际 ' + escapeHTML(review.actual_minutes) + ' / 计划 ' + escapeHTML(review.planned_minutes) + ' 分钟">实际完成 ' + escapeHTML(review.completion_percent) + '%</span>'
+          : '<span class="badge">待到当日结束</span>');
+    }
+    capacity.innerHTML =
+      planCapacityHtml(plan) +
+      '<p class="meta plan-review-note">' +
+      (reviewDone
+        ? '实际完成 ' + escapeHTML(review.completion_percent) + '% · 依据当日日志'
+        : '实际完成以当日结束后的日志为准') +
+      '</p>';
+    const query = text(state.query).toLowerCase();
+    const items = (state.workItemCache || []).filter(
+      (item) =>
+        text(item.status) !== 'done' &&
+        text(item.status) !== 'cancelled' &&
+        (!query || text(item.title).toLowerCase().indexOf(query) >= 0 || text(item.project).toLowerCase().indexOf(query) >= 0),
+    );
+    if (el('plan-backlog-count')) el('plan-backlog-count').textContent = items.length + ' 项未完成';
+    backlog.innerHTML = items.length
+      ? items
+          .map(
+            (item) =>
+              '<article class="plan-item"><div class="plan-item-head"><strong>' +
+              escapeHTML(item.title) +
+              '</strong><span class="priority-pill p-' +
+              escapeHTML(item.priority || 'P2') +
+              '">' +
+              escapeHTML(item.priority || 'P2') +
+              '</span></div><div class="plan-item-meta"><span>' +
+              escapeHTML(item.project || '') +
+              (item.feature ? ' · ' + escapeHTML(item.feature) : '') +
+              '</span><span>预计 ' +
+              escapeHTML(hoursShort(item.estimate_minutes) || '0') +
+              'h · 剩余 ' +
+              escapeHTML(hoursShort(item.remaining_minutes) || '0') +
+              'h</span>' +
+              (item.due_date ? '<span>截止 ' + escapeHTML(item.due_date) + '</span>' : '') +
+              '</div><div class="plan-item-actions"><button class="btn subtle" type="button" data-plan-schedule="' +
+              escapeHTML(item.id) +
+              '">排入</button><button class="btn subtle" type="button" data-plan-item-edit="' +
+              escapeHTML(item.id) +
+              '">编辑</button></div></article>',
+          )
+          .join('')
+      : '<p class="meta pad">没有待排工作项。先新增一个，或把已完成的工作项重新打开。</p>';
+
+    const blocks = (plan.blocks || []).slice().sort((a, b) => text(a.start).localeCompare(text(b.start)));
+    const reviewByID = {};
+    ((review && review.blocks) || []).forEach((item) => {
+      reviewByID[text(item.id)] = item;
+    });
+    const actualLabel = (status) => {
+      if (status === 'done') return '实际完成';
+      if (status === 'partial') return '部分完成';
+      if (status === 'skipped') return '未完成';
+      return '待结算';
+    };
+    node.innerHTML = blocks.length
+      ? blocks
+          .map((block) => {
+            const title = text(block.title) || PLAN_BLOCK_KIND_LABELS[block.kind] || block.kind;
+            const duration = blockMinutes(block);
+            const workItem = (state.workItemCache || []).find((item) => text(item.id) === text(block.work_item_id));
+            const reviewBlock = reviewByID[text(block.id)];
+            const actualHtml =
+              reviewDone && reviewBlock && (block.kind === 'focus' || block.kind === 'admin')
+                ? '<span class="plan-actual status-' +
+                  escapeHTML(reviewBlock.status) +
+                  '" title="' +
+                  escapeHTML(reviewBlock.evidence || '') +
+                  '">' +
+                  escapeHTML(actualLabel(reviewBlock.status)) +
+                  '</span>'
+                : '';
+            return (
+              '<article class="plan-block kind-' +
+              escapeHTML(block.kind) +
+              ' status-' +
+              escapeHTML(block.status) +
+              '" data-block-id="' +
+              escapeHTML(block.id) +
+              '"><div class="plan-block-time"><strong>' +
+              escapeHTML(block.start) +
+              '</strong><span>' +
+              escapeHTML(block.end) +
+              '</span></div><div class="plan-block-body"><div class="plan-block-title">' +
+              escapeHTML(title) +
+              (block.locked ? '<span class="lock-badge">锁定</span>' : '') +
+              '</div><div class="plan-block-meta">' +
+              escapeHTML(PLAN_BLOCK_KIND_LABELS[block.kind] || block.kind) +
+              (duration ? ' · ' + escapeHTML(hoursShort(duration)) + 'h' : '') +
+              (workItem ? ' · ' + escapeHTML(workItem.project) : '') +
+              ' · ' +
+              escapeHTML(PLAN_BLOCK_STATUS_LABELS[block.status] || block.status) +
+              actualHtml +
+              '</div></div><div class="plan-block-actions"><button class="btn subtle" type="button" data-plan-block-edit="' +
+              escapeHTML(block.id) +
+              '">编辑</button><button class="btn subtle" type="button" data-plan-block-delete="' +
+              escapeHTML(block.id) +
+              '">删除</button></div></article>'
+            );
+          })
+          .join('')
+      : '<div class="empty"><strong>今天还没有时间块</strong><ul><li>从左侧工作项点「排入」，或点右上角「添加时间块」。</li></ul></div>';
+    bindPlan();
+  }
+
+  function blockMinutes(block) {
+    const start = text(block.start).split(':').map(Number);
+    const end = text(block.end).split(':').map(Number);
+    if (start.length !== 2 || end.length !== 2 || start.some(isNaN) || end.some(isNaN)) return 0;
+    return end[0] * 60 + end[1] - (start[0] * 60 + start[1]);
+  }
+
+  function bindPlan() {
+    const node = el('plan-view');
+    if (!node) return;
+    node.querySelectorAll('[data-plan-schedule]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const item = (state.workItemCache || []).find((x) => text(x.id) === button.getAttribute('data-plan-schedule'));
+        if (item) openBlockModal(null, item);
+      });
+    });
+    node.querySelectorAll('[data-plan-item-edit]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const item = (state.workItemCache || []).find((x) => text(x.id) === button.getAttribute('data-plan-item-edit'));
+        if (item) openItemModal(item);
+      });
+    });
+    node.querySelectorAll('[data-plan-block-done]').forEach((button) => {
+      button.addEventListener('click', () => togglePlanBlockDone(button.getAttribute('data-plan-block-done')));
+    });
+    node.querySelectorAll('[data-plan-block-edit]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const id = button.getAttribute('data-plan-block-edit');
+        const block = (state.plan.blocks || []).find((x) => text(x.id) === id);
+        if (block) openBlockModal(block, null);
+      });
+    });
+    node.querySelectorAll('[data-plan-block-delete]').forEach((button) => {
+      button.addEventListener('click', () => deletePlanBlock(button.getAttribute('data-plan-block-delete')));
+    });
+  }
+
+  async function autoPlanNow() {
+    const button = el('plan-auto');
+    if (button) button.disabled = true;
+    try {
+      const result = await bridgeInvoke('work-log.plan.auto', { date: ensurePlanDate() });
+      const scheduled = Number(result && result.scheduled_minutes) || 0;
+      const unscheduled = Number(result && result.unscheduled_minutes) || 0;
+      await loadPlan(state.planDate);
+      notify(
+        '智能排期完成：已排 ' +
+          (hoursShort(scheduled) || '0') +
+          'h' +
+          (unscheduled > 0 ? '，还有 ' + (hoursShort(unscheduled) || '0') + 'h 未排入' : '') +
+          '。',
+      );
+    } catch (error) {
+      notify('智能排期失败：' + String((error && error.message) || error), 'error');
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+  async function savePlan() {
+    if (!state.plan) return;
+    try {
+      const result = await bridgeInvoke('work-log.plan.save', { plan: state.plan });
+      state.plan = (result && result.plan) || state.plan;
+      notify('计划已保存。');
+      renderPlan();
+    } catch (error) {
+      notify('保存计划失败：' + String((error && error.message) || error), 'error');
+    }
+  }
+
+  function togglePlanBlockDone(id) {
+    if (!state.plan) return;
+    state.plan.blocks = (state.plan.blocks || []).map((block) =>
+      text(block.id) === id ? Object.assign({}, block, { status: block.status === 'done' ? 'planned' : 'done' }) : block,
+    );
+    savePlan();
+  }
+
+  function deletePlanBlock(id) {
+    if (!state.plan) return;
+    state.plan.blocks = (state.plan.blocks || []).filter((block) => text(block.id) !== id);
+    savePlan();
+  }
+
+  function planDateShift(days) {
+    const d = parseDate(ensurePlanDate()) || new Date();
+    d.setDate(d.getDate() + days);
+    loadPlan(formatDate(d));
+  }
+
+  function openItemModal(item) {
+    const list = state.projects && state.projects.length ? state.projects : boardProjects();
+    const select = el('i-project');
+    if (select) {
+      select.innerHTML = list
+        .map((p) => '<option value="' + escapeHTML(p.name) + '">' + escapeHTML(p.name) + '</option>')
+        .join('');
+    }
+    state.workItemEditing = item || null;
+    el('i-id').value = item ? text(item.id) : '';
+    el('i-title').value = item ? text(item.title) : '';
+    el('i-feature').value = item ? text(item.feature) : '';
+    el('i-priority').value = item ? text(item.priority, 'P2') : 'P2';
+    el('i-status').value = item ? text(item.status, 'todo') : 'todo';
+    el('i-estimate').value = item ? Number(item.estimate_minutes) || 0 : 60;
+    el('i-remaining').value = item ? Number(item.remaining_minutes) || 0 : 60;
+    el('i-due').value = item ? text(item.due_date) : '';
+    el('i-notes').value = item ? text(item.notes) : '';
+    if (select && item && text(item.project)) select.value = text(item.project);
+    el('item-title').textContent = item ? '编辑工作项' : '新增工作项';
+    el('item-backdrop').hidden = false;
+    setTimeout(() => el('i-title').focus(), 30);
+  }
+
+  function closeItemModal() {
+    el('item-backdrop').hidden = true;
+    state.workItemEditing = null;
+  }
+
+  async function submitItemForm(event) {
+    event.preventDefault();
+    const project = el('i-project').value;
+    if (!project) {
+      notify('请先选择项目。', 'warn');
+      return;
+    }
+    const payload = {
+      project: project,
+      title: el('i-title').value,
+      feature: el('i-feature').value,
+      priority: el('i-priority').value,
+      status: el('i-status').value,
+      estimate_minutes: Number(el('i-estimate').value) || 0,
+      remaining_minutes: Number(el('i-remaining').value) || 0,
+      due_date: el('i-due').value,
+      notes: el('i-notes').value,
+    };
+    try {
+      if (state.workItemEditing) {
+        await bridgeInvoke('work-log.item.update', {
+          work_item_id: state.workItemEditing.id,
+          patch: payload,
+        });
+      } else {
+        await bridgeInvoke('work-log.item.upsert', { work_item: payload });
+      }
+      closeItemModal();
+      notify('工作项已保存。');
+      await loadPlan(state.planDate);
+    } catch (error) {
+      notify('保存工作项失败：' + String((error && error.message) || error), 'error');
+    }
+  }
+
+  function openBlockModal(block, item) {
+    state.planEditingBlock = block || null;
+    const select = el('b-item');
+    if (select) {
+      select.innerHTML =
+        '<option value="">不关联</option>' +
+        (state.workItemCache || [])
+          .map((x) => '<option value="' + escapeHTML(x.id) + '">' + escapeHTML(x.title) + ' · ' + escapeHTML(x.project) + '</option>')
+          .join('');
+    }
+    const blocks = (state.plan && state.plan.blocks) || [];
+    const last = blocks.length ? blocks[blocks.length - 1] : null;
+    el('b-id').value = block ? text(block.id) : '';
+    el('b-kind').value = block ? text(block.kind, 'focus') : 'focus';
+    el('b-title').value = block ? text(block.title) : '';
+    el('b-start').value = block ? text(block.start, '09:30') : text(last && last.end, '09:30');
+    el('b-end').value = block ? text(block.end, '11:00') : '11:00';
+    el('b-locked').checked = block ? !!block.locked : false;
+    if (select) select.value = block ? text(block.work_item_id) : item ? text(item.id) : '';
+    if (item && !block) {
+      el('b-title').value = text(item.title);
+      const start = el('b-start').value || '09:30';
+      const startParts = start.split(':').map(Number);
+      if (startParts.length === 2) {
+        const total = Math.min(23 * 60 + 59, startParts[0] * 60 + startParts[1] + Math.min(90, Number(item.remaining_minutes) || 90));
+        el('b-end').value = String(Math.floor(total / 60)).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0');
+      }
+    }
+    el('block-title').textContent = block ? '编辑时间块' : '添加时间块';
+    el('block-backdrop').hidden = false;
+    setTimeout(() => el('b-start').focus(), 30);
+  }
+
+  function closeBlockModal() {
+    el('block-backdrop').hidden = true;
+    state.planEditingBlock = null;
+  }
+
+  async function submitBlockForm(event) {
+    event.preventDefault();
+    if (!state.plan) return;
+    const block = Object.assign({}, state.planEditingBlock || {}, {
+      id: el('b-id').value || '',
+      kind: el('b-kind').value,
+      work_item_id: el('b-item').value,
+      title: el('b-title').value,
+      start: el('b-start').value,
+      end: el('b-end').value,
+      status: state.planEditingBlock ? text(state.planEditingBlock.status, 'planned') : 'planned',
+      locked: el('b-locked').checked,
+      source: 'manual',
+      rationale: state.planEditingBlock ? text(state.planEditingBlock.rationale) : '',
+    });
+    if (state.planEditingBlock) {
+      state.plan.blocks = (state.plan.blocks || []).map((item) => (text(item.id) === text(block.id) ? block : item));
+    } else {
+      state.plan.blocks = (state.plan.blocks || []).concat([block]);
+    }
+    closeBlockModal();
+    await savePlan();
+  }  // ---------- 项目 ----------
 
   function renderProjectsMode() {
     const node = el('projects-mode');
@@ -1761,6 +2861,76 @@
     renderProjectProgress();
   }
 
+  function projectWorkPanel(proj) {
+    if (!proj) return '';
+    const stateValue = text(proj.state || (proj.work && proj.work.state), 'planned');
+    const priority = text(proj.priority || (proj.work && proj.work.priority), 'P2');
+    const goal = text(proj.goal || (proj.work && proj.work.goal));
+    const target = text(proj.target_date || (proj.work && proj.work.target_date));
+    const stage = text(proj.stage, 'unknown');
+    const stageLabel = text(proj.stage_label, '未判断');
+    const progress = Number(proj.progress) || 0;
+    const progressSource = text(proj.progress_source, 'stage');
+    const steps = (proj.next_steps || (proj.work && proj.work.next_steps) || []).slice(0, 6);
+    const blockers = proj.blockers || (proj.work && proj.work.blockers) || [];
+    const done = stateValue === 'done';
+    const dormant = proj.is_other === true;
+    const running = stateValue === 'in_progress' && proj.is_current === true;
+    const stepHtml = steps.length
+      ? steps
+          .map(
+            (step) =>
+              '<label class="wb-step' + (step.done ? ' done' : '') + '"><input type="checkbox" data-pp-step="' +
+              escapeHTML(step.id) +
+              '"' +
+              (step.done ? ' checked' : '') +
+              ' /><span>' +
+              escapeHTML(step.text) +
+              (step.due ? '<em>@' + escapeHTML(step.due) + '</em>' : '') +
+              '</span></label>',
+          )
+          .join('')
+      : '<span class="wb-empty-line">还没有下一步</span>';
+    return (
+      '<section class="pp-work"><div class="pp-work-head">' +
+      (running ? '<span class="wb-spinner" role="status" aria-label="正在推进" title="正在推进"></span>' : '') +
+      '<span class="state-pill state-' +
+      escapeHTML(dormant ? 'dormant' : stateValue) +
+      '">' +
+      escapeHTML(dormant ? '未活跃' : workStateLabel(stateValue)) +
+      '</span>' +
+      (done
+        ? ''
+        : '<span class="stage-pill stage-' +
+          escapeHTML(stage) +
+          '">' +
+          escapeHTML(stageLabel) +
+          '</span>') +
+      '<span class="priority-pill p-' +
+      escapeHTML(priority) +
+      '">' +
+      escapeHTML(priorityLabel(priority)) +
+      '</span><span class="meta">' +
+      (progressSource === 'manual' ? '手工进度 ' : done ? '' : '约 ') +
+      escapeHTML(progress) +
+      '%' +
+      (progressSource === 'manual' ? '' : ' · 智能推断') +
+      '</span>' +
+      (target ? '<span class="meta">目标 ' + escapeHTML(target) + '</span>' : '') +
+      (dormant ? '<span class="meta">超过 14 天未活跃</span>' : '') +
+      (proj.stale ? '<span class="wb-warn">' + escapeHTML(proj.days_since_activity) + ' 天无日志</span>' : '') +
+      '</div>' +
+      (goal ? '<p class="pp-work-goal">' + escapeHTML(goal) + '</p>' : '') +
+      '<div class="pp-work-next"><strong>下一步</strong>' +
+      stepHtml +
+      '</div>' +
+      (blockers.length ? '<div class="pp-work-blockers"><strong>阻塞</strong>' + blockers.map((item) => '<span>' + escapeHTML(item) + '</span>').join('') + '</div>' : '') +
+      (done && text(proj.completion_summary) ? '<p class="pp-work-summary">完成摘要：' + escapeHTML(proj.completion_summary) + '</p>' : '') +
+      '<div class="wb-actions"><button class="btn subtle" type="button" data-pp-work-edit>编辑工作状态</button>' +
+      (done ? '' : '<button class="btn subtle" type="button" data-pp-work-complete>标记完成</button>') +
+      '</div></section>'
+    );
+  }
   function renderProjectProgress() {
     const node = el('proj-progress');
     if (!node) return;
@@ -2008,8 +3178,23 @@
       body = '<div class="pp-timeline">' + daySections(entries) + '</div>';
     }
 
-    node.innerHTML = head + toolbar + body;
+    node.innerHTML = head + projectWorkPanel(proj) + toolbar + body;
     bindEntryCards(node);
+    node.querySelectorAll("[data-pp-work-edit]").forEach((button) => {
+      button.addEventListener("click", () => openWorkModal(proj, false));
+    });
+    node.querySelectorAll("[data-pp-work-complete]").forEach((button) => {
+      button.addEventListener("click", () => openWorkModal(proj, true));
+    });
+    node.querySelectorAll("[data-pp-step]").forEach((checkbox) => {
+      checkbox.addEventListener("change", () => {
+        const stepID = checkbox.getAttribute("data-pp-step");
+        const steps = (proj.next_steps || []).map((step) =>
+          text(step.id) === stepID ? Object.assign({}, step, { done: checkbox.checked }) : step,
+        );
+        updateProjectWork(proj.id, { next_steps: steps });
+      });
+    });
     node.querySelectorAll('[data-exhibit]').forEach((btn) => {
       btn.addEventListener('click', () => {
         state.projectExhibit = btn.getAttribute('data-exhibit') || '';
@@ -3022,7 +4207,7 @@
 
   function trapFocus(event) {
     if (event.key !== 'Tab') return;
-    const backdrop = ['maint-backdrop', 'manual-backdrop'].map((id) => el(id)).find((node) => node && !node.hidden);
+    const backdrop = ['maint-backdrop', 'manual-backdrop', 'work-backdrop', 'item-backdrop', 'block-backdrop'].map((id) => el(id)).find((node) => node && !node.hidden);
     if (!backdrop) return;
     const focusable = backdrop.querySelectorAll(
       'button, [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])',
@@ -3318,7 +4503,9 @@
   // ---------- 视图切换 ----------
 
   function switchView(view) {
-    state.view = VIEWS.indexOf(view) >= 0 ? view : 'calendar';
+    state.view = VIEWS.indexOf(view) >= 0 ? view : 'workbench';
+    el('workbench-view').hidden = state.view !== 'workbench';
+    el('plan-view').hidden = state.view !== 'plan';
     el('calendar-view').hidden = state.view !== 'calendar';
     el('report-view').hidden = state.view !== 'report';
     el('matrix-view').hidden = state.view !== 'matrix';
@@ -3331,6 +4518,8 @@
     const search = el('search');
     if (search) {
       const placeholders = {
+        workbench: '筛选当前项目…',
+        plan: '筛选工作项…',
         calendar: '搜索日志…',
         report: '筛选本期记录…',
         matrix: '筛选项目…',
@@ -3343,7 +4532,17 @@
     } else {
       closeManualForm();
     }
-    if (state.view === 'report') {
+    if (state.view === 'workbench') {
+      if (!state.board) {
+        loadBoard();
+      } else {
+        renderWorkbench();
+        loadBoard({ silent: true });
+      }
+    } else if (state.view === 'plan') {
+      if (!state.plan || state.plan.date !== ensurePlanDate()) loadPlan(state.planDate);
+      else renderPlan();
+    } else if (state.view === 'report') {
       if (!state.reportAnchor) state.reportAnchor = state.selected || today();
       loadReport();
     } else if (state.view === 'matrix') {
@@ -3380,11 +4579,73 @@
       submitManual();
     });
 
+    // 工作台 / 计划
+    el('wb-open-plan').addEventListener('click', () => switchView('plan'));
+    el('wb-all-projects').addEventListener('click', () => switchView('projects'));
+    el('plan-prev').addEventListener('click', () => planDateShift(-1));
+    el('plan-next').addEventListener('click', () => planDateShift(1));
+    el('plan-today').addEventListener('click', () => loadPlan(today()));
+    el('plan-date').addEventListener('change', () => {
+      const value = el('plan-date').value;
+      if (value) loadPlan(value);
+    });
+    el('plan-auto').addEventListener('click', autoPlanNow);
+    el('plan-add-item').addEventListener('click', () => openItemModal(null));
+    el('plan-add-block').addEventListener('click', () => openBlockModal(null, null));
+
+    el('w-close').addEventListener('click', closeWorkModal);
+    el('w-cancel').addEventListener('click', closeWorkModal);
+    el('work-backdrop').addEventListener('mousedown', (event) => {
+      if (event.target === el('work-backdrop')) closeWorkModal();
+    });
+    el('work-form').addEventListener('submit', submitWorkForm);
+    el('w-state').addEventListener('change', updateCompleteBox);
+    el('w-next-add').addEventListener('click', addWorkStep);
+    el('w-next-input').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        addWorkStep();
+      }
+    });
+    el('w-next-list').addEventListener('change', (event) => {
+      const input = event.target.closest('[data-w-next-toggle]');
+      if (!input) return;
+      const index = Number(input.getAttribute('data-w-next-toggle'));
+      if (state.workEditingSteps[index]) {
+        state.workEditingSteps[index].done = input.checked;
+        state.workEditingSteps[index].completed_at = input.checked ? new Date().toISOString() : '';
+        renderWorkSteps();
+      }
+    });
+    el('w-next-list').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-w-next-remove]');
+      if (!button) return;
+      const index = Number(button.getAttribute('data-w-next-remove'));
+      state.workEditingSteps.splice(index, 1);
+      renderWorkSteps();
+    });
+
+    el('i-close').addEventListener('click', closeItemModal);
+    el('i-cancel').addEventListener('click', closeItemModal);
+    el('item-backdrop').addEventListener('mousedown', (event) => {
+      if (event.target === el('item-backdrop')) closeItemModal();
+    });
+    el('item-form').addEventListener('submit', submitItemForm);
+
+    el('b-close').addEventListener('click', closeBlockModal);
+    el('b-cancel').addEventListener('click', closeBlockModal);
+    el('block-backdrop').addEventListener('mousedown', (event) => {
+      if (event.target === el('block-backdrop')) closeBlockModal();
+    });
+    el('block-form').addEventListener('submit', submitBlockForm);
+
     const search = el('search');
     search.addEventListener('input', () => {
       state.query = search.value || '';
       state.searchResults = null;
-      if (state.view === 'calendar') renderPanel();
+      if (state.view === 'workbench') renderWorkbench();
+      else if (state.view === 'plan') renderPlan();
+      else if (state.view === 'calendar') renderPanel();
       else if (state.view === 'report') renderReport();
       else if (state.view === 'matrix') renderMatrix();
       else if (state.view === 'projects') {
@@ -3486,10 +4747,21 @@
       renderProjectsView();
     });
 
+    // 工作台只在页面可见时每 60 秒静默刷新一次；spinner 本身由 CSS 持续动画驱动。
+    startBoardAutoRefresh();
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && state.view === 'workbench') {
+        loadBoard({ silent: true });
+      }
+    });
+
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
         closeManualForm();
         closeMaintenance();
+        closeWorkModal();
+        closeItemModal();
+        closeBlockModal();
       }
       trapFocus(event);
     });
@@ -3503,6 +4775,8 @@
       await loadProjects();
       await loadCalendar(parts[0], parts[1]);
       await selectDate(pickDefaultDate(state.calendar));
+      await loadBoard();
+      if (state.view === 'plan') await loadPlan(state.planDate);
       if (state.view === 'report') loadReport();
       if (state.view === 'matrix') loadMatrix(state.matrixYear || parts[0], state.matrixMonth || parts[1]);
     } catch (error) {
@@ -3520,7 +4794,7 @@
   }
 
   bind();
-  switchView('calendar');
+  switchView('workbench');
   refresh();
   window.__WORK_LOG_VIEW__ = { PLUGIN_ID: PLUGIN_ID, refresh: refresh };
 })();

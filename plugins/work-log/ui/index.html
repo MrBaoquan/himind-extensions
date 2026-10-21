@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>工作日志 · 日历回看</title>
+    <title>工作日志 · 当前工作</title>
     <!-- 资源带版本后缀：插件 UI 由 Agent 直接按路径提供，不带缓存头；版本号变化会让 WebView
          重新拉取 app.js/app.css，避免界面改版后仍显示旧脚本。改动前端资源时请同步提升。 -->
-    <link rel="stylesheet" href="app.css?v=0.14.0" />
+    <link rel="stylesheet" href="app.css?v=0.15.0" />
   </head>
   <body>
     <header class="topbar">
@@ -14,12 +14,14 @@
         <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H17a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5.5A1.5 1.5 0 0 1 4 19.5z" /><path d="M8 8h7M8 12h7M8 16h4" /></svg></span>
         <div class="brand-text">
           <strong>工作日志</strong>
-          <small>项目 · 功能 · 工时</small>
+          <small>项目 · 计划 · 工时</small>
         </div>
       </div>
       <div class="toolbar">
         <div class="view-switch" role="tablist" aria-label="主导航">
-          <button id="view-calendar" class="switch active" type="button" role="tab" aria-selected="true" aria-controls="calendar-view" data-view="calendar">日历回看</button>
+          <button id="view-workbench" class="switch active" type="button" role="tab" aria-selected="true" aria-controls="workbench-view" data-view="workbench">工作台</button>
+          <button id="view-plan" class="switch" type="button" role="tab" aria-selected="false" aria-controls="plan-view" data-view="plan">计划</button>
+          <button id="view-calendar" class="switch" type="button" role="tab" aria-selected="false" aria-controls="calendar-view" data-view="calendar">日历回看</button>
           <button id="view-report" class="switch" type="button" role="tab" aria-selected="false" aria-controls="report-view" data-view="report">报告</button>
           <button id="view-matrix" class="switch" type="button" role="tab" aria-selected="false" aria-controls="matrix-view" data-view="matrix">工时表</button>
           <button id="view-projects" class="switch" type="button" role="tab" aria-selected="false" aria-controls="projects-view" data-view="projects">项目</button>
@@ -35,6 +37,68 @@
     </header>
 
     <p class="notice" id="notice" hidden role="status" aria-live="polite"></p>
+
+    <div id="workbench-view" role="tabpanel" aria-labelledby="view-workbench" hidden>
+      <section class="detail workbench-plane">
+        <div class="detail-head">
+          <div>
+            <h1>当前工作</h1>
+            <p id="wb-subtitle">只显示最近 14 天有推进的项目。</p>
+          </div>
+          <div class="detail-tools"><span id="wb-summary" class="wb-summary-line"></span><button id="wb-open-plan" class="btn subtle" type="button">今日计划</button></div>
+        </div>
+        <div id="wb-attention" class="wb-attention" aria-live="polite"></div>
+        <div class="wb-section-head wb-mode-head">
+          <div><h2 id="wb-list-title">最近活动</h2><span class="meta" id="wb-current-note">按优先级与最近活动排序</span></div>
+          <div class="seg" id="wb-modes" role="tablist" aria-label="当前工作分类">
+            <button class="seg-btn active" type="button" data-wb-mode="recent" aria-pressed="true">最近活动 <span id="wb-recent-count">0</span></button>
+            <button class="seg-btn" type="button" data-wb-mode="planned" aria-pressed="false">待开始 <span id="wb-planned-count">0</span></button>
+          </div>
+        </div>
+        <div id="wb-current" class="wb-simple-list"></div>
+        <details id="wb-done-wrap" class="wb-collapse" hidden>
+          <summary>最近完成 <span id="wb-done-count"></span></summary>
+          <div id="wb-done" class="wb-simple-list"></div>
+        </details>
+        <div class="wb-footer"><button id="wb-all-projects" class="btn subtle" type="button">查看全部项目</button></div>
+      </section>
+    </div>
+    <div id="plan-view" role="tabpanel" aria-labelledby="view-plan" hidden>
+      <section class="detail plan-plane">
+        <div class="detail-head">
+          <div>
+            <h1>计划</h1>
+            <p>一键智能排期仅支持今天；实际完成情况在当日结束后结算。</p>
+          </div>
+          <div class="detail-tools"><span id="plan-badges" class="badges"></span></div>
+        </div>
+        <div class="plan-toolbar">
+          <div class="cal-head plan-date-nav">
+            <button type="button" class="cal-nav" id="plan-prev" aria-label="前一天">‹</button>
+            <strong id="plan-title" aria-live="polite">—</strong>
+            <input id="plan-date" type="date" aria-label="计划日期" />
+            <button type="button" class="cal-nav" id="plan-next" aria-label="后一天">›</button>
+            <button type="button" class="btn subtle" id="plan-today">今天</button>
+          </div>
+          <div class="plan-actions">
+            <button type="button" class="btn primary" id="plan-auto">一键智能排期</button>
+            <button type="button" class="btn" id="plan-add-block">添加时间块</button>
+            <button type="button" class="btn" id="plan-add-item">新增工作项</button>
+          </div>
+        </div>
+        <div id="plan-capacity" class="plan-capacity" aria-live="polite"></div>
+        <div class="plan-layout">
+          <aside class="plan-backlog">
+            <div class="wb-section-head"><div><h2>待排工作项</h2><span class="meta" id="plan-backlog-count"></span></div></div>
+            <div id="plan-backlog-list"></div>
+          </aside>
+          <section class="plan-timeline-wrap">
+            <div class="wb-section-head"><div><h2>时间块</h2><span class="meta">计划保存后可在日历回看里对照实际日志。</span></div></div>
+            <div id="plan-blocks" class="plan-blocks"></div>
+          </section>
+        </div>
+      </section>
+    </div>
 
     <div class="modal-backdrop" id="manual-backdrop" hidden>
       <section id="manual-form" class="modal" role="dialog" aria-modal="true" aria-labelledby="manual-title">
@@ -224,6 +288,118 @@
       </section>
     </div>
 
-    <script src="app.js?v=0.14.0"></script>
+    <div class="modal-backdrop" id="work-backdrop" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="work-title">
+        <div class="modal-head">
+          <div><strong id="work-title">编辑项目工作状态</strong><span class="meta" id="work-hint">只维护当前状态与计划，不改历史日志。</span></div>
+          <button type="button" class="modal-close" id="w-close" aria-label="关闭">×</button>
+        </div>
+        <form id="work-form">
+          <input type="hidden" id="w-project-id" />
+          <input type="hidden" id="w-project-name" />
+          <div class="manual-grid">
+            <label class="field"><span>状态</span><select id="w-state">
+              <option value="planned">待开始</option>
+              <option value="in_progress">进行中</option>
+              <option value="blocked">受阻</option>
+              <option value="review">待验收</option>
+              <option value="paused">已暂停</option>
+              <option value="dormant">已搁置</option>
+              <option value="done">已完成</option>
+            </select></label>
+            <label class="field"><span>优先级</span><select id="w-priority">
+              <option value="P0">P0 · 最高</option>
+              <option value="P1">P1 · 高</option>
+              <option value="P2">P2 · 中</option>
+              <option value="P3">P3 · 低</option>
+            </select></label>
+            <div class="field wide">
+              <span>下一步</span>
+              <div id="w-next-list" class="wb-next-editor"></div>
+              <div class="wb-next-add">
+                <input id="w-next-input" type="text" placeholder="添加下一步，可写 @YYYY-MM-DD 截止" />
+                <button id="w-next-add" class="btn subtle" type="button">添加</button>
+              </div>
+            </div>
+            <div id="w-complete-box" class="w-complete-box wide" hidden>
+              <label class="field"><span>完成摘要</span><input id="w-completion" type="text" placeholder="完成时填写，可选" /></label>
+              <label class="check"><input id="w-write-log" type="checkbox" checked /> 同时写一条完成日志</label>
+            </div>
+            <details id="w-more" class="manual-more wide">
+              <summary>更多设置（目标、日期、进度、阻塞）</summary>
+              <div class="manual-grid">
+                <label class="field"><span>手工进度（%）</span><input id="w-progress" type="number" min="0" max="100" step="5" /></label>
+                <label class="field"><span>目标日期</span><input id="w-target" type="date" /></label>
+                <label class="field wide"><span>目标</span><input id="w-goal" type="text" placeholder="这一阶段要达成什么" /></label>
+                <label class="field wide"><span>阻塞（每行一条）</span><textarea id="w-blockers" rows="3" placeholder="等待设计确认"></textarea></label>
+              </div>
+            </details>
+          </div>
+          <div class="manual-actions">
+            <button class="btn primary" type="submit">保存工作状态</button>
+            <button class="btn" type="button" id="w-cancel">取消</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="item-backdrop" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="item-title">
+        <div class="modal-head">
+          <div><strong id="item-title">新增工作项</strong><span class="meta">工作项用于排期与预计耗时，不替代日志。</span></div>
+          <button type="button" class="modal-close" id="i-close" aria-label="关闭">×</button>
+        </div>
+        <form id="item-form">
+          <input type="hidden" id="i-id" />
+          <div class="manual-grid">
+            <label class="field"><span>项目</span><select id="i-project"></select></label>
+            <label class="field"><span>标题</span><input id="i-title" type="text" placeholder="动词开头，例如：实现计划保存" /></label>
+            <label class="field"><span>功能 / 模块</span><input id="i-feature" type="text" /></label>
+            <label class="field"><span>优先级</span><select id="i-priority">
+              <option value="P0">P0</option><option value="P1">P1</option><option value="P2" selected>P2</option><option value="P3">P3</option>
+            </select></label>
+            <label class="field"><span>状态</span><select id="i-status">
+              <option value="todo">待办</option><option value="in_progress">进行中</option><option value="blocked">受阻</option><option value="done">已完成</option><option value="cancelled">取消</option>
+            </select></label>
+            <label class="field"><span>预计耗时（分钟）</span><input id="i-estimate" type="number" min="0" step="15" /></label>
+            <label class="field"><span>剩余耗时（分钟）</span><input id="i-remaining" type="number" min="0" step="15" /></label>
+            <label class="field"><span>截止日期</span><input id="i-due" type="date" /></label>
+            <label class="field wide"><span>备注</span><textarea id="i-notes" rows="3"></textarea></label>
+          </div>
+          <div class="manual-actions">
+            <button class="btn primary" type="submit">保存工作项</button>
+            <button class="btn" type="button" id="i-cancel">取消</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="block-backdrop" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="block-title">
+        <div class="modal-head">
+          <div><strong id="block-title">添加时间块</strong><span class="meta">同一天内的时间块不能重叠。</span></div>
+          <button type="button" class="modal-close" id="b-close" aria-label="关闭">×</button>
+        </div>
+        <form id="block-form">
+          <input type="hidden" id="b-id" />
+          <div class="manual-grid">
+            <label class="field"><span>类型</span><select id="b-kind">
+              <option value="focus">专注</option><option value="meeting">会议</option><option value="admin">行政</option><option value="break">休息</option><option value="buffer">缓冲</option><option value="personal">个人事务</option>
+            </select></label>
+            <label class="field"><span>关联工作项</span><select id="b-item"><option value="">不关联</option></select></label>
+            <label class="field wide"><span>标题</span><input id="b-title" type="text" placeholder="留空时使用工作项标题或类型名" /></label>
+            <label class="field"><span>开始</span><input id="b-start" type="time" value="09:30" /></label>
+            <label class="field"><span>结束</span><input id="b-end" type="time" value="11:00" /></label>
+            <label class="check wide"><input id="b-locked" type="checkbox" /> 锁定（后续重排时保留）</label>
+          </div>
+          <div class="manual-actions">
+            <button class="btn primary" type="submit">保存时间块</button>
+            <button class="btn" type="button" id="b-cancel">取消</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <script src="app.js?v=0.15.0"></script>
   </body>
 </html>

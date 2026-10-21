@@ -489,9 +489,9 @@ func capRefs(items []reconcileRef, limit int) []reconcileRef {
 // ---------- 整库备份 / 一键恢复 ----------
 
 // backupIncludeRoots 是备份纳入的目录（相对日志根）；单文件见 backupIncludeFiles。
-var backupIncludeRoots = []string{"logs", "reports", "config"}
+var backupIncludeRoots = []string{"logs", "reports", "config", "plans"}
 
-var backupIncludeFiles = []string{"projects.json"}
+var backupIncludeFiles = []string{"projects.json", "work-items.json"}
 
 func archiveBackupCap(in input) (any, error) {
 	root, err := logRoot(in.LogRoot)
@@ -678,10 +678,10 @@ func archiveRestoreCap(in input) (any, error) {
 
 func isRestorablePath(rel string) bool {
 	lower := strings.ToLower(rel)
-	if lower == "projects.json" {
+	if lower == "projects.json" || lower == "work-items.json" {
 		return true
 	}
-	for _, prefix := range []string{"logs/", "reports/", "config/"} {
+	for _, prefix := range []string{"logs/", "reports/", "config/", "plans/"} {
 		if strings.HasPrefix(lower, prefix) {
 			return true
 		}

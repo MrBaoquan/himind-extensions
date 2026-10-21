@@ -182,6 +182,36 @@ func TestScanCodexAndClaude(t *testing.T) {
 	}
 }
 
+// TestScanCodexWritesLocalOffset 验证素材里的时间戳统一换算成本机时区。
+//
+// Codex 原始 rollout 里是 UTC（后缀 Z），而 OpenCode 等来源是本地偏移。素材若原样透传，
+// 同一天里就会混着两种时钟，读素材的人和 AI 都会把 UTC 那半当成本地时间（本机 +08:00
+// 时正好差 8 小时）。这里锁定两件事：写出的偏移是本机偏移，且时刻本身没有被改变。
+func TestScanCodexWritesLocalOffset(t *testing.T) {
+	home := writeFixture(t)
+	day := time.Date(2026, 10, 9, 0, 0, 0, 0, time.Local)
+	digests, err := scanCodex(filepath.Join(home, ".codex"), day, day.AddDate(0, 0, 1))
+	if err != nil {
+		t.Fatalf("扫描 Codex 失败: %v", err)
+	}
+	if len(digests) != 1 {
+		t.Fatalf("应扫描到 1 个 Codex 会话，实际 %d", len(digests))
+	}
+	digest := digests[0]
+	parsed, err := time.Parse(time.RFC3339, digest.StartedAt)
+	if err != nil {
+		t.Fatalf("started_at 应为 RFC3339: %q", digest.StartedAt)
+	}
+	_, wantOffset := time.Now().Zone()
+	_, gotOffset := parsed.Zone()
+	if gotOffset != wantOffset {
+		t.Fatalf("素材时间戳应为本机偏移 %d 秒，实际 %q（%d 秒）", wantOffset, digest.StartedAt, gotOffset)
+	}
+	if want := time.Date(2026, 10, 9, 2, 0, 0, 0, time.UTC); !parsed.Equal(want) {
+		t.Fatalf("时间点不应被改动：%s != %s", parsed.UTC(), want)
+	}
+}
+
 func TestScanDateFilterExcludes(t *testing.T) {
 	home := writeFixture(t)
 	out := call(t, "work-log.session.scan", `{"home":`+quote(home)+`,"date":"2026-10-08","limit":10}`)

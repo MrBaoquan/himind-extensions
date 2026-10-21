@@ -3,9 +3,9 @@
   "name": "工作日志工具",
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
-  "description": "以按日工作日志为核心：条目按仓库路径/项目/展项稳定归类，含功能与工时；报告按 项目→功能→工时 聚合，含月报、项目进展与月度工时表；周报/月报按自然周期自动补算并去重；支持条目导出/导入、整库备份与一键恢复、重扫对账预览与手工锁定防覆盖。",
-  "release_notes": "0.14.0：日报时间线、功能分组、HTML 报告与界面条目补齐记录来源的 AI 客户端展示（含 Claude Desktop），支持按客户端名称搜索。",
-  "version": "0.14.0",
+  "description": "以按日工作日志为核心，含当前工作台（项目状态、优先级、下一步、完成）、工作项、每日时间块计划与容量校验；按项目/功能/工时聚合报告，支持导出导入、备份恢复与重扫对账。",
+  "release_notes": "0.15.0：工作台聚焦最近 14 天活跃与待开始项目，智能推断阶段/进度；进行中项目后台静默刷新；新增工作项、每日时间块计划与一键智能排期，按当日日志结算实际完成；修正 Codex 等 UTC 记录的时间显示。",
+  "version": "0.15.0",
   "capability_namespace": "work-log",
   "distribution_targets": ["workbench", "github"],
   "entry": "bin/work-log.exe",
@@ -211,9 +211,203 @@
         "properties": {
           "log_root": {"type": "string"},
           "status": {"type": "string", "enum": ["active", "archived"]},
-          "include_stats": {"type": "boolean"}
+          "include_stats": {"type": "boolean"},
+          "recent_days": {"type": "integer", "minimum": 1, "maximum": 365, "description": "当前工作的最近活动窗口，默认 14 天"}
         },
         "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.project.board",
+      "description": "当前工作台：项目状态、优先级、下一步、阻塞、最近活动与本周投入",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "recent_days": {"type": "integer", "minimum": 1, "maximum": 365, "description": "当前工作的最近活动窗口，默认 14 天"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.project.work.update",
+      "description": "更新项目工作状态：状态、优先级、目标、目标日期、下一步、阻塞、完成摘要",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "project_id": {"type": "string"},
+          "project_name": {"type": "string"},
+          "project": {"type": "string"},
+          "patch": {"type": "object", "additionalProperties": true}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.item.list",
+      "description": "列出工作项，可按项目、状态、优先级和关键词筛选",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "project": {"type": "string"},
+          "status": {"type": "string"},
+          "priority": {"type": "string"},
+          "query": {"type": "string"},
+          "include_done": {"type": "boolean"},
+          "from": {"type": "string"},
+          "to": {"type": "string"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.item.upsert",
+      "description": "新增或更新一个工作项（预计耗时、剩余耗时、截止日期、优先级）",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "work_item": {"type": "object", "additionalProperties": true}
+        },
+        "required": ["work_item"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.item.update",
+      "description": "字段级更新工作项：状态、预计/剩余耗时、优先级、截止日期等",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "work_item_id": {"type": "string"},
+          "patch": {"type": "object", "additionalProperties": true}
+        },
+        "required": ["work_item_id", "patch"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.item.delete",
+      "description": "删除一个或多个工作项",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "work_item_id": {"type": "string"},
+          "work_item_ids": {"type": "array", "items": {"type": "string"}}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.plan.get",
+      "description": "读取某天的计划、时间块与容量",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "date": {"type": "string"}
+        },
+        "required": ["date"],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.plan.save",
+      "description": "保存某天的计划与时间块，校验重叠和容量",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "date": {"type": "string"},
+          "plan": {"type": "object", "additionalProperties": true}
+        },
+        "required": ["plan"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.plan.auto",
+      "description": "一键智能排期（仅当天）：根据当前/待开始项目、工作项优先级、截止日期与剩余耗时生成当日计划",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "date": {"type": "string"}
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "work-log.plan.validate",
+      "description": "校验计划的时间块重叠、起止时间与容量，不写盘",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "plan": {"type": "object", "additionalProperties": true}
+        },
+        "required": ["plan"],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.plan.review",
+      "description": "按当日结束后的日志结算计划实际完成情况；当天返回 pending",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "date": {"type": "string"}
+        },
+        "required": ["date"],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.plan.list",
+      "description": "按日期区间读取计划摘要",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "from": {"type": "string"},
+          "to": {"type": "string"}
+        },
+        "required": ["from", "to"],
         "additionalProperties": false
       },
       "risk_level": "read_only"
@@ -768,7 +962,7 @@
     "views": [
       {
         "id": "work-log.timeline",
-        "title": "工作日志 · 日历回看",
+        "title": "工作日志 · 当前工作",
         "short_title": "工作日志",
         "icon": "calendar",
         "quick_access": true,
@@ -792,6 +986,12 @@
       {"id": "work-log.report.aggregate", "title": "汇总周报/月报"},
       {"id": "work-log.archive.list", "title": "浏览工作日志归档"},
       {"id": "work-log.project.list", "title": "查看项目归类"},
+      {"id": "work-log.project.board", "title": "查看当前工作台"},
+      {"id": "work-log.project.work.update", "title": "更新项目工作状态"},
+      {"id": "work-log.item.upsert", "title": "新增工作项"},
+      {"id": "work-log.item.update", "title": "更新工作项"},
+      {"id": "work-log.plan.save", "title": "保存每日计划"},
+      {"id": "work-log.plan.auto", "title": "一键智能排期"},
       {"id": "work-log.project.claim", "title": "把仓库路径归到项目"},
       {"id": "work-log.project.autofill", "title": "自动补全项目路径"},
       {"id": "work-log.link.reveal", "title": "打开日志目录"}

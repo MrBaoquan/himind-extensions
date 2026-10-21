@@ -17,7 +17,7 @@ import (
 // 存储位置：<日志根>/projects.json，与日志数据同属一个写入者（本插件），
 // 采集器只读取、不写入。
 
-const projectsSchemaVersion = "work-log-projects.v1"
+const projectsSchemaVersion = "work-log-projects.v2"
 
 // project 是项目登记表里的一项。
 type project struct {
@@ -36,9 +36,12 @@ type project struct {
 	// Exhibits 是该项目下的展项（可选维度）。展项也支持别名。
 	Exhibits []exhibit `json:"exhibits,omitempty"`
 	// Paths 是该项目的本机目录/仓库映射（路径是稳定标识，名称只是展示）。
-	Paths     []projectPath `json:"paths,omitempty"`
-	CreatedAt string        `json:"created_at"`
-	UpdatedAt string        `json:"updated_at"`
+	Paths []projectPath `json:"paths,omitempty"`
+	// Work 是项目当前工作状态：优先级、目标、下一步、阻塞、是否完成。
+	// 与 Status（active/archived 登记生命周期）分开，避免把“完成”和“归档”混为一谈。
+	Work      projectWork `json:"work,omitempty"`
+	CreatedAt string      `json:"created_at"`
+	UpdatedAt string      `json:"updated_at"`
 }
 
 // exhibit 是项目下的展项（工作台维度）。
@@ -90,7 +93,7 @@ func writeProjects(root string, pf projectsFile) error {
 		return errors.New("项目登记序列化失败")
 	}
 	if err := writeFileAtomic(projectsPath(root), append(payload, '\n')); err != nil {
-		return errors.New("项目登记写入失败")
+		return fmt.Errorf("项目登记写入失败：%w", err)
 	}
 	return nil
 }
@@ -167,6 +170,7 @@ func registerProject(pf *projectsFile, index map[string]string, name string) boo
 		Name:      strings.TrimSpace(name),
 		Aliases:   []string{},
 		Status:    "active",
+		Work:      projectWork{Priority: priorityP2, NextSteps: []nextStep{}, Blockers: []string{}},
 		CreatedAt: now,
 		UpdatedAt: now,
 	})
@@ -362,75 +366,29 @@ func projectListCap(in input) (any, error) {
 	statusFilter := strings.TrimSpace(in.Status)
 	index := projectIndex(pf)
 
-	type projectStat struct {
-		count int
-		days  map[string]struct{}
-		first string
-		last  string
-	}
-	stats := map[string]*projectStat{}
-	unmatched := map[string]int{}
-	var pending []entry
-	if includeStats {
-		entries, err := collectEntries(root, "0000-01-01", "9999-12-31")
-		if err != nil {
-			return nil, err
-		}
-		for _, item := range entries {
-			raw := strings.TrimSpace(item.Project)
-			if raw == "" {
-				pending = append(pending, item)
-				continue
-			}
-			canonical, ok := resolveProjectName(index, raw)
-			if !ok {
-				unmatched[raw]++
-				canonical = raw
-			}
-			stat := stats[canonical]
-			if stat == nil {
-				stat = &projectStat{days: map[string]struct{}{}}
-				stats[canonical] = stat
-			}
-			stat.count++
-			stat.days[item.Date] = struct{}{}
-			if stat.first == "" || item.Date < stat.first {
-				stat.first = item.Date
-			}
-			if item.Date > stat.last {
-				stat.last = item.Date
-			}
-		}
+	recentDays := recentDaysFor(in)
+	stats, err := collectProjectStats(root, index)
+	if err != nil {
+		return nil, err
 	}
 
+	now := time.Now()
 	out := make([]map[string]any, 0, len(pf.Projects))
 	for _, p := range pf.Projects {
 		if statusFilter != "" && !strings.EqualFold(p.Status, statusFilter) {
 			continue
 		}
-		item := map[string]any{
-			"id":          p.ID,
-			"name":        p.Name,
-			"aliases":     nonNilStrings(p.Aliases),
-			"description": p.Description,
-			"status":      p.Status,
-			"color":       p.Color,
-			"kind":        p.Kind,
-			"source":      p.Source,
-			"external_id": p.ExternalID,
-			"paths":       pathsToMaps(p.Paths),
-			"exhibits":    exhibitsToMaps(p.Exhibits),
-			"created_at":  p.CreatedAt,
-			"updated_at":  p.UpdatedAt,
-		}
-		if includeStats {
-			if stat := stats[p.Name]; stat != nil {
-				item["entry_count"] = stat.count
-				item["active_days"] = len(stat.days)
-				item["first_date"] = stat.first
-				item["last_date"] = stat.last
-			} else {
-				item["entry_count"] = 0
+		stat := stats.Stats[p.Name]
+		work := projectWorkFor(p, stat, now, recentDays)
+		item := projectBoardItem(p, work, stat, now, recentDays)
+		item["aliases"] = nonNilStrings(p.Aliases)
+		if !includeStats {
+			for _, key := range []string{
+				"entry_count", "active_days", "first_date", "last_date", "last_title",
+				"minutes_7d", "minutes_30d", "days_since_activity", "stale", "overdue",
+				"plan_completion", "has_plan",
+			} {
+				delete(item, key)
 			}
 		}
 		out = append(out, item)
@@ -440,29 +398,17 @@ func projectListCap(in input) (any, error) {
 		if left != right {
 			return left > right
 		}
-		return strings.ToLower(mapString(out[i]["name"])) < strings.ToLower(mapString(out[j]["name"]))
-	})
-
-	unmatchedList := make([]map[string]any, 0, len(unmatched))
-	for name, count := range unmatched {
-		unmatchedList = append(unmatchedList, map[string]any{"name": name, "entry_count": count})
-	}
-	sort.SliceStable(unmatchedList, func(i, j int) bool {
-		if mapInt(unmatchedList[i]["entry_count"]) != mapInt(unmatchedList[j]["entry_count"]) {
-			return mapInt(unmatchedList[i]["entry_count"]) > mapInt(unmatchedList[j]["entry_count"])
-		}
-		return mapString(unmatchedList[i]["name"]) < mapString(unmatchedList[j]["name"])
+		return strings.ToLower(mapStr(out[i], "name")) < strings.ToLower(mapStr(out[j], "name"))
 	})
 
 	return map[string]any{
 		"log_root":      root,
 		"total":         len(out),
 		"projects":      out,
-		"unmatched":     unmatchedList,
-		"pending_paths": collectPendingPaths(pending),
+		"unmatched":     unmatchedList(stats.Unmatched),
+		"pending_paths": collectPendingPaths(stats.Pending),
 	}, nil
 }
-
 func projectUpsertCap(in input) (any, error) {
 	root, err := logRoot(in.LogRoot)
 	if err != nil {
@@ -515,6 +461,7 @@ func projectUpsertCap(in input) (any, error) {
 			Status:      status,
 			Color:       strings.TrimSpace(in.Color),
 			Kind:        strings.TrimSpace(in.Kind),
+			Work:        projectWork{State: workStatePlanned, Priority: priorityP2, NextSteps: []nextStep{}, Blockers: []string{}},
 			Paths:       sanitizePaths(in.Paths),
 			CreatedAt:   now,
 			UpdatedAt:   now,
@@ -522,6 +469,12 @@ func projectUpsertCap(in input) (any, error) {
 		index = len(pf.Projects) - 1
 	} else {
 		item := pf.Projects[index]
+		if item.Work.NextSteps == nil {
+			item.Work.NextSteps = []nextStep{}
+		}
+		if item.Work.Blockers == nil {
+			item.Work.Blockers = []string{}
+		}
 		item.Name = name
 		if len(aliases) > 0 {
 			item.Aliases = mergeAliases(item.Aliases, aliases)

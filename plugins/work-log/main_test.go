@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/MrBaoquan/himind-extensions/sdk/jsonrpc"
 )
@@ -651,6 +652,51 @@ func TestTimeSpanFormatsTimestamps(t *testing.T) {
 	}
 	if got := hoursText(90); got != "1.5 小时" {
 		t.Fatalf("小时文本异常: %q", got)
+	}
+}
+
+// TestTimeSpanLocalizesUTCStamp 覆盖「采集器写入 UTC、界面按本地时钟展示」的口径：
+// Codex / Copilot 的会话时间戳是 UTC，报告里的时间必须是换算后的本地时刻，
+// 而不是直接把字符串里的时分截出来（否则会整体偏一个时区）。
+// 期望值按本机时区算，测试不依赖运行机器的时区。
+func TestTimeSpanLocalizesUTCStamp(t *testing.T) {
+	item := entry{StartedAt: "2026-10-09T01:30:00Z", EndedAt: "2026-10-09T03:00:00Z"}
+	startLocal := time.Date(2026, 10, 9, 1, 30, 0, 0, time.UTC).Local()
+	endLocal := time.Date(2026, 10, 9, 3, 0, 0, 0, time.UTC).Local()
+	if startLocal.Format("2006-01-02") != endLocal.Format("2006-01-02") {
+		t.Skip("本机时区下该区间跨天，改由跨天分支覆盖")
+	}
+	want := startLocal.Format("15:04") + "–" + endLocal.Format("15:04")
+	if got := timeSpan(item); got != want {
+		t.Fatalf("UTC 时间戳应换算成本地时刻 %q，实际 %q", want, got)
+	}
+}
+
+// TestSortEntriesComparesInstantsAcrossTimezones 验证跨时区排序：采集器对 Codex 写 UTC、
+// 对 OpenCode 写本地偏移，同一批条目里直接比字符串会把先后顺序排反。
+func TestSortEntriesComparesInstantsAcrossTimezones(t *testing.T) {
+	// 真实时刻：01:00Z（09:00 +08:00）晚于 00:00Z（08:00 +08:00），
+	// 但字符串比较 "01:00:00Z" < "08:00:00+08:00" 会把它排到前面。
+	entries := []entry{
+		{Source: "codex", Title: "晚", StartedAt: "2026-10-20T01:00:00Z"},
+		{Source: "opencode", Title: "早", StartedAt: "2026-10-20T08:00:00+08:00"},
+	}
+	sortEntries(entries)
+	if entries[0].Title != "早" || entries[1].Title != "晚" {
+		t.Fatalf("应按真实时刻排序（早→晚），实际 %q → %q", entries[0].Title, entries[1].Title)
+	}
+}
+
+// TestSortEntriesKeepsManualOrderSemantics 保证改动后手工条目的既有排序语义不变：
+// 无法解析成时间戳的写法仍按字符串比较。
+func TestSortEntriesKeepsManualOrderSemantics(t *testing.T) {
+	entries := []entry{
+		{Source: "manual", Title: "下午", StartedAt: "14:00"},
+		{Source: "manual", Title: "上午", StartedAt: "09:30"},
+	}
+	sortEntries(entries)
+	if entries[0].Title != "上午" || entries[1].Title != "下午" {
+		t.Fatalf("手工 HH:MM 仍应按字符串升序，实际 %q → %q", entries[0].Title, entries[1].Title)
 	}
 }
 
