@@ -1,0 +1,4 @@
+interface:
+  display_name: "微信小程序开发助手"
+  short_description: "路由微信小程序开发、调试、自动化与交付任务"
+  default_prompt: "使用 $wechat-miniprogram-assistant 先检查微信开发者工具环境，再按目标场景调用对应能力或工作流。"

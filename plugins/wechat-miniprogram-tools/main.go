@@ -96,6 +96,9 @@ func main() {
 }
 
 func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
+	if isDevtoolsMethod(request.Method) {
+		return handleDevtools(request)
+	}
 	var in input
 	if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
 		return nil, rpcError

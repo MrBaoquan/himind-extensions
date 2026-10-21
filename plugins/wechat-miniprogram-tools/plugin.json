@@ -1,16 +1,25 @@
 {
   "id": "com.himind.wechat-miniprogram-tools",
-  "name": "微信小程序交付工具",
+  "name": "微信小程序开发工具",
   "author": "马宝全",
-  "categories": ["software-engineering", "release"],
-  "description": "提供微信小程序项目检查、依赖准备、测试、构建、预览、体验版上传、审核材料、发布记录和回滚证据能力。",
-  "release_notes": "0.3.20：声明 capability_namespace=wechat.miniprogram，能力 ID 与命名空间对齐（ADR 0119）。",
-  "version": "0.3.20",
+  "categories": [
+    "software-engineering",
+    "testing-quality",
+    "collaboration-delivery"
+  ],
+  "description": "提供微信小程序/小游戏的 CI 交付、开发者工具控制、自动化、调试与云开发能力。",
+  "release_notes": "0.4.0：合并交付与开发者工具控制能力，保留现有 CI 能力，新增 devtools、cloud 与安装检测能力。",
+  "version": "0.4.0",
   "capability_namespace": "wechat.miniprogram",
-  "distribution_targets": ["workbench", "github"],
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
   "entry": "wechat-miniprogram-tools.exe",
   "runtime": "process-jsonrpc-stdio",
-  "platforms": ["windows-x64"],
+  "platforms": [
+    "windows-x64"
+  ],
   "min_agent_version": "0.3.47",
   "governance": "managed",
   "capabilities": [
@@ -20,17 +29,44 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "workspace_root": {"type": "string"},
-          "source_root": {"type": "string"},
-          "project_root": {"type": "string"},
-          "artifact_dir": {"type": "string"},
-          "requirement": {"type": "string"},
-          "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
-          "constraints": {"type": "array", "items": {"type": "string"}},
-          "candidate": {"type": "object"},
-          "workflow_context": {"type": "object"}
+          "workspace_root": {
+            "type": "string"
+          },
+          "source_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "artifact_dir": {
+            "type": "string"
+          },
+          "requirement": {
+            "type": "string"
+          },
+          "acceptance_criteria": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "candidate": {
+            "type": "object"
+          },
+          "workflow_context": {
+            "type": "object"
+          }
         },
-        "required": ["workspace_root", "requirement"],
+        "required": [
+          "workspace_root",
+          "requirement"
+        ],
         "additionalProperties": false
       },
       "risk_level": "local_write",
@@ -42,13 +78,26 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "workspace_root": {"type": "string"},
-          "source_root": {"type": "string"},
-          "project_root": {"type": "string"},
-          "candidate": {"type": "object"},
-          "workflow_context": {"type": "object"}
+          "workspace_root": {
+            "type": "string"
+          },
+          "source_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "candidate": {
+            "type": "object"
+          },
+          "workflow_context": {
+            "type": "object"
+          }
         },
-        "required": ["workspace_root", "project_root"],
+        "required": [
+          "workspace_root",
+          "project_root"
+        ],
         "additionalProperties": false
       },
       "risk_level": "read_only",
@@ -60,19 +109,52 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "workspace_root": {"type": "string"},
-          "project_root": {"type": "string"},
-          "app_id": {"type": "string"},
-          "private_key_path": {"type": "string"},
-          "venue": {"type": "string"},
-          "environment": {"type": "string", "enum": ["development", "production"]},
-          "upload_channel": {"type": "string", "enum": ["auto", "ci", "wechatide"]},
-          "wechatide_client": {"type": "string"},
-          "require_ci_installed": {"type": "boolean"},
-          "candidate": {"type": "object"},
-          "workflow_context": {"type": "object"}
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "app_id": {
+            "type": "string"
+          },
+          "private_key_path": {
+            "type": "string"
+          },
+          "venue": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "development",
+              "production"
+            ]
+          },
+          "upload_channel": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "ci",
+              "wechatide"
+            ]
+          },
+          "wechatide_client": {
+            "type": "string"
+          },
+          "require_ci_installed": {
+            "type": "boolean"
+          },
+          "candidate": {
+            "type": "object"
+          },
+          "workflow_context": {
+            "type": "object"
+          }
         },
-        "required": ["workspace_root"],
+        "required": [
+          "workspace_root"
+        ],
         "additionalProperties": false
       },
       "risk_level": "read_only",
@@ -84,17 +166,47 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "workspace_root": {"type": "string"},
-          "project_root": {"type": "string"},
-          "artifact_dir": {"type": "string"},
-          "stage": {"type": "string", "enum": ["plan", "changes"]},
-          "evidence_paths": {"type": "array", "items": {"type": "string"}},
-          "change_summary": {"type": "string"},
-          "commit_sha": {"type": "string"},
-          "candidate": {"type": "object"},
-          "workflow_context": {"type": "object"}
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "artifact_dir": {
+            "type": "string"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "changes"
+            ]
+          },
+          "evidence_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "change_summary": {
+            "type": "string"
+          },
+          "commit_sha": {
+            "type": "string"
+          },
+          "candidate": {
+            "type": "object"
+          },
+          "workflow_context": {
+            "type": "object"
+          }
         },
-        "required": ["workspace_root", "project_root", "stage", "change_summary"],
+        "required": [
+          "workspace_root",
+          "project_root",
+          "stage",
+          "change_summary"
+        ],
         "additionalProperties": false
       },
       "risk_level": "local_write",
@@ -106,16 +218,46 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "workspace_root": {"type": "string"},
-          "source_root": {"type": "string"},
-          "project_root": {"type": "string"},
-          "package_manager": {"type": "string", "enum": ["npm", "pnpm", "yarn"]},
-          "install_mode": {"type": "string", "enum": ["ci", "install"]},
-          "timeout_seconds": {"type": "integer", "minimum": 30, "maximum": 1800},
-          "candidate": {"type": "object"},
-          "workflow_context": {"type": "object"}
+          "workspace_root": {
+            "type": "string"
+          },
+          "source_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "package_manager": {
+            "type": "string",
+            "enum": [
+              "npm",
+              "pnpm",
+              "yarn"
+            ]
+          },
+          "install_mode": {
+            "type": "string",
+            "enum": [
+              "ci",
+              "install"
+            ]
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 1800
+          },
+          "candidate": {
+            "type": "object"
+          },
+          "workflow_context": {
+            "type": "object"
+          }
         },
-        "required": ["workspace_root", "project_root"],
+        "required": [
+          "workspace_root",
+          "project_root"
+        ],
         "additionalProperties": false
       },
       "risk_level": "process",
@@ -128,17 +270,43 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "workspace_root": {"type": "string"},
-          "project_root": {"type": "string"},
-          "artifact_dir": {"type": "string"},
-          "tester": {"type": "string"},
-          "passed": {"type": "boolean"},
-          "evidence_paths": {"type": "array", "items": {"type": "string"}},
-          "notes": {"type": "string"},
-          "candidate": {"type": "object"},
-          "workflow_context": {"type": "object"}
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "artifact_dir": {
+            "type": "string"
+          },
+          "tester": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "evidence_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notes": {
+            "type": "string"
+          },
+          "candidate": {
+            "type": "object"
+          },
+          "workflow_context": {
+            "type": "object"
+          }
         },
-        "required": ["workspace_root", "tester", "passed", "evidence_paths"],
+        "required": [
+          "workspace_root",
+          "tester",
+          "passed",
+          "evidence_paths"
+        ],
         "additionalProperties": false
       },
       "risk_level": "local_write",
@@ -150,17 +318,48 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "workspace_root": {"type": "string"},
-          "source_root": {"type": "string"},
-          "project_root": {"type": "string"},
-          "package_manager": {"type": "string", "enum": ["npm", "pnpm", "yarn"]},
-          "scripts": {"type": "array", "items": {"type": "string"}},
-          "artifact_dir": {"type": "string"},
-          "timeout_seconds": {"type": "integer", "minimum": 30, "maximum": 1800},
-          "candidate": {"type": "object"},
-          "workflow_context": {"type": "object"}
+          "workspace_root": {
+            "type": "string"
+          },
+          "source_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "package_manager": {
+            "type": "string",
+            "enum": [
+              "npm",
+              "pnpm",
+              "yarn"
+            ]
+          },
+          "scripts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "artifact_dir": {
+            "type": "string"
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 1800
+          },
+          "candidate": {
+            "type": "object"
+          },
+          "workflow_context": {
+            "type": "object"
+          }
         },
-        "required": ["workspace_root", "project_root"],
+        "required": [
+          "workspace_root",
+          "project_root"
+        ],
         "additionalProperties": false
       },
       "risk_level": "process",
@@ -173,19 +372,54 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "workspace_root": {"type": "string"},
-          "source_root": {"type": "string"},
-          "project_root": {"type": "string"},
-          "package_manager": {"type": "string", "enum": ["npm", "pnpm", "yarn"]},
-          "script": {"type": "string"},
-          "build_script": {"type": "string"},
-          "venue": {"type": "string"},
-          "environment": {"type": "string", "enum": ["development", "production"]},
-          "timeout_seconds": {"type": "integer", "minimum": 30, "maximum": 3600},
-          "candidate": {"type": "object"},
-          "workflow_context": {"type": "object"}
+          "workspace_root": {
+            "type": "string"
+          },
+          "source_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "package_manager": {
+            "type": "string",
+            "enum": [
+              "npm",
+              "pnpm",
+              "yarn"
+            ]
+          },
+          "script": {
+            "type": "string"
+          },
+          "build_script": {
+            "type": "string"
+          },
+          "venue": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "development",
+              "production"
+            ]
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 3600
+          },
+          "candidate": {
+            "type": "object"
+          },
+          "workflow_context": {
+            "type": "object"
+          }
         },
-        "required": ["workspace_root"],
+        "required": [
+          "workspace_root"
+        ],
         "additionalProperties": false
       },
       "risk_level": "process",
@@ -198,20 +432,54 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "workspace_root": {"type": "string"},
-          "project_root": {"type": "string"},
-          "app_id": {"type": "string"},
-          "private_key_path": {"type": "string"},
-          "venue": {"type": "string"},
-          "environment": {"type": "string", "enum": ["development", "production"]},
-          "version": {"type": "string"},
-          "qrcode_output_dest": {"type": "string"},
-          "description": {"type": "string"},
-          "timeout_seconds": {"type": "integer", "minimum": 60, "maximum": 1800},
-          "candidate": {"type": "object"},
-          "workflow_context": {"type": "object"}
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "app_id": {
+            "type": "string"
+          },
+          "private_key_path": {
+            "type": "string"
+          },
+          "venue": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "development",
+              "production"
+            ]
+          },
+          "version": {
+            "type": "string"
+          },
+          "qrcode_output_dest": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 1800
+          },
+          "candidate": {
+            "type": "object"
+          },
+          "workflow_context": {
+            "type": "object"
+          }
         },
-        "required": ["workspace_root", "private_key_path", "version"],
+        "required": [
+          "workspace_root",
+          "private_key_path",
+          "version"
+        ],
         "additionalProperties": false
       },
       "risk_level": "network",
@@ -224,22 +492,63 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "workspace_root": {"type": "string"},
-          "project_root": {"type": "string"},
-          "app_id": {"type": "string"},
-          "private_key_path": {"type": "string"},
-          "venue": {"type": "string"},
-          "environment": {"type": "string", "enum": ["development", "production"]},
-          "upload_channel": {"type": "string", "enum": ["auto", "ci", "wechatide"]},
-          "wechatide_client": {"type": "string"},
-          "version": {"type": "string"},
-          "description": {"type": "string"},
-          "artifact_dir": {"type": "string"},
-          "timeout_seconds": {"type": "integer", "minimum": 60, "maximum": 1800},
-          "candidate": {"type": "object"},
-          "workflow_context": {"type": "object"}
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "app_id": {
+            "type": "string"
+          },
+          "private_key_path": {
+            "type": "string"
+          },
+          "venue": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "development",
+              "production"
+            ]
+          },
+          "upload_channel": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "ci",
+              "wechatide"
+            ]
+          },
+          "wechatide_client": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "artifact_dir": {
+            "type": "string"
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 1800
+          },
+          "candidate": {
+            "type": "object"
+          },
+          "workflow_context": {
+            "type": "object"
+          }
         },
-        "required": ["workspace_root"],
+        "required": [
+          "workspace_root"
+        ],
         "additionalProperties": false
       },
       "risk_level": "network",
@@ -252,15 +561,33 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "workspace_root": {"type": "string"},
-          "project_root": {"type": "string"},
-          "artifact_dir": {"type": "string"},
-          "version": {"type": "string"},
-          "review_notes": {"type": "string"},
-          "candidate": {"type": "object"},
-          "workflow_context": {"type": "object"}
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "artifact_dir": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "review_notes": {
+            "type": "string"
+          },
+          "candidate": {
+            "type": "object"
+          },
+          "workflow_context": {
+            "type": "object"
+          }
         },
-        "required": ["workspace_root", "project_root", "version"],
+        "required": [
+          "workspace_root",
+          "project_root",
+          "version"
+        ],
         "additionalProperties": false
       },
       "risk_level": "local_write",
@@ -272,14 +599,28 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "workspace_root": {"type": "string"},
-          "artifact_dir": {"type": "string"},
-          "submission_receipt": {"type": "string"},
-          "manual_evidence_path": {"type": "string"},
-          "candidate": {"type": "object"},
-          "workflow_context": {"type": "object"}
+          "workspace_root": {
+            "type": "string"
+          },
+          "artifact_dir": {
+            "type": "string"
+          },
+          "submission_receipt": {
+            "type": "string"
+          },
+          "manual_evidence_path": {
+            "type": "string"
+          },
+          "candidate": {
+            "type": "object"
+          },
+          "workflow_context": {
+            "type": "object"
+          }
         },
-        "required": ["workspace_root"],
+        "required": [
+          "workspace_root"
+        ],
         "additionalProperties": false
       },
       "risk_level": "system",
@@ -291,15 +632,33 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "workspace_root": {"type": "string"},
-          "artifact_dir": {"type": "string"},
-          "app_id": {"type": "string"},
-          "version": {"type": "string"},
-          "release_evidence_path": {"type": "string"},
-          "candidate": {"type": "object"},
-          "workflow_context": {"type": "object"}
+          "workspace_root": {
+            "type": "string"
+          },
+          "artifact_dir": {
+            "type": "string"
+          },
+          "app_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "release_evidence_path": {
+            "type": "string"
+          },
+          "candidate": {
+            "type": "object"
+          },
+          "workflow_context": {
+            "type": "object"
+          }
         },
-        "required": ["workspace_root", "app_id", "version"],
+        "required": [
+          "workspace_root",
+          "app_id",
+          "version"
+        ],
         "additionalProperties": false
       },
       "risk_level": "system",
@@ -311,17 +670,40 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "workspace_root": {"type": "string"},
-          "artifact_dir": {"type": "string"},
-          "app_id": {"type": "string"},
-          "version": {"type": "string"},
-          "target_version": {"type": "string"},
-          "rollback_requested": {"type": "boolean"},
-          "confirm": {"type": "boolean"},
-          "candidate": {"type": "object"},
-          "workflow_context": {"type": "object"}
+          "workspace_root": {
+            "type": "string"
+          },
+          "artifact_dir": {
+            "type": "string"
+          },
+          "app_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "target_version": {
+            "type": "string"
+          },
+          "rollback_requested": {
+            "type": "boolean"
+          },
+          "confirm": {
+            "type": "boolean"
+          },
+          "candidate": {
+            "type": "object"
+          },
+          "workflow_context": {
+            "type": "object"
+          }
         },
-        "required": ["workspace_root", "app_id", "version", "target_version"],
+        "required": [
+          "workspace_root",
+          "app_id",
+          "version",
+          "target_version"
+        ],
         "additionalProperties": false
       },
       "risk_level": "system",
@@ -333,21 +715,852 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "workspace_root": {"type": "string"},
-          "app_id": {"type": "string"},
-          "version": {"type": "string"},
+          "workspace_root": {
+            "type": "string"
+          },
+          "app_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
           "artifact_paths": {
             "type": "object",
-            "additionalProperties": {"type": "string"}
+            "additionalProperties": {
+              "type": "string"
+            }
           },
-          "candidate": {"type": "object"},
-          "workflow_context": {"type": "object"}
+          "candidate": {
+            "type": "object"
+          },
+          "workflow_context": {
+            "type": "object"
+          }
         },
-        "required": ["workspace_root", "app_id", "version", "artifact_paths", "candidate"],
+        "required": [
+          "workspace_root",
+          "app_id",
+          "version",
+          "artifact_paths",
+          "candidate"
+        ],
         "additionalProperties": false
       },
       "risk_level": "read_only",
       "availability": "local"
+    },
+    {
+      "id": "wechat.miniprogram.devtools.environment.get",
+      "description": "读取开发者工具登录态、版本关系、CLI 可用性与项目配置状态",
+      "risk_level": "read_only",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_root"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.devtools.login.start",
+      "description": "触发微信开发者工具扫码登录，返回待轮询任务",
+      "risk_level": "local_write",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "window",
+              "image"
+            ]
+          }
+        },
+        "required": [
+          "workspace_root"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.devtools.task.get",
+      "description": "查询开发者工具异步任务状态，可选短等待",
+      "risk_level": "read_only",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "task_id": {
+            "type": "string"
+          },
+          "wait_seconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 30
+          }
+        },
+        "required": [
+          "workspace_root",
+          "task_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.devtools.project.list",
+      "description": "列出微信开发者工具已导入的项目或 AppID",
+      "risk_level": "read_only",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "miniprogram",
+              "other",
+              "all"
+            ]
+          }
+        },
+        "required": [
+          "workspace_root"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.devtools.project.import",
+      "description": "导入项目、分享代码片段或导入代码片段链接",
+      "risk_level": "local_write",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "import",
+              "share",
+              "import_minicode"
+            ]
+          },
+          "link": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "project_root"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.devtools.project.remove",
+      "description": "从开发者工具项目列表移除项目，不删除磁盘文件",
+      "risk_level": "system",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "project_root"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.devtools.window.manage",
+      "description": "打开、关闭或退出微信开发者工具项目窗口",
+      "risk_level": "local_write",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "open",
+              "close",
+              "quit"
+            ]
+          },
+          "window_mode": {
+            "type": "string",
+            "enum": [
+              "liteMode",
+              "fullMode"
+            ]
+          }
+        },
+        "required": [
+          "workspace_root",
+          "project_root",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.devtools.compile.inspect",
+      "description": "读取 WXML 或 WXSS 单文件编译诊断",
+      "risk_level": "read_only",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "compile_type": {
+            "type": "string",
+            "enum": [
+              "miniprogram",
+              "plugin"
+            ]
+          }
+        },
+        "required": [
+          "workspace_root",
+          "project_root",
+          "file"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.devtools.compile.run",
+      "description": "打开页面、刷新模拟器或构建 npm",
+      "risk_level": "local_write",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "open_page",
+              "refresh",
+              "build_npm"
+            ]
+          },
+          "page": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "scene": {
+            "type": "integer"
+          },
+          "compile_type": {
+            "type": "string",
+            "enum": [
+              "miniprogram",
+              "plugin"
+            ]
+          }
+        },
+        "required": [
+          "workspace_root",
+          "project_root",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.devtools.preview.create",
+      "description": "推送自动预览或生成预览二维码",
+      "risk_level": "network",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "qrcode"
+            ]
+          },
+          "page_path": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "scene": {
+            "type": "integer"
+          },
+          "qr_format": {
+            "type": "string",
+            "enum": [
+              "window",
+              "image"
+            ]
+          },
+          "qr_output": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "project_root"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.devtools.debug.inspect",
+      "description": "读取运行时、console、network 或模拟器截图",
+      "risk_level": "read_only",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "runtime_info",
+              "console",
+              "network",
+              "screenshot"
+            ]
+          },
+          "runtime_action": {
+            "type": "string",
+            "enum": [
+              "pageStack",
+              "currentPage",
+              "systemInfo"
+            ]
+          },
+          "pattern": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "wait": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "wait_for_selector": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "project_root",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.devtools.debug.mutate",
+      "description": "清理缓存、mock 或调用 wx API、管理测试号 ticket",
+      "risk_level": "system",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "clear_cache",
+              "wx_api",
+              "testaccount"
+            ]
+          },
+          "cache_action": {
+            "type": "string"
+          },
+          "wx_action": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "args": {
+            "type": "array",
+            "items": {}
+          },
+          "result": {},
+          "ticket_action": {
+            "type": "string"
+          },
+          "ticket": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "project_root",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.devtools.automation.element",
+      "description": "读取或操作 selector 命中的小程序元素",
+      "risk_level": "local_write",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "selector": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "wait": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "wait_for_selector": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "project_root",
+          "action",
+          "selector"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.devtools.automation.page",
+      "description": "读写页面数据、导航、滚动或调用页面方法",
+      "risk_level": "local_write",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "selector": {
+            "type": "string"
+          },
+          "data_path": {
+            "type": "string"
+          },
+          "patch": {},
+          "method": {
+            "type": "string"
+          },
+          "args": {
+            "type": "array",
+            "items": {}
+          },
+          "url": {
+            "type": "string"
+          },
+          "delta": {
+            "type": "integer"
+          },
+          "scroll_top": {
+            "type": "number"
+          },
+          "wait": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "wait_for_selector": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "project_root",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.devtools.automation.game",
+      "description": "对小游戏画布执行点击、滑动或触摸事件",
+      "risk_level": "local_write",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "tap",
+              "swipe",
+              "touchstart",
+              "touchmove",
+              "touchend"
+            ]
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "start_x": {
+            "type": "number"
+          },
+          "start_y": {
+            "type": "number"
+          },
+          "end_x": {
+            "type": "number"
+          },
+          "end_y": {
+            "type": "number"
+          },
+          "duration": {
+            "type": "integer"
+          },
+          "coordinate_space": {
+            "type": "string",
+            "enum": [
+              "canvas",
+              "image"
+            ]
+          },
+          "image_width": {
+            "type": "integer"
+          },
+          "image_height": {
+            "type": "integer"
+          },
+          "wait": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "workspace_root",
+          "project_root",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.devtools.automation.evaluate",
+      "description": "在运行时执行受控表达式或生成自动化脚本草稿",
+      "risk_level": "system",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "evaluate",
+              "generate_script"
+            ]
+          },
+          "fn_source": {
+            "type": "string"
+          },
+          "args": {
+            "type": "array",
+            "items": {}
+          },
+          "include_failed": {
+            "type": "boolean"
+          },
+          "clear_history": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "project_root"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.cloud.read",
+      "description": "读取云环境、云函数、云数据库结构/文档与云存储信息",
+      "risk_level": "read_only",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "app_id": {
+            "type": "string"
+          },
+          "env": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "env_list",
+              "fn_list",
+              "fn_info",
+              "db_read_doc",
+              "db_read_struct",
+              "storage_query"
+            ]
+          },
+          "collection_name": {
+            "type": "string"
+          },
+          "query": {},
+          "projection": {},
+          "sort": {
+            "type": "array",
+            "items": {}
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "names": {
+            "type": "string"
+          },
+          "cloud_path": {
+            "type": "string"
+          },
+          "max_age": {
+            "type": "integer"
+          },
+          "struct_action": {
+            "type": "string",
+            "description": "db_read_struct 的底层动作，默认 list"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.cloud.write",
+      "description": "部署云函数、写云数据库或管理云存储文件",
+      "risk_level": "system",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "app_id": {
+            "type": "string"
+          },
+          "env": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "fn_deploy",
+              "fn_inc_deploy",
+              "db_write_doc",
+              "db_write_struct",
+              "storage_manage"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "remote_npm_install": {
+            "type": "boolean"
+          },
+          "collection_name": {
+            "type": "string"
+          },
+          "documents": {
+            "type": "array",
+            "items": {}
+          },
+          "query": {},
+          "update": {},
+          "is_multi": {
+            "type": "boolean"
+          },
+          "upsert": {
+            "type": "boolean"
+          },
+          "update_options": {},
+          "cloud_path": {
+            "type": "string"
+          },
+          "local_path": {
+            "type": "string"
+          },
+          "is_directory": {
+            "type": "boolean"
+          },
+          "data_action": {
+            "type": "string",
+            "description": "对应底层写操作的动作"
+          },
+          "struct_action": {
+            "type": "string",
+            "description": "对应底层写操作的动作"
+          },
+          "storage_action": {
+            "type": "string",
+            "description": "对应底层写操作的动作"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "app_id",
+          "env",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "wechat.miniprogram.devtools.installer.check",
+      "description": "只读检测微信开发者工具 CLI 与安装目录",
+      "risk_level": "read_only",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string"
+          },
+          "install_root": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_root"
+        ],
+        "additionalProperties": false
+      }
     }
   ],
   "permissions": [
@@ -355,6 +1568,7 @@
     "filesystem.workspace.write",
     "process.go",
     "process.node",
-    "network.wechat"
+    "network.wechat",
+    "process.wechatide"
   ]
 }

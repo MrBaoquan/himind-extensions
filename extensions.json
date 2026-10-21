@@ -164,6 +164,16 @@
       "type": "plugin",
       "id": "com.himind.media-ai",
       "path": "plugins/media-ai"
+    },
+    {
+      "type": "skill",
+      "id": "com.mrbaoquan.skill.wechat-miniprogram-assistant",
+      "path": "skills/wechat-miniprogram-assistant"
+    },
+    {
+      "type": "workflow",
+      "id": "com.himind.workflow.wechat-miniprogram-ci-delivery",
+      "path": "workflows/wechat-miniprogram-ci-delivery"
     }
   ],
   "feature_packs": [

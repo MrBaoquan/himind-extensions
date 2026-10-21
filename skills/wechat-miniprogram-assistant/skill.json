@@ -1,0 +1,57 @@
+{
+  "id": "com.mrbaoquan.skill.wechat-miniprogram-assistant",
+  "name": "微信小程序开发助手",
+  "author": "马宝全",
+  "categories": [
+    "software-engineering",
+    "testing-quality"
+  ],
+  "version": "0.1.0",
+  "scope": "organization",
+  "distribution_targets": ["workbench", "github"],
+  "description": "面向微信小程序与小游戏开发，指导项目检查、开发者工具控制、编译预览、页面自动化、调试取证、云开发与体验版交付；当用户提到微信开发者工具、小程序模拟器、预览上传、console/network、云函数或云数据库时使用。",
+  "release_notes": "首次沉淀：承接 wechatide-skill 0.3.9 的场景路由、异步任务、安全门禁与失败处理，并接入合并后的微信小程序开发工具插件。",
+  "min_agent_version": "0.3.47",
+  "supported_clients": [
+    "agent-skills"
+  ],
+  "capabilities": [
+    {"id": "wechat.miniprogram.devtools.environment.get", "required": true, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.devtools.login.start", "required": true, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.devtools.task.get", "required": true, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.devtools.project.list", "required": true, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.devtools.project.import", "required": true, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.devtools.project.remove", "required": true, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.devtools.window.manage", "required": true, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.devtools.compile.inspect", "required": true, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.devtools.compile.run", "required": true, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.devtools.preview.create", "required": true, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.devtools.debug.inspect", "required": true, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.devtools.debug.mutate", "required": true, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.devtools.automation.element", "required": true, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.devtools.automation.page", "required": true, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.devtools.automation.game", "required": true, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.devtools.automation.evaluate", "required": false, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.cloud.read", "required": false, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.cloud.write", "required": false, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.devtools.installer.check", "required": false, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.build", "required": false, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.preview", "required": false, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.upload", "required": false, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"},
+    {"id": "wechat.miniprogram.ci.readiness", "required": false, "min_version": "0.4.0", "provider": "com.himind.wechat-miniprogram-tools"}
+  ],
+  "plugin_dependencies": [
+    {"plugin_id": "com.himind.wechat-miniprogram-tools", "required": true, "min_version": "0.4.0"}
+  ],
+  "risk_summary": "可控制本机微信开发者工具、执行页面自动化、读取调试信息、上传体验版和写入云资源；上传、云写、任意 JS 执行与清缓存需审批，不读取或保存原始 token。",
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml",
+    "references/scenes.md",
+    "references/async-tasks.md",
+    "references/approval-policy.md",
+    "references/error-codes.md",
+    "references/project-config-fields.md"
+  ]
+}
