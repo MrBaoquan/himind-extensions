@@ -5,14 +5,14 @@
   "categories": [
     "software-engineering"
   ],
-  "version": "1.7.4",
+  "version": "1.7.5",
   "distribution_targets": [
     "workbench",
     "github"
   ],
   "scope": "organization",
   "description": "使用中文规范设计、构建、校验、调试并打包 HiMind Agent 插件。",
-  "release_notes": "1.7.4：命名与文案规则改为引用扩展开发规范。",
+  "release_notes": "1.7.5：修复与内置扩展工具链对齐后未提升版本导致的重新安装冲突。",
   "min_agent_version": "0.3.37",
   "supported_clients": [
     "himind-ai",
