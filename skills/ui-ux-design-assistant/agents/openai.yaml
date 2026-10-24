@@ -1,0 +1,4 @@
+interface:
+  display_name: "界面设计助手"
+  short_description: "生成设计系统、落地界面并校验设计令牌"
+  default_prompt: "使用 $ui-ux-design-assistant 检查项目设计约束并为新界面生成可落地的设计系统。"

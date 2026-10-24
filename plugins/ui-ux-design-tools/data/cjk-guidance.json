@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-10-23",
+  "source": "himind-local-guidance",
+  "font_files_bundled": false,
+  "font_pairs": [
+    {
+      "id": "technical-ui",
+      "name": "数据界面黑体",
+      "heading": ["HarmonyOS Sans SC", "MiSans", "Noto Sans SC", "Microsoft YaHei"],
+      "body": ["HarmonyOS Sans SC", "Noto Sans SC", "Microsoft YaHei", "PingFang SC"],
+      "best_for": ["dashboard", "analytics", "admin", "data", "technical", "developer", "仪表盘", "数据", "后台", "运维"],
+      "note": "中文界面优先使用本地可用的现代黑体；数字和代码可使用等宽字体，但不要让标题和正文混用过多字族。"
+    },
+    {
+      "id": "editorial",
+      "name": "编辑与文化宋黑搭配",
+      "heading": ["Source Han Serif SC", "Noto Serif SC", "Songti SC", "SimSun"],
+      "body": ["Source Han Sans SC", "Noto Sans SC", "Microsoft YaHei", "PingFang SC"],
+      "best_for": ["editorial", "content", "culture", "luxury", "magazine", "文化", "内容", "杂志", "编辑", "奢华"],
+      "note": "标题可使用宋体或衬线体建立编辑感，正文保持高可读黑体；必须确认字体授权和离线可用性。"
+    },
+    {
+      "id": "friendly",
+      "name": "友好消费级黑体",
+      "heading": ["MiSans", "HarmonyOS Sans SC", "Noto Sans SC", "Microsoft YaHei"],
+      "body": ["Noto Sans SC", "HarmonyOS Sans SC", "Microsoft YaHei", "PingFang SC"],
+      "best_for": ["education", "children", "consumer", "playful", "community", "教育", "儿童", "消费", "社区"],
+      "note": "字重不宜过细，正文应有足够字重和行距；避免把圆体当作所有场景的默认选择。"
+    }
+  ]
+}

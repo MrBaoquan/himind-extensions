@@ -1,0 +1,298 @@
+{
+  "id": "com.himind.ui-ux-design-tools",
+  "name": "界面设计工具",
+  "author": "马宝全",
+  "categories": [
+    "visual-design"
+  ],
+  "description": "检索 UI/UX 风格、配色、字体、图表与技术栈指南，并生成结构化设计系统建议。",
+  "release_notes": "0.2.1：增强 Avalonia/XAML 项目识别与令牌校验，并补充工业桌面中文检索意图。",
+  "version": "0.2.1",
+  "entry": "bin/ui-ux-design-tools.exe",
+  "runtime": "process-jsonrpc-stdio",
+  "platforms": [
+    "windows-x64"
+  ],
+  "min_agent_version": "0.3.47",
+  "governance": "optional",
+  "capability_namespace": "ui-ux",
+  "distribution_targets": [
+    "workbench"
+  ],
+  "capabilities": [
+    {
+      "id": "ui-ux.guideline.search",
+      "description": "检索离线设计规范并返回匹配字段与来源。",
+      "availability": "local",
+      "timeout_seconds": 20,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "一个主要设计意图，建议使用 2 到 8 个有意义的词。"
+          },
+          "domain": {
+            "type": "string",
+            "enum": [
+              "product",
+              "style",
+              "color",
+              "typography",
+              "landing",
+              "chart",
+              "ux",
+              "icons",
+              "gsap",
+              "react",
+              "web",
+              "google-fonts",
+              "reasoning"
+            ],
+            "description": "显式检索域；与 stack 二选一。"
+          },
+          "stack": {
+            "type": "string",
+            "enum": [
+              "angular",
+              "astro",
+              "avalonia",
+              "flutter",
+              "html-tailwind",
+              "javafx",
+              "jetpack-compose",
+              "laravel",
+              "nextjs",
+              "nuxt-ui",
+              "nuxtjs",
+              "react-native",
+              "react",
+              "shadcn",
+              "svelte",
+              "swiftui",
+              "threejs",
+              "uno",
+              "uwp",
+              "vue",
+              "winui",
+              "wpf"
+            ],
+            "description": "技术栈指南；与 domain 二选一。"
+          },
+          "max_results": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 5
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "ui-ux.design-system.generate",
+      "description": "生成风格、配色、字体、布局与检查清单建议。",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "产品、用户、平台与视觉目标。"
+          },
+          "project_name": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "可选项目名称。"
+          },
+          "variance": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "视觉变化度：1 克制居中，10 大胆非对称。"
+          },
+          "motion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "动效强度：1 克制，10 复杂。"
+          },
+          "density": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "信息密度：1 宽松，10 紧凑。"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "ui-ux.catalog.describe",
+      "description": "说明设计数据版本、来源、许可与检索域。",
+      "availability": "local",
+      "timeout_seconds": 10,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "ui-ux.project.inspect",
+      "description": "只读识别项目技术栈、设计系统、主题/令牌文件与组件约束。",
+      "availability": "local",
+      "timeout_seconds": 20,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "项目工作区绝对路径。"
+          },
+          "max_depth": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8,
+            "default": 4
+          },
+          "max_files": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000,
+            "default": 3000
+          }
+        },
+        "required": [
+          "workspace_root"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "ui-ux.design-system.persist",
+      "description": "在工作区内受控写入设计系统与页面覆盖文件。",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "project_slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "maxLength": 64
+          },
+          "page_slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "maxLength": 64
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 524288
+          },
+          "overwrite": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "workspace_root",
+          "project_slug",
+          "content"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "ui-ux.token.validate",
+      "description": "检查设计令牌、硬编码颜色与文本对比度，支持 CSS、JSON 与 Avalonia XAML。",
+      "availability": "local",
+      "timeout_seconds": 20,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "paths": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "maxLength": 1000
+            }
+          },
+          "max_files": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          }
+        },
+        "required": [
+          "workspace_root"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "permissions": [],
+  "contributes": {
+    "commands": [
+      {
+        "id": "ui-ux.catalog.describe",
+        "title": "查看设计数据目录"
+      },
+      {
+        "id": "ui-ux.guideline.search",
+        "title": "检索设计规范"
+      },
+      {
+        "id": "ui-ux.design-system.generate",
+        "title": "生成设计系统建议"
+      },
+      {
+        "id": "ui-ux.project.inspect",
+        "title": "检查项目设计上下文"
+      },
+      {
+        "id": "ui-ux.design-system.persist",
+        "title": "保存设计系统"
+      },
+      {
+        "id": "ui-ux.token.validate",
+        "title": "校验设计令牌"
+      }
+    ],
+    "views": []
+  }
+}
