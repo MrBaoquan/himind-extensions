@@ -1,7 +1,8 @@
 {
   "id": "com.himind.skill.mcp-experience-feedback",
+  "icon": "assets/icon.png",
   "name": "MCP 体验反馈",
-  "author": "超级管理员",
+  "author": "马宝全",
   "categories": [
     "software-engineering",
     "collaboration-delivery"
@@ -21,6 +22,7 @@
   "contents": [
     "skill.json",
     "SKILL.md",
-    "agents/openai.yaml"
+    "agents/openai.yaml",
+    "assets/icon.png"
   ]
 }

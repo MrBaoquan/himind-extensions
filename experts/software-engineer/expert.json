@@ -1,6 +1,7 @@
 {
   "schema_version": "expert.v1",
   "id": "com.himind.expert.software-engineer",
+  "icon": "assets/icon.png",
   "name": "软件工程师",
   "author": "HiMind",
   "categories": ["software-engineering"],

@@ -1,0 +1,42 @@
+{
+  "plugin": {
+    "frames": 10,
+    "badges": 10,
+    "missingBadgeFrames": 0,
+    "background": "rgb(37, 99, 235)",
+    "color": "rgb(255, 255, 255)",
+    "badgeWidth": 20,
+    "badgeHeight": 20,
+    "firstTitle": "IOStudio 工具"
+  },
+  "skill": {
+    "frames": 16,
+    "badges": 16,
+    "missingBadgeFrames": 0,
+    "background": "rgb(4, 120, 87)",
+    "color": "rgb(255, 255, 255)",
+    "badgeWidth": 20,
+    "badgeHeight": 20,
+    "firstTitle": "媒体下载助手"
+  },
+  "workflow": {
+    "frames": 4,
+    "badges": 4,
+    "missingBadgeFrames": 0,
+    "background": "rgb(180, 83, 9)",
+    "color": "rgb(255, 255, 255)",
+    "badgeWidth": 20,
+    "badgeHeight": 20,
+    "firstTitle": "每日工作日志"
+  },
+  "expert": {
+    "frames": 5,
+    "badges": 5,
+    "missingBadgeFrames": 0,
+    "background": "rgb(124, 58, 237)",
+    "color": "rgb(255, 255, 255)",
+    "badgeWidth": 20,
+    "badgeHeight": 20,
+    "firstTitle": "项目架构师"
+  }
+}

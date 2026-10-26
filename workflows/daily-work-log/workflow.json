@@ -1,6 +1,7 @@
 {
   "schema_version": "workflow_package.v1",
   "id": "com.himind.workflow.daily-work-log",
+  "icon": "assets/icon.png",
   "version": "0.7.6",
   "distribution_targets": ["workbench", "github"],
   "name": "每日工作日志",

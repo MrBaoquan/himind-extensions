@@ -1,6 +1,7 @@
 {
   "schema_version": "expert.v1",
   "id": "com.himind.expert.senior-ui-designer",
+  "icon": "assets/icon.png",
   "name": "高级 UI 设计师",
   "author": "HiMind",
   "categories": ["software-engineering"],

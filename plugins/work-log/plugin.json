@@ -1,5 +1,6 @@
 {
   "id": "com.himind.work-log",
+  "icon": "assets/icon.png",
   "name": "工作日志工具",
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],

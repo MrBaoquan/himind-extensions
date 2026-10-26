@@ -1,6 +1,7 @@
 {
   "schema_version": "expert.v1",
   "id": "com.himind.expert.senior-test-engineer",
+  "icon": "assets/icon.png",
   "name": "高级测试工程师",
   "author": "HiMind",
   "categories": ["software-engineering"],

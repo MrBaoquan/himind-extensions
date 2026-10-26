@@ -1,0 +1,132 @@
+
+> check:ui
+> npm run check:start-form && npm run check:workflow-option-sources && npm run check:run-view && npm run check:workflow-graph && npm run check:workflow-process && npm run check:market-catalog && npm run check:task-view && npm run check:shell-structure && npm run check:icon-version && npm run check:ai-service-presets && npm run check:ai-balance-matching && npm run check:ai-service-routing && npm run check:text-layout && npm run check:operation-plan && npm run check:projection-requeue && npm run check:acp-profiles && npm run check:runtime-providers && npm run check:mcp-servers && npm run check:settings-ia && npm run check:engine && npm run check:copy && npm run check:design-tokens
+
+
+> check:start-form
+> node --experimental-strip-types scripts/check-start-form.mts
+
+start form conversion checks passed
+
+> check:workflow-option-sources
+> node --experimental-strip-types scripts/check-workflow-option-sources.mts
+
+workflow option source cache checks passed
+
+> check:run-view
+> node --experimental-strip-types scripts/check-run-view.mts
+
+run view checks passed
+
+> check:workflow-graph
+> node --experimental-strip-types scripts/check-workflow-graph.mts
+
+workflow graph checks passed
+
+> check:workflow-process
+> node --experimental-strip-types scripts/check-workflow-process-ui.mts
+
+workflow process UI checks passed
+
+> check:market-catalog
+> node --experimental-strip-types scripts/check-market-catalog.mts
+
+market catalog checks passed
+
+> check:task-view
+> node --experimental-strip-types scripts/check-task-view.mts
+
+task view checks passed
+
+> check:shell-structure
+> node --experimental-strip-types scripts/check-shell-structure.mts
+
+shell structure checks passed
+
+> check:icon-version
+> node --experimental-strip-types scripts/check-icon-version.mts
+
+icon version checks passed
+
+> check:ai-service-presets
+> node --experimental-strip-types scripts/check-ai-service-presets.mts
+
+ai service preset checks passed（23 条 / 4 个分类）
+ai service preset layout checks passed
+
+> check:ai-balance-matching
+> node --experimental-strip-types scripts/check-ai-balance-matching.mts
+
+AI balance template matching checks passed
+
+> check:ai-service-routing
+> node --experimental-strip-types scripts/check-ai-service-routing.mts
+
+AI service routing checks passed
+
+> check:text-layout
+> node --experimental-strip-types scripts/check-text-layout.mts
+
+text layout checks passed（4046 条规则 / 6 组路径）
+
+> check:operation-plan
+> node --experimental-strip-types scripts/check-operation-plan.mts
+
+operation plan checks passed（7 个依赖动作 / 7 个后端取值）
+
+> check:projection-requeue
+> node --experimental-strip-types scripts/check-projection-requeue.mts
+
+projection-requeue UI checks passed
+
+> check:acp-profiles
+> node --experimental-strip-types scripts/check-acp-profiles.mts
+
+acp profile checks passed（命令解析 / ID 派生 / 状态判读 / 4 个预设）
+
+> check:runtime-providers
+> node --experimental-strip-types scripts/check-runtime-providers.mts
+
+runtime provider checks passed（运行环境命名 / 品牌判定 / 探测状态 / 页面接线）
+
+> check:mcp-servers
+> node --experimental-strip-types scripts/check-mcp-servers.mts
+
+check:mcp-servers OK
+
+> check:settings-ia
+> node --experimental-strip-types scripts/check-settings-ia.mts
+
+settings IA: 3 组 / 8 条，深链白名单、窄窗折叠、AI 连接约定校验通过
+
+> check:engine
+> node --experimental-strip-types scripts/check-engine.mts
+
+engine UI checks passed
+
+> check:copy
+> node --experimental-strip-types scripts/check-copy.mts
+
+copy checks passed（82 个文件 / 40+ 字 0 条 / 28+ 字 28 条）
+
+> check:design-tokens
+> node scripts/check-design-tokens.mjs
+
+{
+  "tokens": 24,
+  "contrast": {
+    "bodyOnSurface": 17.44,
+    "mutedOnSurface": 6.24,
+    "subtleOnMuted": 5.16,
+    "neutralBadge": 4.74,
+    "primaryOnSurface": 8.66,
+    "controlBorderOnSurface": 3.66,
+    "controlBorderOnMuted": 3.19
+  },
+  "type": {
+    "meta": 12,
+    "body": 13,
+    "title": 14
+  }
+}
+design token checks passed

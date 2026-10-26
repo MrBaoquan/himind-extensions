@@ -1,7 +1,8 @@
 {
   "id": "com.himind.media-downloader-assistant",
+  "icon": "assets/icon.png",
   "name": "媒体下载助手",
-  "author": "超级管理员",
+  "author": "马宝全",
   "categories": ["video-post", "audio-sound", "data-automation"],
   "version": "0.1.1",
   "distribution_targets": ["workbench", "github"],
@@ -23,5 +24,10 @@
     {"plugin_id": "com.himind.media-downloader", "required": true, "min_version": "0.1.0"}
   ],
   "risk_summary": "默认只读检查；安装运行时和创建下载任务需要用户确认；不接受任意命令、Cookie、DRM 或私密凭据。",
-  "contents": ["skill.json", "SKILL.md", "agents/openai.yaml"]
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml",
+    "assets/icon.png"
+  ]
 }

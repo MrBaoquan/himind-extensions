@@ -1,5 +1,6 @@
 {
   "id": "com.himind.skill.develop-himind-workflows",
+  "icon": "assets/icon.png",
   "name": "工作流开发助手",
   "author": "马宝全",
   "categories": [
@@ -127,6 +128,7 @@
   "contents": [
     "skill.json",
     "SKILL.md",
-    "agents/openai.yaml"
+    "agents/openai.yaml",
+    "assets/icon.png"
   ]
 }

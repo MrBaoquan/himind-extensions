@@ -1,5 +1,6 @@
 {
   "id": "com.himind.skill.develop-himind-skills",
+  "icon": "assets/icon.png",
   "name": "技能开发助手",
   "author": "马宝全",
   "categories": [
@@ -108,6 +109,7 @@
   "contents": [
     "skill.json",
     "SKILL.md",
-    "agents/openai.yaml"
+    "agents/openai.yaml",
+    "assets/icon.png"
   ]
 }

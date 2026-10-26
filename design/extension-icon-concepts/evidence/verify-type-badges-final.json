@@ -1,0 +1,28 @@
+{
+  "title": "开源热榜",
+  "listAuthorFrames": 35,
+  "listTypeBadges": 35,
+  "badgeKinds": {
+    "plugin": 10,
+    "skill": 16,
+    "workflow": 4,
+    "expert": 5
+  },
+  "detailFrame": {
+    "width": 52,
+    "height": 52
+  },
+  "detailArt": {
+    "width": 52,
+    "height": 52
+  },
+  "detailBadge": {
+    "width": 20.796875,
+    "height": 20.796875
+  },
+  "detailKind": "plugin",
+  "iconSource": "author",
+  "imageComplete": true,
+  "naturalWidth": 256,
+  "naturalHeight": 256
+}

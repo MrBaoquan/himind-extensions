@@ -1,5 +1,6 @@
 {
   "id": "com.himind.skill.ui-ux-design-assistant",
+  "icon": "assets/icon.png",
   "name": "界面设计助手",
   "author": "马宝全",
   "categories": ["visual-design", "software-engineering"],
@@ -22,5 +23,10 @@
     {"plugin_id": "com.himind.ui-ux-design-tools", "required": true, "min_version": "0.2.0"}
   ],
   "risk_summary": "只读项目检查与设计建议；设计系统写入仅限工作区约定路径，覆盖已有文件需用户确认；不联网、不执行脚本。",
-  "contents": ["skill.json", "SKILL.md", "agents/openai.yaml"]
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml",
+    "assets/icon.png"
+  ]
 }

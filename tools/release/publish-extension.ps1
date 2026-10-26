@@ -220,8 +220,10 @@ $manifestFile = Join-Path $outputRoot ([string]$plan.manifest_name)
 # 签名只进发布清单的 signature 字段，中间文件放临时目录，dist 里只留交付物。
 $signature = Join-Path ([IO.Path]::GetTempPath()) "himind-extension-signature-$([guid]::NewGuid().ToString('N')).json"
 $lock = Join-Path $outputRoot ([string]$plan.lock_name)
+$icon = if ([string]::IsNullOrWhiteSpace([string]$plan.icon_name)) { $null } else { Join-Path $outputRoot ([string]$plan.icon_name) }
 $commit = (git rev-parse HEAD).Trim()
 $releaseAssets = @($artifact, $manifestFile)
+if ($icon) { $releaseAssets += $icon }
 
 # Release 的 --target 与清单的 source_commit 都指向 HEAD，所以 HEAD 必须先到达
 # 远端分支。否则 GitHub 会因为目标提交不存在而报 5xx，清单也会指向一个别人
@@ -335,6 +337,9 @@ if ($releaseExists) {
         if ($Kind -eq 'workflow') {
             Copy-Item -LiteralPath (Join-Path $downloadRoot ([string]$plan.lock_name)) -Destination $lock -Force
         }
+        if ($icon) {
+            Copy-Item -LiteralPath (Join-Path $downloadRoot ([string]$plan.icon_name)) -Destination $icon -Force
+        }
         # 复用不等于免检：取回的制品必须与取回的清单摘要逐字节一致，否则这次
         # 「复用」会把一个来源不明的字节写进市场索引。
         $downloadedManifest = Get-Content -LiteralPath $manifestFile -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -342,6 +347,14 @@ if ($releaseExists) {
         $actualDigest = (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($expectedDigest -ne $actualDigest) {
             throw "Release $tag artifact $([IO.Path]::GetFileName($artifact)) does not match its release manifest."
+        }
+        if ($icon) {
+            $expectedIconDigest = ([string]$downloadedManifest.icon.sha256).Trim().ToLowerInvariant()
+            $actualIconDigest = (Get-FileHash -LiteralPath $icon -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ([string]$downloadedManifest.icon.file_name -ne [IO.Path]::GetFileName($icon) -or
+                $expectedIconDigest -ne $actualIconDigest) {
+                throw "Release $tag icon $([IO.Path]::GetFileName($icon)) does not match its release manifest."
+            }
         }
     }
     finally {
@@ -393,10 +406,11 @@ else {
     }
     $manifestArguments += @(
         '-artifact', $artifact,
-        '-signature', $signature,
         '-manifest-out', $manifestFile,
         '-source-commit', $commit
     )
+    if ($icon) { $manifestArguments += @('-icon', $icon) }
+    $manifestArguments += @('-signature', $signature)
     & go @manifestArguments | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Release manifest generation failed.' }
     Remove-Item -LiteralPath $signature -Force -ErrorAction SilentlyContinue
@@ -423,6 +437,7 @@ if (-not $allowGithub) {
         version = $version
         kind = $Kind
         artifact = [IO.Path]::GetFileName($artifact)
+        icon = if ($icon) { [IO.Path]::GetFileName($icon) } else { $null }
         release_manifest = [IO.Path]::GetFileName($manifestFile)
         lock = if ($Kind -eq 'workflow') { [IO.Path]::GetFileName($lock) } else { $null }
         distribution_targets = $targets

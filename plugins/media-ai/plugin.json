@@ -1,5 +1,6 @@
 {
   "id": "com.himind.media-ai",
+  "icon": "assets/icon.png",
   "name": "媒体理解工具",
   "author": "马宝全",
   "categories": [

@@ -1,6 +1,7 @@
 {
   "schema_version": "workflow_package.v1",
   "id": "com.himind.workflow.tech-radar",
+  "icon": "assets/icon.png",
   "version": "0.4.9",
   "distribution_targets": ["workbench", "github"],
   "name": "科技雷达日报",

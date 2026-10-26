@@ -1,0 +1,38 @@
+{
+  "ok": true,
+  "capability_id": "media.image.generate",
+  "text": "已生成 1 张图片：\nC:\\Users\\mrma6\\Documents\\HiMindExtensions\\himind-extensions\\design\\extension-icon-concepts\\himind-extension-icon-atlas-0-c6947eea.jpg\n后续可用 media:<id> 引用继续改图。",
+  "structured_content": {
+    "mode": "local",
+    "provider": "ark.cn-beijing.volces.com",
+    "service_id": "ark-agent-plan",
+    "capability": "image.generate",
+    "model": "doubao-seedream-5.0-pro",
+    "output_dir": "C:\\Users\\mrma6\\Documents\\HiMindExtensions\\himind-extensions\\design\\extension-icon-concepts",
+    "files": [
+      {
+        "media_id": "media_1792993491_93756e59d14c",
+        "path": "C:\\Users\\mrma6\\Documents\\HiMindExtensions\\himind-extensions\\design\\extension-icon-concepts\\himind-extension-icon-atlas-0-c6947eea.jpg",
+        "name": "himind-extension-icon-atlas-0-c6947eea.jpg",
+        "mime_type": "image/jpeg",
+        "size_bytes": 540493,
+        "sha256": "c21458250fb8c1d510a12c19ef421be7137f29e3f11b08ec95dc077be5aadc50",
+        "width": 2048,
+        "height": 2048,
+        "revised_prompt": null
+      }
+    ]
+  },
+  "schema_version": "himind.ai-capability-result.v1",
+  "request_id": "cap-18e1fdf7c8a08044",
+  "capability": "image.generate",
+  "service_id": "ark-agent-plan",
+  "attempts": [
+    {
+      "service_id": "ark-agent-plan",
+      "state": "succeeded"
+    }
+  ],
+  "fallback_used": false,
+  "warnings": []
+}

@@ -59,6 +59,7 @@ type Manifest struct {
 	Version            string                   `json:"version"`
 	ReleaseNotes       string                   `json:"release_notes"`
 	MinAgentVersion    string                   `json:"min_agent_version"`
+	Icon               string                   `json:"icon"`
 	SupportedClients   []string                 `json:"supported_clients"`
 	Capabilities       json.RawMessage          `json:"capabilities"`
 	PluginDependencies []map[string]interface{} `json:"plugin_dependencies"`
@@ -293,6 +294,11 @@ func Entry(kind string, value Manifest, facts ReleaseFacts) (map[string]interfac
 		"source_commit": release.SourceCommit, "source_tree": facts.SourceTree, "release_tag": release.Tag,
 		"artifact_sha256": release.Artifact.SHA256,
 	}
+	if release.Icon != nil {
+		entry["icon"] = map[string]interface{}{
+			"url": release.IconURLOf(repository), "sha256": release.Icon.SHA256, "source": "author",
+		}
+	}
 	switch kind {
 	case distribution.KindPlugin:
 		entry["plugin_id"] = value.ID
@@ -339,6 +345,24 @@ func ValidateEntry(kind string, entry map[string]interface{}, release distributi
 	sha, err := entryString(entry, "sha256")
 	if err != nil || !strings.EqualFold(sha, release.Artifact.SHA256) {
 		return fmt.Errorf("索引记录 sha256 与发布清单摘要不一致: %s", release.Artifact.Name)
+	}
+	if release.Icon != nil {
+		icon, ok := entry["icon"].(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("索引记录缺少发布清单声明的图标: %s", release.Icon.FileName)
+		}
+		iconURL, _ := icon["url"].(string)
+		if !strings.HasPrefix(iconURL, "https://github.com/") ||
+			!strings.Contains(iconURL, "/releases/download/") ||
+			!strings.HasSuffix(iconURL, "/"+release.Icon.FileName) {
+			return fmt.Errorf("索引记录图标地址不是对应 Release 资产: %s", release.Icon.FileName)
+		}
+		iconSHA, _ := icon["sha256"].(string)
+		if !strings.EqualFold(iconSHA, release.Icon.SHA256) {
+			return fmt.Errorf("索引记录图标摘要与发布清单不一致: %s", release.Icon.FileName)
+		}
+	} else if _, exists := entry["icon"]; exists {
+		return fmt.Errorf("索引记录声明了发布清单没有的图标")
 	}
 	return nil
 }

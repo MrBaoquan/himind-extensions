@@ -67,6 +67,27 @@ $artifact = Join-Path $outputRoot ([string]$plan.artifact_name)
 $lock = Join-Path $outputRoot ([string]$plan.lock_name)
 $artifactSha256 = ''
 $lockSha256 = ''
+$sourceManifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+$declaredIcon = [string]$sourceManifest.icon
+$icon = $null
+$iconSha256 = ''
+if (-not [string]::IsNullOrWhiteSpace($declaredIcon)) {
+    if ([string]::IsNullOrWhiteSpace([string]$plan.icon_name)) { throw 'Release plan did not produce an icon name.' }
+    $iconSource = [IO.Path]::GetFullPath((Join-Path $source $declaredIcon))
+    $sourcePrefix = $source.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+    if (-not $iconSource.StartsWith($sourcePrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Extension icon must stay inside the extension source directory.'
+    }
+    if (-not (Test-Path -LiteralPath $iconSource -PathType Leaf)) {
+        throw "Declared extension icon was not found: $declaredIcon"
+    }
+    if ((Get-Item -LiteralPath $iconSource).Length -gt 262144) {
+        throw 'Extension icon must not exceed 256 KB.'
+    }
+    $icon = Join-Path $outputRoot ([string]$plan.icon_name)
+    Copy-Item -LiteralPath $iconSource -Destination $icon -Force
+    $iconSha256 = (Get-FileHash -LiteralPath $icon -Algorithm SHA256).Hash.ToLowerInvariant()
+}
 
 if ($Kind -eq 'skill') {
     Push-Location $repoRoot
@@ -89,8 +110,10 @@ elseif ($Kind -eq 'plugin') {
         try { & go test ./... }
         finally { Pop-Location }
         if ($LASTEXITCODE -ne 0) { throw 'Plugin tests failed.' }
-        Push-Location $repoRoot
-        try { & go build -o $binary "./$($ExtensionPath.Replace('\', '/'))" }
+        # Plugins may be their own Go module. Build from the plugin source root
+        #; invoking the package from the distribution repo root fails for nested modules.
+        Push-Location $source
+        try { & go build -o $binary . }
         finally { Pop-Location }
         if ($LASTEXITCODE -ne 0) { throw 'Plugin build failed.' }
         # 随包文件按 pluginpack 的排除法整份摊平：这里曾经是「plugin.json + ui/ +
@@ -157,6 +180,11 @@ $outputs = @(
     "release_tag=$([string]$plan.tag)",
     "manifest_name=$([string]$plan.manifest_name)"
 )
+if ($icon) {
+    $outputs += "icon_path=$icon"
+    $outputs += "icon_name=$([string]$plan.icon_name)"
+    $outputs += "icon_sha256=$iconSha256"
+}
 if ($Kind -eq 'workflow') {
     $outputs += "lock_path=$lock"
     $outputs += "lock_name=$([string]$plan.lock_name)"

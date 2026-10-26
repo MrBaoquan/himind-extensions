@@ -35,6 +35,7 @@ type Manifest struct {
 	Author       string   `json:"author"`
 	Categories   []string `json:"categories"`
 	Description  string   `json:"description"`
+	Icon         string   `json:"icon"`
 	ReleaseNotes string   `json:"release_notes"`
 	Version      string   `json:"version"`
 	Entry        string   `json:"entry"`
@@ -193,7 +194,7 @@ func buildManifest(name, displayName, description, author string, categories []s
 	// 分发目标按仓库默认（extensions.json 的 default_distribution_targets）写入：
 	// 声明是上限，Agent 侧只能在范围内收窄，不能扩权 —— 所以默认给全两个比漏写更好。
 	targets := []string{"workbench", "github"}
-	return Manifest{ID: id, Name: displayName, Author: strings.TrimSpace(author), Categories: append([]string(nil), categories...), Description: strings.TrimSpace(description), ReleaseNotes: strings.TrimSpace(releaseNotes), Version: "0.1.0", Entry: "bin/" + name + ".exe", Runtime: "process-jsonrpc-stdio", Platforms: []string{"windows-x64"}, MinAgent: "0.3.0", Governance: "optional", CapabilityNamespace: namespace, DistributionTargets: targets, Capabilities: []Capability{capability}, Permissions: []string{}, Contributes: contributes}
+	return Manifest{ID: id, Name: displayName, Author: strings.TrimSpace(author), Categories: append([]string(nil), categories...), Description: strings.TrimSpace(description), Icon: "", ReleaseNotes: strings.TrimSpace(releaseNotes), Version: "0.1.0", Entry: "bin/" + name + ".exe", Runtime: "process-jsonrpc-stdio", Platforms: []string{"windows-x64"}, MinAgent: "0.3.0", Governance: "optional", CapabilityNamespace: namespace, DistributionTargets: targets, Capabilities: []Capability{capability}, Permissions: []string{}, Contributes: contributes}
 }
 
 func uiTemplate(displayName string) string {

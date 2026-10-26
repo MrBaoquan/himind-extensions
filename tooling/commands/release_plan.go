@@ -33,20 +33,21 @@ func ReleasePlanMain() {
 	flags.Var(&dependencyCatalogs, "dependency-catalog",
 		"依赖所在仓的市场索引，用于解析跨分发依赖；可重复指定，文件不存在时视为空索引")
 	artifactPath := flags.String("artifact", "", "本地制品，写发布清单时必填")
+	iconPath := flags.String("icon", "", "本地图标 sidecar，提供时写进发布清单")
 	signaturePath := flags.String("signature", "", "本地签名元数据，提供时内嵌进发布清单")
 	manifestOut := flags.String("manifest-out", "", "发布清单输出路径；缺省只打印命名事实")
 	sourceCommit := flags.String("source-commit", "", "源码提交，写进发布清单")
 	_ = flags.Parse(os.Args[1:])
 
 	if err := releasePlan(*kind, *source, *repository, *channel, *catalogPath, dependencyCatalogs,
-		*artifactPath, *signaturePath, *manifestOut, *sourceCommit); err != nil {
+		*artifactPath, *iconPath, *signaturePath, *manifestOut, *sourceCommit); err != nil {
 		fmt.Fprintln(os.Stderr, "release plan failed:", err)
 		os.Exit(1)
 	}
 }
 
 func releasePlan(kind, source, repository, channel, catalogPath string, dependencyCatalogs []string,
-	artifactPath, signaturePath, manifestOut, sourceCommit string) error {
+	artifactPath, iconPath, signaturePath, manifestOut, sourceCommit string) error {
 	plan, err := releaseplan.Build(kind, source, repository, channel, catalogPath, dependencyCatalogs...)
 	if err != nil {
 		return err
@@ -62,6 +63,17 @@ func releasePlan(kind, source, repository, channel, catalogPath string, dependen
 	if err != nil {
 		return err
 	}
+	var icon *distribution.ReleaseIcon
+	if strings.TrimSpace(iconPath) != "" {
+		value, err := describeIcon(iconPath)
+		if err != nil {
+			return err
+		}
+		if plan.IconName == "" || filepath.Base(iconPath) != plan.IconName {
+			return fmt.Errorf("图标 sidecar 名必须是 %s", plan.IconName)
+		}
+		icon = &value
+	}
 	// 签名元数据必须与本地制品逐字节一致，否则这次发布会在安装侧被拒绝。
 	var signature *distribution.ReleaseSignature
 	if strings.TrimSpace(signaturePath) != "" {
@@ -71,7 +83,7 @@ func releasePlan(kind, source, repository, channel, catalogPath string, dependen
 		}
 		signature = &value
 	}
-	manifest := plan.Manifest(artifact, signature)
+	manifest := plan.Manifest(artifact, icon, signature)
 	if err := manifest.Validate(); err != nil {
 		return err
 	}
@@ -85,6 +97,39 @@ func releasePlan(kind, source, repository, channel, catalogPath string, dependen
 		ManifestPath string `json:"manifest_path"`
 	}{Plan: plan, ManifestPath: manifestOut}
 	return printJSON(output)
+}
+
+// describeIcon 读取并识别图标 sidecar。真正的图像解码与尺寸校验由 Agent
+// 发布器完成；仓库脚本负责锁定 MIME、大小、摘要和包内声明的一致性。
+func describeIcon(path string) (distribution.ReleaseIcon, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return distribution.ReleaseIcon{}, err
+	}
+	extension := strings.ToLower(filepath.Ext(path))
+	contentType := map[string]string{".png": "image/png", ".webp": "image/webp"}[extension]
+	if contentType == "" {
+		return distribution.ReleaseIcon{}, fmt.Errorf("图标只支持 PNG 或 WebP: %s", path)
+	}
+	if extension == ".png" &&
+		(len(data) < 8 || !strings.EqualFold(hex.EncodeToString(data[:8]), "89504e470d0a1a0a")) {
+		return distribution.ReleaseIcon{}, fmt.Errorf("PNG 图标文件头无效: %s", path)
+	}
+	if extension == ".webp" &&
+		(len(data) < 12 || string(data[:4]) != "RIFF" || string(data[8:12]) != "WEBP") {
+		return distribution.ReleaseIcon{}, fmt.Errorf("WebP 图标文件头无效: %s", path)
+	}
+	digest := sha256.Sum256(data)
+	value := distribution.ReleaseIcon{
+		FileName:    filepath.Base(path),
+		SizeBytes:   int64(len(data)),
+		SHA256:      hex.EncodeToString(digest[:]),
+		ContentType: contentType,
+	}
+	if err := value.Validate(); err != nil {
+		return distribution.ReleaseIcon{}, err
+	}
+	return value, nil
 }
 
 // describeArtifact 用本地制品填清单里的制品事实。

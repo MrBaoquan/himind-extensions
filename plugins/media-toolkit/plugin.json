@@ -1,5 +1,6 @@
 {
   "id": "com.himind.media-toolkit",
+  "icon": "assets/icon.png",
   "name": "媒体处理工具",
   "author": "马宝全",
   "categories": [

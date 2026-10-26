@@ -1,5 +1,6 @@
 {
   "id": "com.himind.work-log-collector",
+  "icon": "assets/icon.png",
   "name": "工作日志采集器",
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],

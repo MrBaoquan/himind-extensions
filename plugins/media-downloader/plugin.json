@@ -1,7 +1,8 @@
 {
   "id": "com.himind.media-downloader",
+  "icon": "assets/icon.png",
   "name": "媒体下载工具",
-  "author": "超级管理员",
+  "author": "马宝全",
   "categories": [
     "video-post",
     "audio-sound",

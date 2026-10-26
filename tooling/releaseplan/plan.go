@@ -8,6 +8,7 @@ package releaseplan
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/MrBaoquan/himind-extensions/tooling/catalog"
@@ -27,6 +28,7 @@ type Plan struct {
 	ArtifactName    string                           `json:"artifact_name"`
 	Extension       string                           `json:"extension"`
 	ManifestName    string                           `json:"manifest_name"`
+	IconName        string                           `json:"icon_name,omitempty"`
 	LockName        string                           `json:"lock_name"`
 	SourceCommit    string                           `json:"source_commit"`
 	Dependencies    []distribution.ReleaseDependency `json:"dependencies"`
@@ -73,6 +75,17 @@ func Build(kind, source, repository, channel, catalogPath string, dependencyCata
 		ManifestName: distribution.ManifestName(manifest.ID, manifest.Version),
 		LockName:     manifest.ID + "-" + manifest.Version + ".extension-lock.json",
 	}
+	if declaredIcon := strings.TrimSpace(manifest.Icon); declaredIcon != "" {
+		normalized := filepath.ToSlash(filepath.Clean(declaredIcon))
+		if filepath.IsAbs(declaredIcon) || normalized == ".." || strings.HasPrefix(normalized, "../") {
+			return Plan{}, fmt.Errorf("扩展图标必须是包内相对路径: %s", declaredIcon)
+		}
+		extension := strings.ToLower(filepath.Ext(normalized))
+		if extension != ".png" && extension != ".webp" {
+			return Plan{}, fmt.Errorf("扩展图标只支持 PNG 或 WebP: %s", declaredIcon)
+		}
+		plan.IconName = manifest.ID + "-" + manifest.Version + "-icon" + extension
+	}
 	if plan.Channel == "" {
 		plan.Channel = "stable"
 	}
@@ -101,7 +114,7 @@ func Build(kind, source, repository, channel, catalogPath string, dependencyCata
 }
 
 // Manifest 用制品事实与签名补齐发布清单。
-func (p Plan) Manifest(artifact distribution.ReleaseArtifact, signature *distribution.ReleaseSignature) distribution.ReleaseManifest {
+func (p Plan) Manifest(artifact distribution.ReleaseArtifact, icon *distribution.ReleaseIcon, signature *distribution.ReleaseSignature) distribution.ReleaseManifest {
 	return distribution.ReleaseManifest{
 		SchemaVersion:   distribution.ReleaseManifestSchema,
 		Repository:      p.Repository,
@@ -113,6 +126,7 @@ func (p Plan) Manifest(artifact distribution.ReleaseArtifact, signature *distrib
 		SourceCommit:    p.SourceCommit,
 		MinAgentVersion: p.MinAgentVersion,
 		Artifact:        artifact,
+		Icon:            icon,
 		Dependencies:    p.Dependencies,
 		Signature:       signature,
 	}

@@ -1,6 +1,7 @@
 {
   "schema_version": "workflow_package.v1",
   "id": "com.himind.workflow.wechat-miniprogram-ci-delivery",
+  "icon": "assets/icon.png",
   "version": "1.0.0",
   "distribution_targets": [
     "workbench",

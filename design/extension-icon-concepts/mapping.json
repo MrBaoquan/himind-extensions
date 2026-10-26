@@ -1,0 +1,674 @@
+{
+  "source": "himind-extension-icon-atlas-0-c6947eea.jpg",
+  "grid": {
+    "columns": 5,
+    "rows": 7
+  },
+  "icons": [
+    {
+      "index": 1,
+      "row": 1,
+      "column": 1,
+      "kind": "plugin",
+      "id": "com.himind.tech-radar",
+      "name": "科技雷达",
+      "slug": "tech-radar",
+      "concept": "radar scanning repository nodes",
+      "file": "icons/plugin-tech-radar.png",
+      "source_box": [
+        83,
+        51,
+        374,
+        317
+      ],
+      "applied_manifest": "plugins/tech-radar/plugin.json",
+      "applied_asset": "plugins/tech-radar/assets/icon.png"
+    },
+    {
+      "index": 2,
+      "row": 1,
+      "column": 2,
+      "kind": "plugin",
+      "id": "com.himind.wechat-miniprogram-tools",
+      "name": "微信小程序开发工具",
+      "slug": "wechat-miniprogram-tools",
+      "concept": "speech bubbles plus code brackets",
+      "file": "icons/plugin-wechat-miniprogram-tools.png",
+      "source_box": [
+        481,
+        52,
+        774,
+        316
+      ],
+      "applied_manifest": "plugins/wechat-miniprogram-tools/plugin.json",
+      "applied_asset": "plugins/wechat-miniprogram-tools/assets/icon.png"
+    },
+    {
+      "index": 3,
+      "row": 1,
+      "column": 3,
+      "kind": "plugin",
+      "id": "com.himind.media-library",
+      "name": "媒体资源库",
+      "slug": "media-library",
+      "concept": "stacked media cards with play",
+      "file": "icons/plugin-media-library.png",
+      "source_box": [
+        881,
+        51,
+        1173,
+        316
+      ],
+      "applied_manifest": "plugins/media-library/plugin.json",
+      "applied_asset": "plugins/media-library/assets/icon.png"
+    },
+    {
+      "index": 4,
+      "row": 1,
+      "column": 4,
+      "kind": "plugin",
+      "id": "com.himind.media-downloader",
+      "name": "媒体下载工具",
+      "slug": "media-downloader",
+      "concept": "download arrow in play frame",
+      "file": "icons/plugin-media-downloader.png",
+      "source_box": [
+        1279,
+        51,
+        1571,
+        316
+      ],
+      "applied_manifest": "plugins/media-downloader/plugin.json",
+      "applied_asset": "plugins/media-downloader/assets/icon.png"
+    },
+    {
+      "index": 5,
+      "row": 1,
+      "column": 5,
+      "kind": "plugin",
+      "id": "com.himind.media-toolkit",
+      "name": "媒体处理工具",
+      "slug": "media-toolkit",
+      "concept": "film strip with sliders",
+      "file": "icons/plugin-media-toolkit.png",
+      "source_box": [
+        1678,
+        51,
+        1969,
+        316
+      ],
+      "applied_manifest": "plugins/media-toolkit/plugin.json",
+      "applied_asset": "plugins/media-toolkit/assets/icon.png"
+    },
+    {
+      "index": 6,
+      "row": 2,
+      "column": 1,
+      "kind": "plugin",
+      "id": "com.himind.iostudio",
+      "name": "IOStudio 工具",
+      "slug": "iostudio",
+      "concept": "hardware board ports waveform",
+      "file": "icons/plugin-iostudio.png",
+      "source_box": [
+        83,
+        341,
+        374,
+        603
+      ],
+      "applied_manifest": "plugins/iostudio/plugin.json",
+      "applied_asset": "plugins/iostudio/assets/icon.png"
+    },
+    {
+      "index": 7,
+      "row": 2,
+      "column": 2,
+      "kind": "plugin",
+      "id": "com.himind.work-log",
+      "name": "工作日志工具",
+      "slug": "work-log-plugin",
+      "concept": "notebook calendar check",
+      "file": "icons/plugin-work-log-plugin.png",
+      "source_box": [
+        481,
+        341,
+        774,
+        603
+      ],
+      "applied_manifest": "plugins/work-log/plugin.json",
+      "applied_asset": "plugins/work-log/assets/icon.png"
+    },
+    {
+      "index": 8,
+      "row": 2,
+      "column": 3,
+      "kind": "plugin",
+      "id": "com.himind.work-log-collector",
+      "name": "工作日志采集器",
+      "slug": "work-log-collector",
+      "concept": "chat bubbles into folder",
+      "file": "icons/plugin-work-log-collector.png",
+      "source_box": [
+        881,
+        341,
+        1173,
+        603
+      ],
+      "applied_manifest": "plugins/work-log-collector/plugin.json",
+      "applied_asset": "plugins/work-log-collector/assets/icon.png"
+    },
+    {
+      "index": 9,
+      "row": 2,
+      "column": 4,
+      "kind": "plugin",
+      "id": "com.himind.media-ai",
+      "name": "媒体 AI 工具",
+      "slug": "media-ai",
+      "concept": "neural spark with film frame",
+      "file": "icons/plugin-media-ai.png",
+      "source_box": [
+        1279,
+        341,
+        1571,
+        603
+      ],
+      "applied_manifest": "plugins/media-ai/plugin.json",
+      "applied_asset": "plugins/media-ai/assets/icon.png"
+    },
+    {
+      "index": 10,
+      "row": 2,
+      "column": 5,
+      "kind": "plugin",
+      "id": "com.himind.ui-ux-design-tools",
+      "name": "界面设计工具",
+      "slug": "ui-ux-design-tools",
+      "concept": "pen tool and swatches",
+      "file": "icons/plugin-ui-ux-design-tools.png",
+      "source_box": [
+        1678,
+        340,
+        1969,
+        603
+      ],
+      "applied_manifest": "plugins/ui-ux-design-tools/plugin.json",
+      "applied_asset": "plugins/ui-ux-design-tools/assets/icon.png"
+    },
+    {
+      "index": 11,
+      "row": 3,
+      "column": 1,
+      "kind": "skill",
+      "id": "com.himind.skill.develop-himind-plugins",
+      "name": "插件开发助手",
+      "slug": "develop-himind-plugins",
+      "concept": "puzzle piece and wrench",
+      "file": "icons/skill-develop-himind-plugins.png",
+      "source_box": [
+        83,
+        627,
+        374,
+        886
+      ],
+      "applied_manifest": "skills/develop-himind-plugins/skill.json",
+      "applied_asset": "skills/develop-himind-plugins/assets/icon.png"
+    },
+    {
+      "index": 12,
+      "row": 3,
+      "column": 2,
+      "kind": "skill",
+      "id": "com.himind.skill.develop-himind-skills",
+      "name": "技能开发助手",
+      "slug": "develop-himind-skills",
+      "concept": "open manual with sparkle",
+      "file": "icons/skill-develop-himind-skills.png",
+      "source_box": [
+        481,
+        627,
+        774,
+        886
+      ],
+      "applied_manifest": "skills/develop-himind-skills/skill.json",
+      "applied_asset": "skills/develop-himind-skills/assets/icon.png"
+    },
+    {
+      "index": 13,
+      "row": 3,
+      "column": 3,
+      "kind": "skill",
+      "id": "com.himind.skill.develop-himind-workflows",
+      "name": "工作流开发助手",
+      "slug": "develop-himind-workflows",
+      "concept": "branching flow diagram",
+      "file": "icons/skill-develop-himind-workflows.png",
+      "source_box": [
+        881,
+        627,
+        1173,
+        886
+      ],
+      "applied_manifest": "skills/develop-himind-workflows/skill.json",
+      "applied_asset": "skills/develop-himind-workflows/assets/icon.png"
+    },
+    {
+      "index": 14,
+      "row": 3,
+      "column": 4,
+      "kind": "skill",
+      "id": "com.himind.skill.develop-himind-conventions",
+      "name": "扩展开发规范",
+      "slug": "develop-himind-conventions",
+      "concept": "ruler and checklist",
+      "file": "icons/skill-develop-himind-conventions.png",
+      "source_box": [
+        1279,
+        627,
+        1571,
+        886
+      ],
+      "applied_manifest": "skills/develop-himind-conventions/skill.json",
+      "applied_asset": "skills/develop-himind-conventions/assets/icon.png"
+    },
+    {
+      "index": 15,
+      "row": 3,
+      "column": 5,
+      "kind": "skill",
+      "id": "com.himind.skill.dev-workflow-orchestrator",
+      "name": "工程工作流助手",
+      "slug": "dev-workflow-orchestrator",
+      "concept": "conductor baton and nodes",
+      "file": "icons/skill-dev-workflow-orchestrator.png",
+      "source_box": [
+        1678,
+        627,
+        1968,
+        886
+      ],
+      "applied_manifest": "skills/dev-workflow-orchestrator/skill.json",
+      "applied_asset": "skills/dev-workflow-orchestrator/assets/icon.png"
+    },
+    {
+      "index": 16,
+      "row": 4,
+      "column": 1,
+      "kind": "skill",
+      "id": "com.himind.skill.git-svn-commit-summary",
+      "name": "Git/SVN 提交摘要",
+      "slug": "git-svn-commit-summary",
+      "concept": "branch merge into document",
+      "file": "icons/skill-git-svn-commit-summary.png",
+      "source_box": [
+        82,
+        910,
+        374,
+        1168
+      ],
+      "applied_manifest": "skills/git-svn-commit-summary/skill.json",
+      "applied_asset": "skills/git-svn-commit-summary/assets/icon.png"
+    },
+    {
+      "index": 17,
+      "row": 4,
+      "column": 2,
+      "kind": "skill",
+      "id": "com.himind.skill.mcp-experience-feedback",
+      "name": "MCP 体验反馈",
+      "slug": "mcp-experience-feedback",
+      "concept": "speech bubble with loop arrows",
+      "file": "icons/skill-mcp-experience-feedback.png",
+      "source_box": [
+        481,
+        910,
+        774,
+        1168
+      ],
+      "applied_manifest": "skills/mcp-experience-feedback/skill.json",
+      "applied_asset": "skills/mcp-experience-feedback/assets/icon.png"
+    },
+    {
+      "index": 18,
+      "row": 4,
+      "column": 3,
+      "kind": "skill",
+      "id": "com.himind.skill.software-distribution",
+      "name": "软件分发助手",
+      "slug": "software-distribution",
+      "concept": "package with release arrow",
+      "file": "icons/skill-software-distribution.png",
+      "source_box": [
+        881,
+        910,
+        1173,
+        1168
+      ],
+      "applied_manifest": "skills/software-distribution/skill.json",
+      "applied_asset": "skills/software-distribution/assets/icon.png"
+    },
+    {
+      "index": 19,
+      "row": 4,
+      "column": 4,
+      "kind": "skill",
+      "id": "com.himind.skill.software-ui-spec",
+      "name": "软件界面规范",
+      "slug": "software-ui-spec",
+      "concept": "grid ruler and check",
+      "file": "icons/skill-software-ui-spec.png",
+      "source_box": [
+        1279,
+        910,
+        1571,
+        1168
+      ],
+      "applied_manifest": "skills/software-ui-spec/skill.json",
+      "applied_asset": "skills/software-ui-spec/assets/icon.png"
+    },
+    {
+      "index": 20,
+      "row": 4,
+      "column": 5,
+      "kind": "skill",
+      "id": "com.himind.media-downloader-assistant",
+      "name": "媒体下载助手",
+      "slug": "media-downloader-assistant",
+      "concept": "assistant spark and download",
+      "file": "icons/skill-media-downloader-assistant.png",
+      "source_box": [
+        1678,
+        910,
+        1969,
+        1168
+      ],
+      "applied_manifest": "skills/media-downloader-assistant/skill.json",
+      "applied_asset": "skills/media-downloader-assistant/assets/icon.png"
+    },
+    {
+      "index": 21,
+      "row": 5,
+      "column": 1,
+      "kind": "skill",
+      "id": "com.himind.skill.work-log",
+      "name": "工作日志助手",
+      "slug": "work-log-skill",
+      "concept": "clock over notebook",
+      "file": "icons/skill-work-log-skill.png",
+      "source_box": [
+        83,
+        1192,
+        374,
+        1449
+      ],
+      "applied_manifest": "skills/work-log/skill.json",
+      "applied_asset": "skills/work-log/assets/icon.png"
+    },
+    {
+      "index": 22,
+      "row": 5,
+      "column": 2,
+      "kind": "skill",
+      "id": "com.mrbaoquan.skill.unihper-unity-development",
+      "name": "UNIHper 开发助手",
+      "slug": "unihper-unity-development",
+      "concept": "game cube controller and code",
+      "file": "icons/skill-unihper-unity-development.png",
+      "source_box": [
+        481,
+        1192,
+        774,
+        1448
+      ],
+      "applied_manifest": "skills/unihper-unity-development/skill.json",
+      "applied_asset": "skills/unihper-unity-development/assets/icon.png"
+    },
+    {
+      "index": 23,
+      "row": 5,
+      "column": 3,
+      "kind": "skill",
+      "id": "com.himind.skill.video-motion-authoring",
+      "name": "视频动作编排助手",
+      "slug": "video-motion-authoring",
+      "concept": "camera and motion path",
+      "file": "icons/skill-video-motion-authoring.png",
+      "source_box": [
+        881,
+        1192,
+        1173,
+        1448
+      ],
+      "applied_manifest": "skills/video-motion-authoring/skill.json",
+      "applied_asset": "skills/video-motion-authoring/assets/icon.png"
+    },
+    {
+      "index": 24,
+      "row": 5,
+      "column": 4,
+      "kind": "skill",
+      "id": "com.himind.skill.long-task-driver",
+      "name": "长任务推进助手",
+      "slug": "long-task-driver",
+      "concept": "relay baton on track",
+      "file": "icons/skill-long-task-driver.png",
+      "source_box": [
+        1279,
+        1193,
+        1571,
+        1448
+      ],
+      "applied_manifest": "skills/long-task-driver/skill.json",
+      "applied_asset": "skills/long-task-driver/assets/icon.png"
+    },
+    {
+      "index": 25,
+      "row": 5,
+      "column": 5,
+      "kind": "skill",
+      "id": "com.mrbaoquan.skill.wechat-miniprogram-assistant",
+      "name": "微信小程序开发助手",
+      "slug": "wechat-miniprogram-assistant",
+      "concept": "speech bubble and app window",
+      "file": "icons/skill-wechat-miniprogram-assistant.png",
+      "source_box": [
+        1678,
+        1192,
+        1969,
+        1448
+      ],
+      "applied_manifest": "skills/wechat-miniprogram-assistant/skill.json",
+      "applied_asset": "skills/wechat-miniprogram-assistant/assets/icon.png"
+    },
+    {
+      "index": 26,
+      "row": 6,
+      "column": 1,
+      "kind": "skill",
+      "id": "com.himind.skill.ui-ux-design-assistant",
+      "name": "界面设计助手",
+      "slug": "ui-ux-design-assistant",
+      "concept": "palette cursor and sparkle",
+      "file": "icons/skill-ui-ux-design-assistant.png",
+      "source_box": [
+        82,
+        1472,
+        374,
+        1729
+      ],
+      "applied_manifest": "skills/ui-ux-design-assistant/skill.json",
+      "applied_asset": "skills/ui-ux-design-assistant/assets/icon.png"
+    },
+    {
+      "index": 27,
+      "row": 6,
+      "column": 2,
+      "kind": "workflow",
+      "id": "com.himind.workflow.software-release",
+      "name": "软件发布",
+      "slug": "software-release-workflow",
+      "concept": "pipeline arrow and rocket",
+      "file": "icons/workflow-software-release-workflow.png",
+      "source_box": [
+        482,
+        1472,
+        774,
+        1728
+      ],
+      "applied_manifest": "workflows/software-release/workflow.json",
+      "applied_asset": "workflows/software-release/assets/icon.png"
+    },
+    {
+      "index": 28,
+      "row": 6,
+      "column": 3,
+      "kind": "workflow",
+      "id": "com.himind.workflow.tech-radar",
+      "name": "科技雷达工作流",
+      "slug": "tech-radar-workflow",
+      "concept": "radar and report page",
+      "file": "icons/workflow-tech-radar-workflow.png",
+      "source_box": [
+        881,
+        1472,
+        1173,
+        1728
+      ],
+      "applied_manifest": "workflows/tech-radar/workflow.json",
+      "applied_asset": "workflows/tech-radar/assets/icon.png"
+    },
+    {
+      "index": 29,
+      "row": 6,
+      "column": 4,
+      "kind": "workflow",
+      "id": "com.himind.workflow.daily-work-log",
+      "name": "每日工作日志",
+      "slug": "daily-work-log",
+      "concept": "sunrise over journal",
+      "file": "icons/workflow-daily-work-log.png",
+      "source_box": [
+        1279,
+        1472,
+        1571,
+        1729
+      ],
+      "applied_manifest": "workflows/daily-work-log/workflow.json",
+      "applied_asset": "workflows/daily-work-log/assets/icon.png"
+    },
+    {
+      "index": 30,
+      "row": 6,
+      "column": 5,
+      "kind": "workflow",
+      "id": "com.himind.workflow.wechat-miniprogram-ci-delivery",
+      "name": "微信小程序 CI 交付",
+      "slug": "wechat-miniprogram-ci-delivery",
+      "concept": "speech bubble gear upload",
+      "file": "icons/workflow-wechat-miniprogram-ci-delivery.png",
+      "source_box": [
+        1678,
+        1472,
+        1969,
+        1728
+      ],
+      "applied_manifest": "workflows/wechat-miniprogram-ci-delivery/workflow.json",
+      "applied_asset": "workflows/wechat-miniprogram-ci-delivery/assets/icon.png"
+    },
+    {
+      "index": 31,
+      "row": 7,
+      "column": 1,
+      "kind": "expert",
+      "id": "com.himind.expert.software-engineer",
+      "name": "软件工程师",
+      "slug": "software-engineer",
+      "concept": "code brackets and wrench",
+      "file": "icons/expert-software-engineer.png",
+      "source_box": [
+        82,
+        1753,
+        373,
+        2008
+      ],
+      "applied_manifest": "experts/software-engineer/expert.json",
+      "applied_asset": "experts/software-engineer/assets/icon.png"
+    },
+    {
+      "index": 32,
+      "row": 7,
+      "column": 2,
+      "kind": "expert",
+      "id": "com.himind.expert.project-architect",
+      "name": "项目架构师",
+      "slug": "project-architect",
+      "concept": "blueprint and compass",
+      "file": "icons/expert-project-architect.png",
+      "source_box": [
+        482,
+        1752,
+        774,
+        2008
+      ],
+      "applied_manifest": "experts/project-architect/expert.json",
+      "applied_asset": "experts/project-architect/assets/icon.png"
+    },
+    {
+      "index": 33,
+      "row": 7,
+      "column": 3,
+      "kind": "expert",
+      "id": "com.himind.expert.senior-system-architect",
+      "name": "高级系统架构师",
+      "slug": "senior-system-architect",
+      "concept": "layered system blocks network",
+      "file": "icons/expert-senior-system-architect.png",
+      "source_box": [
+        881,
+        1752,
+        1173,
+        2008
+      ],
+      "applied_manifest": "experts/senior-system-architect/expert.json",
+      "applied_asset": "experts/senior-system-architect/assets/icon.png"
+    },
+    {
+      "index": 34,
+      "row": 7,
+      "column": 4,
+      "kind": "expert",
+      "id": "com.himind.expert.senior-ui-designer",
+      "name": "高级 UI 设计师",
+      "slug": "senior-ui-designer",
+      "concept": "design compass and screen",
+      "file": "icons/expert-senior-ui-designer.png",
+      "source_box": [
+        1279,
+        1753,
+        1571,
+        2008
+      ],
+      "applied_manifest": "experts/senior-ui-designer/expert.json",
+      "applied_asset": "experts/senior-ui-designer/assets/icon.png"
+    },
+    {
+      "index": 35,
+      "row": 7,
+      "column": 5,
+      "kind": "expert",
+      "id": "com.himind.expert.senior-test-engineer",
+      "name": "高级测试工程师",
+      "slug": "senior-test-engineer",
+      "concept": "shield magnifier and check",
+      "file": "icons/expert-senior-test-engineer.png",
+      "source_box": [
+        1678,
+        1753,
+        1969,
+        2008
+      ],
+      "applied_manifest": "experts/senior-test-engineer/expert.json",
+      "applied_asset": "experts/senior-test-engineer/assets/icon.png"
+    }
+  ]
+}

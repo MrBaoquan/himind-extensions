@@ -1,5 +1,6 @@
 {
   "id": "com.himind.skill.git-svn-commit-summary",
+  "icon": "assets/icon.png",
   "name": "Git/SVN 提交摘要",
   "author": "马宝全",
   "categories": ["collaboration-delivery"],
@@ -20,6 +21,7 @@
   "contents": [
     "skill.json",
     "SKILL.md",
-    "agents/openai.yaml"
+    "agents/openai.yaml",
+    "assets/icon.png"
   ]
 }

@@ -1,5 +1,6 @@
 {
   "id": "com.himind.skill.develop-himind-conventions",
+  "icon": "assets/icon.png",
   "name": "扩展开发规范",
   "author": "马宝全",
   "categories": ["software-engineering"],
@@ -16,6 +17,7 @@
   "contents": [
     "skill.json",
     "SKILL.md",
-    "agents/openai.yaml"
+    "agents/openai.yaml",
+    "assets/icon.png"
   ]
 }

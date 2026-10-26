@@ -1,6 +1,7 @@
 {
   "schema_version": "expert.v1",
   "id": "com.himind.expert.senior-system-architect",
+  "icon": "assets/icon.png",
   "name": "高级系统架构师",
   "author": "HiMind",
   "categories": ["software-engineering"],

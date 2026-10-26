@@ -1,0 +1,34 @@
+{
+  "applied_at": "2026-10-26T14:36:48.7599987+08:00",
+  "generator_capability": "media.image.generate",
+  "provider": "ark.cn-beijing.volces.com",
+  "service_id": "ark-agent-plan",
+  "model": "doubao-seedream-5.0-pro",
+  "manifest_count": 35,
+  "manifest_by_kind": {
+    "expert": 5,
+    "skill": 16,
+    "workflow": 4,
+    "plugin": 10
+  },
+  "skill_contents_with_icon": 16,
+  "author_icons_loaded_in_market": 35,
+  "horizontal_overflow": false,
+  "views": [
+    "980x720",
+    "760x520",
+    "320x720"
+  ],
+  "screenshots": [
+    "evidence/market-author-icons-980x720.png",
+    "evidence/market-author-icons-760x520.png",
+    "evidence/market-author-icons-320x720.png"
+  ],
+  "agent": {
+    "executable": "C:\\Users\\mrma6\\Documents\\HiMindExtensions\\HiMind-Agent\\target\\release\\himind-agent.exe",
+    "profile": "development",
+    "port": 18082,
+    "pid": 29312,
+    "capabilities": 498
+  }
+}

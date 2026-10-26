@@ -1,5 +1,6 @@
 {
   "id": "com.himind.skill.work-log",
+  "icon": "assets/icon.png",
   "name": "工作日志助手",
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
@@ -38,5 +39,10 @@
     {"plugin_id": "com.himind.work-log", "required": true, "min_version": "0.15.0"}
   ],
   "risk_summary": "read_only_by_default; writing_logs_requires_user_confirmation",
-  "contents": ["skill.json", "SKILL.md", "agents/openai.yaml"]
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml",
+    "assets/icon.png"
+  ]
 }

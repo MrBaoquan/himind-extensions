@@ -1,5 +1,6 @@
 {
   "id": "com.mrbaoquan.skill.wechat-miniprogram-assistant",
+  "icon": "assets/icon.png",
   "name": "微信小程序开发助手",
   "author": "马宝全",
   "categories": [
@@ -52,6 +53,7 @@
     "references/async-tasks.md",
     "references/approval-policy.md",
     "references/error-codes.md",
-    "references/project-config-fields.md"
+    "references/project-config-fields.md",
+    "assets/icon.png"
   ]
 }

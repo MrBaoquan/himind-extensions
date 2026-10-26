@@ -1,5 +1,6 @@
 {
   "id": "com.himind.wechat-miniprogram-tools",
+  "icon": "assets/icon.png",
   "name": "微信小程序开发工具",
   "author": "马宝全",
   "categories": [

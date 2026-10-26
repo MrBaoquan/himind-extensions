@@ -1,6 +1,7 @@
 {
   "schema_version": "expert.v1",
   "id": "com.himind.expert.project-architect",
+  "icon": "assets/icon.png",
   "name": "项目架构师",
   "author": "HiMind",
   "categories": ["software-engineering"],

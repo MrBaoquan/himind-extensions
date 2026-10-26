@@ -1,5 +1,6 @@
 {
   "id": "com.himind.iostudio",
+  "icon": "assets/icon.png",
   "name": "IOStudio 工具",
   "author": "马宝全",
   "categories": [

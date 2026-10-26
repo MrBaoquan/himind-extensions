@@ -1,0 +1,81 @@
+{
+  "width": 320,
+  "height": 720,
+  "scrollWidth": 320,
+  "bodyScrollWidth": 320
+}
+true
+{
+  "viewport": {
+    "width": 320,
+    "height": 720,
+    "scrollWidth": 320
+  },
+  "workspace": {
+    "x": 82,
+    "y": 199,
+    "width": 205,
+    "height": 39280,
+    "right": 287
+  },
+  "browser": {
+    "x": 83,
+    "y": 247,
+    "width": 203,
+    "height": 39231,
+    "right": 286
+  },
+  "result": {
+    "x": 83,
+    "y": 374,
+    "width": 203,
+    "height": 30,
+    "right": 286
+  },
+  "resultChildren": [
+    {
+      "x": 93,
+      "y": 374,
+      "width": 55,
+      "height": 17,
+      "right": 148
+    },
+    {
+      "x": 93,
+      "y": 395,
+      "width": 183,
+      "height": 26,
+      "right": 276
+    }
+  ],
+  "list": {
+    "x": 83,
+    "y": 404,
+    "width": 203,
+    "height": 39074,
+    "right": 286
+  },
+  "item": {
+    "x": 88,
+    "y": 404,
+    "width": 193,
+    "height": 123,
+    "right": 281
+  },
+  "frame": {
+    "x": 97,
+    "y": 427,
+    "width": 44,
+    "height": 44,
+    "right": 141
+  },
+  "badge": {
+    "x": 126,
+    "y": 423,
+    "width": 20,
+    "height": 20,
+    "right": 146
+  },
+  "itemScrollWidth": 191,
+  "browserScrollWidth": 203
+}

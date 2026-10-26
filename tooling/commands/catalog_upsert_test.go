@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/MrBaoquan/himind-extensions/tooling/distribution"
@@ -60,6 +61,10 @@ func newFixture(t *testing.T, kind, id, version, channel string) fixture {
 		Artifact: distribution.ReleaseArtifact{
 			Name: artifactName, SizeBytes: int64(len(payload)), SHA256: hex.EncodeToString(digest[:]),
 		},
+		Icon: &distribution.ReleaseIcon{
+			FileName: id + "-" + version + "-icon.png", SizeBytes: 12,
+			SHA256: strings.Repeat("a", 64), ContentType: "image/png",
+		},
 		Signature: &distribution.ReleaseSignature{
 			FileName: artifactName, FileSize: int64(len(payload)), SHA256: hex.EncodeToString(digest[:]),
 			Signature: "c2ln", SignatureKeyID: "key-1", SignatureAlgorithm: "rsa-pss-sha256",
@@ -100,6 +105,10 @@ func TestUpsertWritesCanonicalEntry(t *testing.T) {
 	}
 	if entry["source_tree"] != "tree-sha" || entry["signature_key_id"] != "key-1" {
 		t.Fatalf("entry = %#v", entry)
+	}
+	icon, ok := entry["icon"].(map[string]interface{})
+	if !ok || icon["source"] != "author" || icon["sha256"] != strings.Repeat("a", 64) {
+		t.Fatalf("icon = %#v", entry["icon"])
 	}
 	if value.Generation == "old" || value.Generation == "" {
 		t.Fatalf("generation = %#v", value.Generation)

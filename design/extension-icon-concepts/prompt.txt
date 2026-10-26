@@ -1,0 +1,45 @@
+Create one polished sprite sheet containing exactly 35 distinct extension icons arranged in a precise 5-column by 7-row grid, all tiles the same square size, tightly aligned, no labels and no text.
+
+Overall art direction: premium desktop AI product icon system for "HiMind Agent"; modern minimal 3D vector-like symbols, confident silhouettes, subtle glass and soft gradient lighting, consistent visual weight, consistent corner radius, consistent padding. Each icon sits on a dark graphite/navy rounded-square tile. Use a restrained but vivid palette across the set: electric blue, cyan, violet, mint, amber, coral, and warm white accents. Strong readability at 28–64 px. Clean background between tiles, no overlapping, no drop shadows outside tiles, no mockup frame, no watermark.
+
+Theme vocabulary across the 35 icons, one per tile:
+1 tech radar scanning concentric rings with repository nodes
+2 WeChat mini-program development: two friendly speech bubbles combined with code brackets, no literal logo
+3 media library: stacked picture cards with play triangle
+4 media downloader: down arrow integrated with a play frame
+5 media toolkit: film strip with adjustment sliders
+6 IO device studio: hardware board with ports and waveform
+7 work log: notebook page with calendar check
+8 work-log collector: chat bubbles flowing into a folder/log
+9 media AI: neural spark combined with film frame
+10 UI/UX design tools: pen tool with color swatches
+
+11 plugin development: puzzle piece with wrench
+12 skill development: open manual with sparkle
+13 workflow development: branching flow diagram
+14 extension conventions: ruler with checklist
+15 workflow orchestrator: conductor baton among connected nodes
+16 Git/SVN commit summary: branch merge into a document
+17 MCP experience feedback: speech bubble with loop arrows
+18 software distribution: package box with upward release arrow
+19 software UI spec: grid with ruler and check
+20 media downloader assistant: assistant spark with download arrow
+
+21 work-log skill: clock over notebook
+22 Unity/UNIHper development: game cube with controller and code accent
+23 video motion authoring: camera with motion path
+24 long task driver: relay baton along a continuous track
+25 WeChat assistant: speech bubble with miniature app window
+26 UI/UX design assistant: palette with cursor and sparkle
+27 software release workflow: pipeline arrow with rocket
+28 tech radar workflow: radar with report page
+29 daily work log workflow: sunrise over journal page
+30 WeChat CI delivery: speech bubble with gear and upload arrow
+
+31 software engineer: code brackets with wrench
+32 project architect: blueprint with compass
+33 senior system architect: layered system blocks connected by network lines
+34 senior UI designer: design compass in front of a screen
+35 senior test engineer: shield with magnifier and check
+
+Strict constraints: exactly 35 icons, exactly 5 columns and 7 rows, every cell filled, uniform grid geometry, no words, no letters, no numbers, no logos, no watermarks. Prioritize a coherent family and crystal-clear silhouettes over decorative detail.

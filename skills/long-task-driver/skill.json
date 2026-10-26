@@ -1,7 +1,8 @@
 {
   "id": "com.himind.skill.long-task-driver",
+  "icon": "assets/icon.png",
   "name": "长任务推进助手",
-  "author": "超级管理员",
+  "author": "马宝全",
   "categories": [
     "software-engineering",
     "collaboration-delivery"
@@ -27,6 +28,7 @@
     "agents/openai.yaml",
     "references/protocol.md",
     "references/templates.md",
-    "references/clients.md"
+    "references/clients.md",
+    "assets/icon.png"
   ]
 }

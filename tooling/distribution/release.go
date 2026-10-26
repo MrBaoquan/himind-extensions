@@ -22,6 +22,15 @@ type ReleaseArtifact struct {
 	SHA256    string `json:"sha256"`
 }
 
+// ReleaseIcon 是扩展品牌图标的可选 sidecar。图标与主制品在同一次 Release
+// 中发布，市场索引只记录受控下载地址与摘要，客户端不得信任任意远端图片 URL。
+type ReleaseIcon struct {
+	FileName    string `json:"file_name"`
+	SizeBytes   int64  `json:"size_bytes"`
+	SHA256      string `json:"sha256"`
+	ContentType string `json:"content_type"`
+}
+
 // ReleaseSignature 是制品分离签名。清单里有该字段就代表这次发布是签名的，
 // 消费侧必须验签通过；字段缺失表示未签名发布，是否接受由分发策略决定。
 type ReleaseSignature struct {
@@ -49,6 +58,7 @@ type ReleaseManifest struct {
 	SourceCommit    string              `json:"source_commit"`
 	MinAgentVersion string              `json:"min_agent_version"`
 	Artifact        ReleaseArtifact     `json:"artifact"`
+	Icon            *ReleaseIcon        `json:"icon,omitempty"`
 	Dependencies    []ReleaseDependency `json:"dependencies,omitempty"`
 	Signature       *ReleaseSignature   `json:"signature,omitempty"`
 }
@@ -114,6 +124,11 @@ func (m ReleaseManifest) Validate() error {
 	if err := ValidateSHA256("artifact sha256", m.Artifact.SHA256); err != nil {
 		return err
 	}
+	if m.Icon != nil {
+		if err := m.Icon.Validate(); err != nil {
+			return err
+		}
+	}
 	if m.Signature != nil {
 		if m.Signature.Signature == "" || m.Signature.SignatureKeyID == "" {
 			return errors.New("发布清单声明了签名但内容不完整")
@@ -131,6 +146,27 @@ func (m ReleaseManifest) Validate() error {
 		}
 	}
 	return nil
+}
+
+// Validate 校验图标 sidecar 的类型、大小与摘要。不允许路径分隔符，因为该字段
+// 是 Release 资产名而不是包内相对路径。
+func (i ReleaseIcon) Validate() error {
+	name := strings.TrimSpace(i.FileName)
+	if name == "" || filepath.Base(name) != name {
+		return fmt.Errorf("图标文件名无效: %q", i.FileName)
+	}
+	extension := strings.ToLower(filepath.Ext(name))
+	if extension != ".png" && extension != ".webp" {
+		return fmt.Errorf("图标只支持 PNG 或 WebP: %s", name)
+	}
+	expectedType := map[string]string{".png": "image/png", ".webp": "image/webp"}[extension]
+	if i.ContentType != expectedType {
+		return fmt.Errorf("图标 MIME 与扩展名不一致: %s / %s", i.ContentType, name)
+	}
+	if i.SizeBytes <= 0 || i.SizeBytes > 256*1024 {
+		return fmt.Errorf("图标大小必须在 1 到 262144 字节之间: %d", i.SizeBytes)
+	}
+	return ValidateSHA256("icon sha256", i.SHA256)
 }
 
 // Validate 校验一条依赖 pin 自洽：类型受支持、ID 非空、必需依赖必须可定位。
@@ -163,6 +199,14 @@ func (d ReleaseDependency) Validate() error {
 // DownloadURLOf 返回该版本制品的下载地址。
 func (m ReleaseManifest) DownloadURLOf(repository string) string {
 	return DownloadURL(repository, m.Tag, m.Artifact.Name)
+}
+
+// IconURLOf 返回图标 sidecar 在该次 Release 上的下载地址。
+func (m ReleaseManifest) IconURLOf(repository string) string {
+	if m.Icon == nil {
+		return ""
+	}
+	return DownloadURL(repository, m.Tag, m.Icon.FileName)
 }
 
 // DependencyList 返回依赖列表；缺省是空数组，保证清单自描述。

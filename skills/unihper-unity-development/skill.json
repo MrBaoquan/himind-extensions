@@ -1,5 +1,6 @@
 {
     "id":  "com.mrbaoquan.skill.unihper-unity-development",
+    "icon": "assets/icon.png",
     "name":  "UNIHper 开发助手",
     "author":  "马宝全",
     "categories":  [
@@ -23,9 +24,10 @@
                             ],
     "risk_summary":  "可能按用户要求修改目标 Unity 工程内的 C#、JSON、UXML、USS、asmdef 与资源配置；禁止访问项目外路径、凭据和生成缓存，涉及迁移、删除、发布或提交时必须先确认范围。",
     "contents":  [
-                     "SKILL.md",
-                     "agents/openai.yaml",
-                     "skill.json"
-                 ],
+      "SKILL.md",
+      "agents/openai.yaml",
+      "skill.json",
+      "assets/icon.png"
+    ],
     "release_notes":  "1.0.1：名称与说明收敛到约定长度。"
 }

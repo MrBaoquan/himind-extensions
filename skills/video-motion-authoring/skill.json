@@ -1,5 +1,6 @@
 {
   "id": "com.himind.skill.video-motion-authoring",
+  "icon": "assets/icon.png",
   "name": "视频动作编排助手",
   "author": "马宝全",
   "categories": [
@@ -145,6 +146,7 @@
     "SKILL.md",
     "agents/openai.yaml",
     "references/action-vocabulary.json",
-    "references/show-spec.md"
+    "references/show-spec.md",
+    "assets/icon.png"
   ]
 }

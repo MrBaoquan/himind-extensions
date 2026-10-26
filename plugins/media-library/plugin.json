@@ -1,5 +1,6 @@
 {
   "id": "com.himind.media-library",
+  "icon": "assets/icon.png",
   "name": "媒体资源库",
   "author": "马宝全",
   "categories": [

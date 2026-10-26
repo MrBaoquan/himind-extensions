@@ -139,9 +139,18 @@ go run ./tools/cmd/himind-agent-workspace-sync -commit (git rev-parse HEAD)
 ]
 ```
 
+### 扩展品牌图标
+
+插件、技能和 Workflow 清单都可以在顶层声明可选 `icon`，值必须是包内相对
+路径，例如 `"icon": "assets/icon.png"`。v1 只接受 PNG/WebP，文件不超过
+256 KB、尺寸 64–1024px。发布时会多上传一个
+`<id>-<version>-icon.<png|webp>` sidecar；发布清单记录其大小与 SHA-256，
+Catalog 再生成同源下载地址。没有图标或图片损坏时，Agent 回退到扩展类型图标；
+用户仍可在市场详情用本机图片覆盖，恢复默认不会修改发布包。
+
 ### 发布命令
 
-每个扩展按自己的语义版本单独发布，不跟随 Agent 版本。仓库维护者在本机运行 `tools/release/publish-extension.ps1`，传入 `plugin`、`skill` 或 `workflow` 及仓库内路径。脚本按清单声明执行，完成测试、打包、RSA-PSS/SHA-256 签名、Release 创建和公共目录更新，不依赖 GitHub Actions。Workflow 发布还会生成并上传 `extension_lock.v1`，Catalog 同时写入制品和 Lock。
+每个扩展按自己的语义版本单独发布，不跟随 Agent 版本。仓库维护者在本机运行 `tools/release/publish-extension.ps1`，传入 `plugin`、`skill` 或 `workflow` 及仓库内路径。脚本按清单声明执行，完成测试、打包、RSA-PSS/SHA-256 签名、Release 创建和公共目录更新，不依赖 GitHub Actions。Workflow 发布还会生成并上传 `extension_lock.v1`，声明品牌图标时同时上传图标 sidecar，Catalog 写入制品、Lock 与图标事实。
 
 示例：
 

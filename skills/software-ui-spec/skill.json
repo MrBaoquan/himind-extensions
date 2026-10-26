@@ -1,7 +1,8 @@
 {
   "id": "com.himind.skill.software-ui-spec",
+  "icon": "assets/icon.png",
   "name": "软件界面规范",
-  "author": "超级管理员",
+  "author": "马宝全",
   "categories": [
     "visual-design",
     "software-engineering"
@@ -21,6 +22,7 @@
   "contents": [
     "skill.json",
     "SKILL.md",
-    "agents/openai.yaml"
+    "agents/openai.yaml",
+    "assets/icon.png"
   ]
 }

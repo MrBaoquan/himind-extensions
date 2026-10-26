@@ -1,5 +1,6 @@
 {
   "id": "com.himind.skill.dev-workflow-orchestrator",
+  "icon": "assets/icon.png",
   "name": "工程工作流助手",
   "author": "马宝全",
   "categories": ["software-engineering", "collaboration-delivery"],
@@ -28,6 +29,7 @@
   "contents": [
     "skill.json",
     "SKILL.md",
-    "agents/openai.yaml"
+    "agents/openai.yaml",
+    "assets/icon.png"
   ]
 }
