@@ -15,7 +15,7 @@ import (
 	"github.com/MrBaoquan/himind-extensions/sdk/jsonrpc"
 )
 
-const wechatideBridgeVersion = "0.3.9"
+const wechatideBridgeVersion = "0.3.11"
 
 type devtoolsInput struct {
 	WorkspaceRoot      string   `json:"workspace_root"`
@@ -110,7 +110,7 @@ func handleDevtools(request jsonrpc.Request) (any, *jsonrpc.Error) {
 		return nil, rpcError
 	}
 	switch request.Method {
-	case "wechat.miniprogram.devtools.environment.get":
+	case "wechat.miniprogram.devtools.env.get", "wechat.miniprogram.devtools.environment.get":
 		return devtoolsEnvironment(in)
 	case "wechat.miniprogram.devtools.login.start":
 		return devtoolsLoginStart(in)
@@ -118,35 +118,35 @@ func handleDevtools(request jsonrpc.Request) (any, *jsonrpc.Error) {
 		return devtoolsTaskGet(in)
 	case "wechat.miniprogram.devtools.project.list":
 		return devtoolsProjectList(in)
-	case "wechat.miniprogram.devtools.project.import":
+	case "wechat.miniprogram.devtools.project.add", "wechat.miniprogram.devtools.project.import":
 		return devtoolsProjectImport(in)
-	case "wechat.miniprogram.devtools.project.remove":
+	case "wechat.miniprogram.devtools.project.del", "wechat.miniprogram.devtools.project.remove":
 		return devtoolsProjectRemove(in)
-	case "wechat.miniprogram.devtools.window.manage":
+	case "wechat.miniprogram.devtools.window.ctrl", "wechat.miniprogram.devtools.window.manage":
 		return devtoolsWindowManage(in)
-	case "wechat.miniprogram.devtools.compile.inspect":
+	case "wechat.miniprogram.devtools.compile.get", "wechat.miniprogram.devtools.compile.inspect":
 		return devtoolsCompileInspect(in)
 	case "wechat.miniprogram.devtools.compile.run":
 		return devtoolsCompileRun(in)
-	case "wechat.miniprogram.devtools.preview.create":
+	case "wechat.miniprogram.devtools.preview.make", "wechat.miniprogram.devtools.preview.create":
 		return devtoolsPreviewCreate(in)
-	case "wechat.miniprogram.devtools.debug.inspect":
+	case "wechat.miniprogram.devtools.debug.read", "wechat.miniprogram.devtools.debug.inspect":
 		return devtoolsDebugInspect(in)
 	case "wechat.miniprogram.devtools.debug.mutate":
 		return devtoolsDebugMutate(in)
-	case "wechat.miniprogram.devtools.automation.element":
+	case "wechat.miniprogram.devtools.auto.click", "wechat.miniprogram.devtools.automation.element":
 		return devtoolsAutomationElement(in)
-	case "wechat.miniprogram.devtools.automation.page":
+	case "wechat.miniprogram.devtools.auto.page", "wechat.miniprogram.devtools.automation.page":
 		return devtoolsAutomationPage(in)
-	case "wechat.miniprogram.devtools.automation.game":
+	case "wechat.miniprogram.devtools.auto.game", "wechat.miniprogram.devtools.automation.game":
 		return devtoolsAutomationGame(in)
-	case "wechat.miniprogram.devtools.automation.evaluate":
+	case "wechat.miniprogram.devtools.auto.eval", "wechat.miniprogram.devtools.automation.evaluate":
 		return devtoolsAutomationEvaluate(in)
 	case "wechat.miniprogram.cloud.read":
 		return devtoolsCloudRead(in)
 	case "wechat.miniprogram.cloud.write":
 		return devtoolsCloudWrite(in)
-	case "wechat.miniprogram.devtools.installer.check":
+	case "wechat.miniprogram.devtools.install.get", "wechat.miniprogram.devtools.installer.check":
 		return devtoolsInstallerCheck(in)
 	default:
 		return nil, jsonrpc.InvalidParams("unsupported WeChat devtools capability")
@@ -288,7 +288,7 @@ func devtoolsEnvironment(in devtoolsInput) (any, *jsonrpc.Error) {
 	if err != nil {
 		return nil, jsonrpc.InvalidParams(err.Error())
 	}
-	result := devtoolsResult("wechat.miniprogram.devtools.environment.get")
+	result := devtoolsResult("wechat.miniprogram.devtools.env.get")
 	result["workspace_root"] = workspace
 	status, statusErr := runWechatide("check_wechatide_status", []string{"--skill-version", wechatideBridgeVersion}, 20*time.Second)
 	if statusErr != nil {
@@ -404,13 +404,13 @@ func devtoolsProjectImport(in devtoolsInput) (any, *jsonrpc.Error) {
 		if runErr != nil {
 			return nil, jsonrpc.InternalError(runErr.Error())
 		}
-		return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.project.import", "action": action, "result": result}, nil
+		return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.project.add", "action": action, "result": result}, nil
 	case "share":
 		result, runErr := runWechatide("share_minicode", []string{"--project", project}, 120*time.Second)
 		if runErr != nil {
 			return nil, jsonrpc.InternalError(runErr.Error())
 		}
-		return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.project.import", "action": action, "result": result}, nil
+		return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.project.add", "action": action, "result": result}, nil
 	case "import_minicode":
 		if err := validateMiniCodeLink(in.Link); err != nil {
 			return nil, jsonrpc.InvalidParams(err.Error())
@@ -419,7 +419,7 @@ func devtoolsProjectImport(in devtoolsInput) (any, *jsonrpc.Error) {
 		if runErr != nil {
 			return nil, jsonrpc.InternalError(runErr.Error())
 		}
-		return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.project.import", "action": action, "result": result, "requires_review": true, "review_note": "导入后必须先检查项目配置、依赖脚本和可执行代码，再打开项目窗口"}, nil
+		return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.project.add", "action": action, "result": result, "requires_review": true, "review_note": "导入后必须先检查项目配置、依赖脚本和可执行代码，再打开项目窗口"}, nil
 	default:
 		return nil, jsonrpc.InvalidParams("action 必须是 import、share 或 import_minicode")
 	}
@@ -447,7 +447,7 @@ func devtoolsProjectRemove(in devtoolsInput) (any, *jsonrpc.Error) {
 	if runErr != nil {
 		return nil, jsonrpc.InternalError(runErr.Error())
 	}
-	return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.project.remove", "result": result}, nil
+	return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.project.del", "result": result}, nil
 }
 
 func devtoolsWindowManage(in devtoolsInput) (any, *jsonrpc.Error) {
@@ -466,19 +466,19 @@ func devtoolsWindowManage(in devtoolsInput) (any, *jsonrpc.Error) {
 		if runErr != nil {
 			return nil, jsonrpc.InternalError(runErr.Error())
 		}
-		return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.window.manage", "action": action, "result": result}, nil
+		return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.window.ctrl", "action": action, "result": result}, nil
 	case "close":
 		result, runErr := runWechatide("close_project_window", []string{"--project", project}, 60*time.Second)
 		if runErr != nil {
 			return nil, jsonrpc.InternalError(runErr.Error())
 		}
-		return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.window.manage", "action": action, "result": result}, nil
+		return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.window.ctrl", "action": action, "result": result}, nil
 	case "quit":
 		result, runErr := runWechatide("quit", nil, 60*time.Second)
 		if runErr != nil {
 			return nil, jsonrpc.InternalError(runErr.Error())
 		}
-		return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.window.manage", "action": action, "result": result}, nil
+		return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.window.ctrl", "action": action, "result": result}, nil
 	default:
 		return nil, jsonrpc.InvalidParams("action 必须是 open、close 或 quit")
 	}
@@ -512,7 +512,7 @@ func devtoolsCompileInspect(in devtoolsInput) (any, *jsonrpc.Error) {
 	if runErr != nil {
 		return nil, jsonrpc.InternalError(runErr.Error())
 	}
-	return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.compile.inspect", "result": result}, nil
+	return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.compile.get", "result": result}, nil
 }
 
 func devtoolsCompileRun(in devtoolsInput) (any, *jsonrpc.Error) {
@@ -603,7 +603,7 @@ func devtoolsPreviewCreate(in devtoolsInput) (any, *jsonrpc.Error) {
 	if runErr != nil {
 		return nil, jsonrpc.InternalError(runErr.Error())
 	}
-	return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.preview.create", "action": action, "result": result}, nil
+	return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.preview.make", "action": action, "result": result}, nil
 }
 
 func devtoolsDebugInspect(in devtoolsInput) (any, *jsonrpc.Error) {
@@ -659,7 +659,7 @@ func devtoolsDebugInspect(in devtoolsInput) (any, *jsonrpc.Error) {
 	if runErr != nil {
 		return nil, jsonrpc.InternalError(runErr.Error())
 	}
-	return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.debug.inspect", "action": action, "result": result}, nil
+	return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.debug.read", "action": action, "result": result}, nil
 }
 
 func devtoolsDebugMutate(in devtoolsInput) (any, *jsonrpc.Error) {
@@ -765,7 +765,7 @@ func devtoolsAutomationElement(in devtoolsInput) (any, *jsonrpc.Error) {
 	if runErr != nil {
 		return nil, jsonrpc.InternalError(runErr.Error())
 	}
-	return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.automation.element", "action": action, "result": result}, nil
+	return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.auto.click", "action": action, "result": result}, nil
 }
 
 func devtoolsAutomationPage(in devtoolsInput) (any, *jsonrpc.Error) {
@@ -834,7 +834,7 @@ func devtoolsAutomationPage(in devtoolsInput) (any, *jsonrpc.Error) {
 	if runErr != nil {
 		return nil, jsonrpc.InternalError(runErr.Error())
 	}
-	return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.automation.page", "action": action, "result": result}, nil
+	return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.auto.page", "action": action, "result": result}, nil
 }
 
 func devtoolsAutomationGame(in devtoolsInput) (any, *jsonrpc.Error) {
@@ -884,7 +884,7 @@ func devtoolsAutomationGame(in devtoolsInput) (any, *jsonrpc.Error) {
 	if runErr != nil {
 		return nil, jsonrpc.InternalError(runErr.Error())
 	}
-	return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.automation.game", "action": action, "result": result}, nil
+	return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.auto.game", "action": action, "result": result}, nil
 }
 
 func devtoolsAutomationEvaluate(in devtoolsInput) (any, *jsonrpc.Error) {
@@ -902,7 +902,7 @@ func devtoolsAutomationEvaluate(in devtoolsInput) (any, *jsonrpc.Error) {
 		if runErr != nil {
 			return nil, jsonrpc.InternalError(runErr.Error())
 		}
-		return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.automation.evaluate", "action": action, "result": result}, nil
+		return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.auto.eval", "action": action, "result": result}, nil
 	case "generate_script":
 		args := []string{}
 		if in.IncludeFailed {
@@ -915,7 +915,7 @@ func devtoolsAutomationEvaluate(in devtoolsInput) (any, *jsonrpc.Error) {
 		if runErr != nil {
 			return nil, jsonrpc.InternalError(runErr.Error())
 		}
-		return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.automation.evaluate", "action": action, "result": result, "requires_review": true}, nil
+		return map[string]any{"ok": true, "operation": "wechat.miniprogram.devtools.auto.eval", "action": action, "result": result, "requires_review": true}, nil
 	default:
 		return nil, jsonrpc.InvalidParams("action 必须是 evaluate 或 generate_script")
 	}
@@ -1128,7 +1128,7 @@ func devtoolsInstallerCheck(in devtoolsInput) (any, *jsonrpc.Error) {
 	if _, err := ensureWorkspace(in.WorkspaceRoot); err != nil {
 		return nil, jsonrpc.InvalidParams(err.Error())
 	}
-	result := devtoolsResult("wechat.miniprogram.devtools.installer.check")
+	result := devtoolsResult("wechat.miniprogram.devtools.install.get")
 	candidates := []string{}
 	if in.InstallRoot != "" {
 		candidates = append(candidates, filepath.Join(in.InstallRoot, "wechatide.exe"), filepath.Join(in.InstallRoot, "wechatide.cmd"), filepath.Join(in.InstallRoot, "wechatide"))

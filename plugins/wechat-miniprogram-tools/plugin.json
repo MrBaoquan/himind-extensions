@@ -9,8 +9,8 @@
     "collaboration-delivery"
   ],
   "description": "提供微信小程序/小游戏的 CI 交付、开发者工具控制、自动化、调试与云开发能力。",
-  "release_notes": "0.4.0：合并交付与开发者工具控制能力，保留现有 CI 能力，新增 devtools、cloud 与安装检测能力。",
-  "version": "0.4.0",
+  "release_notes": "0.4.2：对齐微信开发者工具内置 skill 0.3.11，环境与上传就绪检查显式校验版本，消除 agent_behind 告警。",
+  "version": "0.4.2",
   "capability_namespace": "wechat.miniprogram",
   "distribution_targets": [
     "workbench",
@@ -751,7 +751,7 @@
       "availability": "local"
     },
     {
-      "id": "wechat.miniprogram.devtools.environment.get",
+      "id": "wechat.miniprogram.devtools.env.get",
       "description": "读取开发者工具登录态、版本关系、CLI 可用性与项目配置状态",
       "risk_level": "read_only",
       "availability": "local",
@@ -850,7 +850,7 @@
       }
     },
     {
-      "id": "wechat.miniprogram.devtools.project.import",
+      "id": "wechat.miniprogram.devtools.project.add",
       "description": "导入项目、分享代码片段或导入代码片段链接",
       "risk_level": "local_write",
       "availability": "local",
@@ -883,7 +883,7 @@
       }
     },
     {
-      "id": "wechat.miniprogram.devtools.project.remove",
+      "id": "wechat.miniprogram.devtools.project.del",
       "description": "从开发者工具项目列表移除项目，不删除磁盘文件",
       "risk_level": "system",
       "availability": "local",
@@ -905,7 +905,7 @@
       }
     },
     {
-      "id": "wechat.miniprogram.devtools.window.manage",
+      "id": "wechat.miniprogram.devtools.window.ctrl",
       "description": "打开、关闭或退出微信开发者工具项目窗口",
       "risk_level": "local_write",
       "availability": "local",
@@ -943,7 +943,7 @@
       }
     },
     {
-      "id": "wechat.miniprogram.devtools.compile.inspect",
+      "id": "wechat.miniprogram.devtools.compile.get",
       "description": "读取 WXML 或 WXSS 单文件编译诊断",
       "risk_level": "read_only",
       "availability": "local",
@@ -1023,7 +1023,7 @@
       }
     },
     {
-      "id": "wechat.miniprogram.devtools.preview.create",
+      "id": "wechat.miniprogram.devtools.preview.make",
       "description": "推送自动预览或生成预览二维码",
       "risk_level": "network",
       "availability": "local",
@@ -1071,7 +1071,7 @@
       }
     },
     {
-      "id": "wechat.miniprogram.devtools.debug.inspect",
+      "id": "wechat.miniprogram.devtools.debug.read",
       "description": "读取运行时、console、network 或模拟器截图",
       "risk_level": "read_only",
       "availability": "local",
@@ -1175,7 +1175,7 @@
       }
     },
     {
-      "id": "wechat.miniprogram.devtools.automation.element",
+      "id": "wechat.miniprogram.devtools.auto.click",
       "description": "读取或操作 selector 命中的小程序元素",
       "risk_level": "local_write",
       "availability": "local",
@@ -1224,7 +1224,7 @@
       }
     },
     {
-      "id": "wechat.miniprogram.devtools.automation.page",
+      "id": "wechat.miniprogram.devtools.auto.page",
       "description": "读写页面数据、导航、滚动或调用页面方法",
       "risk_level": "local_write",
       "availability": "local",
@@ -1280,7 +1280,7 @@
       }
     },
     {
-      "id": "wechat.miniprogram.devtools.automation.game",
+      "id": "wechat.miniprogram.devtools.auto.game",
       "description": "对小游戏画布执行点击、滑动或触摸事件",
       "risk_level": "local_write",
       "availability": "local",
@@ -1351,7 +1351,7 @@
       }
     },
     {
-      "id": "wechat.miniprogram.devtools.automation.evaluate",
+      "id": "wechat.miniprogram.devtools.auto.eval",
       "description": "在运行时执行受控表达式或生成自动化脚本草稿",
       "risk_level": "system",
       "availability": "local",
@@ -1543,7 +1543,7 @@
       }
     },
     {
-      "id": "wechat.miniprogram.devtools.installer.check",
+      "id": "wechat.miniprogram.devtools.install.get",
       "description": "只读检测微信开发者工具 CLI 与安装目录",
       "risk_level": "read_only",
       "availability": "local",

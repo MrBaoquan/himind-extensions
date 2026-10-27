@@ -22,23 +22,23 @@
 
 ## 开发者工具能力
 
-- `wechat.miniprogram.devtools.environment.get`
+- `wechat.miniprogram.devtools.env.get`
 - `wechat.miniprogram.devtools.login.start`
 - `wechat.miniprogram.devtools.task.get`
 - `wechat.miniprogram.devtools.project.list`
-- `wechat.miniprogram.devtools.project.import`
-- `wechat.miniprogram.devtools.project.remove`
-- `wechat.miniprogram.devtools.window.manage`
-- `wechat.miniprogram.devtools.compile.inspect`
+- `wechat.miniprogram.devtools.project.add`
+- `wechat.miniprogram.devtools.project.del`
+- `wechat.miniprogram.devtools.window.ctrl`
+- `wechat.miniprogram.devtools.compile.get`
 - `wechat.miniprogram.devtools.compile.run`
-- `wechat.miniprogram.devtools.preview.create`
-- `wechat.miniprogram.devtools.debug.inspect`
+- `wechat.miniprogram.devtools.preview.make`
+- `wechat.miniprogram.devtools.debug.read`
 - `wechat.miniprogram.devtools.debug.mutate`
-- `wechat.miniprogram.devtools.automation.element`
-- `wechat.miniprogram.devtools.automation.page`
-- `wechat.miniprogram.devtools.automation.game`
-- `wechat.miniprogram.devtools.automation.evaluate`
-- `wechat.miniprogram.devtools.installer.check`
+- `wechat.miniprogram.devtools.auto.click`
+- `wechat.miniprogram.devtools.auto.page`
+- `wechat.miniprogram.devtools.auto.game`
+- `wechat.miniprogram.devtools.auto.eval`
+- `wechat.miniprogram.devtools.install.get`
 
 ## 云开发能力
 
@@ -68,5 +68,5 @@ go run ./tools/cmd/himind-plugin-validate-cli -path plugins/wechat-miniprogram-t
 2. `preview` 和 `upload` 解析工程本地的 `miniprogram-ci`，不把凭据拼入 Shell。
 3. 微信审核没有稳定公开自动提交接口时，`review.submit` 必须要求人工回执或证据，不能猜测成功。
 4. `release.record` 只记录真实版本、Commit SHA 和证据，不伪造平台审核状态。
-5. `devtools.automation.evaluate`、`devtools.debug.mutate`、`cloud.write`、`devtools.project.remove` 属于高风险能力，需审批。
-6. `devtools.project.import` 的 `import_minicode` 导入的是不可信代码，打开窗口前必须先审查。
+5. `devtools.auto.eval`、`devtools.debug.mutate`、`cloud.write`、`devtools.project.del` 属于高风险能力，需审批。
+6. `devtools.project.add` 的 `import_minicode` 导入的是不可信代码，打开窗口前必须先审查。

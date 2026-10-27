@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -282,6 +283,7 @@ if (tool === "upload") {
 		t.Fatal(err)
 	}
 	t.Setenv("WECHAT_DEVTOOLS_HOME", root)
+	useFastWechatidePolling(t)
 
 	output, taskID, err := runWechatideUpload(input{
 		WechatideClient: "Copilot",
@@ -293,6 +295,103 @@ if (tool === "upload") {
 	}
 	if taskID != "task-1" || output["status"] != "uploaded" {
 		t.Fatalf("unexpected upload result: task=%s output=%#v", taskID, output)
+	}
+}
+
+// 历史 pending 任务已失效时，不能把 Task not found 直接变成工作流失败；
+// 应清掉过期任务号，重新发起一次上传并完成新任务。
+func TestWechatideUploadRestartsExpiredPendingTask(t *testing.T) {
+	root := t.TempDir()
+	useFastWechatidePolling(t)
+	helper := `const fs = require("fs");
+const path = require("path");
+function bump(name) {
+  const file = path.join(process.cwd(), name);
+  let count = 0;
+  try { count = Number(fs.readFileSync(file, "utf8")); } catch (error) {}
+  fs.writeFileSync(file, String(count + 1));
+}
+const args = process.argv.slice(2);
+const tool = args[2];
+if (tool === "upload") {
+  bump("upload-count");
+  process.stdout.write(JSON.stringify({ok:true,result:{success:true,taskId:"task-new",taskType:"confirmation_upload",status:"pending",message:"Waiting for user confirmation."}}));
+} else {
+  const taskID = args[args.indexOf("--task-id") + 1];
+  if (taskID === "task-expired") {
+    process.stdout.write(JSON.stringify({ok:false,errorType:"MCP_TOOL_ERROR",message:"Task not found"}));
+    process.exitCode = 1;
+  } else {
+    process.stdout.write(JSON.stringify({ok:true,result:{success:true,status:"success",message:"uploaded"}}));
+  }
+}
+`
+	writeFakeWechatide(t, root, helper)
+	t.Setenv("WECHAT_DEVTOOLS_HOME", root)
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	savePendingUpload(pendingWechatideUpload{TaskID: "task-expired", ProjectRoot: root, Version: "1.26.1029"})
+
+	output, taskID, err := runWechatideUpload(input{WechatideClient: "Copilot"}, root, "1.26.1029", "acceptance", 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if taskID != "task-new" || output["status"] != "uploaded" {
+		t.Fatalf("过期任务应重发并完成: task=%s output=%#v", taskID, output)
+	}
+	if output["recovered_from_task_id"] != "task-expired" {
+		t.Fatalf("成功结果应记录被恢复的过期任务: %#v", output)
+	}
+	if count := counterValue(t, root, "upload-count"); count != 1 {
+		t.Fatalf("过期任务只应重发一次，upload 调用次数=%d", count)
+	}
+	if _, ok := loadPendingUpload(root); ok {
+		t.Fatal("新任务完成后应清理待确认状态")
+	}
+}
+
+// 刚创建的任务连续两轮都查不到时，不能无限重发或谎报成功；
+// 应保留最后一次任务号并返回“可重新发起”的待确认错误。
+func TestWechatideUploadStopsAfterTwoUnretainedTasks(t *testing.T) {
+	root := t.TempDir()
+	useFastWechatidePolling(t)
+	helper := `const fs = require("fs");
+const path = require("path");
+function bump(name) {
+  const file = path.join(process.cwd(), name);
+  let count = 0;
+  try { count = Number(fs.readFileSync(file, "utf8")); } catch (error) {}
+  count += 1;
+  fs.writeFileSync(file, String(count));
+  return count;
+}
+if (process.argv.slice(2)[2] === "upload") {
+  const count = bump("upload-count");
+  process.stdout.write(JSON.stringify({ok:true,result:{success:true,taskId:"task-"+count,taskType:"confirmation_upload",status:"pending"}}));
+} else {
+  process.stdout.write(JSON.stringify({ok:false,errorType:"MCP_TOOL_ERROR",message:"Task not found"}));
+  process.exitCode = 1;
+}
+`
+	writeFakeWechatide(t, root, helper)
+	t.Setenv("WECHAT_DEVTOOLS_HOME", root)
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+
+	_, taskID, err := runWechatideUpload(input{WechatideClient: "Copilot"}, root, "1.26.1029", "acceptance", 5*time.Second)
+	if err == nil {
+		t.Fatal("连续查不到任务时不得返回成功")
+	}
+	var pending pendingUploadError
+	if !errors.As(err, &pending) {
+		t.Fatalf("应返回可恢复的待确认错误: %T %v", err, err)
+	}
+	if taskID != "task-2" || pending.TaskID != "task-2" {
+		t.Fatalf("应保留最后一次任务号: task=%s pending=%s", taskID, pending.TaskID)
+	}
+	if count := counterValue(t, root, "upload-count"); count != 2 {
+		t.Fatalf("最多只能重新发起一次，upload 调用次数=%d", count)
+	}
+	if _, ok := loadPendingUpload(root); ok {
+		t.Fatal("连续失效的任务号不应继续留作 pending，否则下一轮会再次卡在 Task not found")
 	}
 }
 
@@ -499,6 +598,19 @@ func counterValue(t *testing.T, root, name string) int {
 		t.Fatalf("计数器 %s 内容非法: %v", name, err)
 	}
 	return value
+}
+
+// 轮询的 5 秒生产间隔不适合单测；这里只缩短时间，不改变恢复分支本身。
+func useFastWechatidePolling(t *testing.T) {
+	t.Helper()
+	previousInterval := wechatidePollInterval
+	previousGrace := wechatideTaskNotFoundGrace
+	wechatidePollInterval = 10 * time.Millisecond
+	wechatideTaskNotFoundGrace = 200 * time.Millisecond
+	t.Cleanup(func() {
+		wechatidePollInterval = previousInterval
+		wechatideTaskNotFoundGrace = previousGrace
+	})
 }
 
 const countingWechatideHelper = `const fs = require("fs");

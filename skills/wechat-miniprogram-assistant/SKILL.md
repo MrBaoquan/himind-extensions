@@ -17,7 +17,7 @@ description: 面向微信小程序与小游戏开发，指导项目检查、开�
 
 任何需要 `wechat.miniprogram.devtools.*` 的任务，先调用：
 
-1. `wechat.miniprogram.devtools.environment.get`，确认 CLI 可用、版本关系、登录态与项目配置。
+1. `wechat.miniprogram.devtools.env.get`，确认 CLI 可用、版本关系、登录态与项目配置。
 2. 若 `ready=false`，按 `blockers[].code` 处理，不要猜参数或反复重试。
 3. 需要登录时调用 `wechat.miniprogram.devtools.login.start`，再按异步规则处理。
 4. 项目路径必须位于 `workspace_root` 内；不要使用工作区外路径。
@@ -28,14 +28,14 @@ description: 面向微信小程序与小游戏开发，指导项目检查、开�
 
 | 用户意图 | 能力或工作流 |
 |---|---|
-| 检查环境、版本、登录 | `wechat.miniprogram.devtools.environment.get` / `login.start` |
+| 检查环境、版本、登录 | `wechat.miniprogram.devtools.env.get` / `login.start` |
 | 查项目列表、导入、分享、删除 | `wechat.miniprogram.devtools.project.*` |
-| 打开/关闭项目窗口、退出工具 | `wechat.miniprogram.devtools.window.manage` |
-| 编译单文件、刷新、构建 npm | `wechat.miniprogram.devtools.compile.inspect` / `compile.run` |
-| 预览、二维码 | `wechat.miniprogram.devtools.preview.create` |
-| 点击、输入、滚动、页面断言 | `wechat.miniprogram.devtools.automation.element` / `.page` |
-| 小游戏画布触摸 | `wechat.miniprogram.devtools.automation.game` |
-| console / network / 截图 / 运行时 | `wechat.miniprogram.devtools.debug.inspect` |
+| 打开/关闭项目窗口、退出工具 | `wechat.miniprogram.devtools.window.ctrl` |
+| 编译单文件、刷新、构建 npm | `wechat.miniprogram.devtools.compile.get` / `compile.run` |
+| 预览、二维码 | `wechat.miniprogram.devtools.preview.make` |
+| 点击、输入、滚动、页面断言 | `wechat.miniprogram.devtools.auto.click` / `.page` |
+| 小游戏画布触摸 | `wechat.miniprogram.devtools.auto.game` |
+| console / network / 截图 / 运行时 | `wechat.miniprogram.devtools.debug.read` |
 | mock wx API、清缓存、测试号 | `wechat.miniprogram.devtools.debug.mutate` |
 | 云环境、云函数、云数据库、云存储 | `wechat.miniprogram.cloud.read` / `cloud.write` |
 | 上传体验版 | 优先走 `com.himind.workflow.wechat-miniprogram-delivery` |
@@ -58,8 +58,8 @@ description: 面向微信小程序与小游戏开发，指导项目检查、开�
 ## 安全与审批
 
 - 上传体验版、云函数部署、云数据库/存储写入、删除项目、清缓存、mock wx API、执行任意 JS：必须先审批。
-- `wechat.miniprogram.devtools.automation.evaluate` 是代码执行能力，默认不主动使用；只有用户明确要求且审批通过才调用。
-- `wechat.miniprogram.devtools.project.import` 的 `import_minicode` 导入的是不可信代码；先检查项目配置、依赖脚本、可执行代码和网络请求，再打开窗口。
+- `wechat.miniprogram.devtools.auto.eval` 是代码执行能力，默认不主动使用；只有用户明确要求且审批通过才调用。
+- `wechat.miniprogram.devtools.project.add` 的 `import_minicode` 导入的是不可信代码；先检查项目配置、依赖脚本、可执行代码和网络请求，再打开窗口。
 - `project.config.json` 的 `scripts.beforeCompile/beforePreview/beforeUpload` 可能执行本地命令；构建前先向用户展示并要求确认。
 - 不读取、不记录、不复述 token、ticket 或私钥内容；凭据只通过安全存储或凭据句柄使用。
 - 不写微信开发者工具安装目录，不执行任意 shell，不接受工作区外路径。

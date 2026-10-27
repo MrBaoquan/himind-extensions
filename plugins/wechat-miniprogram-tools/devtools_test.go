@@ -24,7 +24,7 @@ func writeProjectConfig(t *testing.T, root, appid string) {
 func TestDevtoolsEnvironmentUsesFakeCLI(t *testing.T) {
 	t.Setenv("HIMIND_WECHATIDE_FAKE", "1")
 	workspace := t.TempDir()
-	result := invoke(t, "wechat.miniprogram.devtools.environment.get", map[string]any{
+	result := invoke(t, "wechat.miniprogram.devtools.env.get", map[string]any{
 		"workspace_root": workspace,
 	}).(map[string]any)
 	if result["ready"] != true {
@@ -35,7 +35,7 @@ func TestDevtoolsEnvironmentUsesFakeCLI(t *testing.T) {
 func TestDevtoolsRejectsProjectOutsideWorkspace(t *testing.T) {
 	workspace := t.TempDir()
 	outside := t.TempDir()
-	request, err := jsonrpc.NewRequest(1, "wechat.miniprogram.devtools.window.manage", map[string]any{
+	request, err := jsonrpc.NewRequest(1, "wechat.miniprogram.devtools.window.ctrl", map[string]any{
 		"workspace_root": workspace,
 		"project_root":   outside,
 		"action":         "open",
@@ -51,7 +51,7 @@ func TestDevtoolsRejectsProjectOutsideWorkspace(t *testing.T) {
 
 func TestProjectImportRejectsNonHTTPSLink(t *testing.T) {
 	workspace := t.TempDir()
-	request, err := jsonrpc.NewRequest(1, "wechat.miniprogram.devtools.project.import", map[string]any{
+	request, err := jsonrpc.NewRequest(1, "wechat.miniprogram.devtools.project.add", map[string]any{
 		"workspace_root": workspace,
 		"project_root":   workspace,
 		"action":         "import_minicode",

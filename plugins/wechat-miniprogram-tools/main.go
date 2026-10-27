@@ -24,13 +24,21 @@ import (
 
 const defaultArtifactDir = ".himind/artifacts/wechat-miniprogram"
 const defaultWechatideHome = `C:\Program Files (x86)\Tencent\微信web开发者工具`
-const wechatidePollInterval = 5 * time.Second
+
+var wechatidePollInterval = 5 * time.Second
+
 const pendingUploadStateFile = "wechatide-pending-upload.json"
 
 // 上传确认是「人要在开发者工具窗口里点一下」的动作：等太久只会让工作流长时间卡在
 // 一个不可能自动完成的等待上。因此只等一个短窗口，超时就如实返回「待确认」，
 // 用户确认后重跑即可续上同一个任务。
 var wechatideConfirmWindow = 2 * time.Minute
+
+// Task not found 可能只是任务号刚下发、IDE 尚未登记成功的瞬时状态；给一个短宽限，
+// 但不能把已经失效的历史任务无限当成“仍在等待确认”。
+var wechatideTaskNotFoundGrace = 30 * time.Second
+
+var errWechatideTaskNotFound = errors.New("wechatide 上传任务不存在")
 
 var scriptPattern = regexp.MustCompile(`^[A-Za-z0-9:_-]+$`)
 var venuePattern = regexp.MustCompile(`^[a-z0-9_-]+$`)
@@ -245,7 +253,7 @@ func ciReadiness(in input) (any, *jsonrpc.Error) {
 			projectRoot,
 			clientName,
 			"check_wechatide_status",
-			nil,
+			[]string{"--skill-version", wechatideBridgeVersion},
 			30*time.Second,
 		)
 		if err != nil {
@@ -1477,6 +1485,7 @@ func runWechatideUpload(
 
 	// 开发者工具里同一时刻只有一个待确认的上传任务：上一轮还没确认完时，
 	// 直接续等旧任务，不再向开发者工具发新的上传请求，免得重复弹确认框。
+	recoveredTaskID := ""
 	if state, ok := loadPendingUpload(projectRoot); ok {
 		payload, output, err := pollWechatideUploadTask(projectRoot, clientName, state.TaskID, confirmWindow)
 		switch {
@@ -1488,51 +1497,82 @@ func runWechatideUpload(
 				"上一轮发起的体验版上传仍在等待你在微信开发者工具内确认（taskId=%s）：这次没有重新发起，也不会再弹新的确认框；在开发者工具窗口点确认后重跑本步骤即可续上同一个任务完成上传",
 				state.TaskID,
 			)}
+		case errors.Is(err, errWechatideTaskNotFound):
+			// 历史任务已经不存在，继续轮询只会让整个工作流以 Task not found 失败。
+			// 清掉失效状态后重新发起一次，是新旧 IDE 会话之间唯一可恢复的路径。
+			clearPendingUpload(projectRoot)
+			recoveredTaskID = state.TaskID
 		default:
-			// 旧任务已经终结（失败 / 取消 / 过期 / 查不到），允许重新发起。
+			// 旧任务已经终结（失败 / 取消 / 过期），允许重新发起。
 			clearPendingUpload(projectRoot)
 		}
 	}
 
-	payload, output, err := runWechatideTool(
-		projectRoot,
-		clientName,
-		"upload",
-		wechatideUploadArgs(projectRoot, version, description),
-		timeoutDuration,
-	)
-	if err != nil {
-		return nil, "", err
-	}
-	status, taskID, message := classifyWechatidePayload(payload)
-	if status == "uploaded" {
-		return wechatideOutput(payload, output, "", "uploaded"), "", nil
-	}
-	if status == "failed" {
-		return nil, "", fmt.Errorf("wechatide 上传失败: %s", message)
-	}
-	if taskID == "" {
-		return nil, "", errors.New("wechatide 上传未返回 taskId")
-	}
+	// Task not found 在刚创建任务时偶尔是瞬时竞态。若等待宽限后仍不存在，
+	// 说明旧任务号已不可恢复；最多重新发起一次，避免无限重复弹确认框。
+	for attempt := 1; attempt <= 2; attempt++ {
+		payload, output, err := runWechatideTool(
+			projectRoot,
+			clientName,
+			"upload",
+			wechatideUploadArgs(projectRoot, version, description),
+			timeoutDuration,
+		)
+		if err != nil {
+			return nil, "", err
+		}
+		status, taskID, message := classifyWechatidePayload(payload)
+		if status == "uploaded" {
+			result := wechatideOutput(payload, output, "", "uploaded")
+			if recoveredTaskID != "" {
+				result["recovered_from_task_id"] = recoveredTaskID
+			}
+			return result, "", nil
+		}
+		if status == "failed" {
+			return nil, "", fmt.Errorf("wechatide 上传失败: %s", message)
+		}
+		if taskID == "" {
+			return nil, "", errors.New("wechatide 上传未返回 taskId")
+		}
 
-	savePendingUpload(pendingWechatideUpload{
-		TaskID:      taskID,
-		ProjectRoot: projectRoot,
-		Version:     version,
-	})
+		savePendingUpload(pendingWechatideUpload{
+			TaskID:      taskID,
+			ProjectRoot: projectRoot,
+			Version:     version,
+		})
 
-	payload, output, err = pollWechatideUploadTask(projectRoot, clientName, taskID, confirmWindow)
-	if err != nil {
+		payload, output, err = pollWechatideUploadTask(projectRoot, clientName, taskID, confirmWindow)
+		if err == nil {
+			clearPendingUpload(projectRoot)
+			result := wechatideOutput(payload, output, taskID, "uploaded")
+			if recoveredTaskID != "" {
+				result["recovered_from_task_id"] = recoveredTaskID
+			}
+			return result, taskID, nil
+		}
 		if errors.Is(err, errWechatideConfirmationPending) {
 			return nil, taskID, pendingUploadError{TaskID: taskID, Err: fmt.Errorf(
 				"上传已在微信开发者工具发起，正在等待你在开发者工具窗口内确认（taskId=%s）：任务号已记录，重跑本步骤会续等同一任务、不会重复发起；在窗口点确认后重跑即可完成。想彻底免确认，可配置 CI 上传私钥（上传通道留空「自动」即可走直传）",
 				taskID,
 			)}
 		}
+		if errors.Is(err, errWechatideTaskNotFound) {
+			clearPendingUpload(projectRoot)
+			recoveredTaskID = firstNonEmpty(recoveredTaskID, taskID)
+			if attempt < 2 {
+				continue
+			}
+			// 第二轮仍查不到时不能谎报成功，也不能再把工作流卡成无法恢复的硬失败：
+			// 保留“待重新发起”的事实和任务号，提示用户重新运行本步骤。
+			return nil, taskID, pendingUploadError{TaskID: taskID, Err: fmt.Errorf(
+				"微信开发者工具连续两次没有保留刚创建的上传任务（taskId=%s）。失效状态已清理，重跑本步骤会重新发起确认；请确认开发者工具窗口仍打开且已登录",
+				taskID,
+			)}
+		}
 		return nil, taskID, err
 	}
-	clearPendingUpload(projectRoot)
-	return wechatideOutput(payload, output, taskID, "uploaded"), taskID, nil
+	return nil, "", errors.New("wechatide 上传未完成")
 }
 
 var errWechatideConfirmationPending = errors.New("wechatide 上传仍在等待开发者工具内确认")
@@ -1588,9 +1628,10 @@ func pollWechatideUploadTask(
 				if taskNotFoundSince.IsZero() {
 					taskNotFoundSince = time.Now()
 				}
-				if time.Since(taskNotFoundSince) < 30*time.Second {
+				if time.Since(taskNotFoundSince) < wechatideTaskNotFoundGrace {
 					continue
 				}
+				return nil, "", fmt.Errorf("%w: %v", errWechatideTaskNotFound, err)
 			}
 			return nil, "", err
 		}
@@ -1604,9 +1645,10 @@ func pollWechatideUploadTask(
 				if taskNotFoundSince.IsZero() {
 					taskNotFoundSince = time.Now()
 				}
-				if time.Since(taskNotFoundSince) < 30*time.Second {
+				if time.Since(taskNotFoundSince) < wechatideTaskNotFoundGrace {
 					continue
 				}
+				return nil, "", fmt.Errorf("%w: %s", errWechatideTaskNotFound, pollMessage)
 			}
 			return nil, "", fmt.Errorf("wechatide 上传失败: %s", pollMessage)
 		}
