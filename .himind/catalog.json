@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-cfb4ae0b8c10a305",
+  "generation": "sync-d9c8af94b60c146a",
   "plugins": [
     {
       "allow_disable": true,
@@ -1483,6 +1483,149 @@
     }
   ],
   "workflows": [
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:workflow/com.himind.workflow.daily-work-log@0.7.7:com.himind.workflow.daily-work-log-0.7.7.hmwf",
+      "artifact_sha256": "4d455a9f05a07c5b6985c4a0c0b2f60dd48a943bd43e6fd61c812c49db936989",
+      "assignment": "optional",
+      "author_name": "",
+      "capability_ids": [
+        "work-log.session.scan",
+        "work-log.entry.upsert",
+        "work-log.report.render",
+        "work-log.report.aggregate"
+      ],
+      "categories": [],
+      "channel": "stable",
+      "dependencies": [
+        {
+          "kind": "plugin",
+          "id": "com.himind.work-log",
+          "required": true,
+          "min_version": "",
+          "version": "0.15.0",
+          "sha256": "98a42a822c4b6ed5fe3f500280b87ef0d1f607f11a74b36b32dea17d1ca73580",
+          "source": {
+            "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
+            "reference": "plugin/com.himind.work-log@0.15.0",
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.work-log@0.15.0/com.himind.work-log-0.15.0.hmpkg"
+          },
+          "pinned": true
+        },
+        {
+          "kind": "plugin",
+          "id": "com.himind.work-log-collector",
+          "required": true,
+          "min_version": "",
+          "version": "0.7.2",
+          "sha256": "a068fd3d60eec597ee665c76104920e74d87337e20b19b1f7443955658ed9ccd",
+          "source": {
+            "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
+            "reference": "plugin/com.himind.work-log-collector@0.7.2",
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.work-log-collector@0.7.2/com.himind.work-log-collector-0.7.2.hmpkg"
+          },
+          "pinned": true
+        }
+      ],
+      "description": "采集本机 AI 会话素材，按仓库路径/项目/展项稳定归类并用内置 AI 总结成清晰的工作日志条目（按项目→功能聚合），写入全局工作日志，生成日报归档，并跨期补算周报/月报（自然周期去重）。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/workflow%2Fcom.himind.workflow.daily-work-log@0.7.7/com.himind.workflow.daily-work-log-0.7.7.hmwf",
+      "extension_lock": {
+        "dependencies": [
+          {
+            "id": "com.himind.work-log",
+            "kind": "plugin",
+            "required": true,
+            "sha256": "e9ff264b4cfa85399cb3f674b81cc4c3e12d843d440a5ae20b704aaa726a3107",
+            "source_id": "MrBaoquan/himind-extensions",
+            "version": "0.15.0"
+          },
+          {
+            "id": "com.himind.work-log-collector",
+            "kind": "plugin",
+            "required": true,
+            "sha256": "c35bd1158c2f4fddaae1c9a4fe03282e3dc5b9a70447584f858a6e0122fb489f",
+            "source_id": "MrBaoquan/himind-extensions",
+            "version": "0.7.2"
+          }
+        ],
+        "environment": {
+          "capabilities": [
+            {
+              "availability": "local",
+              "id": "work-log.session.scan",
+              "provider": "plugin:com.himind.work-log-collector",
+              "required": true
+            },
+            {
+              "availability": "local",
+              "id": "work-log.entry.upsert",
+              "provider": "plugin:com.himind.work-log",
+              "required": true
+            },
+            {
+              "availability": "local",
+              "id": "work-log.report.render",
+              "provider": "plugin:com.himind.work-log",
+              "required": true
+            },
+            {
+              "availability": "local",
+              "id": "work-log.report.aggregate",
+              "provider": "plugin:com.himind.work-log",
+              "required": true
+            }
+          ],
+          "connectors": [],
+          "runtimes": [
+            {
+              "id": "himind.builtin",
+              "required": true,
+              "status": "ready",
+              "version": "0.2.0-rc.2"
+            }
+          ]
+        },
+        "generated_at": "unix-ms:1793099171540",
+        "root": {
+          "id": "com.himind.workflow.daily-work-log",
+          "kind": "workflow",
+          "sha256": "4d455a9f05a07c5b6985c4a0c0b2f60dd48a943bd43e6fd61c812c49db936989",
+          "version": "0.7.7"
+        },
+        "schema_version": "extension_lock.v1"
+      },
+      "file_name": "com.himind.workflow.daily-work-log-0.7.7.hmwf",
+      "file_size": 69894,
+      "icon": {
+        "sha256": "c7f69f54ec2b97e4f7dbcea7467397ac1741acdc59e00322d5333e1e4252881d",
+        "source": "author",
+        "url": "https://github.com/MrBaoquan/himind-extensions/releases/download/workflow%2Fcom.himind.workflow.daily-work-log@0.7.7/com.himind.workflow.daily-work-log-0.7.7-icon.png"
+      },
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.47",
+      "name": "每日工作日志",
+      "organization_reason": "",
+      "plugin_dependencies": [],
+      "published_at": "2026-10-27T11:06:17Z",
+      "release_notes": "0.7.7：项目与展项同步改用当前 workbench.business.* 能力 ID，避免新版 Agent 中因旧 ID 不存在而跳过看板同步。",
+      "release_tag": "workflow/com.himind.workflow.daily-work-log@0.7.7",
+      "sha256": "4d455a9f05a07c5b6985c4a0c0b2f60dd48a943bd43e6fd61c812c49db936989",
+      "signature": "IrRlEU8O3KJV9Goce+HF7wf8Hnjwm7Ix2joINJjTSZuWH6q6IAUDp9frKYUh82wfchqyY5X8vSl9ATELQ4TV7xywSbXcIRSiCelQM2y37ayIw3Yk1X4peeKMZOjRFTMgVmT454YGYrE0Oq2dtyiJ64cusSgUaq5HtRByqxTiVRLQJRK2ZKeRxwcyYxVKZMyVl2DBfh1yWo9nZulWFHpWSqXN1t/y7tCkHmzG5qgjdQ6sbm56uGF/pPBO7Npn+lR/zcHx/cPGUGoNHf4MSurJFbwFirkxCSgbWOh26NFu3h1ut/zd4W7NHp5gMlM9RgRDGDHNaD73pkPFS5L4VG1gcQ==",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-extension-production-2026",
+      "source": "github",
+      "source_commit": "b540e6aeb39fca80175a3618012346963c081904",
+      "source_tree": "9dfd15467a69455c790d350661c5f7d670b7ba24",
+      "version": "0.7.7",
+      "workflow_id": "com.himind.workflow.daily-work-log"
+    },
     {
       "allow_disable": true,
       "allow_uninstall": true,
