@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -131,5 +132,21 @@ func TestValidateCapabilityShape(t *testing.T) {
 	good := CapabilityDependency{ID: "media.toolkit.frames.contact-sheet", Provider: "com.himind.media-toolkit"}
 	if err := validateCapabilityShape(Manifest{Capabilities: []CapabilityDependency{good}}); err != nil {
 		t.Errorf("合规能力应通过: %v", err)
+	}
+}
+
+func TestParseManifestRejectsPluginDependencyWithLegacyIDField(t *testing.T) {
+	_, err := parseManifest([]byte(`{
+		"id":"com.himind.skill.demo","name":"示例助手","author":"测试用户",
+		"categories":["software-engineering"],"version":"1.0.0","scope":"organization",
+		"description":"示例。","release_notes":"首次。","min_agent_version":"0.3.47",
+		"distribution_targets":["workbench"],
+		"supported_clients":["agent-skills"],
+		"capabilities":[],
+		"plugin_dependencies":[{"id":"com.himind.media-toolkit","required":true,"min_version":"1.0.0"}],
+		"contents":["skill.json","SKILL.md"]
+	}`))
+	if err == nil || !strings.Contains(err.Error(), "plugin_id is required") {
+		t.Fatalf("legacy id field must be rejected, got: %v", err)
 	}
 }

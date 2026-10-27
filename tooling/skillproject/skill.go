@@ -296,6 +296,9 @@ func validateManifest(manifest Manifest) error {
 	if hits := metaguide.BannedIn(manifest.Name); len(hits) > 0 {
 		return fmt.Errorf("skill name contains disallowed words: %s", strings.Join(hits, ", "))
 	}
+	if err := validatePluginDependencies(manifest); err != nil {
+		return err
+	}
 	if err := validateCapabilityShape(manifest); err != nil {
 		return err
 	}
@@ -332,6 +335,29 @@ func validateManifest(manifest Manifest) error {
 	}
 	if !declared["skill.json"] || !declared["SKILL.md"] {
 		return errors.New("contents must include skill.json and SKILL.md")
+	}
+	return nil
+}
+
+// validatePluginDependencies 校验插件依赖的规范字段。JSON 反序列化会忽略未知字段，
+// 因此必须显式拒绝缺失的 plugin_id，避免把 `id` 之类的旧字段包装成“无依赖”制品。
+func validatePluginDependencies(manifest Manifest) error {
+	seen := map[string]bool{}
+	for index, dependency := range manifest.PluginDependencies {
+		pluginID := strings.TrimSpace(dependency.PluginID)
+		if pluginID == "" {
+			return fmt.Errorf("plugin_dependencies[%d].plugin_id is required", index)
+		}
+		if err := metaguide.Check(metaguide.StableID, pluginID); err != nil {
+			return fmt.Errorf("plugin_dependencies[%d].plugin_id: %w", index, err)
+		}
+		if seen[pluginID] {
+			return fmt.Errorf("duplicate plugin dependency: %s", pluginID)
+		}
+		seen[pluginID] = true
+		if dependency.MinVersion != "" && !versionPattern.MatchString(dependency.MinVersion) {
+			return fmt.Errorf("invalid min_version for plugin dependency %s: %s", pluginID, dependency.MinVersion)
+		}
 	}
 	return nil
 }
