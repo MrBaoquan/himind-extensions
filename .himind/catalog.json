@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-4673717b2dc91b51",
+  "generation": "sync-e34110052309d352",
   "plugins": [
     {
       "allow_disable": true,
@@ -1186,6 +1186,100 @@
         "workbuddy"
       ],
       "version": "1.0.1"
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:skill/com.mrbaoquan.skill.wechat-miniprogram-assistant@0.1.2:com.mrbaoquan.skill.wechat-miniprogram-assistant-0.1.2.hmskill",
+      "artifact_sha256": "1c720db9849cd16ed48466c5ffb23df0a5dc6d683fb99e7feec470d507bfe616",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [
+        "wechat.miniprogram.devtools.env.get",
+        "wechat.miniprogram.devtools.login.start",
+        "wechat.miniprogram.devtools.task.get",
+        "wechat.miniprogram.devtools.project.list",
+        "wechat.miniprogram.devtools.project.add",
+        "wechat.miniprogram.devtools.project.del",
+        "wechat.miniprogram.devtools.window.ctrl",
+        "wechat.miniprogram.devtools.compile.get",
+        "wechat.miniprogram.devtools.compile.run",
+        "wechat.miniprogram.devtools.preview.make",
+        "wechat.miniprogram.devtools.debug.read",
+        "wechat.miniprogram.devtools.debug.mutate",
+        "wechat.miniprogram.devtools.auto.click",
+        "wechat.miniprogram.devtools.auto.page",
+        "wechat.miniprogram.devtools.auto.game",
+        "wechat.miniprogram.devtools.auto.eval",
+        "wechat.miniprogram.cloud.read",
+        "wechat.miniprogram.cloud.write",
+        "wechat.miniprogram.devtools.install.get",
+        "wechat.miniprogram.build",
+        "wechat.miniprogram.preview",
+        "wechat.miniprogram.upload",
+        "wechat.miniprogram.ci.readiness"
+      ],
+      "categories": [
+        "software-engineering",
+        "testing-quality"
+      ],
+      "channel": "stable",
+      "dependencies": [
+        {
+          "kind": "plugin",
+          "id": "com.himind.wechat-miniprogram-tools",
+          "required": true,
+          "min_version": "0.4.1",
+          "version": "0.4.2",
+          "sha256": "345625dbfa6d4ad8e85b921ca7bbb246d66437c223ec19d33075870258b2b9c8",
+          "source": {
+            "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
+            "reference": "plugin/com.himind.wechat-miniprogram-tools@0.4.2",
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.wechat-miniprogram-tools@0.4.2/com.himind.wechat-miniprogram-tools-0.4.2.hmpkg"
+          },
+          "pinned": true
+        }
+      ],
+      "description": "面向微信小程序与小游戏开发，指导项目检查、开发者工具控制、编译预览、页面自动化、调试取证、云开发与体验版交付；当用户提到微信开发者工具、小程序模拟器、预览上传、console/network、云函数或云数据库时使用。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.mrbaoquan.skill.wechat-miniprogram-assistant@0.1.2/com.mrbaoquan.skill.wechat-miniprogram-assistant-0.1.2.hmskill",
+      "file_name": "com.mrbaoquan.skill.wechat-miniprogram-assistant-0.1.2.hmskill",
+      "file_size": 63728,
+      "icon": {
+        "sha256": "969d7bb877537bb6af4e67b209c6a5161e7094705f34035d357ecae364ae1cf6",
+        "source": "author",
+        "url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.mrbaoquan.skill.wechat-miniprogram-assistant@0.1.2/com.mrbaoquan.skill.wechat-miniprogram-assistant-0.1.2-icon.png"
+      },
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.47",
+      "name": "微信小程序开发助手",
+      "organization_reason": "",
+      "plugin_dependencies": [
+        {
+          "min_version": "0.4.1",
+          "plugin_id": "com.himind.wechat-miniprogram-tools",
+          "required": true
+        }
+      ],
+      "published_at": "2026-10-27T11:04:23Z",
+      "release_notes": "0.1.2：修正场景文档中的能力短名，并与微信小程序开发工具 0.4.2 的版本校验对齐。",
+      "release_tag": "skill/com.mrbaoquan.skill.wechat-miniprogram-assistant@0.1.2",
+      "risk_summary": "可控制本机微信开发者工具、执行页面自动化、读取调试信息、上传体验版和写入云资源；上传、云写、任意 JS 执行与清缓存需审批，不读取或保存原始 token。",
+      "sha256": "1c720db9849cd16ed48466c5ffb23df0a5dc6d683fb99e7feec470d507bfe616",
+      "signature": "eddfzz+J/bTLAtKwXNowNoN3cVuk7J2WbPjBGtL057XP/YUrFjzHvVCtVEYeZ980xC46PYWwPus94X+haF9rBDrXCMuDI9Xb8ic2cw7QdEVuv197xmv+IvQOSKgf+K2ntzAiebCoG2le+GEFY4Va4xt9llp2jFjxTm+V4qi6+ArRrWiZTFTxv4L0y6H8jppSrNkYLpsUg+qmXHlcfdCIUWJEqnPG+jULq/q697jp4B9za9MZQoxScQlyMDml4AF+UQ5BkfUefLhMq98YVrg9B9VM1TrCHHi3yk6s2LBRd8vU/V/vgSVoUBsZknA16QpMxczFBgW1GTVhCCRNwP7+gg==",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-extension-production-2026",
+      "skill_id": "com.mrbaoquan.skill.wechat-miniprogram-assistant",
+      "source": "github",
+      "source_commit": "29e5e52535aded4c360c6bc512b4a188c4555ba6",
+      "source_tree": "8c2ec644e75d99da59eae9feeeb1670f9d778d5c",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "version": "0.1.2"
     }
   ],
   "workflows": [
