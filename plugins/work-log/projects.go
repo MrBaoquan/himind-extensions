@@ -943,7 +943,7 @@ func projectSyncCap(in input) (any, error) {
 		updated++
 	}
 
-	// 扁平展项列表（来自 business.exhibit.list）：按项目归位，携带 source_path/release_path。
+	// 扁平展项列表（来自 workbench.business.exhibit.list）：按项目归位，携带 source_path/release_path。
 	exUpdated := 0
 	for _, raw := range exhibitItems {
 		name := firstNonEmpty(mapStr(raw, "exhibit_name"), mapStr(raw, "name"))
