@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-e34110052309d352",
+  "generation": "sync-31a9d3629443e41a",
   "plugins": [
     {
       "allow_disable": true,
@@ -1147,6 +1147,54 @@
     {
       "allow_disable": true,
       "allow_uninstall": true,
+      "artifact_id": "github:skill/com.mrbaoquan.skill.unihper-unity-development@1.2.0:com.mrbaoquan.skill.unihper-unity-development-1.2.0.hmskill",
+      "artifact_sha256": "c0bca8f37690269634139699a5e1e14f0c1220b6e6dbee80d0305b8c85eef6ce",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [],
+      "categories": [
+        "software-engineering"
+      ],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "指导基于 UNIHper 的 Unity 项目开发，覆盖生命周期、UI、资源、UConfig、Managements、待机、UniRx 自闭环与 MCP 自动化测试。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.mrbaoquan.skill.unihper-unity-development@1.2.0/com.mrbaoquan.skill.unihper-unity-development-1.2.0.hmskill",
+      "file_name": "com.mrbaoquan.skill.unihper-unity-development-1.2.0.hmskill",
+      "file_size": 72946,
+      "icon": {
+        "sha256": "92d550655592b537b8b9b13370141530a49aedfacc5a85852fc3a72bedff81d3",
+        "source": "author",
+        "url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.mrbaoquan.skill.unihper-unity-development@1.2.0/com.mrbaoquan.skill.unihper-unity-development-1.2.0-icon.png"
+      },
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.1",
+      "name": "UNIHper 开发助手",
+      "organization_reason": "",
+      "plugin_dependencies": [],
+      "published_at": "2026-10-27T11:04:40Z",
+      "release_notes": "1.2.0：补充 CoplayDev Unity MCP 安装、MCP/Test Runner/批处理 harness 矩阵与自动化测试门禁。",
+      "release_tag": "skill/com.mrbaoquan.skill.unihper-unity-development@1.2.0",
+      "risk_summary": "可能按用户要求修改目标 Unity 工程内的 C#、JSON、UXML、USS、asmdef、资源配置与 Packages/manifest.json，并安装 com.coplaydev.unity-mcp；禁止访问项目外路径、凭据和生成缓存，涉及迁移、删除、发布或提交时必须先确认范围。",
+      "sha256": "c0bca8f37690269634139699a5e1e14f0c1220b6e6dbee80d0305b8c85eef6ce",
+      "signature": "Scr/jCXaaC4RBM5M5QA0wwZSmj/SmYbYdGzHh5ZEiBK6OfXhPtH4eGsIbNFUrfcdV4EaVMNmg0RyOhk9sVhDrbo4YqU7NNNRaNtxetxXSVUcKX9U16LI2SP3FGmoUdKQCMaycd506jHgL3lb/ggxwASWC0tskBhbK7Wp8TILQk6uI4EMRWckQCdmAyTcKYiqMEYHuAU9SlXiym3UmgJ7VH3OjadmG5rRWjpwvZO8pH8is69HJuKECX/BUWA7+w3iQIgWrmF1iKGrD3lRThWxCvtrgdKse1fBurobc81zlbsieYT9GX9KVkiFeBTbGyweKoHVX+da1u7eCwsDpI8q3A==",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-extension-production-2026",
+      "skill_id": "com.mrbaoquan.skill.unihper-unity-development",
+      "source": "github",
+      "source_commit": "bbf1760d37cb7bc578fc29bec023fcef56c6073b",
+      "source_tree": "71258eb8e8e3d5b75be928bfab8e3c03c4fd6507",
+      "supported_clients": [
+        "codex",
+        "github-copilot",
+        "workbuddy"
+      ],
+      "version": "1.2.0"
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
       "artifact_id": "github:skill/com.mrbaoquan.skill.unihper-unity-development@1.0.1:com.mrbaoquan.skill.unihper-unity-development-1.0.1.hmskill",
       "artifact_sha256": "b95037927d650317aa47290b3ca7171dbe51350e680b32b433eadb886a83d65b",
       "assignment": "optional",
@@ -1226,20 +1274,20 @@
       "channel": "stable",
       "dependencies": [
         {
-          "kind": "plugin",
           "id": "com.himind.wechat-miniprogram-tools",
-          "required": true,
+          "kind": "plugin",
           "min_version": "0.4.1",
-          "version": "0.4.2",
+          "pinned": true,
+          "required": true,
           "sha256": "345625dbfa6d4ad8e85b921ca7bbb246d66437c223ec19d33075870258b2b9c8",
           "source": {
-            "kind": "github",
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.wechat-miniprogram-tools@0.4.2/com.himind.wechat-miniprogram-tools-0.4.2.hmpkg",
             "id": "github:MrBaoquan/himind-extensions",
-            "repository": "MrBaoquan/himind-extensions",
+            "kind": "github",
             "reference": "plugin/com.himind.wechat-miniprogram-tools@0.4.2",
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.wechat-miniprogram-tools@0.4.2/com.himind.wechat-miniprogram-tools-0.4.2.hmpkg"
+            "repository": "MrBaoquan/himind-extensions"
           },
-          "pinned": true
+          "version": "0.4.2"
         }
       ],
       "description": "面向微信小程序与小游戏开发，指导项目检查、开发者工具控制、编译预览、页面自动化、调试取证、云开发与体验版交付；当用户提到微信开发者工具、小程序模拟器、预览上传、console/network、云函数或云数据库时使用。",
