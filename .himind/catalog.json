@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-9d3239a4e04a2d21",
+  "generation": "sync-cfb4ae0b8c10a305",
   "plugins": [
     {
       "allow_disable": true,
@@ -361,6 +361,59 @@
       "source_commit": "d4e29602904878d6af61eeebc56ce3a55764a125",
       "source_tree": "591b537a164c44bea791394702a6bb8983b192f2",
       "version": "0.15.0",
+      "view_count": 0
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:plugin/com.himind.work-log-collector@0.7.2:com.himind.work-log-collector-0.7.2.hmpkg",
+      "artifact_sha256": "a068fd3d60eec597ee665c76104920e74d87337e20b19b1f7443955658ed9ccd",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [
+        "work-log.session.sources",
+        "work-log.session.scan"
+      ],
+      "categories": [
+        "collaboration-delivery",
+        "docs-knowledge"
+      ],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "探测本机 AI 客户端会话存储，整理成日志素材；内置 Codex、Claude Code、Claude Desktop、OpenCode、GitHub Copilot（含 VS Code 会话），支持声明式通用来源。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.work-log-collector@0.7.2/com.himind.work-log-collector-0.7.2.hmpkg",
+      "file_name": "com.himind.work-log-collector-0.7.2.hmpkg",
+      "file_size": 6448952,
+      "governance": "optional",
+      "icon": {
+        "sha256": "2082f341a8f2c0159aeeb820eabee51b2dd0cc2486f7237162f9c6330913c606",
+        "source": "author",
+        "url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.work-log-collector@0.7.2/com.himind.work-log-collector-0.7.2-icon.png"
+      },
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.0",
+      "name": "工作日志采集器",
+      "organization_reason": "",
+      "permissions": [
+        "filesystem.workspace.read",
+        "filesystem.workspace.write"
+      ],
+      "plugin_dependencies": [],
+      "plugin_id": "com.himind.work-log-collector",
+      "published_at": "2026-10-27T11:05:48Z",
+      "release_notes": "0.7.2：会话素材的 started_at/ended_at 统一换算成本机时区。Codex 等 UTC 记录与本地偏移混排会整体偏一个时区（+08:00 差 8 小时）。",
+      "release_tag": "plugin/com.himind.work-log-collector@0.7.2",
+      "review_status": "published",
+      "sha256": "a068fd3d60eec597ee665c76104920e74d87337e20b19b1f7443955658ed9ccd",
+      "signature": "PzE33dWwYxKIdEoMREm6SxQqI+EnKQuHwGBIGCVHi8opHTXG67Q+2peWYGOhNMImYOXjPnKA/lcsQucewbqZ8IFSNuLnpbjci6FKjQzBubWrtIurIncbcrSQsM3IhWXztautSOyldJ2FZKqfEZGM4pa8ezi10Mi6JxGFfjAOgHZlYonmjEcXpp2O/wLbgHljOiA3rsOdn/Kt8ZvuyZWeh2FIHBqXuH4Fj8ECmwVw0w0DzVcpzfNbgK9FR8i422uyxiyfogP19ecy7OpUpdx12pq0mQ78vEhXyCoTKcf3WnBLU/gVP6A6m3szKVGky+wfNYumYA289/LTgT6CFEEF5w==",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-extension-production-2026",
+      "source": "github",
+      "source_commit": "bd0a22b32af774d8972da466dae7723a2a088084",
+      "source_tree": "5d1b0cf5f9332b37e11b68a741d968358a4c99fe",
+      "version": "0.7.2",
       "view_count": 0
     }
   ],
