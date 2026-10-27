@@ -1,33 +1,32 @@
 {
-    "id":  "com.mrbaoquan.skill.unihper-unity-development",
-    "icon": "assets/icon.png",
-    "name":  "UNIHper 开发助手",
-    "author":  "马宝全",
-    "categories":  [
-                       "software-engineering"
-                   ],
-    "version":  "1.0.1",
-    "distribution_targets":  ["workbench", "github"],
-    "scope":  "organization",
-    "description":  "指导基于 UNIHper 框架的 Unity 项目的场景脚本、UI、资源与配置开发。",
-    "min_agent_version":  "0.3.1",
-    "supported_clients":  [
-                              "codex",
-                              "github-copilot",
-                              "workbuddy"
-                          ],
-    "capabilities":  [
-
-                     ],
-    "plugin_dependencies":  [
-
-                            ],
-    "risk_summary":  "可能按用户要求修改目标 Unity 工程内的 C#、JSON、UXML、USS、asmdef 与资源配置；禁止访问项目外路径、凭据和生成缓存，涉及迁移、删除、发布或提交时必须先确认范围。",
-    "contents":  [
-      "SKILL.md",
-      "agents/openai.yaml",
-      "skill.json",
-      "assets/icon.png"
-    ],
-    "release_notes":  "1.0.1：名称与说明收敛到约定长度。"
+  "id": "com.mrbaoquan.skill.unihper-unity-development",
+  "icon": "assets/icon.png",
+  "name": "UNIHper 开发助手",
+  "author": "马宝全",
+  "categories": [
+    "software-engineering"
+  ],
+  "version": "1.2.0",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
+  "scope": "organization",
+  "description": "指导基于 UNIHper 的 Unity 项目开发，覆盖生命周期、UI、资源、UConfig、Managements、待机、UniRx 自闭环与 MCP 自动化测试。",
+  "min_agent_version": "0.3.1",
+  "supported_clients": [
+    "codex",
+    "github-copilot",
+    "workbuddy"
+  ],
+  "capabilities": [],
+  "plugin_dependencies": [],
+  "risk_summary": "可能按用户要求修改目标 Unity 工程内的 C#、JSON、UXML、USS、asmdef、资源配置与 Packages/manifest.json，并安装 com.coplaydev.unity-mcp；禁止访问项目外路径、凭据和生成缓存，涉及迁移、删除、发布或提交时必须先确认范围。",
+  "contents": [
+    "SKILL.md",
+    "agents/openai.yaml",
+    "skill.json",
+    "assets/icon.png"
+  ],
+  "release_notes": "1.2.0：补充 CoplayDev Unity MCP 安装、MCP/Test Runner/批处理 harness 矩阵与自动化测试门禁。"
 }
