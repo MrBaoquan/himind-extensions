@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://himind.local/schemas/video-to-motion/platform-binding.schema.json",
+  "title": "Platform Binding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "platform_profile_id",
+    "platform_profile_sha256",
+    "overall_status",
+    "phrases",
+    "required_approvals",
+    "unsupported_semantics"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "platform_profile_id": {
+      "type": "string"
+    },
+    "platform_profile_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "overall_status": {
+      "enum": [
+        "exact",
+        "approximate",
+        "unsupported"
+      ]
+    },
+    "phrases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "semantic",
+          "status",
+          "output_roles",
+          "requires_approval"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "semantic": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "exact",
+              "approximate",
+              "unsupported"
+            ]
+          },
+          "output_roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requires_approval": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "required_approvals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "unsupported_semantics": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "device_profile_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

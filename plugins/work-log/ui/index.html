@@ -6,7 +6,7 @@
     <title>工作日志 · 当前工作</title>
     <!-- 资源带版本后缀：插件 UI 由 Agent 直接按路径提供，不带缓存头；版本号变化会让 WebView
          重新拉取 app.js/app.css，避免界面改版后仍显示旧脚本。改动前端资源时请同步提升。 -->
-    <link rel="stylesheet" href="app.css?v=0.15.0" />
+    <link rel="stylesheet" href="app.css?v=0.16.0" />
   </head>
   <body>
     <header class="topbar">
@@ -232,6 +232,13 @@
             <button type="button" class="btn" id="report-next" aria-label="下一期">下一期 ›</button>
           </div>
         </div>
+        <div class="report-fiscal" id="report-fiscal">
+          <label class="field inline"><span>季度起算月</span>
+            <select id="fiscal-start-month" aria-label="季度与年度的起算月"></select>
+          </label>
+          <span class="meta" id="fiscal-rule"></span>
+          <span class="meta fiscal-note">口径存在日志库里；已生成的归档按原口径留存，重算同名周期会覆盖。</span>
+        </div>
         <div class="report-actions">
           <button type="button" class="btn" id="report-generate" title="按当前周期覆盖生成归档">生成本期归档</button>
           <button type="button" class="btn" id="report-aggregate" title="跨期补算周报/月报，已有记录不重复">汇总周报/月报</button>
@@ -258,12 +265,16 @@
             <strong id="mx-title" aria-live="polite">—</strong>
             <button type="button" class="cal-nav" id="mx-next" aria-label="下个月">›</button>
           </div>
-          <div class="seg" role="group" aria-label="工时口径" id="matrix-mode">
-            <button type="button" class="seg-btn active" data-mode="actual" aria-pressed="true">实际工时</button>
-            <button type="button" class="seg-btn" data-mode="aligned" aria-pressed="false">8 小时对齐</button>
+          <div class="matrix-actions">
+            <div class="seg" role="group" aria-label="工时口径" id="matrix-mode">
+              <button type="button" class="seg-btn active" data-mode="actual" aria-pressed="true">实际工时</button>
+              <button type="button" class="seg-btn" data-mode="aligned" aria-pressed="false">8 小时对齐</button>
+            </div>
+            <button type="button" class="btn" id="mx-copy-all" title="复制整张工时表（含表头与合计），可直接粘贴到 Excel">复制整表</button>
           </div>
         </div>
         <p class="meta" id="matrix-note"></p>
+        <p class="meta matrix-hint">按行复制：鼠标移到项目名或「当天合计」上，点出现的 ⧉ 按钮；粘贴到 Excel 即为表格。</p>
         <div id="matrix-body" class="matrix-scroll"></div>
       </section>
     </div>
@@ -400,6 +411,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=0.15.0"></script>
+    <script src="app.js?v=0.16.0"></script>
   </body>
 </html>

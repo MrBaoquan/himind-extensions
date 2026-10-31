@@ -5,8 +5,8 @@ package main
 // 它只做四件事：把已配置的免费素材来源列出来、按关键词跨来源检索、把选中的
 // 素材落到工作区并留下来源与许可记录、给本机已有媒体建索引并按名检索。
 //
-// 边界：不依赖 HiMind 工作台，不调用 Dashboard 接口，不读取 Agent 凭据；
-// 所有写操作只发生在工作区目录和扩展私有数据目录内。
+// 边界：不依赖 HiMind 工作台；在线来源凭据只通过 Agent 的按次 Broker 获取，
+// 长期密钥不写入插件私有目录。
 
 import (
 	"context"
@@ -30,7 +30,6 @@ import (
 const (
 	dataNamespace   = "com.himind.media-library"
 	indexFileName   = "library-index.json"
-	keysFileName    = "provider-keys.json"
 	defaultDestDir  = "media"
 	maxIndexFiles   = 20000
 	minDownloadSize = 1 << 10
@@ -53,11 +52,14 @@ var mediaExtensions = map[string]string{
 }
 
 type providerStatus struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Kinds       []string `json:"kinds"`
-	Configured  bool     `json:"configured"`
-	Requirement string   `json:"requirement"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Kinds        []string `json:"kinds"`
+	CredentialID string   `json:"credential_id,omitempty"`
+	Configured   bool     `json:"configured"`
+	State        string   `json:"state"`
+	Requirement  string   `json:"requirement"`
+	Error        string   `json:"error,omitempty"`
 }
 
 type searchInput struct {
@@ -147,15 +149,73 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 			return nil, rpcError
 		}
 		return rpcResult(searchLibrary(in.Query, in.Kinds, in.Limit))
-	case "media-library.provider.configure":
+	case "media-library.repository.create":
+		var in createLibraryInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(createLibrary(in))
+	case "media-library.repository.list":
+		return rpcResult(listLibraries())
+	case "media-library.repository.update":
+		var in updateLibraryInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(updateLibrary(in))
+	case "media-library.repository.remove":
+		var in removeLibraryInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(removeLibrary(in))
+	case "media-library.source.add":
 		var in struct {
-			Provider string `json:"provider"`
-			Key      string `json:"key"`
+			Path        string `json:"path"`
+			DisplayName string `json:"display_name"`
 		}
 		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
 			return nil, rpcError
 		}
-		return rpcResult(configureProvider(in.Provider, in.Key))
+		return rpcResult(addSourceRoot(in.Path, in.DisplayName))
+	case "media-library.source.update":
+		var in updateSourceInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(updateSourceRoot(in))
+	case "media-library.source.remove":
+		var in removeSourceInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(removeSourceRoot(in))
+	case "media-library.source.scan.batch":
+		var in sourceScanInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(scanSourceBatch(in))
+	case "media-library.asset.search":
+		var in resourceSearchInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(searchResources(in))
+	case "media-library.asset.adopt":
+		var in adoptInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(adoptAssets(in))
+	case "media-library.source.list":
+		return rpcResult(listSourceRoots())
+	case "media-library.asset.preview":
+		var in previewInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(previewAsset(in))
 	default:
 		return nil, &jsonrpc.Error{Code: -32602, Message: "不支持的媒体资源库能力"}
 	}
@@ -171,101 +231,33 @@ func rpcResult(result any, err error) (any, *jsonrpc.Error) {
 // ---------------------------------------------------------------------------
 // provider.list
 // ---------------------------------------------------------------------------
-// configurableProviders 是允许在视图里填写密钥的来源。
-var configurableProviders = map[string]string{
-	"pexels":    "Pexels API Key",
-	"unsplash":  "Unsplash Access Key",
-	"freesound": "Freesound API Token",
-}
-
-// configureProvider 把密钥写进扩展私有数据目录；传空值表示清除。
-// 密钥只落在本插件自己的目录里，不回显、不进日志、不写进工作区。
-func configureProvider(provider string, key string) (any, error) {
-	id := strings.TrimSpace(provider)
-	if _, ok := configurableProviders[id]; !ok {
-		return nil, fmt.Errorf("不支持配置的来源: %s", provider)
-	}
-	value := strings.TrimSpace(key)
-	if value != "" && len(value) < 8 {
-		return nil, fmt.Errorf("密钥长度不足，请确认复制完整")
-	}
-	if err := saveProviderKey(id, value); err != nil {
-		return nil, err
-	}
-	configured := value != ""
-	message := "已保存，可以开始检索"
-	if !configured {
-		message = "已清除该来源的密钥"
-	}
-	return map[string]any{"provider": id, "configured": configured, "message": message}, nil
-}
-
-func providerKeyFile() (string, error) {
-	root, err := pluginDataRoot()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(root, keysFileName), nil
-}
-
-func readProviderKeys() map[string]string {
-	keys := map[string]string{}
-	path, err := providerKeyFile()
-	if err != nil {
-		return keys
-	}
-	payload, err := os.ReadFile(path)
-	if err != nil {
-		return keys
-	}
-	_ = json.Unmarshal(payload, &keys)
-	return keys
-}
-
-// providerKey 先看扩展自己的配置，再看环境变量；两条路都不需要工作台。
-func providerKey(id string, envName string) string {
-	if value := strings.TrimSpace(readProviderKeys()[id]); value != "" {
-		return value
-	}
-	return strings.TrimSpace(os.Getenv(envName))
-}
-
-func saveProviderKey(id string, value string) error {
-	path, err := providerKeyFile()
-	if err != nil {
-		return err
-	}
-	keys := readProviderKeys()
-	if value == "" {
-		delete(keys, id)
-	} else {
-		keys[id] = value
-	}
-	encoded, err := json.MarshalIndent(keys, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(path, append(encoded, '\n'), 0o600); err != nil {
-		return fmt.Errorf("保存密钥失败: %w", err)
-	}
-	return nil
-}
-
-// ---------------------------------------------------------------------------
-// provider.list
-// ---------------------------------------------------------------------------
 
 func listProviders() (any, error) {
 	providers := providerRegistry()
 	items := make([]providerStatus, 0, len(providers))
 	for _, item := range providers {
-		items = append(items, providerStatus{
-			ID:          item.ID(),
-			Name:        item.Name(),
-			Kinds:       item.Kinds(),
-			Configured:  item.Configured(),
-			Requirement: item.Requirement(),
-		})
+		status := providerStatus{
+			ID:           item.ID(),
+			Name:         item.Name(),
+			Kinds:        item.Kinds(),
+			CredentialID: item.CredentialID(),
+			Requirement:  item.Requirement(),
+		}
+		if item.CredentialID() == "" {
+			status.Configured = strings.TrimSpace(os.Getenv("HIMIND_MEDIA_LIBRARY_FAKE")) == "1"
+			if status.Configured {
+				status.State = "configured"
+			} else {
+				status.State = "unconfigured"
+				status.Error = "设置 HIMIND_MEDIA_LIBRARY_FAKE=1 后可用于离线联调"
+			}
+			items = append(items, status)
+			continue
+		}
+		_, err := acquireCredential(item.CredentialID(), "media-library.provider.list")
+		status.State, status.Error = credentialState(err)
+		status.Configured = err == nil
+		items = append(items, status)
 	}
 	return map[string]any{"providers": items}, nil
 }
@@ -312,13 +304,29 @@ func search(in searchInput) (any, error) {
 		go func(slot int, provider mediaProvider) {
 			defer wait.Done()
 			outcome := providerOutcome{ID: provider.ID(), Name: provider.Name(), Items: []assetItem{}}
-			if !provider.Configured() {
-				outcome.Status = "skipped"
-				outcome.Error = "未配置：" + provider.Requirement()
-				outcomes[slot] = outcome
-				return
+			var credential map[string]string
+			if provider.CredentialID() == "" {
+				if strings.TrimSpace(os.Getenv("HIMIND_MEDIA_LIBRARY_FAKE")) != "1" {
+					outcome.Status = "skipped"
+					outcome.Error = "离线样例来源未启用"
+					outcomes[slot] = outcome
+					return
+				}
+			} else {
+				acquired, credentialErr := acquireCredential(provider.CredentialID(), "media-library.search")
+				if credentialErr != nil {
+					state, message := credentialState(credentialErr)
+					outcome.Status = "failed"
+					if state == "unconfigured" || state == "session_expired" {
+						outcome.Status = "skipped"
+					}
+					outcome.Error = message
+					outcomes[slot] = outcome
+					return
+				}
+				credential = acquired
 			}
-			found, err := provider.Search(ctx, searchQuery{
+			found, err := provider.Search(ctx, credential, searchQuery{
 				Text:        query,
 				Kinds:       in.Kinds,
 				PerSource:   in.PerSource,
@@ -759,6 +767,7 @@ func safeFilename(value string) string {
 			return r
 		default:
 			return '-'
+
 		}
 	}, value)
 	replaced = strings.Trim(replaced, " .")

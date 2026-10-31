@@ -11,6 +11,7 @@ import (
 	"himind-plugin/media-toolkit/internal/media/ffmpeg"
 	"himind-plugin/media-toolkit/internal/media/frames"
 	"himind-plugin/media-toolkit/internal/media/probe"
+	"himind-plugin/media-toolkit/internal/media/projection"
 	"himind-plugin/media-toolkit/internal/media/recipe"
 )
 
@@ -191,5 +192,42 @@ func TestIntegrationFrameExtractWritesFiles(t *testing.T) {
 		if stat, err := os.Stat(path); err != nil || stat.Size() == 0 {
 			t.Fatalf("抽帧文件缺失或为空: %s (%v)", path, err)
 		}
+	}
+}
+
+func TestIntegrationEquirectProjectionProducesFlatVideo(t *testing.T) {
+	tools := requireTools(t)
+	dir := t.TempDir()
+	source := filepath.Join(dir, "equirect.mp4")
+	output := filepath.Join(dir, "front.mp4")
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	_, err := tools.Run(ctx, ffmpeg.RunOptions{Args: []string{
+		"-f", "lavfi", "-i", "testsrc=duration=3:size=640x320:rate=30",
+		"-f", "lavfi", "-i", "sine=frequency=440:duration=3",
+		"-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+		"-c:a", "aac", "-shortest", source,
+	}})
+	if err != nil {
+		t.Skipf("无法合成等距柱状测试素材: %v", err)
+	}
+
+	result, err := projection.Project(ctx, tools, projection.Options{
+		Source: source, Output: output,
+		YawDeg: 0, PitchDeg: 0, HFovDeg: 100, VFovDeg: 65,
+		Width: 640, Height: 360, CRF: 24,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Width != 640 || result.Height != 360 || result.Size == 0 {
+		t.Fatalf("投影结果异常: %+v", result)
+	}
+	info, err := probe.Read(ctx, tools, output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.HasVideo || !info.HasAudio || info.Video.Width != 640 || info.Video.Height != 360 {
+		t.Fatalf("投影产物流信息异常: %+v", info)
 	}
 }

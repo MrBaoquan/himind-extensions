@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "device": "YDL-0",
+  "viewpoint": "main_narrative_forward",
+  "design_basis": "Heave-only flight sequence",
+  "capability_constraints": {
+    "motion_axes": [
+      "heave"
+    ],
+    "environment_actions": [
+      "wind",
+      "scent"
+    ],
+    "normalized_peak": 0.8
+  },
+  "intensity_profiles": {},
+  "phrases": [
+    {
+      "id": "glide",
+      "intent": "flight_float",
+      "semantic": "flight_float",
+      "energy": 0.6,
+      "confidence": 0.9
+    },
+    {
+      "id": "drop",
+      "intent": "weightless_drop",
+      "semantic": "weightless_drop",
+      "energy": 0.9,
+      "confidence": 0.9
+    }
+  ]
+}

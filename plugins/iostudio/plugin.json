@@ -8,8 +8,8 @@
     "video-post"
   ],
   "description": "驱动 IOStudio 设备调试工作台：查设备动作通道、构建与预检动作文件、执行协议测试场景。",
-  "release_notes": "1.1.0：显示名改为「IOStudio 工具」（原「工作台」与平台自有术语撞名），并补齐命令，使能力可在命令面板检索。",
-  "version": "1.1.0",
+  "release_notes": "1.1.1：从能力清单移除 skip_validate，避免绕过设备声明、量程与联锁预检；补齐调试相关触发词。",
+  "version": "1.1.1",
   "entry": "bin/iostudio.exe",
   "runtime": "process-jsonrpc-stdio",
   "platforms": [
@@ -24,7 +24,7 @@
   "capabilities": [
     {
       "id": "iostudio.runtime.status",
-      "description": "查看 IOStudio 命令行是否就绪及所用设备表",
+      "description": "查看 IOStudio 就绪状态、版本与生效设备表",
       "availability": "local",
       "timeout_seconds": 30,
       "risk_level": "read_only",
@@ -42,7 +42,7 @@
     },
     {
       "id": "iostudio.devices",
-      "description": "列出设备及其可用动作与输出通道",
+      "description": "列出设备动作与输出通道，排查设备不动",
       "availability": "local",
       "timeout_seconds": 30,
       "risk_level": "read_only",
@@ -64,7 +64,7 @@
     },
     {
       "id": "iostudio.motion.plan",
-      "description": "只构建与预检、不保留动作文件",
+      "description": "干跑：构建并预检动作文件，不保留产物",
       "availability": "local",
       "timeout_seconds": 900,
       "risk_level": "read_only",
@@ -82,9 +82,6 @@
           "spec_path": {
             "type": "string",
             "maxLength": 1000
-          },
-          "skip_validate": {
-            "type": "boolean"
           }
         },
         "required": [
@@ -118,9 +115,6 @@
           "out_path": {
             "type": "string",
             "maxLength": 1000
-          },
-          "skip_validate": {
-            "type": "boolean"
           }
         },
         "required": [
@@ -132,7 +126,7 @@
     },
     {
       "id": "iostudio.motion.validate",
-      "description": "预检动作文件并返回问题清单",
+      "description": "预检动作文件，返回问题清单与原因",
       "availability": "local",
       "timeout_seconds": 300,
       "risk_level": "read_only",

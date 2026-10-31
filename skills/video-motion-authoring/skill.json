@@ -7,10 +7,10 @@
     "video-post",
     "system-device"
   ],
-  "version": "1.4.0",
+  "version": "1.8.0",
   "scope": "organization",
-  "description": "根据视频画面与声音推断该配的平台动作，生成演出规格、构建动作文件并预检，用于影院动感平台、体感游戏与 4D 特效厅的动作编排。",
-  "release_notes": "1.4.0：显示名补类型词为「视频动作编排助手」，与其他技能（如「媒体下载助手」）对齐。",
+  "description": "根据视频主叙事分析行为，生成动作意图、三档演出规格并驱动 IOStudio 构建预检，用于动感平台和 4D 特效编排。",
+  "release_notes": "1.8.0：明确 idle 只填充 clip 外空窗；长段加入低幅飞行底噪，并用 long_static_gap 门禁阻止事件间完全停顿。",
   "min_agent_version": "0.3.47",
   "distribution_targets": [
     "workbench",
@@ -30,6 +30,12 @@
       "id": "media.toolkit.probe",
       "required": true,
       "min_version": "1.0.0",
+      "provider": "com.himind.media-toolkit"
+    },
+    {
+      "id": "media.toolkit.video.project",
+      "required": false,
+      "min_version": "1.4.0",
       "provider": "com.himind.media-toolkit"
     },
     {
@@ -54,6 +60,12 @@
       "id": "media.toolkit.frames.extract",
       "required": false,
       "min_version": "1.0.0",
+      "provider": "com.himind.media-toolkit"
+    },
+    {
+      "id": "media.toolkit.preview.image",
+      "required": false,
+      "min_version": "1.1.0",
       "provider": "com.himind.media-toolkit"
     },
     {
@@ -112,7 +124,7 @@
     },
     {
       "id": "iostudio.motion.validate",
-      "required": false,
+      "required": true,
       "min_version": "1.0.0",
       "provider": "com.himind.iostudio"
     },
@@ -121,6 +133,30 @@
       "required": false,
       "min_version": "1.1.0",
       "provider": "com.himind.media-toolkit"
+    },
+    {
+      "id": "media.toolkit.job.status",
+      "required": false,
+      "min_version": "1.0.0",
+      "provider": "com.himind.media-toolkit"
+    },
+    {
+      "id": "motion.composer.runtime.status",
+      "required": false,
+      "min_version": "1.1.0",
+      "provider": "com.himind.motion-composer"
+    },
+    {
+      "id": "motion.composer.audit",
+      "required": true,
+      "min_version": "1.1.0",
+      "provider": "com.himind.motion-composer"
+    },
+    {
+      "id": "motion.composer.compare",
+      "required": true,
+      "min_version": "1.1.0",
+      "provider": "com.himind.motion-composer"
     }
   ],
   "plugin_dependencies": [
@@ -138,6 +174,11 @@
       "plugin_id": "com.himind.media-ai",
       "required": false,
       "min_version": "1.0.0"
+    },
+    {
+      "plugin_id": "com.himind.motion-composer",
+      "required": true,
+      "min_version": "1.1.0"
     }
   ],
   "risk_summary": "local_write",
@@ -147,6 +188,13 @@
     "agents/openai.yaml",
     "references/action-vocabulary.json",
     "references/show-spec.md",
-    "assets/icon.png"
+    "assets/icon.png",
+    "references/behavior-timeline.schema.json",
+    "references/motion-intent.schema.json",
+    "references/device-profile.schema.json",
+    "references/choreography-playbook.md",
+    "references/orchestration-profile.example.json",
+    "references/field-feedback.schema.json",
+    "references/slew-rate-validation.md"
   ]
 }

@@ -54,7 +54,7 @@ spec 是**面向脚本的紧凑编排输入**，由 IOStudio 展开成合法的 
 
 ### idle 待机循环
 
-暂无动作段落时，让该轨道做小幅周期运动（"呼吸"），避免完全静止显得生硬。
+暂无动作段落时，让该轨道做小幅周期运动（"呼吸"）。**idle 只在没有 clip 覆盖的空窗生效；clip 内部即使曲线完全水平，idle 也不会参与。**
 
 ```jsonc
 "idle": {
@@ -67,6 +67,14 @@ spec 是**面向脚本的紧凑编排输入**，由 IOStudio 展开成合法的 
   ]
 }
 ```
+
+## idle 不能解决什么
+
+- 不能填补一个长 preset 内部的水平曲线；
+- 不能给正在播放的 `clips` 叠加第二层动作；
+- 不能替代事件之间的飞行底噪。
+
+若需要全程持续感，应在 preset 内部生成低幅“飞行底噪”，并只为真正的无 clip 空窗配置 idle。
 
 ## presets —— 可复用动作
 
@@ -119,6 +127,61 @@ spec 是**面向脚本的紧凑编排输入**，由 IOStudio 展开成合法的 
 环境类通道（风扇/喷水/震动/香味/灯光…）是**开关量**，用 gates 表达，
 **不要用曲线**去模拟强度。`fade_ms` 为 0 是硬切（冲击类常用），
 需要柔和过渡时给几百毫秒。
+
+### 环境通道的 value_type 与 gate level
+
+环境门控的 `level` 是**归一化值**，最终工程量由轨道类型和 `engineering_range` 决定。
+
+- `value_type: "bool"`：只能使用 `level: 0` 或 `level: 1`。香氛、水、热风、震动通常是这一类。
+- `value_type: "float"`：可以用 `level: 0..1` 表达连续档位，但必须配置正确的量程。
+- 风机风速不能建成 bool，否则只能输出开/关。
+
+YDL 风机的正确轨道示例：
+
+```json
+{
+  "role": "wind",
+  "channel": "OAxis_18",
+  "output_type": "oaxis",
+  "value_type": "float",
+  "neutral": 0,
+  "engineering_range": 100
+}
+```
+
+对应门控：
+
+```json
+{ "role": "wind", "start_ms": 64000, "end_ms": 80000, "fade_ms": 0, "level": 0.65 }
+```
+
+这里的 `0.65` 在 `engineering_range=100` 时表示 65% 风速。若误写为 bool，或漏掉量程，输出会被压成 0/1，现场通常表现为“风机开了但没有风速层次”。
+
+香氛应使用**短窗口**与场景转义点对齐，例如木屋、水面或终章；不要从进入场景一直常开到片尾。
+
+
+### 片尾复位与特效关闭
+
+每个动作文件都应把“结束”作为独立阶段，而不是让最后一帧停在动作中间：
+
+- Heave 在片尾前回到轨道 `neutral`；
+- 风机、水、热风、震动、香氛在所有事件结束后关闭；
+- 至少给 `motion-composer` 默认的 1500ms 关机余量；
+- 需要更严格时，在 `motion.composer.audit` 中提高 `end_shutdown_margin_ms`。
+
+示例：
+
+```text
+247.5s  全部环境 gate 关闭
+248.5s  Heave 开始复位
+249.7s  Heave 到达 neutral=0
+250.933s 片尾保持中性
+```
+
+门禁错误码：
+
+- `motion.end_not_neutral`：结束时 Heave 没回中
+- `motion.end_effects_not_closed`：片尾仍存在开启的特效窗口
 
 ## clips —— 逐通道原始曲线
 

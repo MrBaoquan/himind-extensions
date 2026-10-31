@@ -6,7 +6,7 @@
   "categories": [
     "software-engineering"
   ],
-  "version": "1.2.0",
+  "version": "1.2.1",
   "distribution_targets": [
     "workbench",
     "github"
@@ -28,5 +28,5 @@
     "skill.json",
     "assets/icon.png"
   ],
-  "release_notes": "1.2.0：补充 CoplayDev Unity MCP 安装、MCP/Test Runner/批处理 harness 矩阵与自动化测试门禁。"
+  "release_notes": "1.2.1：补充 UNIHper/Initialize、SceneEntry 常规入口与程序集/资源配置约定。"
 }

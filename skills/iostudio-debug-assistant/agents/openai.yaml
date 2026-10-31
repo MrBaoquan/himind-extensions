@@ -1,0 +1,4 @@
+interface:
+  display_name: "IOStudio 调试助手"
+  short_description: "查设备通道、预检动作文件、执行协议测试并定位失败步骤"
+  default_prompt: "用 $iostudio-debug-assistant 排查 IOStudio 的这个问题：先确认用的是哪一份安装和哪份设备表，再查设备动作通道，按预检、轨道核对、干跑的顺序定位；需要时执行协议测试场景并解释失败步骤，不要用 skip_validate 绕过门禁。"

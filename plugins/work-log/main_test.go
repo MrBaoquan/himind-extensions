@@ -333,7 +333,7 @@ func TestPeriodRange(t *testing.T) {
 		{"yearly", "2026-10-09", "2026-01-01", "2026-12-31", "2026"},
 	}
 	for _, testCase := range cases {
-		from, to, key, err := periodRange(testCase.period, testCase.anchor)
+		from, to, key, err := periodRange(testCase.period, testCase.anchor, defaultFiscalYearStartMonth)
 		if err != nil {
 			t.Fatalf("%s 计算失败: %v", testCase.period, err)
 		}
@@ -342,6 +342,74 @@ func TestPeriodRange(t *testing.T) {
 		}
 		if testCase.key != "" && key != testCase.key {
 			t.Fatalf("%s 键错误: %s", testCase.period, key)
+		}
+	}
+}
+
+// 公司从 2 月起算财年：Q1 = 2/3/4 月，Q4 跨年到次年 1 月，年度 = 2 月 ~ 次年 1 月。
+// 键里的年份是财年起始年，所以 1 月的记录属于上一个财年。
+func TestPeriodRangeWithFiscalStartMonth(t *testing.T) {
+	cases := []struct {
+		period string
+		anchor string
+		from   string
+		to     string
+		key    string
+	}{
+		{"quarterly", "2026-02-01", "2026-02-01", "2026-04-30", "2026-Q1"},
+		{"quarterly", "2026-04-30", "2026-02-01", "2026-04-30", "2026-Q1"},
+		{"quarterly", "2026-05-01", "2026-05-01", "2026-07-31", "2026-Q2"},
+		{"quarterly", "2026-07-31", "2026-05-01", "2026-07-31", "2026-Q2"},
+		{"quarterly", "2026-08-01", "2026-08-01", "2026-10-31", "2026-Q3"},
+		{"quarterly", "2026-11-01", "2026-11-01", "2027-01-31", "2026-Q4"},
+		{"quarterly", "2027-01-31", "2026-11-01", "2027-01-31", "2026-Q4"},
+		{"quarterly", "2026-01-31", "2025-11-01", "2026-01-31", "2025-Q4"},
+		{"yearly", "2026-03-01", "2026-02-01", "2027-01-31", "2026"},
+		{"yearly", "2026-01-31", "2025-02-01", "2026-01-31", "2025"},
+	}
+	for _, testCase := range cases {
+		from, to, key, err := periodRange(testCase.period, testCase.anchor, 2)
+		if err != nil {
+			t.Fatalf("%s %s 计算失败: %v", testCase.period, testCase.anchor, err)
+		}
+		if from != testCase.from || to != testCase.to || key != testCase.key {
+			t.Fatalf("%s %s 期望 %s~%s/%s，实际 %s~%s/%s",
+				testCase.period, testCase.anchor, testCase.from, testCase.to, testCase.key, from, to, key)
+		}
+	}
+}
+
+// 起算月不是 1 月时，按周期移动不能因为月末溢出跳过目标季度：
+// 断言移动后的锚点仍落在「上一个周期」的区间内，而不是落到目标周期之后。
+func TestPeriodShiftAcrossFiscalQuarters(t *testing.T) {
+	cases := []struct {
+		period string
+		anchor string
+	}{
+		{"quarterly", "2026-03-31"},
+		{"quarterly", "2026-05-31"},
+		{"quarterly", "2026-08-31"},
+		{"quarterly", "2026-12-31"},
+		{"monthly", "2026-03-31"},
+	}
+	for _, testCase := range cases {
+		shifted, err := periodShift(testCase.period, testCase.anchor, -1, 2)
+		if err != nil {
+			t.Fatalf("%s %s 移动失败: %v", testCase.period, testCase.anchor, err)
+		}
+		from, to, wantKey, err := periodRange(testCase.period, shifted, 2)
+		if err != nil {
+			t.Fatalf("%s %s 区间计算失败: %v", testCase.period, shifted, err)
+		}
+		if shifted < from || shifted > to {
+			t.Fatalf("%s %s 移动后 %s 落在本期 %s~%s 之外", testCase.period, testCase.anchor, shifted, from, to)
+		}
+		_, _, gotKey, err := periodRange(testCase.period, testCase.anchor, 2)
+		if err != nil {
+			t.Fatalf("%s %s 区间计算失败: %v", testCase.period, testCase.anchor, err)
+		}
+		if gotKey == wantKey {
+			t.Fatalf("%s %s 移动 -1 后仍停在同一期 %s", testCase.period, testCase.anchor, gotKey)
 		}
 	}
 }
@@ -379,7 +447,7 @@ func TestAggregateCatchUpIsIdempotent(t *testing.T) {
 		t.Fatalf("每个自然周应只有一份周报，实际 %d", got)
 	}
 	// 尚未结束的当前周不应被汇总。
-	_, _, currentKey, err := periodRange("weekly", "2026-10-20")
+	_, _, currentKey, err := periodRange("weekly", "2026-10-20", defaultFiscalYearStartMonth)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -435,8 +503,142 @@ func TestAggregateDefaultPeriodsWeeklyAndMonthly(t *testing.T) {
 	}
 }
 
-func TestUpsertRejectsBadDate(t *testing.T) {
+func TestPreferencesDefaultToCalendarQuarters(t *testing.T) {
 	withDataRoot(t)
+	root := t.TempDir()
+	got := call(t, "work-log.preferences.get", `{"log_root":`+quote(root)+`}`)
+	if got["fiscal_year_start_month"].(float64) != 1 {
+		t.Fatalf("缺省起算月应为 1，实际 %v", got["fiscal_year_start_month"])
+	}
+	if got["exists"] != false {
+		t.Fatalf("未写过的偏好不应存在: %v", got["exists"])
+	}
+}
+
+func TestPreferencesSaveRejectsOutOfRange(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	for _, value := range []string{"0", "13", "-1"} {
+		_, rpcError := handle(jsonrpc.Request{
+			Method: "work-log.preferences.save",
+			Params: []byte(`{"log_root":` + quote(root) + `,"fiscal_year_start_month":` + value + `}`),
+		})
+		if rpcError == nil {
+			t.Fatalf("起算月 %s 应被拒绝", value)
+		}
+	}
+	// 缺少字段同样拒绝：静默写缺省值会让调用方以为设置成功了。
+	if _, rpcError := handle(jsonrpc.Request{
+		Method: "work-log.preferences.save",
+		Params: []byte(`{"log_root":` + quote(root) + `}`),
+	}); rpcError == nil {
+		t.Fatal("缺省 fiscal_year_start_month 应被拒绝")
+	}
+}
+
+// 设置起算月后，季度报告与年度报告都要按公司口径切分，且归档键带财年起始年。
+func TestFiscalStartMonthDrivesQuarterAndYearReports(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	saved := call(t, "work-log.preferences.save", `{"log_root":`+quote(root)+`,"fiscal_year_start_month":2}`)
+	if saved["fiscal_year_start_month"].(float64) != 2 {
+		t.Fatalf("起算月未保存: %v", saved["fiscal_year_start_month"])
+	}
+	if rule, _ := saved["quarter_rule"].(string); !contains(rule, "Q1 2-4 月") {
+		t.Fatalf("季度规则文案异常: %v", saved["quarter_rule"])
+	}
+
+	// 1 月末的条目属于上一财年 Q4；4 月末的条目属于次年 Q1。两者不能进同一份季度报告。
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-01-30","entries":[{"project":"P","title":"年初收尾"}]}`)
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-03-15","entries":[{"project":"P","title":"Q1 开工"}]}`)
+
+	q4 := call(t, "work-log.report.render", `{"log_root":`+quote(root)+`,"period":"quarterly","date":"2026-01-30"}`)["report"].(map[string]any)
+	if q4["key"] != "2025-Q4" || q4["date_from"] != "2025-11-01" || q4["date_to"] != "2026-01-31" {
+		t.Fatalf("2026-01 应落在 2025-Q4（2025-11-01~2026-01-31）: %v / %v~%v", q4["key"], q4["date_from"], q4["date_to"])
+	}
+	q1 := call(t, "work-log.report.render", `{"log_root":`+quote(root)+`,"period":"quarterly","date":"2026-03-15"}`)["report"].(map[string]any)
+	if q1["key"] != "2026-Q1" || q1["date_from"] != "2026-02-01" || q1["date_to"] != "2026-04-30" {
+		t.Fatalf("2026-03 应落在 2026-Q1（2026-02-01~2026-04-30）: %v / %v~%v", q1["key"], q1["date_from"], q1["date_to"])
+	}
+	if q1["entry_count"].(float64) != 1 {
+		t.Fatalf("Q1 只应覆盖 3 月的 1 条，实际 %v", q1["entry_count"])
+	}
+	// 报告正文要能自证口径，否则只看到 2 月起点会以为算错。
+	if markdown, _ := q1["markdown"].(string); !contains(markdown, "Q1 2-4 月") {
+		t.Fatalf("季度报告正文应写明起算月口径:\n%s", markdown)
+	}
+
+	year := call(t, "work-log.report.render", `{"log_root":`+quote(root)+`,"period":"yearly","date":"2026-03-15"}`)["report"].(map[string]any)
+	if year["key"] != "2026" || year["date_from"] != "2026-02-01" || year["date_to"] != "2027-01-31" {
+		t.Fatalf("2026 年度应为 2026-02-01~2027-01-31: %v / %v~%v", year["key"], year["date_from"], year["date_to"])
+	}
+}
+
+// 偏好跟着日志库走：换日志根就换口径，避免把公司口径带到别的库里。
+func TestPreferencesAreScopedToLogRoot(t *testing.T) {
+	withDataRoot(t)
+	first := t.TempDir()
+	second := t.TempDir()
+	call(t, "work-log.preferences.save", `{"log_root":`+quote(first)+`,"fiscal_year_start_month":4}`)
+	if got := call(t, "work-log.preferences.get", `{"log_root":`+quote(first)+`}`); got["fiscal_year_start_month"].(float64) != 4 {
+		t.Fatalf("第一个日志根应记住 4 月: %v", got["fiscal_year_start_month"])
+	}
+	if got := call(t, "work-log.preferences.get", `{"log_root":`+quote(second)+`}`); got["fiscal_year_start_month"].(float64) != 1 {
+		t.Fatalf("新日志根应退回自然季度: %v", got["fiscal_year_start_month"])
+	}
+}
+
+// 起算月跨年时，季度规则文案要写清「次年」，否则「11-1 月」会被误读。
+func TestFiscalQuarterRuleTextHandlesCrossYear(t *testing.T) {
+	cases := []struct {
+		start int
+		want  string
+	}{
+		{1, "Q1 1-3 月 · Q2 4-6 月 · Q3 7-9 月 · Q4 10-12 月"},
+		{2, "Q1 2-4 月 · Q2 5-7 月 · Q3 8-10 月 · Q4 11 月-次年 1 月"},
+		{4, "Q1 4-6 月 · Q2 7-9 月 · Q3 10-12 月 · Q4 1-3 月"},
+	}
+	for _, testCase := range cases {
+		if got := fiscalQuarterRuleText(testCase.start); got != testCase.want {
+			t.Fatalf("起算月 %d 期望 %q，实际 %q", testCase.start, testCase.want, got)
+		}
+	}
+	// 越界值按自然季度解释，与读取侧的容错一致。
+	if got := fiscalQuarterRuleText(13); got != fiscalQuarterRuleText(1) {
+		t.Fatalf("越界起算月应退回自然季度，实际 %q", got)
+	}
+}
+
+// 改过起算月后，旧归档的键会变；读取应按覆盖区间回找到原归档，而不是报「没有报告」。
+func TestReportReadFallsBackToArchiveFromOtherFiscalRule(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-01-30","entries":[{"project":"P","title":"年初收尾"}]}`)
+
+	// 自然季度口径下生成 2026-Q1 归档。
+	quarterly := call(t, "work-log.report.render", `{"log_root":`+quote(root)+`,"period":"quarterly","date":"2026-01-30"}`)["report"].(map[string]any)
+	if quarterly["key"] != "2026-Q1" {
+		t.Fatalf("自然季度下 2026-01-30 应为 2026-Q1，实际 %v", quarterly["key"])
+	}
+
+	// 改成 2 月起算后，同一天落到 2025-Q4，该键下没有归档。
+	call(t, "work-log.preferences.save", `{"log_root":`+quote(root)+`,"fiscal_year_start_month":2}`)
+	read := call(t, "work-log.report.read", `{"log_root":`+quote(root)+`,"period":"quarterly","date":"2026-01-30"}`)
+	if read["key"] != "2026-Q1" {
+		t.Fatalf("应回找到旧归档 2026-Q1，实际 %v", read["key"])
+	}
+	if read["archived_range"] != true {
+		t.Fatalf("应标记为按归档区间回找: %v", read["archived_range"])
+	}
+	if read["fiscal_year_start_month"].(float64) != 2 {
+		t.Fatalf("读回应带上当前起算月 2，实际 %v", read["fiscal_year_start_month"])
+	}
+	if markdown, _ := read["markdown"].(string); !contains(markdown, "年初收尾") {
+		t.Fatalf("应读到旧归档正文:\n%s", markdown)
+	}
+}
+
+func TestUpsertRejectsBadDate(t *testing.T) {	withDataRoot(t)
 	root := t.TempDir()
 	_, rpcError := handle(jsonrpc.Request{
 		Method: "work-log.entry.upsert",

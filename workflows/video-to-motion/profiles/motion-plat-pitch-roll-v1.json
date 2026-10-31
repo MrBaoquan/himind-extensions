@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "platform_profile_id": "motion-plat-pitch-roll-v1",
+  "display_name": "MOTION-PLAT 旧俯仰横滚平台",
+  "plugin": "MOTION-PLAT",
+  "capability_class": "pitch_roll_legacy",
+  "protocol_variant": "motion-plat-legacy-text",
+  "active_command": null,
+  "motion_axes": [
+    {
+      "role": "pitch",
+      "channel": "OAxis_01",
+      "value_type": "float",
+      "unit": "deg",
+      "min": -14,
+      "max": 14,
+      "neutral": 0,
+      "max_slew_rate": null,
+      "slew_rate_status": "not_declared",
+      "direction": "unknown",
+      "direction_status": "provisional",
+      "notes": [
+        "Observed legacy ChairDevice.xml lim_pitch=14."
+      ]
+    },
+    {
+      "role": "roll",
+      "channel": "OAxis_03",
+      "value_type": "float",
+      "unit": "deg",
+      "min": -17,
+      "max": 17,
+      "neutral": 0,
+      "max_slew_rate": null,
+      "slew_rate_status": "not_declared",
+      "direction": "unknown",
+      "direction_status": "provisional",
+      "notes": [
+        "Observed legacy ChairDevice.xml lim_roll=17."
+      ]
+    }
+  ],
+  "controls": [
+    {
+      "role": "speed",
+      "kind": "speed",
+      "channel": "OAxis_08",
+      "min": -20,
+      "max": 20,
+      "notes": [
+        "Legacy protocol speed range [-20,20]."
+      ]
+    }
+  ],
+  "effects": [],
+  "protocol_constraints": {
+    "yaw_implemented": false,
+    "unsupported_roles": [
+      "yaw",
+      "surge",
+      "sway",
+      "heave",
+      "angle"
+    ]
+  },
+  "semantics": {
+    "flight_float": {
+      "status": "approximate",
+      "output_roles": [
+        "pitch",
+        "roll"
+      ],
+      "requires_approval": true,
+      "reason": "No heave; only tilt approximation is available."
+    },
+    "weightless_drop": {
+      "status": "approximate",
+      "output_roles": [
+        "pitch",
+        "roll"
+      ],
+      "requires_approval": true,
+      "reason": "No heave; drop cannot be represented vertically."
+    },
+    "impact": {
+      "status": "approximate",
+      "output_roles": [
+        "pitch",
+        "roll"
+      ],
+      "requires_approval": true,
+      "reason": "Tilt impulse only."
+    },
+    "sharp_turn": {
+      "status": "exact",
+      "output_roles": [
+        "pitch",
+        "roll"
+      ],
+      "requires_approval": false
+    },
+    "lateral_shift": {
+      "status": "unsupported",
+      "output_roles": [],
+      "requires_approval": false
+    },
+    "yaw_turn": {
+      "status": "unsupported",
+      "output_roles": [],
+      "requires_approval": false,
+      "reason": "Legacy readme marks yaw unimplemented."
+    }
+  },
+  "safety": {
+    "safe_stop_mode": "reset_only",
+    "feedback": "none",
+    "tail_reset_required": true,
+    "tail_reset_margin_ms": 1500,
+    "reset_roles": [
+      "pitch",
+      "roll",
+      "speed"
+    ]
+  },
+  "evidence": [
+    {
+      "kind": "legacy_readme",
+      "path": "IOUI\\Binaries\\Win64\\Debug\\ExternalLibraries\\Config\\MOTION-PLAT\\readme.txt",
+      "observed": "2026-10-30"
+    },
+    {
+      "kind": "legacy_config",
+      "path": "IOUI\\Binaries\\Win64\\Debug\\ExternalLibraries\\Config\\MOTION-PLAT\\ChairDevice.xml",
+      "observed": "2026-10-30"
+    }
+  ],
+  "notes": [
+    "Legacy compatibility only; yaw is not available."
+  ]
+}

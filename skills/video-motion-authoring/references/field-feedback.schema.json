@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://himind.local/schemas/field-feedback.schema.json",
+  "title": "Field Feedback",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "production_id",
+    "variant",
+    "reviewer",
+    "scores",
+    "segments",
+    "decision"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "production_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "variant": {
+      "enum": [
+        "gentle",
+        "normal",
+        "intense"
+      ]
+    },
+    "reviewer": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reviewed_at": {
+      "type": "string"
+    },
+    "scores": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "motion_sync",
+        "weightlessness",
+        "comfort",
+        "fatigue",
+        "wind_atmosphere",
+        "scent_timing",
+        "mechanical_risk"
+      ],
+      "properties": {
+        "motion_sync": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "weightlessness": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "comfort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "fatigue": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "wind_atmosphere": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "scent_timing": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "mechanical_risk": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        }
+      }
+    },
+    "segments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "start_ms",
+          "end_ms",
+          "motion_sync",
+          "weightlessness",
+          "comfort"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "start_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end_ms": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "motion_sync": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "weightlessness": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "comfort": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "notes": {
+            "type": "string"
+          },
+          "requested_change": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "decision": {
+      "enum": [
+        "keep",
+        "retune",
+        "stop"
+      ]
+    },
+    "next_revision": {
+      "type": "string"
+    },
+    "safety_notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

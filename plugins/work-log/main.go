@@ -153,6 +153,9 @@ type input struct {
 	// 来源配置（通用可配置来源）：sources 为声明式来源规格数组。
 	Sources  []map[string]any `json:"sources"`
 	SourceID string           `json:"source_id"`
+	// FiscalYearStartMonth 供 work-log.preferences.save 设置季度 / 年度的起算月（1-12）。
+	// 1 表示自然季度；公司按 2 月起算财年时传 2，则 Q1 = 2/3/4 月。
+	FiscalYearStartMonth *int `json:"fiscal_year_start_month"`
 	// 工作项：work_item 为单条写入；List/Update/Delete 复用 project/status/priority/query 等过滤字段。
 	WorkItem    *workItem  `json:"work_item"`
 	WorkItems   []workItem `json:"work_items"`
@@ -324,6 +327,12 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 		return rpcResult(result, err)
 	case "work-log.source.save":
 		result, err := sourceSaveCap(in)
+		return rpcResult(result, err)
+	case "work-log.preferences.get":
+		result, err := preferencesGetCap(in)
+		return rpcResult(result, err)
+	case "work-log.preferences.save":
+		result, err := preferencesSaveCap(in)
 		return rpcResult(result, err)
 	case "work-log.report.render":
 		result, err := renderReport(in)
@@ -1290,7 +1299,8 @@ func reportTarget(in input) (string, string, error) {
 // renderPeriodReport 渲染并落盘一个报告周期。本期没有任何条目时返回 rendered=false，
 // 不落空文件（避免无工作日堆积空白报告）；成功时返回值里带 md/html/json 路径。
 func renderPeriodReport(root, period, anchor, title, narrative string, narratives map[string]string) (map[string]any, error) {
-	start, end, key, err := periodRange(period, anchor)
+	startMonth := fiscalStartMonth(root)
+	start, end, key, err := periodRange(period, anchor, startMonth)
 	if err != nil {
 		return nil, err
 	}
@@ -1316,8 +1326,8 @@ func renderPeriodReport(root, period, anchor, title, narrative string, narrative
 	} else {
 		title = strings.TrimSpace(title)
 	}
-	markdown := renderMarkdown(title, period, key, start, end, entries, narrative, narratives)
-	htmlBody := renderHTML(title, period, key, start, end, entries, narrative, narratives)
+	markdown := renderMarkdown(title, period, key, start, end, entries, narrative, narratives, startMonth)
+	htmlBody := renderHTML(title, period, key, start, end, entries, narrative, narratives, startMonth)
 
 	dir := filepath.Join(root, "reports", period)
 	mdPath := filepath.Join(dir, key+".md")
@@ -1341,6 +1351,12 @@ func renderPeriodReport(root, period, anchor, title, narrative string, narrative
 		"html_path":      htmlPath,
 		"markdown":       markdown,
 		"rendered":       true,
+	}
+	// 季度 / 年度报告带上起算月与划分规则：同一份归档被别人打开时能看出
+	// 「Q1 是 2-4 月」这个口径，不然只看到 2026-02-01 ~ 2026-04-30 会以为算错了。
+	if period == "quarterly" || period == "yearly" {
+		report["fiscal_year_start_month"] = startMonth
+		report["quarter_rule"] = fiscalQuarterRuleText(startMonth)
 	}
 	measuredMinutes, estimatedMinutes := splitMinutes(entries)
 	report["measured_minutes"] = measuredMinutes
@@ -1426,32 +1442,70 @@ func reportExists(root, period, key string) bool {
 }
 
 // periodShift 把锚点日期前后移动整数个自然周期。
-func periodShift(period, anchor string, delta int) (string, error) {
+//
+// 月 / 季 / 年按「周期起点 + 周期内偏移」移动，再按新周期长度夹住偏移天数：
+// 直接对锚点做 AddDate 会让 1 月 31 日 + 3 个月落到 5 月 1 日（Go 会把 4 月 31 日
+// 归一化成 5 月 1 日），一旦起算月不是 1 月，这种溢出会把锚点推出目标季度。
+func periodShift(period, anchor string, delta int, fiscalStartMonth int) (string, error) {
 	parsed, err := time.Parse("2006-01-02", anchor)
 	if err != nil {
 		return "", errors.New("date 必须是 YYYY-MM-DD 格式")
 	}
 	switch period {
 	case "daily":
-		parsed = parsed.AddDate(0, 0, delta)
+		return parsed.AddDate(0, 0, delta).Format("2006-01-02"), nil
 	case "weekly":
-		parsed = parsed.AddDate(0, 0, delta*7)
-	case "monthly":
-		parsed = parsed.AddDate(0, delta, 0)
-	case "quarterly":
-		parsed = parsed.AddDate(0, delta*3, 0)
-	case "yearly":
-		parsed = parsed.AddDate(delta, 0, 0)
+		return parsed.AddDate(0, 0, delta*7).Format("2006-01-02"), nil
+	case "monthly", "quarterly", "yearly":
+		start, _, _, err := periodRange(period, anchor, fiscalStartMonth)
+		if err != nil {
+			return "", err
+		}
+		startDate, startErr := time.Parse("2006-01-02", start)
+		if startErr != nil {
+			return "", errors.New("date 必须是 YYYY-MM-DD 格式")
+		}
+		offset := int(parsed.Sub(startDate).Hours() / 24)
+		var months int
+		switch period {
+		case "monthly":
+			months = delta
+		case "quarterly":
+			months = delta * 3
+		default:
+			months = delta * 12
+		}
+		shiftedStart := startDate.AddDate(0, months, 0)
+		shiftedEnd := shiftedStart.AddDate(0, monthsPerPeriod(period), -1)
+		length := int(shiftedEnd.Sub(shiftedStart).Hours()/24) + 1
+		if offset >= length {
+			offset = length - 1
+		}
+		if offset < 0 {
+			offset = 0
+		}
+		return shiftedStart.AddDate(0, 0, offset).Format("2006-01-02"), nil
 	default:
 		return "", errors.New("period 只能是 daily / weekly / monthly / quarterly / yearly")
 	}
-	return parsed.Format("2006-01-02"), nil
+}
+
+// monthsPerPeriod 返回月 / 季 / 年三种周期各自的月跨度。
+func monthsPerPeriod(period string) int {
+	switch period {
+	case "monthly":
+		return 1
+	case "quarterly":
+		return 3
+	default:
+		return 12
+	}
 }
 
 // aggregatePeriod 汇总锚点所在的单个自然周期。force=false 时若已有归档记录则跳过，
 // 保证同一自然周 / 月只会存在一条记录。
 func aggregatePeriod(root, period, anchor string, force bool, narrative string, narratives map[string]string) (map[string]any, error) {
-	start, end, key, err := periodRange(period, anchor)
+	start, end, key, err := periodRange(period, anchor, fiscalStartMonth(root))
 	if err != nil {
 		return nil, err
 	}
@@ -1496,20 +1550,21 @@ func aggregateCompleted(root, period, anchor string, force bool, lookback int, n
 		return results, 0, nil
 	}
 	earliest := dates[0]
+	startMonth := fiscalStartMonth(root)
 	probe := anchor
-	_, end, _, err := periodRange(period, probe)
+	_, end, _, err := periodRange(period, probe, startMonth)
 	if err != nil {
 		return nil, 0, err
 	}
 	if end >= anchor {
-		probe, err = periodShift(period, probe, -1)
+		probe, err = periodShift(period, probe, -1, startMonth)
 		if err != nil {
 			return nil, 0, err
 		}
 	}
 	skipped, counted := 0, 0
 	for step := 0; step < 400; step++ {
-		start, periodEnd, key, err := periodRange(period, probe)
+		start, periodEnd, key, err := periodRange(period, probe, startMonth)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -1521,7 +1576,7 @@ func aggregateCompleted(root, period, anchor string, force bool, lookback int, n
 			return nil, 0, err
 		}
 		if len(entries) == 0 {
-			probe, err = periodShift(period, probe, -1)
+			probe, err = periodShift(period, probe, -1, startMonth)
 			if err != nil {
 				return nil, 0, err
 			}
@@ -1540,7 +1595,7 @@ func aggregateCompleted(root, period, anchor string, force bool, lookback int, n
 		if counted >= lookback {
 			break
 		}
-		probe, err = periodShift(period, probe, -1)
+		probe, err = periodShift(period, probe, -1, startMonth)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -1620,6 +1675,44 @@ func aggregateReports(in input) (any, error) {
 	}, nil
 }
 
+// findArchivedReport 按日期覆盖区间回找一份已归档的周期报告。
+//
+// 场景：用户把起算月从 1 改成 2，同一个日期会算到新的键（如 2026-01-15 从 2026-Q1
+// 变成 2025-Q4），旧归档仍躺在原键下。若直接按新键找不到就报「没有报告」，用户会
+// 以为归档被删了。这里读归档 JSON 里的 date_from / date_to 判断覆盖关系，避免
+// 用当前口径反推旧键（旧键可能是在别的起算月下生成的）。
+func findArchivedReport(root, period, anchor string) (string, string, string, bool) {
+	dir := filepath.Join(root, "reports", period)
+	names, err := readDirNames(dir)
+	if err != nil {
+		return "", "", "", false
+	}
+	for _, name := range names {
+		if !strings.HasSuffix(name, ".json") {
+			continue
+		}
+		body, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			continue
+		}
+		var artifact struct {
+			Report struct {
+				DateFrom string `json:"date_from"`
+				DateTo   string `json:"date_to"`
+			} `json:"report"`
+		}
+		if json.Unmarshal(body, &artifact) != nil {
+			continue
+		}
+		from, to := artifact.Report.DateFrom, artifact.Report.DateTo
+		if from == "" || to == "" || anchor < from || anchor > to {
+			continue
+		}
+		return strings.TrimSuffix(name, ".json"), from, to, true
+	}
+	return "", "", "", false
+}
+
 func readReport(in input) (any, error) {
 	root, err := logRoot(in.LogRoot)
 	if err != nil {
@@ -1636,11 +1729,21 @@ func readReport(in input) (any, error) {
 	if !validDate(anchor) {
 		return nil, errors.New("date 必须是 YYYY-MM-DD 格式")
 	}
-	start, end, key, err := periodRange(period, anchor)
+	start, end, key, err := periodRange(period, anchor, fiscalStartMonth(root))
 	if err != nil {
 		return nil, err
 	}
 	mdPath := filepath.Join(root, "reports", period, key+".md")
+	archivedFallback := false
+	if _, statErr := os.Stat(mdPath); errors.Is(statErr, os.ErrNotExist) {
+		// 改过起算月后，同一个日期会算到新的键，旧归档还留在原键下。
+		// 直接报「没有报告」会让人以为归档丢了，所以按覆盖区间回找一份。
+		if found, from, to, ok := findArchivedReport(root, period, anchor); ok {
+			key, start, end = found, from, to
+			mdPath = filepath.Join(root, "reports", period, key+".md")
+			archivedFallback = true
+		}
+	}
 	htmlPath := filepath.Join(root, "reports", period, key+".html")
 	mdBody, err := os.ReadFile(mdPath)
 	if errors.Is(err, os.ErrNotExist) {
@@ -1650,7 +1753,7 @@ func readReport(in input) (any, error) {
 		return nil, errors.New("报告 Markdown 读取失败")
 	}
 	htmlBody, _ := os.ReadFile(htmlPath)
-	return map[string]any{
+	result := map[string]any{
 		"log_root":  root,
 		"period":    period,
 		"key":       key,
@@ -1660,7 +1763,15 @@ func readReport(in input) (any, error) {
 		"html":      string(htmlBody),
 		"md_path":   mdPath,
 		"html_path": htmlPath,
-	}, nil
+	}
+	// 归档是按落盘当时的起算月切的；读回时把「当前」口径一并说明，方便调用方
+	// 发现两者不一致（改过起算月的旧归档不会被自动重算）。
+	if period == "quarterly" || period == "yearly" {
+		result["fiscal_year_start_month"] = fiscalStartMonth(root)
+		result["quarter_rule"] = fiscalQuarterRuleText(fiscalStartMonth(root))
+		result["archived_range"] = archivedFallback
+	}
+	return result, nil
 }
 
 // ---------- 存储 ----------
@@ -1894,7 +2005,10 @@ func isKnownPeriod(period string) bool {
 }
 
 // periodRange 把锚点日期展开成周期边界与稳定的报告键。
-func periodRange(period, anchor string) (string, string, string, error) {
+//
+// fiscalStartMonth 只影响 quarterly / yearly：公司按 2 月起算财年时，
+// Q1 = 2/3/4 月，年度 = 2 月 ~ 次年 1 月。日 / 周 / 月是自然周期，与起算月无关。
+func periodRange(period, anchor string, fiscalStartMonth int) (string, string, string, error) {
 	parsed, err := time.Parse("2006-01-02", anchor)
 	if err != nil {
 		return "", "", "", errors.New("date 必须是 YYYY-MM-DD 格式")
@@ -1916,15 +2030,11 @@ func periodRange(period, anchor string) (string, string, string, error) {
 		end := start.AddDate(0, 1, -1)
 		return start.Format("2006-01-02"), end.Format("2006-01-02"), fmt.Sprintf("%04d-%02d", parsed.Year(), int(parsed.Month())), nil
 	case "quarterly":
-		quarter := (int(parsed.Month())-1)/3 + 1
-		startMonth := time.Month((quarter-1)*3 + 1)
-		start := time.Date(parsed.Year(), startMonth, 1, 0, 0, 0, 0, time.UTC)
-		end := start.AddDate(0, 3, -1)
-		return start.Format("2006-01-02"), end.Format("2006-01-02"), fmt.Sprintf("%04d-Q%d", parsed.Year(), quarter), nil
+		span := fiscalQuarterOf(parsed, fiscalStartMonth)
+		return span.Start.Format("2006-01-02"), span.End.Format("2006-01-02"), span.Key(), nil
 	case "yearly":
-		start := time.Date(parsed.Year(), 1, 1, 0, 0, 0, 0, time.UTC)
-		end := time.Date(parsed.Year(), 12, 31, 0, 0, 0, 0, time.UTC)
-		return start.Format("2006-01-02"), end.Format("2006-01-02"), fmt.Sprintf("%04d", parsed.Year()), nil
+		span := fiscalYearOf(parsed, fiscalStartMonth)
+		return span.Start.Format("2006-01-02"), span.End.Format("2006-01-02"), span.Key(), nil
 	default:
 		return "", "", "", errors.New("period 只能是 daily / weekly / monthly / quarterly / yearly")
 	}
@@ -1965,10 +2075,15 @@ func periodLabel(period string) string {
 
 // ---------- 渲染 ----------
 
-func renderMarkdown(title, period, key, from, to string, entries []entry, narrative string, narratives map[string]string) string {
+func renderMarkdown(title, period, key, from, to string, entries []entry, narrative string, narratives map[string]string, fiscalStartMonth int) string {
 	var builder strings.Builder
 	builder.WriteString("# " + title + "\n\n")
 	builder.WriteString(fmt.Sprintf("周期：%s · 覆盖 %s ~ %s · 共 %d 条记录\n\n", key, from, to, len(entries)))
+	// 季度 / 年度按公司起算月划分时，把口径写进正文：只看到 2026-02-01 ~ 2026-04-30
+	// 的人会怀疑算错，写明「Q1 2-4 月」才能自证。
+	if (period == "quarterly" || period == "yearly") && normalizeFiscalYearStartMonth(fiscalStartMonth) != defaultFiscalYearStartMonth {
+		builder.WriteString(fmt.Sprintf("口径：财年从 %d 月起算 · %s\n\n", normalizeFiscalYearStartMonth(fiscalStartMonth), fiscalQuarterRuleText(fiscalStartMonth)))
+	}
 	if narrative != "" {
 		builder.WriteString(narrative + "\n\n")
 	}
@@ -2297,11 +2412,15 @@ func lookupNarrative(narratives map[string]string, key string) string {
 	return ""
 }
 
-func renderHTML(title, period, key, from, to string, entries []entry, narrative string, narratives map[string]string) string {
+func renderHTML(title, period, key, from, to string, entries []entry, narrative string, narratives map[string]string, fiscalStartMonth int) string {
 	sections := make([]string, 0, 6)
 	narrativeHTML := ""
 	if narrative != "" {
 		narrativeHTML = `<p class="narrative">` + html.EscapeString(narrative) + `</p>`
+	}
+	ruleHTML := ""
+	if (period == "quarterly" || period == "yearly") && normalizeFiscalYearStartMonth(fiscalStartMonth) != defaultFiscalYearStartMonth {
+		ruleHTML = `<p class="sub">口径：财年从 ` + fmt.Sprintf("%d", normalizeFiscalYearStartMonth(fiscalStartMonth)) + ` 月起算 · ` + html.EscapeString(fiscalQuarterRuleText(fiscalStartMonth)) + `</p>`
 	}
 	sections = append(sections, `<section><h2>概览</h2><ul class="plain">`+mdListToHTML(overviewLines(entries))+`</ul></section>`)
 	if period == "daily" {
@@ -2343,6 +2462,7 @@ footer{margin-top:18px;color:#94a3b8;font-size:11px}
 </style></head><body><main>
 <h1>` + html.EscapeString(title) + `</h1>
 <p class="sub">周期 ` + html.EscapeString(key) + ` · 覆盖 ` + html.EscapeString(from) + ` ~ ` + html.EscapeString(to) + ` · 共 ` + fmt.Sprintf("%d", len(entries)) + ` 条记录</p>
+` + ruleHTML + `
 ` + narrativeHTML + strings.Join(sections, "\n") + `
 <footer>由工作日志工具按确定性规则聚合；主线叙述（如有）来自所选模型服务。</footer>
 </main></body></html>`

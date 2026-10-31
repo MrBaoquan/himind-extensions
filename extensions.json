@@ -37,6 +37,11 @@
     },
     {
       "type": "plugin",
+      "id": "com.himind.motion-composer",
+      "path": "plugins/motion-composer"
+    },
+    {
+      "type": "plugin",
       "id": "com.himind.iostudio",
       "path": "plugins/iostudio"
     },
@@ -157,6 +162,11 @@
     },
     {
       "type": "skill",
+      "id": "com.himind.skill.iostudio-debug-assistant",
+      "path": "skills/iostudio-debug-assistant"
+    },
+    {
+      "type": "skill",
       "id": "com.himind.skill.long-task-driver",
       "path": "skills/long-task-driver"
     },
@@ -184,6 +194,11 @@
       "type": "skill",
       "id": "com.himind.skill.ui-ux-design-assistant",
       "path": "skills/ui-ux-design-assistant"
+    },
+    {
+      "type": "workflow",
+      "id": "com.himind.workflow.video-to-motion",
+      "path": "workflows/video-to-motion"
     }
   ],
   "feature_packs": [

@@ -1,0 +1,111 @@
+{
+  "schema_version": "show-spec/v1",
+  "name": "YDL neutral=0 normal",
+  "duration_ms": 7000,
+  "fps": 60,
+  "device": "YDL-0",
+  "platform_profile_id": "mp-ydl-heave-v1",
+  "platform_profile_sha256": "af7c6ed63ecc73d83e294ad1ed84b59eda79a1ebe9a469e0dd3e2926f29242c7",
+  "active_command": null,
+  "tracks": [
+    {
+      "role": "heave",
+      "channel": "OAxis_06",
+      "label": "电缸升降",
+      "value_type": "float",
+      "neutral": 0,
+      "engineering_range": 1000
+    },
+    {
+      "role": "wind",
+      "channel": "OAxis_18",
+      "label": "风扇风速",
+      "value_type": "float",
+      "neutral": 0,
+      "engineering_range": 100
+    }
+  ],
+  "presets": [
+    {
+      "id": "ydl_neutral0_probe",
+      "name": "YDL 中性零位验证",
+      "category": "验证",
+      "duration_ms": 3000,
+      "default_intensity": 1.0,
+      "min_intensity": 0.3,
+      "max_intensity": 1.2,
+      "channels": [
+        {
+          "role": "heave",
+          "keyframes": [
+            {
+              "time_ms": 0,
+              "value": 0.0,
+              "interpolation": "ease_in_out"
+            },
+            {
+              "time_ms": 600,
+              "value": 0.55,
+              "interpolation": "ease_in_out"
+            },
+            {
+              "time_ms": 1200,
+              "value": 0.55,
+              "interpolation": "ease_in_out"
+            },
+            {
+              "time_ms": 2100,
+              "value": 0.1,
+              "interpolation": "ease_in_out"
+            },
+            {
+              "time_ms": 2300,
+              "value": 0.35,
+              "interpolation": "ease_in_out"
+            },
+            {
+              "time_ms": 3000,
+              "value": 0.0,
+              "interpolation": "ease_in_out"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "cues": [
+    {
+      "time_ms": 1000,
+      "preset": "ydl_neutral0_probe",
+      "intensity": 1.0
+    }
+  ],
+  "gates": [
+    {
+      "role": "wind",
+      "start_ms": 1000,
+      "end_ms": 3000,
+      "fade_ms": 0,
+      "level": 0.65
+    }
+  ],
+  "chapters": [
+    {
+      "time_ms": 0,
+      "name": "待机"
+    },
+    {
+      "time_ms": 1000,
+      "name": "验证动作"
+    }
+  ],
+  "events": [
+    {
+      "time_ms": 1000,
+      "name": "ydl.gameState",
+      "data": "{\"state\":\"Playing\"}",
+      "lane": "游戏状态",
+      "data_type": "json"
+    }
+  ]
+}

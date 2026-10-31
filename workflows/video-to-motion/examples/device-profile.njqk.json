@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "device": "NJ-QK",
+  "axes": [
+    {
+      "role": "pitch",
+      "channel": "OAxis_01",
+      "value_type": "float",
+      "min": -25,
+      "max": 25,
+      "neutral": 0,
+      "unit": "deg",
+      "category": "motion"
+    },
+    {
+      "role": "roll",
+      "channel": "OAxis_03",
+      "value_type": "float",
+      "min": -25,
+      "max": 25,
+      "neutral": 0,
+      "unit": "deg",
+      "category": "motion"
+    },
+    {
+      "role": "speed",
+      "channel": "OAxis_08",
+      "value_type": "float",
+      "min": 0,
+      "max": 10,
+      "neutral": 0,
+      "unit": "level",
+      "category": "control"
+    }
+  ]
+}

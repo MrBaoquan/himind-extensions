@@ -1,0 +1,251 @@
+{
+  "schema_version": "workflow_view.v1",
+  "title": "视频转动作",
+  "sections": [
+    {
+      "id": "source",
+      "title": "视频与视角",
+      "fields": [
+        {
+          "id": "workspace_root",
+          "label": "工作区目录",
+          "type": "text",
+          "required": true,
+          "placeholder": "例如 F:\\WebProjects\\MotionProject"
+        },
+        {
+          "id": "video_path",
+          "label": "视频路径",
+          "type": "text",
+          "required": true,
+          "placeholder": "相对工作区，例如 media\\飞跃雪山.mp4"
+        },
+        {
+          "id": "projection_mode",
+          "label": "投影类型",
+          "type": "select",
+          "required": true,
+          "default": "equirectangular",
+          "options": [
+            "equirectangular",
+            "flat"
+          ]
+        },
+        {
+          "id": "yaw_deg",
+          "label": "主视角水平角",
+          "type": "number",
+          "default": 0
+        },
+        {
+          "id": "pitch_deg",
+          "label": "主视角俯仰角",
+          "type": "number",
+          "default": 0
+        },
+        {
+          "id": "h_fov_deg",
+          "label": "水平视场角",
+          "type": "number",
+          "default": 100
+        },
+        {
+          "id": "v_fov_deg",
+          "label": "垂直视场角",
+          "type": "number",
+          "default": 65
+        },
+        {
+          "id": "transcribe_enabled",
+          "label": "启用语音转写",
+          "type": "boolean",
+          "default": false
+        }
+      ]
+    },
+    {
+      "id": "platform",
+      "title": "IOUI 平台能力",
+      "fields": [
+        {
+          "id": "platform_profile_path",
+          "label": "平台能力档案",
+          "type": "select",
+          "required": true,
+          "default": "profiles/mp-ydl-heave-v1.json",
+          "options": [
+            "profiles/mp-ydl-heave-v1.json",
+            "profiles/mp-njlj-a3t-v1.json",
+            "profiles/mp-njqk-pitch-roll-v1.json",
+            "profiles/motion-plat-pitch-roll-v1.json"
+          ]
+        },
+        {
+          "id": "device_name",
+          "label": "IOStudio 设备名",
+          "type": "text",
+          "required": true,
+          "placeholder": "例如 YDL-0"
+        },
+        {
+          "id": "allow_approximate",
+          "label": "允许人工审批近似映射",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "confirm_active_command",
+          "label": "确认平台当前命令变体",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "wind_enabled",
+          "label": "允许风机",
+          "type": "boolean",
+          "default": true
+        },
+        {
+          "id": "water_enabled",
+          "label": "允许喷水",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "hot_enabled",
+          "label": "允许热风",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "vibrate_enabled",
+          "label": "允许震动",
+          "type": "boolean",
+          "default": true
+        },
+        {
+          "id": "scent_enabled",
+          "label": "允许香氛",
+          "type": "boolean",
+          "default": false
+        }
+      ]
+    },
+    {
+      "id": "creative",
+      "title": "创作与安全",
+      "fields": [
+        {
+          "id": "creative_direction",
+          "label": "创作方向",
+          "type": "select",
+          "required": true,
+          "default": "faithful",
+          "options": [
+            "faithful",
+            "cinematic",
+            "family",
+            "thrilling"
+          ]
+        },
+        {
+          "id": "max_intensity",
+          "label": "最大强度",
+          "type": "select",
+          "required": true,
+          "default": "normal",
+          "options": [
+            "gentle",
+            "normal",
+            "intense"
+          ]
+        },
+        {
+          "id": "tail_reset_margin_ms",
+          "label": "片尾复位余量(ms)",
+          "type": "number",
+          "default": 1500
+        },
+        {
+          "id": "silent_only",
+          "label": "仅静音预览，不驱动设备",
+          "type": "boolean",
+          "default": true
+        },
+        {
+          "id": "overwrite_policy",
+          "label": "已有产物处理",
+          "type": "select",
+          "required": true,
+          "default": "versioned",
+          "options": [
+            "versioned",
+            "fail"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "delivery",
+      "title": "输出与续跑",
+      "fields": [
+        {
+          "id": "output_dir",
+          "label": "输出目录",
+          "type": "text",
+          "required": true,
+          "placeholder": "相对工作区，例如 motion-runs\\feiyue\\ydl"
+        },
+        {
+          "id": "behavior_timeline_path",
+          "label": "已有行为时间线",
+          "type": "text",
+          "placeholder": "从“从动作意图继续”入口使用"
+        },
+        {
+          "id": "motion_intent_path",
+          "label": "已有动作意图",
+          "type": "text",
+          "placeholder": "从“从动作意图继续”入口使用"
+        },
+        {
+          "id": "motion_spec_set_path",
+          "label": "已有三档规格集",
+          "type": "text",
+          "placeholder": "从规格或构建入口使用"
+        },
+        {
+          "id": "platform_binding_path",
+          "label": "已有平台映射",
+          "type": "text",
+          "placeholder": "从规格入口使用"
+        },
+        {
+          "id": "motion_audit_set_path",
+          "label": "已有质量审计",
+          "type": "text",
+          "placeholder": "从构建入口使用"
+        },
+        {
+          "id": "delivery_manifest_path",
+          "label": "已有交付清单",
+          "type": "text",
+          "placeholder": "从现场确认入口使用"
+        },
+        {
+          "id": "field_notes",
+          "label": "现场备注",
+          "type": "textarea",
+          "placeholder": "动作同步、失重感、舒适度、风速、香氛和机械风险"
+        }
+      ]
+    }
+  ],
+  "actions": [
+    "analyze_video",
+    "from_intent",
+    "from_specs",
+    "build_only",
+    "review_delivery"
+  ]
+}

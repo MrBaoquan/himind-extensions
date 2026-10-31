@@ -1,0 +1,650 @@
+{
+  "schema_version": "workflow_package.v1",
+  "id": "com.himind.workflow.video-to-motion",
+  "icon": "assets/icon.png",
+  "version": "0.1.0",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
+  "name": "视频转动作",
+  "description": "按具体 IOUI 平台能力从视频生成三档 Motion，并完成质量门禁与人工验收。",
+  "release_notes": "0.1.0：平台感知的视频证据、动作意图、三档规格、质量门禁与交付。",
+  "min_agent_version": "0.3.75",
+  "local_requirements": {
+    "platform": "windows",
+    "workspace": "directory",
+    "required_tools": [],
+    "recommended_tools": [
+      "ffmpeg"
+    ]
+  },
+  "execution_policy": "segmented",
+  "entrypoints": [
+    {
+      "id": "analyze_video",
+      "at_step": "V2M-EVIDENCE",
+      "label": "从视频开始分析",
+      "requires": [
+        "workspace_root",
+        "video_path",
+        "platform_profile_path",
+        "projection_mode"
+      ]
+    },
+    {
+      "id": "from_intent",
+      "at_step": "V2M-INTENT",
+      "label": "从动作意图继续",
+      "requires": [
+        "workspace_root",
+        "platform_profile_path",
+        "behavior_timeline_path",
+        "motion_intent_path"
+      ]
+    },
+    {
+      "id": "from_specs",
+      "at_step": "V2M-QA-LOOP",
+      "label": "从三档规格继续",
+      "requires": [
+        "workspace_root",
+        "platform_profile_path",
+        "motion_spec_set_path",
+        "platform_binding_path"
+      ]
+    },
+    {
+      "id": "build_only",
+      "at_step": "V2M-BUILD",
+      "label": "只构建已审计规格",
+      "requires": [
+        "workspace_root",
+        "platform_profile_path",
+        "motion_spec_set_path",
+        "motion_audit_set_path"
+      ]
+    },
+    {
+      "id": "review_delivery",
+      "at_step": "V2M-ACCEPT",
+      "label": "只做现场确认",
+      "requires": [
+        "workspace_root",
+        "delivery_manifest_path"
+      ]
+    }
+  ],
+  "default_entrypoint": "analyze_video",
+  "exits": [
+    {
+      "id": "evidence_ready",
+      "at_step": "V2M-EVIDENCE",
+      "label": "视频证据已就绪",
+      "produces": [
+        "media-evidence"
+      ]
+    },
+    {
+      "id": "behavior_ready",
+      "at_step": "V2M-BEHAVIOR",
+      "label": "行为时间线已就绪",
+      "produces": [
+        "behavior-timeline"
+      ]
+    },
+    {
+      "id": "intent_ready",
+      "at_step": "V2M-INTENT",
+      "label": "动作意图已就绪",
+      "produces": [
+        "motion-intent"
+      ]
+    },
+    {
+      "id": "binding_ready",
+      "at_step": "V2M-BINDING",
+      "label": "平台映射已解析",
+      "produces": [
+        "platform-binding"
+      ]
+    },
+    {
+      "id": "specs_ready",
+      "at_step": "V2M-QA-LOOP",
+      "label": "三档规格已审计",
+      "produces": [
+        "motion-spec-set",
+        "motion-audit-set"
+      ]
+    },
+    {
+      "id": "motions_ready",
+      "at_step": "V2M-BUILD",
+      "label": "三档 motion 已构建",
+      "produces": [
+        "motion-delivery"
+      ]
+    },
+    {
+      "id": "delivery_ready",
+      "at_step": "V2M-DELIVERY",
+      "label": "交付清单已就绪",
+      "produces": [
+        "motion-delivery"
+      ]
+    },
+    {
+      "id": "accepted",
+      "at_step": "V2M-ACCEPT",
+      "label": "现场验收已确认",
+      "produces": [
+        "field-feedback"
+      ]
+    }
+  ],
+  "default_exitpoint": "accepted",
+  "capabilities": [
+    "media.toolkit.runtime.status",
+    "media.toolkit.probe",
+    "media.toolkit.video.project",
+    "media.toolkit.recipe.run",
+    "media.toolkit.job.status",
+    "media.toolkit.frames.contact-sheet",
+    "media.toolkit.scene.score",
+    "media.toolkit.audio.loudness",
+    "media.ai.transcribe",
+    "iostudio.runtime.status",
+    "iostudio.devices",
+    "iostudio.motion.plan",
+    "iostudio.motion.build",
+    "iostudio.motion.validate",
+    "iostudio.motion.tracks",
+    "motion.composer.runtime.status",
+    "motion.composer.audit",
+    "motion.composer.compare",
+    "motion.composer.platform.resolve"
+  ],
+  "dependencies": {
+    "skills": [
+      {
+        "id": "com.himind.skill.video-motion-authoring",
+        "required": true,
+        "min_version": "1.8.0"
+      }
+    ],
+    "plugins": [
+      {
+        "id": "com.himind.media-toolkit",
+        "required": true,
+        "min_version": "1.4.0"
+      },
+      {
+        "id": "com.himind.iostudio",
+        "required": true,
+        "min_version": "1.1.1"
+      },
+      {
+        "id": "com.himind.motion-composer",
+        "required": true,
+        "min_version": "1.2.0"
+      },
+      {
+        "id": "com.himind.media-ai",
+        "required": false,
+        "min_version": "1.0.0"
+      }
+    ],
+    "connectors": [],
+    "runtimes": [
+      "himind.builtin"
+    ]
+  },
+  "steps": [
+    {
+      "id": "V2M-MEDIA-READY",
+      "title": "检查媒体环境",
+      "kind": "capability",
+      "capability_id": "media.toolkit.runtime.status",
+      "execution_mode": "sync",
+      "risk_level": "read_only",
+      "on_failure": "fail",
+      "input": {}
+    },
+    {
+      "id": "V2M-IO-READY",
+      "title": "检查IOStudio",
+      "kind": "capability",
+      "capability_id": "iostudio.runtime.status",
+      "execution_mode": "sync",
+      "risk_level": "read_only",
+      "on_failure": "fail",
+      "input": {}
+    },
+    {
+      "id": "V2M-QA-READY",
+      "title": "检查质量门禁",
+      "kind": "capability",
+      "capability_id": "motion.composer.runtime.status",
+      "execution_mode": "sync",
+      "risk_level": "read_only",
+      "on_failure": "fail",
+      "input": {}
+    },
+    {
+      "id": "V2M-DEVICE",
+      "title": "读取设备通道",
+      "kind": "runtime",
+      "execution_mode": "sync",
+      "risk_level": "read_only",
+      "depends_on": [
+        "V2M-IO-READY"
+      ],
+      "runtime": {
+        "provider": "himind.builtin",
+        "workspace_path": "input.workspace_root",
+        "result_schema": "schemas/device-profile.schema.json",
+        "tool_policy": "default",
+        "allow_network": false,
+        "timeout_seconds": 300,
+        "prompt": "调用 iostudio.devices，读取 input.device_name 对应设备的真实 OAction/OAxis、value_type、neutral、engineering_range、SlewRate 和安全值。把结果写成 device-profile Artifact。禁止猜测通道；设备不存在或关键字段缺失时失败。返回严格符合 result_schema 的 JSON。"
+      }
+    },
+    {
+      "id": "V2M-PLATFORM",
+      "title": "载入平台能力",
+      "kind": "runtime",
+      "execution_mode": "sync",
+      "risk_level": "read_only",
+      "depends_on": [
+        "V2M-MEDIA-READY",
+        "V2M-QA-READY",
+        "V2M-IO-READY"
+      ],
+      "runtime": {
+        "provider": "himind.builtin",
+        "workspace_path": "input.workspace_root",
+        "result_schema": "schemas/platform-profile.schema.json",
+        "tool_policy": "default",
+        "allow_network": false,
+        "timeout_seconds": 120,
+        "prompt": "读取 input.platform_profile_path 指向的受控平台 profile，校验 schema_version、motion_axes、effects、active_command、semantics 和 safety。把 profile 原样写为 platform-profile Artifact，并确认与 iostudio.devices 的 device-profile 通道和值类型一致。若当前 active_command 与 profile 不一致、方向/量程/通道冲突，立即失败，不得继续。"
+      }
+    },
+    {
+      "id": "V2M-EVIDENCE",
+      "title": "采集视频证据",
+      "kind": "runtime",
+      "execution_mode": "long_running",
+      "risk_level": "read_only",
+      "depends_on": [
+        "V2M-MEDIA-READY",
+        "V2M-PLATFORM"
+      ],
+      "runtime": {
+        "provider": "himind.builtin",
+        "workspace_path": "input.workspace_root",
+        "result_schema": "artifacts/media-evidence.schema.json",
+        "tool_policy": "default",
+        "allow_network": false,
+        "timeout_seconds": 3600,
+        "prompt": "使用 video-motion-authoring 技能和 media.toolkit 能力分析 input.video_path。先 probe；必要时创建并轮询分析代理片；全景视频按 input.projection_mode/yaw/pitch/hfov/vfov 创建主前向代理；生成 contact sheet、scene score、loudness；若 input.transcribe_enabled=true 且 media-ai 可用则轮询转写。禁止只凭单个信号判定行为。写入 media-evidence Artifact，源视频必须记录 SHA-256。返回严格符合 result_schema 的 JSON。"
+      }
+    },
+    {
+      "id": "V2M-BEHAVIOR",
+      "title": "分析行为时间线",
+      "kind": "runtime",
+      "execution_mode": "sync",
+      "risk_level": "read_only",
+      "depends_on": [
+        "V2M-EVIDENCE"
+      ],
+      "runtime": {
+        "provider": "himind.builtin",
+        "workspace_path": "input.workspace_root",
+        "input_artifacts": [
+          "media-evidence"
+        ],
+        "result_schema": "artifacts/behavior-timeline.schema.json",
+        "tool_policy": "none",
+        "allow_network": false,
+        "timeout_seconds": 1200,
+        "prompt": "根据只读 media-evidence 生成 behavior-timeline.json。按 video-motion-authoring 技能输出段落 start_ms/end_ms、behavior、scene、energy、confidence、证据时间点和事件。低置信度必须标注；全景必须保留主前向参数。不得编造画面中没有的行为。只输出严格符合 result_schema 的 JSON。"
+      }
+    },
+    {
+      "id": "V2M-INTENT",
+      "title": "生成动作意图",
+      "kind": "runtime",
+      "execution_mode": "sync",
+      "risk_level": "read_only",
+      "depends_on": [
+        "V2M-BEHAVIOR",
+        "V2M-DEVICE",
+        "V2M-PLATFORM"
+      ],
+      "runtime": {
+        "provider": "himind.builtin",
+        "workspace_path": "input.workspace_root",
+        "input_artifacts": [
+          "media-evidence",
+          "behavior-timeline",
+          "device-profile",
+          "platform-profile"
+        ],
+        "result_schema": "artifacts/motion-intent.schema.json",
+        "tool_policy": "none",
+        "allow_network": false,
+        "timeout_seconds": 1200,
+        "prompt": "根据 media-evidence、behavior-timeline、device-profile、platform-profile 生成平台感知的 motion-intent.json。每个 phrase 必须含 canonical semantic（如 flight_float、weightless_drop、impact、sharp_turn、lateral_shift、yaw_turn）以及原有 intent 字段。只使用 platform-profile 中声明为 exact 或 approximate 的语义；不要使用 unsupported 轴。长段必须有低幅飞行底噪；片尾必须关闭全部环境特效并回 neutral。三档共用 cue 时点，只改变幅度、下降时间、环境强度和门控密度。只输出严格符合 result_schema 的 JSON。"
+      }
+    },
+    {
+      "id": "V2M-BINDING",
+      "title": "解析平台映射",
+      "kind": "runtime",
+      "execution_mode": "sync",
+      "risk_level": "read_only",
+      "depends_on": [
+        "V2M-INTENT"
+      ],
+      "runtime": {
+        "provider": "himind.builtin",
+        "workspace_path": "input.workspace_root",
+        "input_artifacts": [
+          "motion-intent",
+          "platform-profile"
+        ],
+        "result_schema": "schemas/platform-binding.schema.json",
+        "tool_policy": "default",
+        "allow_network": false,
+        "timeout_seconds": 300,
+        "prompt": "调用 motion.composer.platform.resolve，传入 workspace_root、platform_profile_path、motion_intent_path、device_profile_path。把返回的 binding 原样保存为 platform-binding Artifact。整体 status=unsupported 时设置 ok=false 并停止后续生成；approximate 时必须列出 required_approvals，等待人工确认；exact 才可自动继续。禁止自行把缺失轴映射成别的轴。"
+      },
+      "fail_when": {
+        "path": "steps.V2M-BINDING.ok",
+        "operator": "equals",
+        "value": false
+      }
+    },
+    {
+      "id": "V2M-REVIEW",
+      "title": "确认语义与降级",
+      "kind": "manual",
+      "execution_mode": "sync",
+      "risk_level": "read_only",
+      "approval_required": true,
+      "depends_on": [
+        "V2M-BINDING"
+      ]
+    },
+    {
+      "id": "V2M-SPECS",
+      "title": "生成三档规格",
+      "kind": "runtime",
+      "execution_mode": "long_running",
+      "risk_level": "local_write",
+      "depends_on": [
+        "V2M-REVIEW"
+      ],
+      "runtime": {
+        "provider": "himind.builtin",
+        "workspace_path": "input.workspace_root",
+        "input_artifacts": [
+          "behavior-timeline",
+          "motion-intent",
+          "device-profile",
+          "platform-profile",
+          "platform-binding"
+        ],
+        "result_schema": "artifacts/motion-spec-set.schema.json",
+        "tool_policy": "default",
+        "allow_network": false,
+        "timeout_seconds": 1800,
+        "prompt": "按 video-motion-authoring 和 platform-binding 生成 gentle/normal/intense 三份 ShowSpec 到 input.output_dir。必须使用 device-profile 的真实通道；只使用 platform-binding 授权的 output_roles；approximate 语义必须在 spec 注释/元数据中保留。三档 duration 和 cue 时点完全一致。片尾 gate 至少提前 1500ms 关闭，所有运动轴回 neutral 并保持。计算每份 spec 的 SHA-256 和 cue_timing_hash，写入 motion-spec-set Artifact。任何一个轴或环境通道超出平台能力时失败，不产出部分集合。 在每份 ShowSpec 顶层写入 platform_profile_id、platform_profile_sha256、active_command，并保证三者来自当前 platform-profile Artifact。"
+      }
+    },
+    {
+      "id": "V2M-QA-LOOP",
+      "title": "质量修订循环",
+      "kind": "loop",
+      "execution_mode": "long_running",
+      "risk_level": "local_write",
+      "depends_on": [
+        "V2M-SPECS"
+      ],
+      "loop": {
+        "max_iterations": 3,
+        "pause_for_feedback": false,
+        "continue_when": {
+          "path": "loops.V2M-QA-LOOP.latest.steps.V2M-AUDIT.ok",
+          "operator": "equals",
+          "value": false
+        },
+        "exit_when": {
+          "path": "loops.V2M-QA-LOOP.latest.steps.V2M-AUDIT.ok",
+          "operator": "equals",
+          "value": true
+        },
+        "steps": [
+          {
+            "id": "V2M-AUDIT",
+            "title": "审计三档动作",
+            "kind": "runtime",
+            "execution_mode": "long_running",
+            "risk_level": "read_only",
+            "runtime": {
+              "provider": "himind.builtin",
+              "workspace_path": "input.workspace_root",
+              "input_artifacts": [
+                "motion-spec-set",
+                "behavior-timeline",
+                "device-profile",
+                "platform-profile",
+                "platform-binding"
+              ],
+              "result_schema": "artifacts/motion-audit-set.schema.json",
+              "tool_policy": "default",
+              "allow_network": false,
+              "timeout_seconds": 1200,
+              "prompt": "调用 motion.composer.audit 分别审计 gentle/normal/intense，再调用 motion.composer.compare。把三份审计和 compare 合并成 motion-audit-set Artifact。任何 Error、same_cue_timing=false、平台轴越权、片尾未复位或特效未关闭都必须令 ok=false。不得手工放行。"
+            }
+          },
+          {
+            "id": "V2M-REVISE",
+            "title": "按审计修订",
+            "kind": "runtime",
+            "execution_mode": "long_running",
+            "risk_level": "local_write",
+            "depends_on": [
+              "V2M-AUDIT"
+            ],
+            "runtime": {
+              "provider": "himind.builtin",
+              "workspace_path": "input.workspace_root",
+              "input_artifacts": [
+                "motion-spec-set",
+                "motion-audit-set",
+                "motion-intent",
+                "platform-binding"
+              ],
+              "result_schema": "artifacts/motion-spec-set.schema.json",
+              "tool_policy": "default",
+              "allow_network": false,
+              "timeout_seconds": 1800,
+              "prompt": "仅依据 motion-audit-set 的 blocking issues 修订三份 ShowSpec。不得改变 cue 时点、平台 profile、通道授权或片尾复位策略；不得超过当前设备 SlewRate。修复后重新计算 spec hash 和 cue_timing_hash，返回更新后的 motion-spec-set。"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "V2M-BUILD",
+      "title": "构建并校验动作",
+      "kind": "runtime",
+      "execution_mode": "long_running",
+      "risk_level": "local_write",
+      "depends_on": [
+        "V2M-QA-LOOP"
+      ],
+      "runtime": {
+        "provider": "himind.builtin",
+        "workspace_path": "input.workspace_root",
+        "input_artifacts": [
+          "motion-spec-set",
+          "motion-audit-set",
+          "device-profile",
+          "platform-profile",
+          "platform-binding",
+          "media-evidence"
+        ],
+        "result_schema": "artifacts/motion-delivery.schema.json",
+        "tool_policy": "default",
+        "allow_network": false,
+        "timeout_seconds": 3600,
+        "prompt": "先确认 motion-audit-set.ok=true 且 binding status 已被审批。对三档逐份执行 iostudio.motion.plan、iostudio.motion.build、iostudio.motion.validate、iostudio.motion.tracks。构建完成后重新打开 .motion，核对 provenance 中 platform_profile_id、platform_profile_sha256、active_command 与当前 profile 一致。任何 validation Error、未解析通道、轨道不一致或 provenance 不匹配都必须失败。不得跳过 validate，不开启 live-output。生成 motion-delivery draft，包含源视频/profile/spec/motion 的 SHA-256 和 tracks/validation 摘要。"
+      }
+    },
+    {
+      "id": "V2M-DELIVERY",
+      "title": "生成交付清单",
+      "kind": "runtime",
+      "execution_mode": "sync",
+      "risk_level": "local_write",
+      "depends_on": [
+        "V2M-BUILD"
+      ],
+      "runtime": {
+        "provider": "himind.builtin",
+        "workspace_path": "input.workspace_root",
+        "input_artifacts": [
+          "motion-delivery",
+          "platform-profile",
+          "device-profile",
+          "platform-binding"
+        ],
+        "result_schema": "artifacts/motion-delivery.schema.json",
+        "tool_policy": "default",
+        "allow_network": false,
+        "timeout_seconds": 300,
+        "prompt": "把 motion-delivery 状态置为 ready，写入 checksums.sha256，记录平台 profile、active_command、三档文件、审计、预检、tracks 与 provenance 摘要。若任何 hash 或验证状态缺失，保持 draft 并失败。不得提交、发布或下发真实设备。"
+      }
+    },
+    {
+      "id": "V2M-ACCEPT",
+      "title": "现场验收确认",
+      "kind": "manual",
+      "execution_mode": "sync",
+      "risk_level": "R3",
+      "approval_required": true,
+      "depends_on": [
+        "V2M-DELIVERY"
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "device-profile",
+      "artifact_type": "device_profile",
+      "name": "设备通道能力",
+      "schema": "schemas/device-profile.schema.json",
+      "required": true,
+      "validation": "strict",
+      "max_bytes": 1048576
+    },
+    {
+      "id": "platform-profile",
+      "artifact_type": "platform_profile",
+      "name": "IOUI平台能力档案",
+      "schema": "schemas/platform-profile.schema.json",
+      "required": true,
+      "validation": "strict",
+      "max_bytes": 1048576
+    },
+    {
+      "id": "media-evidence",
+      "artifact_type": "media_evidence",
+      "name": "视频行为证据包",
+      "schema": "artifacts/media-evidence.schema.json",
+      "required": true,
+      "validation": "strict",
+      "max_bytes": 10485760
+    },
+    {
+      "id": "behavior-timeline",
+      "artifact_type": "behavior_timeline",
+      "name": "行为时间线",
+      "schema": "artifacts/behavior-timeline.schema.json",
+      "required": true,
+      "validation": "strict",
+      "max_bytes": 8388608
+    },
+    {
+      "id": "motion-intent",
+      "artifact_type": "motion_intent",
+      "name": "平台感知动作意图",
+      "schema": "artifacts/motion-intent.schema.json",
+      "required": true,
+      "validation": "strict",
+      "max_bytes": 8388608
+    },
+    {
+      "id": "platform-binding",
+      "artifact_type": "platform_binding",
+      "name": "平台语义映射",
+      "schema": "schemas/platform-binding.schema.json",
+      "required": true,
+      "validation": "strict",
+      "max_bytes": 1048576
+    },
+    {
+      "id": "motion-spec-set",
+      "artifact_type": "motion_spec_set",
+      "name": "三档演出规格",
+      "schema": "artifacts/motion-spec-set.schema.json",
+      "required": true,
+      "validation": "strict",
+      "max_bytes": 2097152
+    },
+    {
+      "id": "motion-audit-set",
+      "artifact_type": "motion_audit_set",
+      "name": "三档质量审计",
+      "schema": "artifacts/motion-audit-set.schema.json",
+      "required": true,
+      "validation": "strict",
+      "max_bytes": 8388608
+    },
+    {
+      "id": "motion-delivery",
+      "artifact_type": "motion_delivery",
+      "name": "Motion交付清单",
+      "schema": "artifacts/motion-delivery.schema.json",
+      "required": true,
+      "validation": "strict",
+      "max_bytes": 2097152
+    },
+    {
+      "id": "field-feedback",
+      "artifact_type": "field_feedback",
+      "name": "现场验收反馈",
+      "schema": "artifacts/field-feedback.schema.json",
+      "required": false,
+      "validation": "advisory",
+      "max_bytes": 1048576
+    }
+  ],
+  "ui": {
+    "mode": "declarative",
+    "surfaces": [
+      "agent",
+      "dashboard"
+    ],
+    "entry": "ui/workflow-view.json"
+  },
+  "supported_runtimes": [
+    "himind.builtin"
+  ],
+  "created_at": "2026-10-30T07:00:00Z"
+}

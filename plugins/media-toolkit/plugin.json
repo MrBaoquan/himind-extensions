@@ -7,9 +7,9 @@
     "video-post",
     "audio-sound"
   ],
-  "description": "对视频与音频做确定性处理与测量：探测、转码压缩、抽帧拼图、画面活动与响度曲线。不依赖模型。",
-  "release_notes": "1.3.0：显示名改为「媒体处理工具」，与「媒体下载工具」等对齐类型词。",
-  "version": "1.3.0",
+  "description": "对视频与音频做确定性处理与测量：探测、全景主前向投影、转码压缩、抽帧拼图、画面活动与响度曲线。",
+  "release_notes": "1.4.0：新增全景主前向投影，补齐视频动作编排的前向视图分析链路。",
+  "version": "1.4.0",
   "entry": "bin/media-toolkit.exe",
   "runtime": "process-jsonrpc-stdio",
   "platforms": [
@@ -56,6 +56,71 @@
         "required": [
           "workspace_root",
           "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.toolkit.video.project",
+      "description": "把等距柱状全景视频展开成固定主前向视图",
+      "availability": "local",
+      "timeout_seconds": 1800,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "output": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "yaw_deg": {
+            "type": "number",
+            "minimum": -360,
+            "maximum": 360
+          },
+          "pitch_deg": {
+            "type": "number",
+            "minimum": -89,
+            "maximum": 89
+          },
+          "h_fov_deg": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 179
+          },
+          "v_fov_deg": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 179
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 320,
+            "maximum": 7680
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 240,
+            "maximum": 4320
+          },
+          "crf": {
+            "type": "integer",
+            "minimum": 12,
+            "maximum": 35
+          }
+        },
+        "required": [
+          "workspace_root",
+          "path",
+          "output"
         ],
         "additionalProperties": false
       }
@@ -422,6 +487,10 @@
       {
         "id": "media.toolkit.runtime.status",
         "title": "检查媒体运行时"
+      },
+      {
+        "id": "media.toolkit.video.project",
+        "title": "投影全景主前向"
       },
       {
         "id": "media.toolkit.files.list",

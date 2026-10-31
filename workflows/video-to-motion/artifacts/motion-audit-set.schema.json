@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://himind.local/schemas/video-to-motion/motion-audit-set.schema.json",
+  "title": "Motion Audit Set",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "ok",
+    "same_cue_timing",
+    "binding_status",
+    "audits",
+    "compare"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "same_cue_timing": {
+      "type": "boolean"
+    },
+    "binding_status": {
+      "enum": [
+        "exact",
+        "approximate"
+      ]
+    },
+    "audits": {
+      "type": "object",
+      "required": [
+        "gentle",
+        "normal",
+        "intense"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "gentle": {
+          "type": "object"
+        },
+        "normal": {
+          "type": "object"
+        },
+        "intense": {
+          "type": "object"
+        }
+      }
+    },
+    "compare": {
+      "type": "object"
+    },
+    "blocking_issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "revision_summary": {
+      "type": "string"
+    }
+  }
+}

@@ -1,265 +1,336 @@
 ---
 name: video-motion-authoring
-description: 根据视频的画面与声音推断该配的平台动作，生成演出规格并构建预检成动作文件。当用户要求「按视频编动作」「给片子配平台/4D 特效」「从影片生成 .motion 或演出规格」，或需要分析视频得出动作时点时使用。
+description: 根据视频画面与声音分析行为、生成平台动作意图、三档演出规格并驱动 IOStudio 构建预检；当用户要求按视频编动作、配动感平台/4D 特效或生成 .motion 时使用。
 ---
 
 # 视频动作编排助手
 
-把一段视频变成平台动作文件（`.motion`）：**先推断该配什么动作，再交给 IOStudio 构建与预检。**
+把视频变成平台动作文件，但不是“看图直接写关键帧”。必须经过：
+
+```text
+媒体证据 → behavior-timeline.json → motion-intent.json → ShowSpec → .motion
+```
+
+AI 负责语义判断、动作意图和不确定性标注；确定性代码负责时间量化、包络、通道映射、限速和连续性。
 
 ## 它做什么、不做什么
 
 | 做 | 不做 |
 | --- | --- |
-| 划分段落、找出事件时点、选动作、给强度初值 | 帧级精确对齐 |
-| 生成演出规格（spec）并驱动构建与预检 | 判断现场机械的实际行程与观众体感 |
-| 把「AI 拿不准」的地方标出来给人看 | 替代安全评审 |
+| 分析镜头/段落/事件、找动作时点、选动作家族、给强度初值 | 帧级精修 |
+| 生成行为时间线和平台无关动作意图 | 判断现场机械实际行程 |
+| 生成 gentle/normal/intense 三档 ShowSpec | 替代安全评审 |
+| 驱动 IOStudio 构建、预检、轨道核对 | 用 `skip_validate` 绕过安全门禁 |
 
-**这是粗排，不是终稿。** 信号分辨率约 0.1 秒量级，转场判断对柔切不敏感。构建前必须让作者过目
-（见步骤 7）。不要把 AI 结论当成可直接上机的编排。
+**这是粗排，不是终稿。** 必须让作者复核行为时间线、动作意图和强度档位后再落地。
 
 ## 必要输入
 
-- 一段视频文件（放在调用方给出的 `workspace_root` 内）
-- 目标设备的 IOStudio 安装（提供动作文件格式与预检规则）
-- 目标设备表（决定哪些设备与动作算已声明）
+- 视频/音频文件，位于调用方给出的 `workspace_root` 内
+- IOStudio 安装及目标设备表
+- 可选：转写模型、全景主前向参数、设备 profile
 
 ## 关键前提：设备表决定一切
 
-**设备表说明了「这台机器上有哪些动作、落到哪个通道」。** 它按 IOStudio 安装目录解析，
-发布包自带的 `IODevice.xml` 往往是空的（刻意如此，避免覆盖现场配置）。
+设备表说明有哪些设备/动作/通道，以及值类型、量程和限速：
 
-所以每步都要留意 `iostudio` 回显的 `device_table`：
-**用错表会让所有段落都报「设备未声明」**，那不是你的编排有问题，是表不对。
+```text
+iostudio.runtime.status {}
+iostudio.devices        {}
+```
 
-动作词汇表（本技能的判据）见 `references/action-vocabulary.json`，先读它再动手。
-演出规格的字段说明见 `references/show-spec.md`。
+通道名必须来自 `iostudio.devices`。不要猜 `OAxis_xx` 或 `OAction`。若动作没有 Key、通道是 bool 还是 float、工程范围如何，都必须记录。
+
+### 环境通道
+
+- bool 通道只能 0/1。
+- float 通道可表达连续值，但必须配置正确的 `engineering_range`。
+- 例如风机风速：`OAxis_18` 使用 `value_type=float`、`engineering_range=100`、gate level `0.65`，输出才是 65% 而不是 0/1。
+- 水、热风、震动、香氛通常按开关量处理；香氛要短而明确，不要长时间常开。
+
+## 全景与主视觉
+
+如果影片是等距柱状/球幕全景：
+
+```text
+media.toolkit.video.project {
+  workspace_root, path, output,
+  yaw_deg: 0, pitch_deg: 0,
+  h_fov_deg: 100, v_fov_deg: 65,
+  width: 640, height: 360
+}
+```
+
+后续探片、拼图、信号分析全部使用这个主前向代理片。不要用 2:1 平铺图的左右或前后位移直接推导平台姿态。平台动作跟随主叙事视觉，不跟随观众自由转头。
+
+## 本地开发与安装顺序
+
+```text
+1. 构建 motion-composer 插件 .hmpkg
+2. 将插件安装/注册到本地 HiMind 运行时
+3. 确认 motion.composer.runtime.status 可用
+4. 构建 video-motion-authoring 技能 .hmskill
+5. 启用技能并运行候选测试
+```
+
+`.hmpkg` 与 `.hmskill` 只是构建产物，不等于已经安装。构建技能不需要插件二进制进入技能包，但**启用技能前**必须完成依赖插件安装和运行时注册。依赖未安装时预检失败是正确行为，不得通过删除 `required` 绕过。
 
 ## 工作流程
 
 ### 0. 前置检查
 
-```
-media.toolkit.runtime.status      # ffmpeg 就绪？
-iostudio.runtime.status   # IOStudio 就绪？用的是哪份设备表？
-```
-
-任一不可用就**停下来**，把提示原样告诉用户（两者都会给出可操作的补救说明）。
-不要在缺失工具的情况下硬走 —— 后面每一步都会失败，而失败点会掩盖真正的原因。
-
-### 1. 查目标设备的真实动作
-
-```
-iostudio.devices          # 设备 → 动作 → 输出通道
+```text
+media.toolkit.runtime.status {}
+iostudio.runtime.status      {}
 ```
 
-**必须做这一步，不能跳。** 通道名靠猜会导致输出被**静默丢弃**：不报错、不提示，
-只是设备不动。把结果记下来，后面只从这份清单里取角色。
+另检查 `media.ai.runtime.status` 与 `motion.composer.runtime.status` 是否可用。`motion-composer` 是必需质量门禁：未安装时停止，先构建并安装该插件，再构建或启用本技能。
 
-若返回里带 `warnings`（例如某个动作没有 Key），一并告诉用户。
+### 1. 查目标设备能力
 
-### 2. 探片
-
-```
-media.toolkit.probe { path }
+```text
+iostudio.devices {}
 ```
 
-拿到时长、帧率、分辨率、有无音轨。**时长决定后面的一切**（拼图采样间隔、信号抽稀）。
-没有音轨就跳过音频信号，只靠画面。
+记录：
 
-### 2b. 大码率源片先造分析代理片
+- 设备与动作
+- 每个动作的通道
+- bool/float
+- 量程/中性/限速
+- 环境动作是否可用
 
-**判据**：码率 ≳ 15 Mbps 或分辨率 ≳ 1080p 时，先造一个低分辨率代理片，后续**全部**分析都跑代理片。
+将设备能力落成 `device-profile.json`，参考 `references/device-profile.schema.json`。
 
-```
-media.toolkit.recipe.run { workspace_root, kind: "proxy", recipe: {
-  inputs: [{ path: "<源片>" }],
-  video: { scale: { width: 960, height: 0 },
-           encode: { codec: "libx264", crf: 26, preset: "veryfast", pixel_format: "yuv420p" } },
-  audio: { encode: { codec: "aac", bitrate: "128k" } },
-  output: { path: "proxy_960.mp4", fast_start: true } } }
-```
+### 2. 探片与代理片
 
-**实测收益（一条 1.2 GB / HEVC 41.5 Mbps / 2000×1000 的动作片）**：
-
-| 步骤 | 原件 | 960×480 代理片 | 提速 |
-| --- | --- | --- | --- |
-| 画面活动分析 | 52.5 s | **2.3 s** | 23× |
-| 缩略图网格 | 52.2 s | **2.4 s** | 22× |
-| 造代理片（一次性） | — | 60.2 s | — |
-
-**单次就已经划算**（69 s vs 107 s），且**信号几乎不变**（峰值 29.47→30.04、中位 0.12→0.13）——
-因为判据本来就是"相对该片自身中位数"，不吃绝对值；拼图每格只有 320 px，960 宽的源绰绰有余。
-迭代时每轮省 100 秒。
-
-代理片顺带还是**编辑器里更好的预览素材**（拖动比原件顺）。
-
-> **不要用硬件解码代替它**：实测 d3d11va 只快 1.9 倍（3.44 s vs 6.57 s / 30 秒），
-> 因为真正贵的是高码率解码本身。代理片是 22 倍。
-
-### 3. 看一眼全片
-
-```
-media.toolkit.frames.contact-sheet { path: "<代理片>", output: "<工作区内的输出路径>" }
+```text
+media.toolkit.probe { workspace_root, path }
 ```
 
-默认 6×4 网格、每格 320 宽。**先看这张图**：它能一眼给出段落结构（这是全片最快的把握方式）。
-看完再决定要不要补抽帧：
+按码率/分辨率决定是否造分析代理片：
 
-```
-media.toolkit.frames.extract { path, output_dir, times_ms: [...] }
-```
-
-画面里认不出在发生什么时就用它放大看。**信号只能告诉你「哪里激烈」，不能告诉你「是什么在激烈」**，
-后者只能看图。
-
-### 4. 取信号
-
-```
-media.toolkit.scene.score    { path, max_points: 2000 }   # 画面活动强度
-media.toolkit.audio.loudness { path, max_points: 2000 }   # 响度
+```text
+media.toolkit.recipe.run { workspace_root, kind: "proxy", recipe: { ... } }
 ```
 
-读法见词汇表的 `signal_reading`。**两条最重要的原则：**
+`recipe.run` 是异步作业。必须轮询：
 
-- **绝对分数没有普适阈值。** 实测一条真实影片逐帧最高分只有 9.0，按常规阈值会得到 0 个切点。
-  一律用**相对该片自身中位数**的方式判断（"远高于中位数"才是尖峰）。
-- **响度尖峰是判断「事件时刻」最可靠的信号**，比画面变化更准。撞击、爆炸、重音都在这里。
-
-`notes` 字段会提示采样是否被抽稀、曲线是否整体偏低，别忽略。
-
-### 4b. 有词的内容要转写
-
-只要有对白或歌词，**这一步的收益往往比画面信号更大**：
-
+```text
+media.toolkit.job.status { job_id }
 ```
-media.ai.runtime.status                          # 运行时/模型是否就绪
-media.ai.runtime.install { models: ["small"] }   # 未就绪时获取（首次约 500MB）
+
+直到 `completed` 且产物存在后才能用于后续分析。
+
+### 3. 主前向与全片概览
+
+全景先用 `media.toolkit.video.project`。平面视频直接使用源片或代理片。
+
+生成全片和关键段拼图：
+
+```text
+media.toolkit.frames.contact-sheet {
+  workspace_root, path, output,
+  columns: 8, rows: 6, tile_width: 320
+}
+```
+
+需要看细节时：
+
+```text
+media.toolkit.frames.extract { workspace_root, path, output_dir, times_ms }
+```
+
+若宿主不能直接打开文件，使用：
+
+```text
+media.toolkit.preview.image { workspace_root, path }
+```
+
+### 4. 信号与转写
+
+```text
+media.toolkit.scene.score    { workspace_root, path, max_points: 2000 }
+media.toolkit.audio.loudness { workspace_root, path, max_points: 2000 }
+```
+
+信号只用于找候选时点，不能单独决定“发生了什么”。有对白/歌词时：
+
+```text
 media.ai.transcribe { workspace_root, path, language: "zh" }
-media.ai.job.status { job_id }                   # 长任务：226 秒音频约 95 秒
+media.ai.job.status { job_id }
 ```
 
-为什么值得做：实测一段音乐片用画面与响度**都找不到段落结构**（曲线平在中位附近、
-全片最强画面变化只有 9.0），而歌词给出了稳定的 4-5 秒一句的节律 ——
-那正是编排时最缺的时点依据。有词的内容不做转写，等于把最可靠的分段信号丢掉。
+转写同样要轮询到完成。看 `content_segments`、`beats_ms`、`full_text` 和 `vocal_ratio`。
 
-**两条硬性注意事项：**
+### 5. 产出行为时间线
 
-- **必须显式指定 `language`**（如 `zh` / `en` / `ja`）。留空会走自动检测，
-  实测它把中文歌判成 `en`，整片只得到 `(singing in foreign language)` 这类占位标注、
-  拿不到任何词。指定后同一段音频稳定转出 39 段歌词。
-- 结果里看 `content_segments`（**已过滤掉占位标注**），不是 `segments`。
-  `placeholder_only: true` 说明只有标注没有词 —— 多半就是语言没指定对。
+写 `behavior-timeline.json`，符合 `references/behavior-timeline.schema.json`。
 
-转写结果的用法：
+每段至少包含：
 
-| 结果字段 | 怎么用 |
-| --- | --- |
-| `content_segments` | 每句的起止时间 + 文本 → **歌词/对白分句就是天然的段落与节拍边界** |
-| `beats_ms` | 各句起点序列 → 动作节拍的候选时点 |
-| `full_text` | 通读一遍，判断这段在讲什么、情绪走向 |
-| `vocal_ratio` | 有人声的比例；很低说明是纯环境段落，别按"有词"去配 |
+- `start_ms` / `end_ms`
+- `behavior` / `scene`
+- `energy`
+- `confidence`
+- 证据时间点和说明
 
-**先读一遍 `full_text` 再划段落** —— 它常能纠正仅凭信号得出的误判
-（比如把一段安静的对白当成"静场该配待机"，而实际上是情绪转折点）。
+事件包含类型、时间、来源、强度和置信度。低置信度必须明确标出，不要用补全代替观察。
 
-### 5. 划分段落并选动作
+全景来源必须写清投影类型、主前向 yaw/pitch/FOV。
 
-对着词汇表逐段判断，每段都要落在某个 `action` 上：
+### 6. 生成动作意图与三档
 
-1. 用 signal 找到候选区间（哪里是尖峰、哪里持续高位、哪里安静）
-2. **有词的内容，用歌词/对白分句作为段落边界**（比信号更可靠，见 4b）
-3. 用拼图/抽帧确认画面上到底发生了什么
-4. 在词汇表里找 `when` 与 `signal` 都吻合的动作
-5. **三者一致才采用**。说不出某段是被哪条 signal、哪句词、哪几格画面支持的，就不要配。
+按 `references/choreography-playbook.md` 写 `motion-intent.json`，符合 `references/motion-intent.schema.json`。
 
-词汇表里没有合适动作时，宁可少配或复用最接近的，**不要凭空发明通道名**。
+重点：
 
-只保留目标设备真实存在的角色（第 1 步的清单）。词汇表里的动作若引用了设备没有的角色，
-按能做的部分降级，并**在摘要里说明降级了什么**。
+- 选动作家族，不直接写最终通道关键帧
+- Heave 失重序列：`准备 → 抬升/蓄势 → 停留 → 下降 → 回弹 → 恢复`
+- 环境动作要有明确场景语义
+- 香氛只安排短窗口
+- 长段事件之间加入低幅飞行底噪，禁止只要峰值、不填平缓空窗
+- idle 只用于 clip 之外的真实空窗，不能替代 preset 内部的持续运动
+- 同时生成 `gentle` / `normal` / `intense` 三档参数
 
-### 6. 生成演出规格
+三档保持片长、段落和 cue 时点一致，可改变：
 
-按 `references/show-spec.md` 写出 spec.json，放在视频旁边。
+- Heave 幅度/斜率
+- 震动门控密度
+- 风机档位
+- 环境特效窗口
 
-词汇表里每个动作都带 `form` 字段，**它决定写进哪里**：
+### 7. 编译 ShowSpec
 
-| form | 含义 | 写到 |
-| --- | --- | --- |
-| `pose` | 有姿态角色（heave/roll/…） | `presets` + `cues`（一个动作可被多个节拍按不同强度复用） |
-| `gate` | 纯环境动作（震动/风/热/闪光…） | **只写 `gates`**，不要写成预设 |
+按 `references/show-spec.md` 生成 spec，放在视频旁边。动作意图映射到设备 profile 的实际角色和通道。
 
-> 把 `gate` 类动作写成预设会导致 `preset.no_channels` 报错 —— 它们没有姿态通道。
-> 这个坑实测踩过：`camera_shake` 被当成预设写进去，预检直接拦下。
+规则：
 
-其余落点：
+- `pose` 写 presets + cues
+- `gate` 只写 gates
+- 离散环境通道用 0/1；风速等 float 通道使用 `engineering_range` 和 gate level
+- 同一轨道 cue 不得重叠或越界
+- 相邻 cue 数值连续
+- 所有通道必须来自设备表
+- 不得用 `skip_validate` 绕过预检（插件清单已移除该参数，能力层也不接受）
+- 片尾必须有复位策略：所有环境 gate 提前关闭，Heave 回到 `neutral` 并保持
 
-- 段落进 `chapters`（**把推断依据写进 note**，作者复核时最需要看的就是它）
-- 环境特效进 `gates`（开关窗口，不要用曲线）
-- 游戏状态宣告等进 `events`
+### 8. 编排质量门禁
 
-**强度从词汇表给的 `default` 起，不要一上来就给最大值。**
+ShowSpec 写完后，必须先过确定性质量门禁，再交给 IOStudio：
 
-> **注意时间不要越界**：预设时长会从其 `cue` 时刻向后延伸，最后一个节拍 + 预设时长
-> 不得超过 `duration_ms`，否则报 `spec.content_beyond_duration`。收尾段要留足余量。
+> `motion-composer` 缺失时不得继续启用技能或进入正式构建。先安装插件；不要用“手工检查”冒充自动门禁通过。
 
-### 7. 干跑复核（人工关口）
-
+```text
+motion.composer.audit {
+  workspace_root,
+  spec_path,
+  behavior_timeline_path,
+  device_profile_path
+}
 ```
+
+三档齐全后：
+
+```text
+motion.composer.compare {
+  workspace_root,
+  spec_paths: [gentle, normal, intense],
+  behavior_timeline_path,
+  device_profile_path
+}
+```
+
+`ok=false` 时不得进入构建。重点看：
+
+- `high_energy_flat`：高能段有峰值但没有足够的动态范围
+- `no_weightless_pulse`：长段没有可识别的抬升→下降→回弹
+- `drop_rate_exceeds_slew`：下降斜率超过设备声明
+- `continuity_gap`：相邻 cue 边界跳变
+- `long_static_gap`：preset 内部长时间没有可感知变化
+- `end_not_neutral`：片尾 Heave 未回中
+- `end_effects_not_closed`：片尾仍有风机/水/热风/震动/香氛开启
+- `same_cue_timing=false`：三档的节拍结构漂移
+
+门禁通过只代表编排语义合格，不代表机械安全合格。片尾至少保留 `end_shutdown_margin_ms`（默认 1500ms）的关机余量。
+
+### 9. 干跑和人工复核
+
+```text
 iostudio.motion.plan { workspace_root, spec_path }
 ```
 
-这一步**不保留产物**，只构建与预检。把结果给作者看：段落划分、事件时点、强度档位。
-`validation.issues` 里的每条都要解释清楚 —— 它们是「播放时会静默失效」的那类问题：
+把 behavior timeline、动作意图、三档峰值和 validation.issues 一起给作者看。每个 issue 必须解释或修正，有 Error 时不得继续。
 
-- `track.device_undeclared` — 设备名不在表里（常见原因是设备表不对，不一定是编排错）
-- `track.oaction_undeclared` — 该设备没声明这个动作
-- 其余码的含义见预检返回的 `message`
+除了 IOStudio 的格式/通道检查，还要做编排质量检查：
 
-**有 Error 就回到第 5-6 步改，不要带着错误往下走。**
+- 高能段落是否存在明确峰值
+- 是否有整段低幅无事件的“平缓噪声”
+- 事件时点是否有画面/声音证据
+- 三档是否结构一致
+- 连续段落是否有数值和速度跳变
 
-### 8. 落地
+### 10. 构建、预检与轨道核对
 
-复核通过后再构建：
+复核通过后：
 
-```
-iostudio.motion.build { workspace_root, spec_path, out_path }
-```
-
-### 9. 交付
-
-```
-iostudio.motion.tracks { workspace_root, motion_path }
+```text
+iostudio.motion.build    { workspace_root, spec_path, out_path }
+iostudio.motion.validate { workspace_root, motion_path }
+iostudio.motion.tracks   { workspace_root, motion_path }
 ```
 
-回报时带上：
+三档都要构建，分别核对。报告：
 
-- 段落表（时刻 / 名称 / 用的动作 / 强度）
-- 事件时点及其依据（哪条 signal、哪几格画面）
-- **降级或跳过了什么**，为什么
-- 建议人工重点复核的段落（通常是高强度事件与安全相关段）
-- 用了哪份设备表（`device_table`）
+- `device_table`
+- `validation`
+- 轨道映射
+- 播放时间/错误/未解析通道
+- 三档参数矩阵
+- 需要现场确认的高风险段
+
+### 11. 现场反馈
+
+按 gentle → normal → intense 顺序验证。每个版本回中复位。
+
+按 `references/field-feedback.schema.json` 记录动作同步、失重感、舒适度、疲劳度、环境氛围、香氛时点和机械风险。反馈回到 `motion-intent.json` 对应段落，不直接手改最终 `.motion`。
 
 ## 风险门禁
 
-平台动作是**物理运动**，配错不是"效果不对"，而是可能让执行机构报错甚至伤人。
+- 只配设备表真实声明的通道。
+- 大幅动作前确认 SlewRate。当前配置值来自设备 profile，不是不可变物理上限；三档可以提高，但必须按 `references/slew-rate-validation.md` 分级测试。
+- 动作文件只约束下降斜率，实际上限由 IODevice 设备表的 `SlewRate` 决定；0.9/s 仅是示例候选。
+- 首次输出、配置变更和更极限值都必须先空载验证，不得用 `skip_validate` 绕过。
+- 每个版本结束时必须关闭全部环境特效并把 Heave 回中；不能只依赖播放器停止或人工急停。
+- 开场不要放强动作。
+- 涉及联锁时检查使能先行、急停不重叠。
+- 三档必须先测试平缓，再测试正常/激烈。
+- `iostudio.motion.validate` 当前不等于完整机械安全验收，现场仍需人工确认。
+- 任何物理动作不得用自动构建替代现场评审。
 
-- **只配真实声明的通道。** 猜通道名 = 输出被静默丢弃。
-- **大幅跳变前确认该通道配了速率上限（SlewRate）。** 实测未配限速时 0↔1.0 会一步跳满 1000mm。
-- **开场不要放强动作**：首次输出不受限速保护。
-- **现场首个版本建议整体降档**跑一遍，再逐步加到词汇表给的值。
-- 涉及安全联锁的场景（如影院平台），编排需满足使能先行、急停不与运动重叠；以
-  `iostudio.motion.validate` 的结果为准。
+## 参考
+
+- `references/behavior-timeline.schema.json`
+- `references/motion-intent.schema.json`
+- `references/device-profile.schema.json`
+- `references/orchestration-profile.example.json`
+- `references/choreography-playbook.md`
+- `references/show-spec.md`
+- `references/action-vocabulary.json`
 
 ## 遇到问题时
 
 | 现象 | 多半是 |
 | --- | --- |
-| 所有段落都报「设备未声明」 | 设备表不对（看 `device_table`），不是编排错 |
-| 某个动作报「未声明」 | 该设备表里没这个动作，换成表里有的 |
-| 切点检测几乎为空 | 正常 —— 柔切/叠化片本来就检不出硬切，改用强度曲线判段落 |
-| 拼图整张发黑 | 抽帧时刻落在黑场，或片源解码异常；换时刻重试 |
-| 构建成功但设备不动 | 通道名对不上（静默丢弃），回去核对第 1 步的清单 |
-| 转写只得到 `(singing in foreign language)` | `language` 没指定对——自动检测对歌曲不可靠，显式给 `zh`/`en` 等 |
-| 转写报「未安装」 | 先跑 `media.ai.runtime.install`（首次约 500MB，含 ffmpeg 需另装） |
-| 转写报「没有可用音轨」 | 源文件确实无音轨；跳过 4b，只用画面信号 |
+| 大部分片段太平缓 | 动作意图仍在使用低幅正弦/模板；先跑 `motion.composer.audit`，重建失重脉冲和强度档位 |
+| 画面和动作不像 | 投影/主前向错了，或没看 1 秒级分镜 |
+| 所有段落都报设备未声明 | 设备表不对，看 `device_table` |
+| 某个动作报未声明 | 改用设备表真实动作，不猜通道 |
+| 风机没有风速 | 检查是否被建为 bool；应使用 float + `engineering_range=100` |
+| 香氛一直开 | 门控窗口过长；改为和转场对齐的短窗口 |
+| 构建成功但设备不动 | 通道映射错误或输出被静默丢弃，回到设备表核对 |
+| 质量门禁报高能平缓 | 峰值可能不低，但缺少短时下降和回弹；增加脉冲而非整体放大正弦 |
+| 三档只有幅度不同但体感没差异 | 风、震动、环境窗口也需随档位变化，且检查下降斜率 |
+| 转写只有占位文本 | 显式指定 language，检查 `content_segments` |
+
+现场排障不走这条流水线：设备表判定、通道核对、协议测试失败定位交给 `iostudio-debug-assistant` 技能。

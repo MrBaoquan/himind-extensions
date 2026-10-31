@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://himind.local/schemas/video-to-motion/motion-spec-set.schema.json",
+  "title": "Motion Spec Set",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "platform_profile_id",
+    "platform_profile_sha256",
+    "duration_ms",
+    "variants"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "platform_profile_id": {
+      "type": "string"
+    },
+    "platform_profile_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "duration_ms": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "variants": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "spec_path",
+          "spec_sha256",
+          "cue_timing_hash"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "gentle",
+              "normal",
+              "intense"
+            ]
+          },
+          "spec_path": {
+            "type": "string"
+          },
+          "spec_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "cue_timing_hash": {
+            "type": "string",
+            "minLength": 1
+          },
+          "peak_heave": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "max_drop_rate": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "binding_status": {
+      "enum": [
+        "exact",
+        "approximate"
+      ]
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

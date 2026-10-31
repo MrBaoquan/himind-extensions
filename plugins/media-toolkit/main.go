@@ -15,6 +15,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"himind-plugin/media-toolkit/internal/media/frames"
 	"himind-plugin/media-toolkit/internal/media/job"
 	"himind-plugin/media-toolkit/internal/media/probe"
+	"himind-plugin/media-toolkit/internal/media/projection"
 	"himind-plugin/media-toolkit/internal/media/recipe"
 	"himind-plugin/media-toolkit/internal/media/workspace"
 )
@@ -33,6 +35,7 @@ import (
 const (
 	capRuntimeStatus = "media.toolkit.runtime.status"
 	capProbe         = "media.toolkit.probe"
+	capVideoProject  = "media.toolkit.video.project"
 	capRecipePlan    = "media.toolkit.recipe.plan"
 	capRecipeRun     = "media.toolkit.recipe.run"
 	capJobStatus     = "media.toolkit.job.status"
@@ -93,6 +96,13 @@ func (s *service) handle(request himindjsonrpc.Request) (any, *himindjsonrpc.Err
 			return nil, rpcError
 		}
 		return s.probe(input)
+
+	case capVideoProject:
+		var input projectInput
+		if rpcError := himindjsonrpc.DecodeParams(request, &input); rpcError != nil {
+			return nil, rpcError
+		}
+		return s.videoProject(input)
 
 	case capRecipePlan:
 		var input planInput
@@ -189,6 +199,19 @@ type planInput struct {
 	Recipe recipe.Recipe `json:"recipe"`
 }
 
+type projectInput struct {
+	WorkspaceRoot string  `json:"workspace_root"`
+	Path          string  `json:"path"`
+	Output        string  `json:"output"`
+	YawDeg        float64 `json:"yaw_deg"`
+	PitchDeg      float64 `json:"pitch_deg"`
+	HFovDeg       float64 `json:"h_fov_deg"`
+	VFovDeg       float64 `json:"v_fov_deg"`
+	Width         int     `json:"width"`
+	Height        int     `json:"height"`
+	CRF           int     `json:"crf"`
+}
+
 type runInput struct {
 	WorkspaceRoot string        `json:"workspace_root"`
 	Recipe        recipe.Recipe `json:"recipe"`
@@ -263,7 +286,7 @@ func (s *service) runtimeStatus() (any, *himindjsonrpc.Error) {
 		status["version"] = s.tools.Version
 	}
 	pipelines := []string{
-		"probe", "recipe.plan", "recipe.run",
+		"probe", "video.project", "recipe.plan", "recipe.run",
 		"job.status", "job.cancel", "job.list",
 		"scene.score", "audio.loudness",
 		"frames.contact-sheet", "frames.extract", "preview.image", "files.list",
@@ -305,6 +328,40 @@ func (s *service) probe(input probeInput) (any, *himindjsonrpc.Error) {
 }
 
 // recipePlan 只编译不执行 —— 长任务开跑前先让人看一眼将要执行什么。
+func (s *service) videoProject(input projectInput) (any, *himindjsonrpc.Error) {
+	tools, rpcError := s.toolsOrError()
+	if rpcError != nil {
+		return nil, rpcError
+	}
+	root, source, rpcError := resolveInputPath(input.WorkspaceRoot, input.Path)
+	if rpcError != nil {
+		return nil, rpcError
+	}
+	output, rpcError := resolveOutputPath(root, input.Output)
+	if rpcError != nil {
+		return nil, rpcError
+	}
+	if filepath.Clean(source) == filepath.Clean(output) {
+		return nil, &himindjsonrpc.Error{Code: -32602, Message: "output 不能覆盖输入文件"}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+	result, err := projection.Project(ctx, tools, projection.Options{
+		Source: source, Output: output,
+		YawDeg: input.YawDeg, PitchDeg: input.PitchDeg,
+		HFovDeg: input.HFovDeg, VFovDeg: input.VFovDeg,
+		Width: input.Width, Height: input.Height, CRF: input.CRF,
+	})
+	if err != nil {
+		return nil, &himindjsonrpc.Error{Code: -32000, Message: "主前向投影失败: " + err.Error()}
+	}
+	return map[string]any{
+		"ok": true, "projection": result,
+		"workspace_root": root.Abs(), "source": source, "output": output,
+	}, nil
+}
+
 func (s *service) recipePlan(input planInput) (any, *himindjsonrpc.Error) {
 	if err := input.Recipe.Validate(); err != nil {
 		return nil, &himindjsonrpc.Error{Code: -32602, Message: "recipe 不合法: " + err.Error()}

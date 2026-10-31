@@ -5,8 +5,8 @@
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
   "description": "以按日工作日志为核心，含当前工作台（项目状态、优先级、下一步、完成）、工作项、每日时间块计划与容量校验；按项目/功能/工时聚合报告，支持导出导入、备份恢复与重扫对账。",
-  "release_notes": "0.15.0：工作台聚焦最近 14 天活跃与待开始项目，智能推断阶段/进度；进行中项目后台静默刷新；新增工作项、每日时间块计划与一键智能排期，按当日日志结算实际完成；修正 Codex 等 UTC 记录的时间显示。",
-  "version": "0.15.0",
+  "release_notes": "0.16.0：季度总结与年度总结可设置起算月，公司按 2 月起算时 Q1 为 2、3、4 月；工时表支持按行复制为表格。",
+  "version": "0.16.0",
   "capability_namespace": "work-log",
   "distribution_targets": ["workbench", "github"],
   "entry": "bin/work-log.exe",
@@ -861,6 +861,38 @@
       "risk_level": "local_write"
     },
     {
+      "id": "work-log.preferences.get",
+      "description": "读取季度与年度起算月（财年口径），缺省 1 月",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {"log_root": {"type": "string"}},
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "work-log.preferences.save",
+      "description": "设置季度与年度的起算月，如公司从 2 月起算财年",
+      "availability": "local",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {"type": "string"},
+          "fiscal_year_start_month": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12,
+            "description": "起算月 1-12：1 为自然季度，2 则 Q1 是 2/3/4 月"
+          }
+        },
+        "required": ["fiscal_year_start_month"],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
       "id": "work-log.report.render",
       "description": "把区间日志聚合渲染为日、周、月、季度或年度报告并归档",
       "availability": "local",
@@ -985,6 +1017,7 @@
       {"id": "work-log.archive.calendar", "title": "按日历回看工作日志"},
       {"id": "work-log.report.render", "title": "生成当日工作简报"},
       {"id": "work-log.report.aggregate", "title": "汇总周报/月报"},
+      {"id": "work-log.preferences.save", "title": "设置季度起算月"},
       {"id": "work-log.archive.list", "title": "浏览工作日志归档"},
       {"id": "work-log.project.list", "title": "查看项目归类"},
       {"id": "work-log.project.board", "title": "查看当前工作台"},

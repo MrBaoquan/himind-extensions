@@ -64,8 +64,8 @@ iostudio.devices          { cli_path?, device? }
 
 ### 动作编排
 ```
-iostudio.motion.plan      { workspace_root, spec_path, cli_path?, skip_validate? }
-iostudio.motion.build     { workspace_root, spec_path, out_path?, cli_path?, skip_validate? }
+iostudio.motion.plan      { workspace_root, spec_path, cli_path? }
+iostudio.motion.build     { workspace_root, spec_path, out_path?, cli_path? }
 iostudio.motion.validate  { workspace_root, motion_path, cli_path? }
 iostudio.motion.tracks    { workspace_root, motion_path, cli_path? }
 ```
@@ -74,6 +74,9 @@ iostudio.motion.tracks    { workspace_root, motion_path, cli_path? }
 - `build`：构建动作文件并预检，写回工作区。
 - `validate`：预检已有动作文件，返回问题清单。
 - `tracks`：轨道 → 通道映射（不建设备、不开窗口，最快）。
+
+两个构建能力都**不给** `skip_validate`：它绕过的是设备声明、动作存在性、量程与安全联锁，
+正好是这类事故的防线。要"先看方案"用 `plan`，不要靠跳预检省一步。
 
 演出规格（spec）的字段见技能 `video-motion-authoring` 的 `references/show-spec.md`。
 

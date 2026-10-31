@@ -87,6 +87,67 @@ func TestBuildRejectsMissingSpec(t *testing.T) {
 	}
 }
 
+func TestManifestDoesNotExposeSkipValidate(t *testing.T) {
+	// skip_validate 绕过设备声明、动作存在性、量程与安全联锁。
+	// 它一旦出现在 input_schema 里，调用方只读 schema 就会把它当成普通可选参数，
+	// 而唯一的约束只剩下技能里的一句「不要用」。这条断言把约束搬进清单本身。
+	data, err := os.ReadFile("plugin.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		Capabilities []struct {
+			ID          string `json:"id"`
+			InputSchema struct {
+				Properties map[string]any `json:"properties"`
+			} `json:"input_schema"`
+		} `json:"capabilities"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if len(manifest.Capabilities) == 0 {
+		t.Fatal("插件清单应声明能力")
+	}
+	for _, capability := range manifest.Capabilities {
+		if _, found := capability.InputSchema.Properties["skip_validate"]; found {
+			t.Fatalf("%s 不应暴露 skip_validate", capability.ID)
+		}
+	}
+}
+
+// 能力说明是 AI 判断「什么时候调用」的唯一线索（上限 48 字），
+// 因此必须写清用途与排查场景，而不是只写一个名词标签。
+func TestCapabilityDescriptionsCarryTriggerWords(t *testing.T) {
+	data, err := os.ReadFile("plugin.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		Capabilities []struct {
+			ID          string `json:"id"`
+			Description string `json:"description"`
+		} `json:"capabilities"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	triggers := map[string]string{
+		"iostudio.devices":       "通道",
+		"iostudio.motion.validate": "预检",
+		"iostudio.protocol.test": "协议测试",
+	}
+	for _, capability := range manifest.Capabilities {
+		want, ok := triggers[capability.ID]
+		if !ok {
+			continue
+		}
+		if !strings.Contains(capability.Description, want) {
+			t.Fatalf("%s 的说明应包含触发词 %q: %s", capability.ID, want, capability.Description)
+		}
+	}
+}
+
 func TestDevicesReportsMissingTableClearly(t *testing.T) {
 	dir := t.TempDir()
 	service := &service{loaded: true, cli: studio.CLI{

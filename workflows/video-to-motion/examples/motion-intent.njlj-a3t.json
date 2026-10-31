@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "device": "NJ-LJ",
+  "viewpoint": "main_narrative_forward",
+  "design_basis": "A3T active frame: pitch, roll, z, speed",
+  "capability_constraints": {
+    "motion_axes": [
+      "pitch",
+      "roll",
+      "heave"
+    ],
+    "environment_actions": [],
+    "normalized_peak": 0.8
+  },
+  "intensity_profiles": {},
+  "phrases": [
+    {
+      "id": "lift_drop",
+      "intent": "weightless_drop",
+      "semantic": "weightless_drop",
+      "energy": 0.9,
+      "confidence": 0.8
+    },
+    {
+      "id": "bank",
+      "intent": "sharp_turn",
+      "semantic": "sharp_turn",
+      "energy": 0.7,
+      "confidence": 0.8
+    },
+    {
+      "id": "yaw",
+      "intent": "yaw_turn",
+      "semantic": "yaw_turn",
+      "energy": 0.4,
+      "confidence": 0.8
+    }
+  ]
+}

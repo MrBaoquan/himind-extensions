@@ -1,4 +1,4 @@
 interface:
   display_name: "视频动作编排助手"
-  short_description: "把视频推断成平台动作并生成可预检的动作文件"
-  default_prompt: "用 $video-motion-authoring 把这部影片编成平台动作：先看画面与声音判断该配什么动作，生成演出规格并预检，构建前把段落划分与强度档位给我过目。"
+  short_description: "从视频分析行为、生成三档动作意图并构建预检动作文件"
+  default_prompt: "用 $video-motion-authoring 分析这部影片：先确认主视觉/投影和设备能力，生成 behavior-timeline 与 motion-intent，按 gentle/normal/intense 三档生成演出规格，先过 motion-composer 质量门禁；检查事件脉冲、飞行底噪、长静止空窗、片尾复位、风速/香氛门控和预检结果。"

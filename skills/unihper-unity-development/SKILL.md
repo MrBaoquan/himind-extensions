@@ -41,6 +41,16 @@ description: 指导基于 UNIHper 的 Unity 项目开发，覆盖生命周期、
 
 `SceneEntryScript` 不是框架特殊基类，只是场景 `SceneEntry` 按命名约定对应的 `SceneScriptBase` 实现。任何场景的入口都是 `<SceneName>Script`。
 
+
+### SceneEntry 的常规初始化入口
+
+- 标准项目入口是场景 `SceneEntry`，场景内包含 `__UNIHper`（`UNIHperEntry` 预制实例）；`SceneEntryScript` 是该场景对应的常规 `SceneScriptBase` 入口。
+- 如果目标场景或项目缺少 `__UNIHper`，优先在 Unity 菜单执行 `UNIHper/Initialize`，不要手工拼装管理器、重复创建第二套运行时根或假设自动初始化成功。
+- `UNIHper/Initialize` 会定位或创建 `Assets/Scenes/SceneEntry.unity`，实例化 `Resources/UNIHper/Prefabs/UNIHper`，把入口场景写入 Build Settings，并复制 `assemblies.json`、`uis.json`、`resources.json` 到 `Assets/Resources/UNIHper`。
+- `UNIHperEntry` 的运行时自动初始化只在 `UNIHperSettings.AutoInitIfNotStarted=true` 且 `Resources/UNIHper/Prefabs/UNIHper` 可加载时生效；默认 `autoInitialize` 可能被项目关闭，因此以场景中的 `__UNIHper` 和 `SceneEntry` 作为可验证入口。
+- 使用独立程序集时，确保 `UNIHperSettings.UseAssembly=true`，程序集名已写入 `Assets/Resources/UNIHper/assemblies.json`，且 `SceneEntryScript` 所在程序集能被 `AssemblyConfig` 扫描。
+- 初始化后先确认 `SceneEntry` 在 Build Settings 首位、场景中存在 `__UNIHper`、UI/资源 Addressables 已登记，再开始业务开发。
+
 ```text
 场景 SceneEntry
 → 查找 SceneEntryScript

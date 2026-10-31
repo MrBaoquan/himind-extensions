@@ -3,51 +3,264 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>媒体资源库</title>
+  <title>媒体库</title>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="tabs" role="tablist">
-      <button type="button" id="tab-online" class="tab active" role="tab" aria-selected="true">在线素材</button>
-      <button type="button" id="tab-local" class="tab" role="tab" aria-selected="false">本机素材</button>
-    </div>
-    <button type="button" id="reload-sources" class="ghost" title="重新读取已配置的素材来源">刷新来源</button>
-  </header>
-
-  <section id="notice" class="notice" hidden></section>
-
-  <section id="panel-online" class="panel">
-    <form id="search-form" class="searchbar">
-      <input id="query" type="search" placeholder="描述你要找的画面或声音，例如：夜晚城市延时" autocomplete="off" />
-      <div class="kinds" role="group" aria-label="素材类型">
-        <label><input type="checkbox" class="kind" value="image" checked />图片</label>
-        <label><input type="checkbox" class="kind" value="video" checked />视频</label>
-        <label><input type="checkbox" class="kind" value="audio" checked />音效</label>
+  <div class="app-shell">
+    <header class="app-bar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">▦</span>
+        <div>
+          <h1>媒体库</h1>
+          <p>图片、视频与音频</p>
+        </div>
       </div>
-      <button type="submit" id="search-button" class="primary">检索</button>
-    </form>
-    <div id="sources" class="sources" aria-label="素材来源"></div>
+      <div class="app-actions">
+        <button type="button" id="open-settings" class="icon-button" aria-label="媒体库设置" title="媒体库设置">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"/></svg>
+        </button>
+      </div>
+    </header>
 
-    <details id="source-settings" class="settings">
-      <summary>来源设置</summary>
-      <div id="settings-rows" class="settings-rows"></div>
-      <p class="hint">密钥只保存在本插件自己的数据目录里，不写进工作区，也不会上传到 HiMind 工作台。没有密钥时检索仍会列出未配置的来源，不会静默失败。</p>
-    </details>
-    <div id="results" class="results"></div>
-  </section>
+    <main class="workspace">
+      <section class="search-section" aria-label="搜索">
+        <form id="search-form" class="search-form">
+          <label class="search-field" for="query">
+            <input id="query" type="search" placeholder="搜索名称、标签、分类路径或来源" autocomplete="off" />
+          </label>
+          <button type="submit" id="search-button" class="primary icon-button search-submit" aria-label="搜索" title="搜索（Enter）">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/></svg>
+          </button>
+        </form>
 
-  <section id="panel-local" class="panel" hidden>
-    <div class="searchbar">
-      <input id="index-roots" type="text" placeholder="要索引的目录，多个用分号分隔" autocomplete="off" />
-      <button type="button" id="index-button" class="ghost">建立索引</button>
+        <div class="search-options">
+          <div id="scope-group" class="segmented" role="group" aria-label="搜索范围">
+            <button type="button" class="segment active" data-scope="all" aria-pressed="true">全部</button>
+            <button type="button" class="segment" data-scope="online" aria-pressed="false">在线</button>
+            <button type="button" class="segment" data-scope="library" aria-pressed="false">资源库</button>
+            <button type="button" class="segment" data-scope="sources" aria-pressed="false">本机</button>
+          </div>
+
+          <div id="kind-group" class="type-toggle" role="group" aria-label="媒体类型">
+            <button type="button" class="type-option active" data-kind="image" aria-pressed="true">图片</button>
+            <button type="button" class="type-option active" data-kind="video" aria-pressed="true">视频</button>
+            <button type="button" class="type-option active" data-kind="audio" aria-pressed="true">音频</button>
+          </div>
+
+          <button type="button" id="filter-toggle" class="filter-toggle" aria-expanded="false" aria-controls="filter-popover">
+            筛选<span id="filter-count" class="filter-count" hidden></span>
+            <svg class="filter-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 9 5 5 5-5"/></svg>
+          </button>
+        </div>
+
+        <div id="filter-popover" class="filter-panel" hidden>
+          <fieldset class="filter-group">
+            <legend>在线来源</legend>
+            <div id="provider-filters" class="filter-options"></div>
+          </fieldset>
+          <div class="filter-grid">
+            <label>画面方向
+              <select id="filter-orientation">
+                <option value="">不限</option>
+                <option value="landscape">横屏</option>
+                <option value="portrait">竖屏</option>
+                <option value="square">方形</option>
+              </select>
+            </label>
+            <label>最小宽度
+              <input id="filter-min-width" type="number" min="0" max="12000" step="100" placeholder="像素" />
+            </label>
+            <label>最小时长
+              <input id="filter-min-duration" type="number" min="0" max="3600" step="1" placeholder="秒" />
+            </label>
+          </div>
+          <div class="filter-footer">
+            <button type="button" id="clear-filters" class="ghost">重置</button>
+            <button type="button" id="apply-filters" class="primary">应用筛选</button>
+          </div>
+        </div>
+
+        <div id="active-filters" class="active-filters" hidden></div>
+        <div id="search-feedback" class="inline-feedback" role="status" hidden></div>
+      </section>
+
+      <section class="results-section" aria-labelledby="results-title" aria-live="polite">
+        <div class="results-head">
+          <div class="results-copy">
+            <strong id="results-title">开始搜索</strong>
+            <span id="result-detail" class="meta">从在线来源、资源库和本机文件夹中查找素材</span>
+          </div>
+          <div class="results-actions">
+            <span id="busy-state" class="meta" hidden>正在处理…</span>
+            <button type="button" id="refresh" class="icon-button" aria-label="刷新" title="刷新">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg>
+            </button>
+          </div>
+        </div>
+        <div id="results" class="results" aria-busy="false"></div>
+        <div class="results-footer"><button type="button" id="load-more" class="ghost" hidden>加载更多</button></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="preview-scrim" class="scrim" hidden></div>
+  <aside id="preview" class="detail-sheet" role="dialog" aria-modal="true" aria-labelledby="preview-title" aria-hidden="true" hidden>
+    <header class="detail-head">
+      <div class="detail-head-main">
+        <div id="preview-badges" class="detail-badges"></div>
+        <div class="detail-title">
+          <h2 id="preview-title">素材预览</h2>
+          <span id="preview-subtitle" class="meta"></span>
+        </div>
+      </div>
+      <div class="detail-toolbar">
+        <span id="preview-position" class="detail-position"></span>
+        <button type="button" id="previous-preview" class="icon-button compact" aria-label="查看上一项" title="上一项">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>
+        </button>
+        <button type="button" id="next-preview" class="icon-button compact" aria-label="查看下一项" title="下一项">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+        </button>
+        <button type="button" id="close-preview" class="icon-button" aria-label="关闭预览" title="关闭">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+    </header>
+    <div class="detail-content">
+      <div id="preview-media" class="detail-media"></div>
+      <section class="detail-info" aria-labelledby="detail-info-title">
+        <div class="detail-info-head">
+          <h3 id="detail-info-title">素材信息</h3>
+          <span id="preview-kind-label" class="meta"></span>
+        </div>
+        <dl id="preview-meta" class="detail-meta"></dl>
+      </section>
+      <div id="preview-feedback" class="inline-feedback" role="status" hidden></div>
     </div>
-    <div class="searchbar">
-      <input id="local-query" type="search" placeholder="按文件名检索本机素材" autocomplete="off" />
-      <button type="button" id="local-search-button" class="primary">检索</button>
-    </div>
-    <div id="local-results" class="results"></div>
-  </section>
+    <footer class="detail-footer">
+      <div id="adopt-form" class="adopt-form">
+        <div class="adopt-form-head">
+          <strong>入库信息</strong>
+          <span id="adopt-source-name" class="meta"></span>
+        </div>
+        <label class="field-stack">入库到
+          <select id="adopt-library" aria-label="选择入库资源库"></select>
+        </label>
+        <label class="field-stack">入库名称
+          <input id="adopt-name" type="text" maxlength="200" autocomplete="off" />
+        </label>
+        <div class="adopt-form-grid">
+          <label>分类路径
+            <input id="adopt-collection" type="text" maxlength="200" autocomplete="off" placeholder="项目/城市/夜景" />
+          </label>
+          <label>标签
+            <input id="adopt-tags" type="text" maxlength="500" autocomplete="off" placeholder="城市, 夜景, 授权素材" />
+          </label>
+        </div>
+        <p class="field-hint">名称、分类和标签用于后续检索；文件仍按内容哈希去重存储。</p>
+      </div>
+      <p id="redistribution-notice" class="adoption-notice" hidden></p>
+      <button type="button" id="adopt-button" class="primary wide" hidden>添加到资源库</button>
+    </footer>
+  </aside>
+
+  <div id="settings-modal" class="modal-layer" aria-hidden="true" hidden>
+    <div class="modal-backdrop" data-close-settings></div>
+    <section class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <header class="settings-head">
+        <div>
+          <h2 id="settings-title">媒体库设置</h2>
+          <p class="meta">资源库、本机来源和在线来源</p>
+        </div>
+        <button type="button" id="close-settings" class="icon-button" aria-label="关闭媒体库设置" title="关闭">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
+      <div id="settings-feedback" class="inline-feedback settings-feedback" role="status" hidden></div>
+      <div class="settings-body">
+        <nav class="settings-nav" role="tablist" aria-label="设置分类">
+          <button type="button" id="settings-tab-libraries" class="settings-tab active" role="tab" aria-selected="true" aria-controls="settings-panel-libraries" data-settings-tab="libraries">资源库</button>
+          <button type="button" id="settings-tab-local" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-panel-local" data-settings-tab="local">本机文件夹</button>
+          <button type="button" id="settings-tab-online" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-panel-online" data-settings-tab="online">在线来源</button>
+          <button type="button" id="settings-tab-index" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-panel-index" data-settings-tab="index">索引状态</button>
+        </nav>
+        <div class="settings-panels">
+          <section id="settings-panel-libraries" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-libraries" data-settings-panel="libraries">
+            <div class="section-head">
+              <div><h3>资源库</h3><p class="meta">本地目录或 SMB 共享目录</p></div>
+              <button type="button" id="show-library-form" class="ghost">新建或关联</button>
+            </div>
+            <label class="field-stack default-library-field">默认入库资源库
+              <select id="target-library" aria-label="默认入库资源库"></select>
+            </label>
+            <form id="library-form" class="config-form" hidden>
+              <div id="library-form-title" class="form-title">新建资源库</div>
+              <div class="form-grid">
+                <label>名称<input id="library-name" type="text" maxlength="200" /></label>
+                <label>类型<select id="library-backend"><option value="local">本地</option><option value="smb">SMB</option></select></label>
+                <label class="span-2">根目录<input id="library-root" type="text" maxlength="2000" placeholder="本地目录或 \\server\share\library" /></label>
+                <label>访问模式<select id="library-access"><option value="contribute">可采纳</option><option value="read_only">只读</option></select></label>
+              </div>
+              <div class="form-actions"><button type="button" id="cancel-library-form" class="ghost">取消</button><button type="submit" class="primary">创建或关联</button></div>
+            </form>
+            <div id="libraries" class="config-list"></div>
+          </section>
+
+          <section id="settings-panel-local" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-local" data-settings-panel="local" hidden>
+            <div class="section-head">
+              <div><h3>本机文件夹</h3><p class="meta">只建立候选索引，不会自动进入资源库</p></div>
+            </div>
+            <div class="inline-form">
+              <input id="source-path" type="text" placeholder="选择要建立索引的文件夹" />
+              <button type="button" id="pick-folder" class="ghost">选择</button>
+              <button type="button" id="add-source" class="primary">添加并扫描</button>
+            </div>
+            <form id="source-edit-form" class="config-form" hidden>
+              <div class="form-title">编辑本机来源</div>
+              <div class="form-grid">
+                <label>名称<input id="source-display-name" type="text" maxlength="200" /></label>
+                <label class="span-2">路径<input id="source-edit-path" type="text" readonly /></label>
+              </div>
+              <div class="form-actions"><button type="button" id="cancel-source-edit" class="ghost">取消</button><button type="submit" class="primary">保存修改</button></div>
+            </form>
+            <div id="sources" class="config-list"></div>
+          </section>
+
+          <section id="settings-panel-online" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-online" data-settings-panel="online" hidden>
+            <div class="section-head">
+              <div><h3>在线来源</h3><p class="meta">凭据由 HiMind Agent 的账号与凭据统一管理</p></div>
+              <button type="button" id="refresh-providers" class="ghost">刷新状态</button>
+            </div>
+            <div id="providers" class="config-list"></div>
+          </section>
+
+          <section id="settings-panel-index" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-index" data-settings-panel="index" hidden>
+            <div class="section-head">
+              <div><h3>索引状态</h3><p class="meta">资源库条目与本机候选来源</p></div>
+              <button type="button" id="scan-all-sources" class="ghost">扫描全部来源</button>
+            </div>
+            <div id="index-overview" class="index-overview"></div>
+            <div id="index-sources" class="config-list"></div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="confirm-modal" class="modal-layer confirm-layer" aria-hidden="true" hidden>
+    <div class="modal-backdrop" data-cancel-confirm></div>
+    <section class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+      <div class="confirm-copy">
+        <h2 id="confirm-title">确认操作</h2>
+        <p id="confirm-message"></p>
+      </div>
+      <div class="confirm-actions">
+        <button type="button" id="cancel-confirm" class="ghost">取消</button>
+        <button type="button" id="accept-confirm" class="primary">确认</button>
+      </div>
+    </section>
+  </div>
 
   <script src="app.js"></script>
 </body>

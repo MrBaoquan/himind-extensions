@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "platform_profile_id": "mp-njqk-pitch-roll-v1",
+  "display_name": "MP-NJQK 俯仰横滚平台",
+  "plugin": "MP-NJQK",
+  "capability_class": "pitch_roll",
+  "protocol_variant": "njqk-binary-udp",
+  "active_command": null,
+  "motion_axes": [
+    {
+      "role": "pitch",
+      "channel": "OAxis_01",
+      "value_type": "float",
+      "unit": "deg",
+      "min": -25,
+      "max": 25,
+      "neutral": 0,
+      "max_slew_rate": null,
+      "slew_rate_status": "not_declared",
+      "direction": "unknown",
+      "direction_status": "provisional",
+      "notes": [
+        "Configured lim_pitch=25."
+      ]
+    },
+    {
+      "role": "roll",
+      "channel": "OAxis_03",
+      "value_type": "float",
+      "unit": "deg",
+      "min": -25,
+      "max": 25,
+      "neutral": 0,
+      "max_slew_rate": null,
+      "slew_rate_status": "not_declared",
+      "direction": "unknown",
+      "direction_status": "provisional",
+      "notes": [
+        "Configured lim_roll=25."
+      ]
+    }
+  ],
+  "controls": [
+    {
+      "role": "speed",
+      "kind": "speed",
+      "channel": "OAxis_08",
+      "min": 0,
+      "max": 10,
+      "notes": [
+        "Configured speed=5, lim_speed=10."
+      ]
+    }
+  ],
+  "effects": [],
+  "protocol_constraints": {
+    "fixed_fields": [
+      "pitch",
+      "roll",
+      "speed",
+      "reset"
+    ],
+    "unsupported_roles": [
+      "yaw",
+      "surge",
+      "sway",
+      "heave",
+      "angle"
+    ]
+  },
+  "semantics": {
+    "flight_float": {
+      "status": "approximate",
+      "output_roles": [
+        "pitch",
+        "roll"
+      ],
+      "requires_approval": true,
+      "reason": "No vertical axis; float is approximated with tilt."
+    },
+    "weightless_drop": {
+      "status": "approximate",
+      "output_roles": [
+        "pitch",
+        "roll"
+      ],
+      "requires_approval": true,
+      "reason": "No heave; drop is approximated by a nose-down pulse and roll accent."
+    },
+    "impact": {
+      "status": "approximate",
+      "output_roles": [
+        "pitch",
+        "roll"
+      ],
+      "requires_approval": true,
+      "reason": "Impact is approximated by a short tilt impulse; no vertical drop."
+    },
+    "sharp_turn": {
+      "status": "exact",
+      "output_roles": [
+        "pitch",
+        "roll"
+      ],
+      "requires_approval": false
+    },
+    "lateral_shift": {
+      "status": "unsupported",
+      "output_roles": [],
+      "requires_approval": false,
+      "reason": "No surge/sway axis."
+    },
+    "yaw_turn": {
+      "status": "unsupported",
+      "output_roles": [],
+      "requires_approval": false,
+      "reason": "No yaw axis."
+    }
+  },
+  "safety": {
+    "safe_stop_mode": "reset_only",
+    "feedback": "none",
+    "tail_reset_required": true,
+    "tail_reset_margin_ms": 1500,
+    "reset_roles": [
+      "pitch",
+      "roll",
+      "speed"
+    ]
+  },
+  "evidence": [
+    {
+      "kind": "plugin_source",
+      "path": "IOUI\\MP-NJQK\\Source\\Private\\ChairDevManager.cpp",
+      "observed": "2026-10-30"
+    },
+    {
+      "kind": "plugin_config",
+      "path": "IOUI\\Config\\MP-NJQK\\config.xml",
+      "observed": "2026-10-30"
+    }
+  ],
+  "notes": [
+    "Pitch/roll only; never claim vertical heave."
+  ]
+}

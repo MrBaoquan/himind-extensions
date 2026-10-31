@@ -2,11 +2,11 @@
   "schema_version": "workflow_package.v1",
   "id": "com.himind.workflow.daily-work-log",
   "icon": "assets/icon.png",
-  "version": "0.7.7",
+  "version": "0.7.8",
   "distribution_targets": ["workbench", "github"],
   "name": "每日工作日志",
   "description": "采集本机 AI 会话素材，按仓库路径/项目/展项稳定归类并用内置 AI 总结成清晰的工作日志条目（按项目→功能聚合），写入全局工作日志，生成日报归档，并跨期补算周报/月报（自然周期去重）。",
-  "release_notes": "0.7.7：项目与展项同步改用当前 workbench.business.* 能力 ID，避免新版 Agent 中因旧 ID 不存在而跳过看板同步。",
+  "release_notes": "0.7.8：刷新依赖锁以使用工作日志采集器 0.7.3，修复 WorkBuddy 会话未采集、系统提示污染标题与摘要的问题。",
   "min_agent_version": "0.3.47",
   "local_requirements": {
     "platform": "windows",

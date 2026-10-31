@@ -16,6 +16,21 @@ checksums.sha256
 .himind/media/
 # 工作流会话素材（采集器在扩展私有目录不可写时改写到 <工作区>/.himind/material），运行期本地状态。
 .himind/material/
+# 长任务驱动的跨会话状态，属于本机运行状态。
+.himind/long-tasks/
+# Skill 工作区同步生成的各客户端投影目录，不进入扩展源码仓。
+skills/*/.agents/
+skills/*/.claude/
+skills/*/.cline/
+skills/*/.codebuddy/
+skills/*/.cursor/
+skills/*/.gemini/
+skills/*/.github/
+skills/*/.himind/
+skills/*/.kiro/
+skills/*/.opencode/
+skills/*/.workbuddy/
+skills/*/.zcode/
 # 媒体下载插件的默认输出目录（运行期本地产物）。只锚定仓库根目录：插件内部的 internal/media 源码包不能被这条规则吞掉。
 /media/
 .idea/

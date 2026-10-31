@@ -1831,6 +1831,35 @@ body.modal-open {
   font-size: 13px;
 }
 
+/* 季度起算月：紧跟在周期切换下面的一行轻量设置，不打断报告阅读。 */
+.report-fiscal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: -2px 0 10px;
+}
+
+.report-fiscal .field.inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.report-fiscal .field.inline select {
+  padding: 5px 8px;
+  font-size: 13px;
+}
+
+.report-fiscal .meta {
+  margin: 0;
+}
+
+.report-fiscal .fiscal-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .report-actions {
   display: flex;
   gap: 8px;
@@ -2185,6 +2214,19 @@ body.modal-open {
   text-align: center;
 }
 
+.matrix-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.matrix-hint {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .matrix-scroll {
   overflow: auto;
   max-height: 72vh;
@@ -2255,6 +2297,57 @@ body.modal-open {
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* 行头 / 表头里的复制按钮：默认低调，悬停该行时才显形，避免整张表被图标塞满。 */
+.matrix .mx-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.matrix .mx-head-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.matrix .mx-copy {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  padding: 3px 5px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.matrix tr:hover .mx-copy,
+.matrix .mx-copy:focus-visible {
+  opacity: 1;
+}
+
+.matrix .mx-copy:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.matrix .mx-copy:active {
+  background: var(--accent-soft);
+}
+
+/* 触屏没有 hover，复制入口必须常显，否则永远点不到。 */
+@media (hover: none) {
+  .matrix .mx-copy {
+    opacity: 1;
+  }
 }
 
 .matrix tbody tr:nth-child(even) .mx-cell {

@@ -86,6 +86,11 @@
     quarterly: '季度总结',
     yearly: '年度总结',
   };
+
+  // 季度 / 年度的起算月（公司财年口径）：1 表示自然季度，2 表示 Q1 = 2/3/4 月。
+  // 由后端 work-log.preferences.get 读回并缓存在 state 里，前端所有周期计算都以它为准，
+  // 避免界面显示一个区间、落盘归档又是另一个区间。
+  const DEFAULT_FISCAL_START_MONTH = 1;
   const WEEKDAYS_MONDAY = ['一', '二', '三', '四', '五', '六', '日'];
   const WEEKDAYS_SUNDAY = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -118,12 +123,16 @@
     reportLoading: false,
     reportArchive: null,
     aggStatus: null,
+    // 财年口径：季度与年度的起算月，来自 work-log.preferences.get
+    fiscalStartMonth: DEFAULT_FISCAL_START_MONTH,
     // 工时表
     matrixYear: 0,
     matrixMonth: 0,
     matrixEntries: null,
     matrixLoading: false,
     matrixMode: 'actual',
+    // matrixTable 是当前矩阵的纯文本副本（表头 / 各行 / 合计），供复制到 Excel。
+    matrixTable: null,
     // 项目
     projectsMode: 'progress',
     activeProject: '',
@@ -364,6 +373,39 @@
     }
     document.body.removeChild(area);
     done();
+  }
+
+  // copyTableToClipboard 把二维文本数组写进剪贴板，保证粘到 Excel 后还是表格。
+  //
+  // 同时写两种格式：text/plain 用制表符分隔（Excel 据此拆列），text/html 用 <table>
+  // 保留单元格边界。只写 text/plain 在部分 Excel 版本里会把整段并进一格，所以优先
+  // 用 ClipboardItem 写多格式；浏览器不支持或被拒绝时退回纯文本（仍能拆列）。
+  function copyTableToClipboard(rows, message) {
+    if (!rows || !rows.length) return;
+    const tsv = rows.map((cells) => cells.join('\t')).join('\n');
+    const htmlTable =
+      '<table>' +
+      rows
+        .map(
+          (cells) =>
+            '<tr>' + cells.map((value) => '<td>' + escapeHTML(value) + '</td>').join('') + '</tr>',
+        )
+        .join('') +
+      '</table>';
+    const done = () => notify(message || '已复制，可直接粘贴到 Excel');
+    if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+      try {
+        const item = new ClipboardItem({
+          'text/plain': new Blob([tsv], { type: 'text/plain' }),
+          'text/html': new Blob([htmlTable], { type: 'text/html' }),
+        });
+        navigator.clipboard.write([item]).then(done, () => copyText(tsv, message));
+        return;
+      } catch (error) {
+        /* 结构化剪贴板不可用时走纯文本兜底。 */
+      }
+    }
+    copyText(tsv, message);
   }
 
   function emptyBlock(title, lines) {
@@ -1117,6 +1159,34 @@
     return target.getUTCFullYear() + '-W' + pad2(week);
   }
 
+  // fiscalStartMonth 归一化起算月：越界值一律当自然季度处理，
+  // 与后端 normalizeFiscalYearStartMonth 保持同一容错行为。
+  function fiscalStartMonth() {
+    const value = Number(state.fiscalStartMonth);
+    if (!Number.isInteger(value) || value < 1 || value > 12) return DEFAULT_FISCAL_START_MONTH;
+    return value;
+  }
+
+  // fiscalYearStart 返回 date 所属财年的首日（用月序做绝对比较，避免跨年特判）。
+  function fiscalYearStart(date) {
+    const startMonth = fiscalStartMonth();
+    const abs = date.getFullYear() * 12 + date.getMonth();
+    let startAbs = date.getFullYear() * 12 + (startMonth - 1);
+    if (startAbs > abs) startAbs -= 12;
+    const year = Math.floor(startAbs / 12);
+    return { year: year, month: startMonth - 1, date: new Date(year, startMonth - 1, 1) };
+  }
+
+  // fiscalQuarterStart 返回 date 所属季度的起始日与索引，季度边界是起算月 + 3k 个月。
+  // month 是起始月的 0 基序号（JS Date 口径），调用方据此算季度末，避免重复推导。
+  function fiscalQuarterStart(date) {
+    const yearStart = fiscalYearStart(date);
+    const offset = (date.getFullYear() - yearStart.year) * 12 + date.getMonth() - yearStart.month;
+    const index = Math.floor(offset / 3);
+    const month = yearStart.month + index * 3;
+    return { year: yearStart.year, index: index, month: month, date: new Date(yearStart.year, month, 1) };
+  }
+
   function periodRangeJS(period, anchor) {
     const date = parseDate(anchor) || new Date();
     const year = date.getFullYear();
@@ -1137,22 +1207,54 @@
       return { from: formatDate(start), to: formatDate(end), key: year + '-' + pad2(month + 1) };
     }
     if (period === 'quarterly') {
-      const quarter = Math.floor(month / 3);
-      const start = new Date(year, quarter * 3, 1);
-      const end = new Date(year, quarter * 3 + 3, 0);
-      return { from: formatDate(start), to: formatDate(end), key: year + '-Q' + (quarter + 1) };
+      const quarter = fiscalQuarterStart(date);
+      // 结束日 = 起点 + 3 个月 - 1 天；用 new Date(y, m+3, 0) 拿到该月最后一天。
+      const end = new Date(quarter.year, quarter.month, 1);
+      end.setMonth(end.getMonth() + 3);
+      end.setDate(0);
+      return { from: formatDate(quarter.date), to: formatDate(end), key: quarter.year + '-Q' + (quarter.index + 1) };
     }
-    return { from: year + '-01-01', to: year + '-12-31', key: String(year) };
+    const yearStart = fiscalYearStart(date);
+    const end = new Date(yearStart.year, yearStart.month, 1);
+    end.setFullYear(end.getFullYear() + 1);
+    end.setDate(0);
+    return { from: formatDate(yearStart.date), to: formatDate(end), key: String(yearStart.year) };
   }
 
+  // shiftAnchor 按周期移动锚点。月 / 季 / 年以「周期起点 + 周期内偏移」为基准再夹住天数，
+  // 直接对锚点 setMonth 会让 31 日溢出到下一个周期（如 5-31 减一月变 5-01）。
   function shiftAnchor(period, anchor, delta) {
     const date = parseDate(anchor) || new Date();
-    if (period === 'daily') date.setDate(date.getDate() + delta);
-    else if (period === 'weekly') date.setDate(date.getDate() + delta * 7);
-    else if (period === 'monthly') date.setMonth(date.getMonth() + delta, 1);
-    else if (period === 'quarterly') date.setMonth(date.getMonth() + delta * 3, 1);
-    else date.setFullYear(date.getFullYear() + delta, 0, 1);
-    return formatDate(date);
+    if (period === 'daily') {
+      date.setDate(date.getDate() + delta);
+      return formatDate(date);
+    }
+    if (period === 'weekly') {
+      date.setDate(date.getDate() + delta * 7);
+      return formatDate(date);
+    }
+    const base = period === 'monthly' ? new Date(date.getFullYear(), date.getMonth(), 1) : period === 'quarterly' ? fiscalQuarterStart(date).date : fiscalYearStart(date).date;
+    const offset = Math.round((new Date(date.getFullYear(), date.getMonth(), date.getDate()) - base) / 86400000);
+    const months = period === 'monthly' ? delta : period === 'quarterly' ? delta * 3 : delta * 12;
+    const shifted = new Date(base.getFullYear(), base.getMonth() + months, 1);
+    const shiftedEnd = new Date(shifted.getFullYear(), shifted.getMonth() + (period === 'monthly' ? 1 : period === 'quarterly' ? 3 : 12), 0);
+    const length = Math.round((shiftedEnd - shifted) / 86400000) + 1;
+    const clamped = Math.min(Math.max(offset, 0), length - 1);
+    return formatDate(new Date(shifted.getFullYear(), shifted.getMonth(), shifted.getDate() + clamped));
+  }
+
+  // quarterRuleText 用一句话说明当前起算月下的季度划分，与后端 fiscalQuarterRuleText 对齐。
+  // 跨年的季度（如 11-1 月）写成「11 月-次年 1 月」，避免被读成 11 月到 1 月之外的区间。
+  function quarterRuleText() {
+    const start = fiscalStartMonth();
+    return [0, 1, 2, 3]
+      .map((index) => {
+        const from = ((start + index * 3 - 1) % 12) + 1;
+        const to = ((start + index * 3 + 1) % 12) + 1;
+        if (to < from) return 'Q' + (index + 1) + ' ' + from + ' 月-次年 ' + to + ' 月';
+        return 'Q' + (index + 1) + ' ' + from + '-' + to + ' 月';
+      })
+      .join(' · ');
   }
 
   function renderReportPeriods() {
@@ -1170,6 +1272,55 @@
         escapeHTML(PERIOD_LABELS[period]) +
         '</button>',
     ).join('');
+  }
+
+  // renderFiscalSetting 渲染起算月选择与规则说明。
+  // 12 个选项用月份序号生成，标签写「从 N 月起算」而不是「第 N 季度」，避免歧义。
+  function renderFiscalSetting() {
+    const select = el('fiscal-start-month');
+    const rule = el('fiscal-rule');
+    if (!select) return;
+    const current = fiscalStartMonth();
+    if (!select.options.length) {
+      select.innerHTML = Array.from({ length: 12 }, (_, index) => index + 1)
+        .map((month) => '<option value="' + month + '">' + month + ' 月</option>')
+        .join('');
+    }
+    select.value = String(current);
+    if (rule) {
+      rule.textContent =
+        '当前：' +
+        quarterRuleText() +
+        (current === DEFAULT_FISCAL_START_MONTH ? '（自然季度）' : '（财年从 ' + current + ' 月起算）');
+    }
+  }
+
+  // loadPreferences 读取日志库级偏好（起算月）。失败时保留缺省值并提示，
+  // 不阻塞报告：口径读不到就用自然季度，界面仍可继续看报告。
+  async function loadPreferences() {
+    try {
+      const data = await bridgeInvoke('work-log.preferences.get', {});
+      state.fiscalStartMonth = Number(data && data.fiscal_year_start_month) || DEFAULT_FISCAL_START_MONTH;
+    } catch (error) {
+      state.fiscalStartMonth = DEFAULT_FISCAL_START_MONTH;
+    }
+    renderFiscalSetting();
+  }
+
+  async function saveFiscalStartMonth(month) {
+    const previous = state.fiscalStartMonth;
+    try {
+      const data = await bridgeInvoke('work-log.preferences.save', { fiscal_year_start_month: month });
+      state.fiscalStartMonth = Number(data && data.fiscal_year_start_month) || month;
+      renderFiscalSetting();
+      notify('已把季度起算月设为 ' + state.fiscalStartMonth + ' 月：' + quarterRuleText());
+      // 口径变了，同一锚点对应的区间与键都可能变，必须重算当前报告。
+      if (state.view === 'report') await loadReport();
+    } catch (error) {
+      state.fiscalStartMonth = previous;
+      renderFiscalSetting();
+      notify('设置起算月失败：' + String((error && error.message) || error), 'error');
+    }
   }
 
   async function loadReport() {
@@ -1194,7 +1345,11 @@
     }
     el('report-range').innerHTML =
       '<span class="badge">' + escapeHTML(range.key) + '</span>' +
-      (range.from !== range.to ? '<span class="badge">' + escapeHTML(range.from) + ' ~ ' + escapeHTML(range.to) + '</span>' : '');
+      (range.from !== range.to ? '<span class="badge">' + escapeHTML(range.from) + ' ~ ' + escapeHTML(range.to) + '</span>' : '') +
+      // 季度 / 年度是按起算月切的，把口径直接标在范围旁边，免得看到 2 月起点以为算错。
+      (state.reportPeriod === 'quarterly' || state.reportPeriod === 'yearly'
+        ? '<span class="badge">' + escapeHTML(quarterRuleText()) + '</span>'
+        : '');
     renderReport();
     renderAggregateStatus();
     loadAggregateStatus();
@@ -1674,6 +1829,7 @@
     const body = el('matrix-body');
     const badges = el('matrix-badges');
     const note = el('matrix-note');
+    state.matrixTable = null;
     if (state.matrixLoading || !state.matrixEntries) {
       body.innerHTML = skeleton();
       return;
@@ -1699,17 +1855,22 @@
       return;
     }
 
+    const dayCells = (valueFor) =>
+      Array.from({ length: matrix.daysInMonth }, (_, i) => valueFor(i + 1));
+
     const head =
-      '<tr><th class="mx-corner" scope="col">项目</th>' +
-      Array.from({ length: matrix.daysInMonth }, (_, i) => i + 1)
-        .map((day) => '<th scope="col" class="mx-day">' + day + '</th>')
-        .join('') +
+      '<tr><th class="mx-corner" scope="col"><span class="mx-head"><span class="mx-head-name">项目</span>' +
+      '<button type="button" class="mx-copy" data-mx-copy="head" title="复制表头，可粘贴到 Excel" aria-label="复制表头">⧉</button>' +
+      '</span></th>' +
+      dayCells((day) => '<th scope="col" class="mx-day">' + day + '</th>').join('') +
       '<th scope="col" class="mx-total-col">合计</th></tr>';
 
+    // 复制用的纯文本副本：表头用「1日」，单元格用小时数值（Excel 能直接求和）。
+    const tableHead = ['项目'].concat(dayCells((day) => day + '日')).concat(['合计']);
+
     const rows = matrix.rows
-      .map((row) => {
-        const cells = Array.from({ length: matrix.daysInMonth }, (_, i) => {
-          const day = i + 1;
+      .map((row, rowIndex) => {
+        const cells = dayCells((day) => {
           const minutes = Number(row.cells[day]) || 0;
           const cats = row.byCategory[day] || {};
           const catText = Object.keys(cats)
@@ -1728,22 +1889,34 @@
             '</td>'
           );
         }).join('');
+        const total = rowTotal(row);
         return (
-          '<tr><th scope="row" class="mx-rowhead">' +
+          '<tr><th scope="row" class="mx-rowhead"><span class="mx-head">' +
+          '<span class="mx-head-name">' +
           escapeHTML(row.name) +
-          '</th>' +
+          '</span>' +
+          '<button type="button" class="mx-copy" data-mx-copy="row" data-mx-row="' +
+          rowIndex +
+          '" title="复制「' +
+          escapeHTML(row.name) +
+          '」这一行，可粘贴到 Excel" aria-label="复制 ' +
+          escapeHTML(row.name) +
+          ' 这一行">⧉</button>' +
+          '</span></th>' +
           cells +
           '<td class="mx-total">' +
-          (rowTotal(row) > 0 ? escapeHTML(hoursShort(rowTotal(row))) : '—') +
+          (total > 0 ? escapeHTML(hoursShort(total)) : '—') +
           '</td></tr>'
         );
       })
       .join('');
 
     const foot =
-      '<tr class="mx-foot"><th scope="row" class="mx-rowhead">当天合计</th>' +
-      Array.from({ length: matrix.daysInMonth }, (_, i) => {
-        const day = i + 1;
+      '<tr class="mx-foot"><th scope="row" class="mx-rowhead"><span class="mx-head">' +
+      '<span class="mx-head-name">当天合计</span>' +
+      '<button type="button" class="mx-copy" data-mx-copy="total" title="复制当天合计行，可粘贴到 Excel" aria-label="复制当天合计行">⧉</button>' +
+      '</span></th>' +
+      dayCells((day) => {
         const minutes = matrix.dayTotals[day] || 0;
         const off = minutes > 0 && minutes !== ALIGN_TARGET_MINUTES;
         return (
@@ -1761,6 +1934,19 @@
       escapeHTML(hoursShort(grand) || '0') +
       '</td></tr>';
 
+    state.matrixTable = {
+      head: tableHead,
+      rows: matrix.rows.map((row) => {
+        const total = rowTotal(row);
+        return [row.name]
+          .concat(dayCells((day) => hoursShort(row.cells[day]) || ''))
+          .concat([total > 0 ? hoursShort(total) : '']);
+      }),
+      total: ['当天合计']
+        .concat(dayCells((day) => hoursShort(matrix.dayTotals[day]) || ''))
+        .concat([hoursShort(grand) || '']),
+    };
+
     body.innerHTML =
       '<table class="matrix"><thead>' +
       head +
@@ -1776,6 +1962,31 @@
         if (date) openDateFromMatrix(date);
       });
     });
+    body.querySelectorAll('[data-mx-copy]').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        // 行头按钮在 sticky 列里，点它不应该连带跳到日历视图。
+        event.stopPropagation();
+        copyMatrixPart(button.getAttribute('data-mx-copy'), button.getAttribute('data-mx-row'));
+      });
+    });
+  }
+
+  // copyMatrixPart 复制工时表的一部分：表头行、某个项目行，或当天合计行。
+  function copyMatrixPart(kind, rowIndex) {
+    const table = state.matrixTable;
+    if (!table) return;
+    if (kind === 'head') {
+      copyTableToClipboard([table.head], '已复制表头，可直接粘贴到 Excel');
+      return;
+    }
+    if (kind === 'total') {
+      copyTableToClipboard([table.total], '已复制当天合计行，可直接粘贴到 Excel');
+      return;
+    }
+    const index = Number(rowIndex);
+    const row = Number.isInteger(index) ? table.rows[index] : null;
+    if (!row) return;
+    copyTableToClipboard([row], '已复制「' + row[0] + '」这一行，可直接粘贴到 Excel');
   }
 
   async function openDateFromMatrix(date) {
@@ -4544,6 +4755,7 @@
       else renderPlan();
     } else if (state.view === 'report') {
       if (!state.reportAnchor) state.reportAnchor = state.selected || today();
+      renderFiscalSetting();
       loadReport();
     } else if (state.view === 'matrix') {
       loadMatrix(state.matrixYear || 0, state.matrixMonth || 0);
@@ -4712,6 +4924,14 @@
     el('report-aggregate').addEventListener('click', aggregateNow);
     el('report-open').addEventListener('click', openArchive);
     el('report-copy').addEventListener('click', copyArchive);
+    const fiscalSelect = el('fiscal-start-month');
+    if (fiscalSelect) {
+      fiscalSelect.addEventListener('change', () => {
+        const month = Number(fiscalSelect.value);
+        if (!month) return;
+        saveFiscalStartMonth(month);
+      });
+    }
 
     // 工时表
     el('mx-prev').addEventListener('click', () => {
@@ -4737,6 +4957,14 @@
       if (!button) return;
       state.matrixMode = button.getAttribute('data-mode');
       renderMatrix();
+    });
+    el('mx-copy-all').addEventListener('click', () => {
+      const table = state.matrixTable;
+      if (!table) {
+        notify('本月还没有可复制的工时数据', 'warn');
+        return;
+      }
+      copyTableToClipboard([table.head].concat(table.rows).concat([table.total]), '已复制整张工时表，可直接粘贴到 Excel');
     });
 
     // 项目
@@ -4795,6 +5023,9 @@
 
   bind();
   switchView('workbench');
+  // 先读回日志库级口径再做首次渲染：报告区间依赖起算月，
+  // 晚读会让首屏先按自然季度画一遍再跳变。
+  loadPreferences();
   refresh();
   window.__WORK_LOG_VIEW__ = { PLUGIN_ID: PLUGIN_ID, refresh: refresh };
 })();

@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "platform_profile_id": "mp-njlj-a3t-v1",
+  "display_name": "MP-NJLJ A3T 三轴平台",
+  "plugin": "MP-NJLJ",
+  "capability_class": "pitch_roll_heave",
+  "protocol_variant": "njlj-text-udp",
+  "active_command": "A3T",
+  "motion_axes": [
+    {
+      "role": "pitch",
+      "channel": "OAxis_01",
+      "value_type": "float",
+      "unit": "deg",
+      "min": -25,
+      "max": 25,
+      "neutral": 0,
+      "max_slew_rate": null,
+      "slew_rate_status": "not_declared",
+      "direction": "unknown",
+      "direction_status": "provisional",
+      "notes": [
+        "Configured lim_pitch=25."
+      ]
+    },
+    {
+      "role": "roll",
+      "channel": "OAxis_03",
+      "value_type": "float",
+      "unit": "deg",
+      "min": -25,
+      "max": 25,
+      "neutral": 0,
+      "max_slew_rate": null,
+      "slew_rate_status": "not_declared",
+      "direction": "unknown",
+      "direction_status": "provisional",
+      "notes": [
+        "Configured lim_roll=25."
+      ]
+    },
+    {
+      "role": "heave",
+      "channel": "OAxis_06",
+      "value_type": "float",
+      "unit": "device_unit",
+      "min": -255,
+      "max": 255,
+      "neutral": 0,
+      "max_slew_rate": null,
+      "slew_rate_status": "not_declared",
+      "direction": "unknown",
+      "direction_status": "provisional",
+      "notes": [
+        "A3T frame sends Offset.Z; engineering unit and sign require field confirmation."
+      ]
+    }
+  ],
+  "controls": [
+    {
+      "role": "speed",
+      "kind": "speed",
+      "channel": "OAxis_08",
+      "min": null,
+      "max": 5000,
+      "notes": [
+        "Config time=1000, lim_time=5000; A3T fourth field is speed/timing control."
+      ]
+    }
+  ],
+  "effects": [],
+  "protocol_constraints": {
+    "effective_frame_fields": [
+      "roll",
+      "pitch",
+      "z",
+      "speed"
+    ],
+    "theoretical_frames_available": [
+      "A3",
+      "A3T",
+      "A4",
+      "A4T",
+      "A6",
+      "A6T",
+      "A7",
+      "A7T"
+    ],
+    "active_fields_limited_by_command": true,
+    "unsupported_roles_in_active_command": [
+      "yaw",
+      "surge",
+      "sway",
+      "angle"
+    ]
+  },
+  "semantics": {
+    "flight_float": {
+      "status": "exact",
+      "output_roles": [
+        "heave",
+        "pitch",
+        "roll"
+      ],
+      "requires_approval": false
+    },
+    "weightless_drop": {
+      "status": "exact",
+      "output_roles": [
+        "heave",
+        "pitch",
+        "roll"
+      ],
+      "requires_approval": false
+    },
+    "impact": {
+      "status": "exact",
+      "output_roles": [
+        "heave",
+        "pitch",
+        "roll"
+      ],
+      "requires_approval": false
+    },
+    "sharp_turn": {
+      "status": "exact",
+      "output_roles": [
+        "pitch",
+        "roll"
+      ],
+      "requires_approval": false
+    },
+    "lateral_shift": {
+      "status": "unsupported",
+      "output_roles": [],
+      "requires_approval": false,
+      "reason": "A3T does not send X/Y."
+    },
+    "yaw_turn": {
+      "status": "unsupported",
+      "output_roles": [],
+      "requires_approval": false,
+      "reason": "A3T does not send yaw."
+    }
+  },
+  "safety": {
+    "safe_stop_mode": "reset_only",
+    "feedback": "none",
+    "tail_reset_required": true,
+    "tail_reset_margin_ms": 1500,
+    "reset_roles": [
+      "pitch",
+      "roll",
+      "heave",
+      "speed"
+    ]
+  },
+  "evidence": [
+    {
+      "kind": "plugin_source",
+      "path": "IOUI\\MP-NJLJ\\Source\\Private\\ChairDevManager.cpp",
+      "observed": "2026-10-30"
+    },
+    {
+      "kind": "plugin_config",
+      "path": "IOUI\\Config\\MP-NJLJ\\config.xml",
+      "observed": "2026-10-30"
+    }
+  ],
+  "notes": [
+    "Current active command is A3T. Do not expose theoretical A6/A7 axes until both config and profile change together."
+  ]
+}

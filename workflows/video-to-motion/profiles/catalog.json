@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "profiles": [
+    {
+      "id": "mp-ydl-heave-v1",
+      "name": "MP-YDL 影动力升降平台",
+      "path": "profiles/mp-ydl-heave-v1.json",
+      "capability_class": "heave_only",
+      "plugin": "MP-YDL",
+      "active_command": null
+    },
+    {
+      "id": "mp-njlj-a3t-v1",
+      "name": "MP-NJLJ A3T 三轴平台",
+      "path": "profiles/mp-njlj-a3t-v1.json",
+      "capability_class": "pitch_roll_heave",
+      "plugin": "MP-NJLJ",
+      "active_command": "A3T"
+    },
+    {
+      "id": "mp-njqk-pitch-roll-v1",
+      "name": "MP-NJQK 俯仰横滚平台",
+      "path": "profiles/mp-njqk-pitch-roll-v1.json",
+      "capability_class": "pitch_roll",
+      "plugin": "MP-NJQK",
+      "active_command": null
+    },
+    {
+      "id": "motion-plat-pitch-roll-v1",
+      "name": "MOTION-PLAT 旧俯仰横滚平台",
+      "path": "profiles/motion-plat-pitch-roll-v1.json",
+      "capability_class": "pitch_roll_legacy",
+      "plugin": "MOTION-PLAT",
+      "active_command": null
+    }
+  ]
+}

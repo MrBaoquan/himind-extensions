@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "name": "heave-first-ydl",
+  "description": "滑翔伞第一视角、Heave-only 设备的三档失重编排示例",
+  "device_profile": {
+    "schema_version": 1,
+    "device": "YDL-0",
+    "axes": [
+      {
+        "role": "heave",
+        "channel": "OAxis_06",
+        "value_type": "float",
+        "min": 0,
+        "max": 1000,
+        "neutral": 0,
+        "unit": "mm",
+        "max_slew_rate": 0.9,
+        "category": "motion",
+        "slew_rate_status": "field_candidate_pending_load_test"
+      },
+      {
+        "role": "wind",
+        "channel": "OAxis_18",
+        "value_type": "float",
+        "min": 0,
+        "max": 100,
+        "neutral": 0,
+        "unit": "percent",
+        "category": "environment"
+      },
+      {
+        "role": "water",
+        "channel": "OAxis_16",
+        "value_type": "bool",
+        "category": "environment"
+      },
+      {
+        "role": "hot",
+        "channel": "OAxis_20",
+        "value_type": "bool",
+        "category": "environment"
+      },
+      {
+        "role": "vibrate",
+        "channel": "OAxis_22",
+        "value_type": "bool",
+        "category": "environment"
+      },
+      {
+        "role": "scent",
+        "channel": "OAxis_24",
+        "value_type": "bool",
+        "category": "environment"
+      }
+    ],
+    "notes": [
+      "SlewRate 0.9 is a field candidate, not a permanent constant",
+      "Only heave is a motion axis",
+      "wind uses engineering_range=100",
+      "Update together with IODevice.YDL.xml after field approval"
+    ]
+  },
+  "intensity_profiles": {
+    "gentle": {
+      "heave_scale": 0.72,
+      "wind_scale": 0.75,
+      "cap": 0.62,
+      "purpose": "first field validation"
+    },
+    "normal": {
+      "heave_scale": 1,
+      "wind_scale": 1,
+      "cap": 0.92,
+      "purpose": "recommended production baseline"
+    },
+    "intense": {
+      "heave_scale": 1.15,
+      "wind_scale": 1.2,
+      "cap": 0.92,
+      "purpose": "after gentle and normal pass"
+    }
+  },
+  "motion_grammar": {
+    "weightless_sequence": [
+      "prepare",
+      "lift",
+      "hold",
+      "drop",
+      "rebound",
+      "settle"
+    ],
+    "avoid": [
+      "small_sine_for_entire_scene",
+      "step_for_large_travel",
+      "no_rebound"
+    ]
+  },
+  "scene_mapping": {
+    "free_flight": {
+      "heave_shape": "lift_drop_rebound",
+      "wind_level": 0.85
+    },
+    "canyon": {
+      "heave_shape": "short_buffet",
+      "wind_level": 0.9,
+      "vibrate": "short_pulses"
+    },
+    "lake_village": {
+      "heave_shape": "gentle_float",
+      "wind_level": 0.35
+    },
+    "tunnel": {
+      "heave_shape": "low_rumble",
+      "wind_level": 0,
+      "vibrate": "pulsed"
+    },
+    "thermal": {
+      "heave_shape": "long_lift_sink",
+      "wind_level": 0.8
+    },
+    "fire": {
+      "heave_shape": "impact_release",
+      "wind_level": 0.9,
+      "hot": "short_window"
+    },
+    "water": {
+      "heave_shape": "buoyant_float",
+      "wind_level": 0.65,
+      "water": "section_window"
+    },
+    "finish": {
+      "heave_shape": "rising_settle",
+      "wind_level": 0.9,
+      "scent": "short_window"
+    }
+  },
+  "quality_gates": {
+    "required_artifacts": [
+      "behavior-timeline.json",
+      "motion-intent.json",
+      "show.spec.json"
+    ],
+    "require_same_cue_timing": true,
+    "require_continuous_cues": true,
+    "require_declared_channels": true,
+    "require_plan_validate_tracks": true,
+    "manual_fields": [
+      "motion_sync",
+      "weightlessness",
+      "comfort",
+      "fatigue",
+      "wind_atmosphere",
+      "scent_timing",
+      "mechanical_risk"
+    ]
+  }
+}

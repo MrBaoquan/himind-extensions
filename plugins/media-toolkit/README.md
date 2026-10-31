@@ -49,6 +49,7 @@
 | `media.toolkit.runtime.status` | ffmpeg 是否就绪、可用能力与内置预设 |
 | `media.toolkit.files.list` | 列出工作区里的媒体文件（跳过运行期产物目录） |
 | `media.toolkit.probe` | 时长 / 帧率 / 分辨率 / 轨道信息 |
+| `media.toolkit.video.project` | 把等距柱状全景视频展开成固定主前向视图 |
 | `media.toolkit.recipe.plan` | 只编译成 ffmpeg 参数，**不执行**（长任务开跑前复核） |
 | `media.toolkit.recipe.run` | 执行并返回可跟踪的作业 |
 | `media.toolkit.job.status` / `job.cancel` / `job.list` | 作业查询、取消、列举 |
@@ -57,6 +58,23 @@
 | `media.toolkit.frames.contact-sheet` | 整段视频拼成一张缩略图网格 |
 | `media.toolkit.frames.extract` | 在指定时刻抽帧 |
 | `media.toolkit.preview.image` | 把工作区内的图片读成可显示的预览（**仅供视图与人工核对**） |
+
+
+## 全景主前向投影
+
+等距柱状全景不是普通平面画面：画面中心不等于观看前向，镜头转向也会污染普通的画面活动分数。
+`media.toolkit.video.project` 用 ffmpeg `v360` 将全景视频展开成固定主前向视图，后续探片、拼图和信号分析都应使用该代理片：
+
+```text
+media.toolkit.video.project {
+  workspace_root, path, output,
+  yaw_deg: 0, pitch_deg: 0,
+  h_fov_deg: 100, v_fov_deg: 65,
+  width: 640, height: 360
+}
+```
+
+输出为 H.264/AAC `.mp4`，保留音轨。它只做投影校准，不做语义判断；平台姿态仍应根据动作意图和设备能力生成。
 
 所有路径（输入与产物）都必须落在调用方给出的 `workspace_root` 内，越界一律拒绝。
 

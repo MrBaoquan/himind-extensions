@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://himind.local/schemas/video-to-motion/motion-delivery.schema.json",
+  "title": "Motion Delivery",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "source_sha256",
+    "platform_profile_id",
+    "platform_profile_sha256",
+    "device_profile_sha256",
+    "active_command",
+    "binding_status",
+    "variants"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "ready",
+        "accepted",
+        "rejected"
+      ]
+    },
+    "source_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "platform_profile_id": {
+      "type": "string"
+    },
+    "platform_profile_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "device_profile_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "active_command": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "binding_status": {
+      "enum": [
+        "exact",
+        "approximate"
+      ]
+    },
+    "variants": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "spec_sha256",
+          "motion_sha256",
+          "motion_path",
+          "validation_ok",
+          "tracks_ok"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "gentle",
+              "normal",
+              "intense"
+            ]
+          },
+          "spec_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "motion_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "motion_path": {
+            "type": "string"
+          },
+          "validation_ok": {
+            "type": "boolean"
+          },
+          "tracks_ok": {
+            "type": "boolean"
+          },
+          "provenance_platform_profile_id": {
+            "type": "string"
+          },
+          "provenance_platform_profile_sha256": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "manual_acceptance": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "checksums_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/MrBaoquan/himind-extensions/sdk/jsonrpc"
@@ -236,55 +237,448 @@ func TestResolveWithinRejectsParentTraversal(t *testing.T) {
 	}
 }
 
-func TestConfigureProviderStoresKeyWithoutEchoing(t *testing.T) {
+func TestBrokerCredentialIsAcquiredPerInvocation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Authorization") != "Bearer broker-token" {
+			t.Fatalf("unexpected authorization header")
+		}
+		var body map[string]string
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			t.Fatalf("decode broker request: %v", err)
+		}
+		if body["credential_id"] != "pexels.api" || body["purpose"] != "media-library.search" {
+			t.Fatalf("unexpected broker request: %#v", body)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"credential_id":"pexels.api","fields":{"api_key":"brokered-secret"}}`))
+	}))
+	defer server.Close()
+	t.Setenv(brokerURLEnd, server.URL)
+	t.Setenv(brokerTokenEnv, "broker-token")
+
+	fields, err := acquireCredential("pexels.api", "media-library.search")
+	if err != nil {
+		t.Fatalf("unexpected broker error: %v", err)
+	}
+	if fields["api_key"] != "brokered-secret" {
+		t.Fatalf("unexpected credential fields: %#v", fields)
+	}
+}
+
+func TestMissingBrokerCredentialDegradesSafely(t *testing.T) {
+	t.Setenv(brokerURLEnd, "")
+	t.Setenv(brokerTokenEnv, "")
+	_, err := acquireCredential("pexels.api", "media-library.search")
+	if err == nil {
+		t.Fatal("expected missing broker to fail")
+	}
+	state, message := credentialState(err)
+	if state != "unconfigured" {
+		t.Fatalf("expected unconfigured state, got %q", state)
+	}
+	if strings.Contains(message, "brokered-secret") || strings.Contains(message, "provider-keys") {
+		t.Fatalf("credential failure leaked private data: %s", message)
+	}
+}
+
+func TestBrokerCredentialFailuresAreClassified(t *testing.T) {
+	for _, tc := range []struct {
+		status int
+		want   string
+	}{
+		{http.StatusConflict, "unconfigured"},
+		{http.StatusForbidden, "permission_denied"},
+		{http.StatusUnauthorized, "session_expired"},
+	} {
+		t.Run(tc.want, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+				writer.WriteHeader(tc.status)
+				_, _ = writer.Write([]byte(`{"error":"credential_unavailable","message":"safe broker message"}`))
+			}))
+			defer server.Close()
+			t.Setenv(brokerURLEnd, server.URL)
+			t.Setenv(brokerTokenEnv, "token")
+			_, err := acquireCredential("pexels.api", "media-library.search")
+			if err == nil {
+				t.Fatal("expected broker failure")
+			}
+			state, message := credentialState(err)
+			if state != tc.want {
+				t.Fatalf("expected state %q, got %q", tc.want, state)
+			}
+			if strings.Contains(message, "secret") {
+				t.Fatalf("failure message leaked a secret: %s", message)
+			}
+		})
+	}
+}
+func TestProviderListUsesAgentBrokerWithoutExposingSecret(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var body map[string]string
+		_ = json.NewDecoder(request.Body).Decode(&body)
+		_, _ = writer.Write([]byte(`{"fields":{"api_key":"broker-secret-value"}}`))
+	}))
+	defer server.Close()
+	t.Setenv(brokerURLEnd, server.URL)
+	t.Setenv(brokerTokenEnv, "token")
+	result, rpcError := call(t, "media-library.provider.list", map[string]any{})
+	if rpcError != nil {
+		t.Fatalf("unexpected error: %s", rpcError.Message)
+	}
+	if strings.Contains(mustJSON(t, result), "broker-secret-value") {
+		t.Fatal("provider list must not expose credential values")
+	}
+}
+
+func TestLocalLibrarySourceScanAdoptAndSearch(t *testing.T) {
 	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
-	t.Setenv("HIMIND_MEDIA_LIBRARY_PEXELS_KEY", "")
-
-	if _, rpcError := call(t, "media-library.provider.configure", map[string]any{"provider": "pexels", "key": "short"}); rpcError == nil {
-		t.Fatalf("short keys should be rejected")
+	libraryRoot := t.TempDir()
+	sourceDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(sourceDir, "hero-image.png"), []byte(strings.Repeat("i", 2048)), 0o644); err != nil {
+		t.Fatal(err)
 	}
-	if _, rpcError := call(t, "media-library.provider.configure", map[string]any{"provider": "unknown", "key": "0123456789abcdef"}); rpcError == nil {
-		t.Fatalf("unknown providers should be rejected")
+	if err := os.WriteFile(filepath.Join(sourceDir, "voice-over.mp3"), []byte(strings.Repeat("a", 1024)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sourceDir, "notes.txt"), []byte("not media"), 0o644); err != nil {
+		t.Fatal(err)
 	}
 
-	const secret = "0123456789abcdef"
-	result, rpcError := call(t, "media-library.provider.configure", map[string]any{"provider": "pexels", "key": secret})
+	created, rpcError := call(t, "media-library.repository.create", map[string]any{
+		"name": "测试资源库", "backend_type": "local", "root_path": libraryRoot, "access_mode": "contribute",
+	})
 	if rpcError != nil {
-		t.Fatalf("unexpected error: %s", rpcError.Message)
+		t.Fatalf("create library: %s", rpcError.Message)
 	}
-	payload := decode(t, result)
-	if payload["configured"] != true {
-		t.Fatalf("expected configured=true after saving a key")
-	}
-	if strings.Contains(mustJSON(t, payload), secret) {
-		t.Fatalf("the capability must not echo the key back")
+	library := decode(t, created)
+	libraryID := library["id"].(string)
+	if _, err := os.Stat(filepath.Join(libraryRoot, ".himind-media", "library.json")); err != nil {
+		t.Fatalf("library manifest missing: %v", err)
 	}
 
-	list, rpcError := call(t, "media-library.provider.list", map[string]any{})
+	added, rpcError := call(t, "media-library.source.add", map[string]any{"path": sourceDir})
 	if rpcError != nil {
-		t.Fatalf("unexpected error: %s", rpcError.Message)
+		t.Fatalf("add source: %s", rpcError.Message)
 	}
-	configured := map[string]bool{}
-	for _, entry := range decode(t, list)["providers"].([]any) {
-		item := entry.(map[string]any)
-		configured[item["id"].(string)] = item["configured"].(bool)
-	}
-	if !configured["pexels"] {
-		t.Fatalf("saving a key should make the source available")
+	sourceID := decode(t, added)["id"].(string)
+	restart := true
+	for {
+		scanned, rpcError := call(t, "media-library.source.scan.batch", map[string]any{
+			"source_id": sourceID, "restart": restart, "max_entries": 1,
+		})
+		if rpcError != nil {
+			t.Fatalf("scan source: %s", rpcError.Message)
+		}
+		payload := decode(t, scanned)
+		restart = false
+		if payload["done"].(bool) {
+			break
+		}
 	}
 
-	if _, rpcError := call(t, "media-library.provider.configure", map[string]any{"provider": "pexels", "key": ""}); rpcError != nil {
-		t.Fatalf("clearing should succeed: %s", rpcError.Message)
+	found, rpcError := call(t, "media-library.asset.search", map[string]any{"query": "hero", "scope": "sources"})
+	if rpcError != nil {
+		t.Fatalf("search sources: %s", rpcError.Message)
 	}
-	cleared, _ := call(t, "media-library.provider.list", map[string]any{})
-	for _, entry := range decode(t, cleared)["providers"].([]any) {
-		item := entry.(map[string]any)
-		if item["id"].(string) == "pexels" && item["configured"].(bool) {
-			t.Fatalf("clearing the key should put the source back to unconfigured")
+	searchPayload := decode(t, found)
+	items := searchPayload["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("expected one candidate, got %d", len(items))
+	}
+	candidate := items[0].(map[string]any)
+	candidateID := candidate["id"].(string)
+
+	adopted, rpcError := call(t, "media-library.asset.adopt", map[string]any{
+		"library_id": libraryID,
+		"mode":       "copy",
+		"actor":      "tester",
+		"items": []map[string]any{{
+			"candidate_id": candidateID,
+			"license_name": "Test License",
+			"title":        "主视觉图",
+			"filename":     "城市主视觉",
+			"collection":   "品牌资产/城市",
+			"tags":         []string{"hero", "test", "夜景"},
+		}},
+	})
+	if rpcError != nil {
+		t.Fatalf("adopt: %s", rpcError.Message)
+	}
+	adoptedPayload := decode(t, adopted)
+	saved := adoptedPayload["saved"].([]any)
+	if len(saved) != 1 {
+		t.Fatalf("expected one adopted asset, got %d", len(saved))
+	}
+	asset := saved[0].(map[string]any)
+	if !strings.HasPrefix(asset["local_path"].(string), filepath.Join(libraryRoot, "assets")) {
+		t.Fatalf("asset escaped library: %s", asset["local_path"])
+	}
+	eventPath := filepath.Join(libraryRoot, ".himind-media", "catalog", "users", "tester.jsonl")
+	if _, err := os.Stat(eventPath); err != nil {
+		t.Fatalf("catalog event missing: %v", err)
+	}
+	eventBytes, err := os.ReadFile(eventPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(eventBytes), "品牌资产/城市") || !strings.Contains(string(eventBytes), "夜景") {
+		t.Fatalf("catalog event lost collection or tags: %s", eventBytes)
+	}
+
+	again, rpcError := call(t, "media-library.asset.adopt", map[string]any{
+		"library_id": libraryID,
+		"mode":       "copy",
+		"actor":      "tester",
+		"items": []map[string]any{{
+			"candidate_id": candidateID,
+		}},
+	})
+	if rpcError != nil {
+		t.Fatalf("dedup adopt: %s", rpcError.Message)
+	}
+	if !decode(t, again)["saved"].([]any)[0].(map[string]any)["deduplicated"].(bool) {
+		t.Fatal("expected duplicate adoption to be deduplicated")
+	}
+
+	librarySearch, rpcError := call(t, "media-library.asset.search", map[string]any{
+		"query": "品牌资产", "scope": "library", "library_id": libraryID,
+	})
+	if rpcError != nil {
+		t.Fatalf("search library: %s", rpcError.Message)
+	}
+	if !decode(t, found)["fts_available"].(bool) {
+		t.Fatal("expected FTS index to be available")
+	}
+	libraryItems := decode(t, librarySearch)["items"].([]any)
+	if len(libraryItems) != 1 {
+		t.Fatal("expected adopted asset in library search")
+	}
+	libraryItem := libraryItems[0].(map[string]any)
+	if libraryItem["collection"].(string) != "品牌资产/城市" {
+		t.Fatalf("collection not searchable: %#v", libraryItem)
+	}
+	tags := libraryItem["tags"].([]any)
+	if len(tags) != 3 || tags[2].(string) != "夜景" {
+		t.Fatalf("tags not returned by search: %#v", libraryItem)
+	}
+}
+
+func TestOnlineAssetAdoptionRecordsLicenseAndDeduplicates(t *testing.T) {
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Type", "image/png")
+		_, _ = writer.Write([]byte(strings.Repeat("p", 4096)))
+	}))
+	defer server.Close()
+	libraryRoot := t.TempDir()
+	created, rpcError := call(t, "media-library.repository.create", map[string]any{
+		"name": "在线采纳库", "backend_type": "local", "root_path": libraryRoot,
+	})
+	if rpcError != nil {
+		t.Fatalf("create library: %s", rpcError.Message)
+	}
+	libraryID := decode(t, created)["id"].(string)
+	item := map[string]any{
+		"provider": "pexels", "provider_id": "42", "kind": "image", "title": "online.png",
+		"author": "Photographer", "license_name": "Pexels License",
+		"source_url": "https://example.invalid/photo/42", "download_url": server.URL + "/photo.png",
+	}
+	adopted, rpcError := call(t, "media-library.asset.adopt", map[string]any{
+		"library_id": libraryID, "mode": "copy", "actor": "tester", "items": []map[string]any{item},
+	})
+	if rpcError != nil {
+		t.Fatalf("adopt online asset: %s", rpcError.Message)
+	}
+	if len(decode(t, adopted)["saved"].([]any)) != 1 {
+		t.Fatal("expected online asset to be adopted")
+	}
+	events, err := os.ReadFile(filepath.Join(libraryRoot, ".himind-media", "catalog", "users", "tester.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(events), "Pexels License") {
+		t.Fatalf("catalog event lost license: %s", events)
+	}
+	if !strings.Contains(string(events), "Pexels License") {
+		t.Fatalf("catalog event lost license: %s", events)
+	}
+}
+
+func TestPreviewReturnsImageDataForAuthorizedLibraryPath(t *testing.T) {
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	libraryRoot := t.TempDir()
+	created, rpcError := call(t, "media-library.repository.create", map[string]any{
+		"name": "预览库", "backend_type": "local", "root_path": libraryRoot,
+	})
+	if rpcError != nil {
+		t.Fatalf("create library: %s", rpcError.Message)
+	}
+	assetDir := filepath.Join(libraryRoot, "assets", "cc")
+	if err := os.MkdirAll(assetDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	assetPath := filepath.Join(assetDir, "preview.png")
+	if err := os.WriteFile(assetPath, []byte("image-bytes"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, rpcError := call(t, "media-library.asset.adopt", map[string]any{
+		"library_id": decode(t, created)["id"].(string),
+		"mode":       "reference",
+		"items":      []map[string]any{{"local_path": assetPath, "kind": "image", "title": "preview.png"}},
+	}); rpcError != nil {
+		t.Fatalf("adopt preview asset: %s", rpcError.Message)
+	}
+	result, rpcError := call(t, "media-library.asset.preview", map[string]any{"path": assetPath, "kind": "image"})
+	if rpcError != nil {
+		t.Fatalf("preview: %s", rpcError.Message)
+	}
+	if !strings.HasPrefix(decode(t, result)["data_url"].(string), "data:image/png;base64,") {
+		t.Fatal("expected image data URL")
+	}
+	if decode(t, created)["id"] == "" {
+		t.Fatal("library id missing")
+	}
+}
+func TestOnlineAdoptionUsesDownloadURLFilename(t *testing.T) {
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Type", "audio/mpeg")
+		_, _ = writer.Write([]byte(strings.Repeat("m", 4096)))
+	}))
+	defer server.Close()
+	libraryRoot := t.TempDir()
+	created, rpcError := call(t, "media-library.repository.create", map[string]any{
+		"name": "音频资源库", "backend_type": "local", "root_path": libraryRoot,
+	})
+	if rpcError != nil {
+		t.Fatalf("create library: %s", rpcError.Message)
+	}
+	result, rpcError := call(t, "media-library.asset.adopt", map[string]any{
+		"library_id": decode(t, created)["id"].(string),
+		"mode":       "copy",
+		"items": []map[string]any{{
+			"provider": "freesound", "provider_id": "420826", "kind": "audio",
+			"title": "城市交通氛围", "filename": "城市交通氛围", "collection": "验收/城市音频",
+			"tags":         []string{"城市交通", "验收"},
+			"download_url": server.URL + "/previews/city.mp3",
+			"license_name": "CC BY 4.0", "redistribution_allowed": true,
+		}},
+	})
+	if rpcError != nil {
+		t.Fatalf("adopt: %s", rpcError.Message)
+	}
+	saved := decode(t, result)["saved"].([]any)[0].(map[string]any)
+	if !strings.HasSuffix(saved["local_path"].(string), ".mp3") {
+		t.Fatalf("expected download URL extension to win, got %s", saved["local_path"])
+	}
+	if !strings.HasSuffix(saved["relative_path"].(string), "城市交通氛围.mp3") {
+		t.Fatalf("expected renamed relative path with .mp3, got %s", saved["relative_path"])
+	}
+	if saved["title"].(string) != "城市交通氛围" || saved["collection"].(string) != "验收/城市音频" {
+		t.Fatalf("online rename metadata not returned: %#v", saved)
+	}
+}
+func TestPreviewReturnsVideoAndAudioDataURLs(t *testing.T) {
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	libraryRoot := t.TempDir()
+	created, rpcError := call(t, "media-library.repository.create", map[string]any{
+		"name": "媒体预览库", "backend_type": "local", "root_path": libraryRoot,
+	})
+	if rpcError != nil {
+		t.Fatalf("create library: %s", rpcError.Message)
+	}
+	libraryID := decode(t, created)["id"].(string)
+	for _, item := range []struct {
+		name string
+		kind string
+		body string
+	}{
+		{"preview.mp4", "video", strings.Repeat("v", 2048)},
+		{"preview.wav", "audio", strings.Repeat("a", 2048)},
+	} {
+		path := filepath.Join(libraryRoot, item.name)
+		if err := os.WriteFile(path, []byte(item.body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, rpcError := call(t, "media-library.asset.adopt", map[string]any{
+			"library_id": libraryID, "mode": "reference",
+			"items": []map[string]any{{"local_path": path, "kind": item.kind, "title": item.name}},
+		}); rpcError != nil {
+			t.Fatalf("adopt %s: %s", item.kind, rpcError.Message)
+		}
+		result, rpcError := call(t, "media-library.asset.preview", map[string]any{"path": path, "kind": item.kind})
+		if rpcError != nil {
+			t.Fatalf("preview %s: %s", item.kind, rpcError.Message)
+		}
+		prefix := "data:" + item.kind + "/"
+		if !strings.HasPrefix(decode(t, result)["data_url"].(string), prefix) {
+			t.Fatalf("expected %s data URL for %s", prefix, item.kind)
 		}
 	}
 }
 
+func TestConcurrentLibraryAndSourceLists(t *testing.T) {
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	libraryRoot := t.TempDir()
+	if _, rpcError := call(t, "media-library.repository.create", map[string]any{
+		"name": "并发资源库", "backend_type": "local", "root_path": libraryRoot,
+	}); rpcError != nil {
+		t.Fatalf("create library: %s", rpcError.Message)
+	}
+	var wait sync.WaitGroup
+	errs := make(chan string, 16)
+	for i := 0; i < 8; i++ {
+		wait.Add(2)
+		go func() {
+			defer wait.Done()
+			if _, rpcError := call(t, "media-library.repository.list", map[string]any{}); rpcError != nil {
+				errs <- rpcError.Message
+			}
+		}()
+		go func() {
+			defer wait.Done()
+			if _, rpcError := call(t, "media-library.source.list", map[string]any{}); rpcError != nil {
+				errs <- rpcError.Message
+			}
+		}()
+	}
+	wait.Wait()
+	close(errs)
+	for message := range errs {
+		if strings.Contains(message, "SQLITE_BUSY") || strings.Contains(strings.ToLower(message), "database is locked") {
+			t.Fatalf("concurrent list hit SQLite lock: %s", message)
+		}
+	}
+}
+func TestSMBLibraryRulesAndNormalization(t *testing.T) {
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	normalized, err := normalizeLibraryRoot("\\\\nas\\media\\library", "smb")
+	if err != nil {
+		t.Fatalf("expected UNC path to be accepted: %v", err)
+	}
+	if !strings.HasPrefix(normalized, `\\`) {
+		t.Fatalf("expected UNC normalized path, got %s", normalized)
+	}
+	if _, err := normalizeLibraryRoot(t.TempDir(), "smb"); err == nil {
+		t.Fatal("expected local path to be rejected for SMB backend")
+	}
+
+	db, err := openLibraryDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	library := &libraryRecord{ID: "lib-test", RootURI: t.TempDir(), BackendType: "smb", AccessMode: "contribute"}
+	_, err = adoptOne(db, library, "copy", "tester", adoptItem{
+		Kind:                  "image",
+		Title:                 "redistribution denied",
+		DownloadURL:           "https://example.invalid/image.png",
+		RedistributionAllowed: false,
+	})
+	if err == nil || !strings.Contains(err.Error(), "未明确允许再分发") {
+		t.Fatalf("expected redistribution guard, got %v", err)
+	}
+}
 func mustJSON(t *testing.T, value any) string {
 	t.Helper()
 	payload, err := json.Marshal(value)

@@ -45,6 +45,9 @@ type genericSource struct {
 	AssistantRoles []string `json:"assistant_roles,omitempty"`
 	// 内容字段：用于 role 模式下提取正文。
 	ContentFields []string `json:"content_fields,omitempty"`
+	// UserQueryTag 只从用户消息的指定 XML 标签中取正文，用于 WorkBuddy 这类
+	// 把系统提醒、身份注入和真实用户请求拼在同一条消息里的客户端。
+	UserQueryTag string `json:"user_query_tag,omitempty"`
 
 	ProjectField    string `json:"project_field,omitempty"`
 	DirectoryField  string `json:"directory_field,omitempty"`
@@ -144,12 +147,14 @@ func genericPresets() []genericSource {
 		},
 		{
 			ID: "workbuddy", Label: "WorkBuddy", Preset: true, Experimental: true,
-			Root: "~/.workbuddy", Glob: "**/*.json", Format: "json",
+			Root: "~/.workbuddy/projects", Glob: "*/*.jsonl", Format: "jsonl",
 			SessionID: "sessionId", TimeFields: []string{"timestamp", "createdAt", "time"},
 			RoleField: "role", UserRoles: []string{"user"}, AssistantRoles: []string{"assistant"},
-			ContentFields:   []string{"content", "text"},
+			ContentFields:   []string{"content.0.text", "content.0.content", "text"},
+			UserQueryTag:    "user_query",
+			DirectoryField:  "cwd",
 			ProjectStrategy: "git_root",
-			Note:            "WorkBuddy 本地会话",
+			Note:            "WorkBuddy 项目会话（.workbuddy/projects/<项目>/<会话>.jsonl）",
 		},
 	}
 }
@@ -606,6 +611,9 @@ func scanGeneric(spec genericSource, home string, start, end time.Time) ([]sessi
 			}
 			role := strings.ToLower(firstText(record, spec.RoleField))
 			text := genericRecordText(spec, record)
+			if spec.UserQueryTag != "" && containsFold(spec.UserRoles, role) {
+				text = extractTaggedText(text, spec.UserQueryTag)
+			}
 			if strings.TrimSpace(text) == "" {
 				continue
 			}
@@ -703,6 +711,21 @@ func genericRecordTime(spec genericSource, record any, fileTime time.Time, dateH
 		}
 	}
 	return time.Time{}, false
+}
+
+func extractTaggedText(value, tag string) string {
+	open := "<" + tag + ">"
+	close := "</" + tag + ">"
+	start := strings.Index(value, open)
+	if start < 0 {
+		return ""
+	}
+	start += len(open)
+	end := strings.Index(value[start:], close)
+	if end < 0 {
+		return ""
+	}
+	return strings.TrimSpace(value[start : start+end])
 }
 
 func genericRecordText(spec genericSource, record any) string {

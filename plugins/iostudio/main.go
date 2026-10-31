@@ -145,7 +145,6 @@ type buildInput struct {
 	WorkspaceRoot string `json:"workspace_root"`
 	SpecPath      string `json:"spec_path"`
 	OutPath       string `json:"out_path"`
-	SkipValidate  bool   `json:"skip_validate"`
 }
 
 type validateInput struct {
@@ -275,7 +274,8 @@ func (s *service) build(input buildInput, dryRun bool) (any, *himindjsonrpc.Erro
 		SpecPath:      specPath,
 		OutPath:       outPath,
 		DryRun:        dryRun,
-		SkipValidate:  input.SkipValidate,
+		// 刻意不暴露 SkipValidate：它绕过的是设备声明、动作存在性、量程与安全联锁，
+		// 正好是这类事故的防线。能力清单里没有这个参数，调用方也就无从传进来。
 	})
 	if err != nil {
 		return nil, &himindjsonrpc.Error{Code: -32000, Message: err.Error()}

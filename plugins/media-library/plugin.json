@@ -9,8 +9,8 @@
     "audio-sound"
   ],
   "description": "检索免费素材库的图片、视频与音效，把选中的素材落到工作区并记录来源许可，也可为本机媒体目录建立索引。",
-  "release_notes": "1.0.0：首个版本，提供跨来源素材检索、落盘与来源记录、本机媒体索引；密钥在扩展视图里配置。",
-  "version": "1.0.0",
+  "release_notes": "2.0.0：统一来源与入库元数据；新增资源库/本机来源编辑移除、原生图标、sticky 搜索、音频试听、连续预览、十万级检索及应用内确认弹窗。",
+  "version": "2.0.0",
   "distribution_targets": [
     "workbench",
     "github"
@@ -35,33 +35,6 @@
         "additionalProperties": false
       },
       "risk_level": "read_only"
-    },
-    {
-      "id": "media-library.provider.configure",
-      "description": "在扩展私有配置里保存或清除某个来源的密钥",
-      "availability": "local",
-      "timeout_seconds": 15,
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "provider": {
-            "enum": [
-              "pexels",
-              "unsplash",
-              "freesound"
-            ]
-          },
-          "key": {
-            "type": "string",
-            "maxLength": 400
-          }
-        },
-        "required": [
-          "provider"
-        ],
-        "additionalProperties": false
-      },
-      "risk_level": "local_action"
     },
     {
       "id": "media-library.search",
@@ -272,10 +245,407 @@
         "additionalProperties": false
       },
       "risk_level": "read_only"
+    },
+    {
+      "id": "media-library.repository.create",
+      "description": "创建或关联本地/SMB 媒体资源库",
+      "availability": "local",
+      "timeout_seconds": 60,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "backend_type": {
+            "enum": [
+              "local",
+              "smb"
+            ]
+          },
+          "root_path": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "credential_ref": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "access_mode": {
+            "enum": [
+              "read_only",
+              "contribute"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "backend_type",
+          "root_path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.repository.list",
+      "description": "列出已创建的本地和 SMB 媒体资源库",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.repository.update",
+      "description": "修改资源库名称和访问模式",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "access_mode": {
+            "enum": [
+              "contribute",
+              "read_only"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "access_mode"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.repository.remove",
+      "description": "移除资源库索引且保留磁盘文件",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.source.add",
+      "description": "注册本地文件夹作为候选资源来源，不自动进入资源库",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.source.update",
+      "description": "修改本机来源显示名称",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "display_name"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.source.remove",
+      "description": "移除来源索引且保留磁盘文件",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.source.scan.batch",
+      "description": "分批扫描本地文件夹并建立候选资源索引",
+      "availability": "local",
+      "timeout_seconds": 300,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "restart": {
+            "type": "boolean"
+          },
+          "max_entries": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000
+          }
+        },
+        "required": [
+          "source_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.asset.search",
+      "description": "统一检索资源库条目和本机候选资源",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "kinds": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "enum": [
+                "image",
+                "video",
+                "audio"
+              ]
+            }
+          },
+          "scope": {
+            "enum": [
+              "all",
+              "library",
+              "sources"
+            ]
+          },
+          "library_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.asset.adopt",
+      "description": "把用户选中的在线或本地资源显式采纳到目标资源库",
+      "availability": "local",
+      "timeout_seconds": 1800,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "mode": {
+            "enum": [
+              "copy",
+              "reference"
+            ]
+          },
+          "actor": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "items": {
+              "type": "object",
+              "properties": {
+                "candidate_id": {
+                  "type": "string"
+                },
+                "local_path": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "provider_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "image",
+                    "video",
+                    "audio"
+                  ]
+                },
+                "title": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "author": {
+                  "type": "string"
+                },
+                "license_name": {
+                  "type": "string"
+                },
+                "license_url": {
+                  "type": "string"
+                },
+                "redistribution_allowed": {
+                  "type": "boolean"
+                },
+                "source_url": {
+                  "type": "string"
+                },
+                "download_url": {
+                  "type": "string"
+                },
+                "filename": {
+                  "type": "string",
+                  "maxLength": 240
+                },
+                "tags": {
+                  "type": "array",
+                  "maxItems": 20,
+                  "items": {
+                    "type": "string",
+                    "maxLength": 60
+                  }
+                },
+                "collection": {
+                  "type": "string",
+                  "maxLength": 200
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "library_id",
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.source.list",
+      "description": "列出已注册的本地候选资源文件夹",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.asset.preview",
+      "description": "返回已关联资源的安全预览数据或本地媒体 URL",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "kind": {
+            "enum": [
+              "image",
+              "video",
+              "audio"
+            ]
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1024,
+            "maximum": 33554432
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
     }
   ],
   "plugin_dependencies": [],
   "permissions": [
+    "secret.broker.acquire",
     "filesystem.workspace.read",
     "filesystem.workspace.write",
     "network.web.read"
@@ -299,10 +669,6 @@
         "title": "查看素材来源"
       },
       {
-        "id": "media-library.provider.configure",
-        "title": "配置素材来源"
-      },
-      {
         "id": "media-library.search",
         "title": "检索媒体素材"
       },
@@ -317,7 +683,117 @@
       {
         "id": "media-library.index.search",
         "title": "检索本机媒体"
+      },
+      {
+        "id": "media-library.repository.create",
+        "title": "创建或关联资源库"
+      },
+      {
+        "id": "media-library.repository.list",
+        "title": "查看资源库"
+      },
+      {
+        "id": "media-library.repository.update",
+        "title": "修改资源库"
+      },
+      {
+        "id": "media-library.repository.remove",
+        "title": "移除资源库"
+      },
+      {
+        "id": "media-library.source.add",
+        "title": "添加本地文件夹"
+      },
+      {
+        "id": "media-library.source.update",
+        "title": "重命名本机来源"
+      },
+      {
+        "id": "media-library.source.remove",
+        "title": "移除本机来源"
+      },
+      {
+        "id": "media-library.source.scan.batch",
+        "title": "扫描候选资源"
+      },
+      {
+        "id": "media-library.asset.search",
+        "title": "检索资源库与候选资源"
+      },
+      {
+        "id": "media-library.asset.adopt",
+        "title": "采纳到资源库"
+      },
+      {
+        "id": "media-library.source.list",
+        "title": "查看本机文件夹"
+      },
+      {
+        "id": "media-library.asset.preview",
+        "title": "预览媒体素材"
       }
     ]
-  }
+  },
+  "credentials": [
+    {
+      "id": "pexels.api",
+      "label": "Pexels API",
+      "kind": "api_key",
+      "required": false,
+      "description": "用于检索 Pexels 图片和视频。密钥只由 HiMind Agent 保管。",
+      "docs_url": "https://www.pexels.com/api/",
+      "verify_capability": "",
+      "fields": [
+        {
+          "key": "api_key",
+          "label": "API Key",
+          "type": "password",
+          "secret": true,
+          "required": true,
+          "placeholder": "粘贴 Pexels API Key",
+          "help": "在 Agent 账号与凭据中心配置。"
+        }
+      ]
+    },
+    {
+      "id": "unsplash.api",
+      "label": "Unsplash API",
+      "kind": "api_key",
+      "required": false,
+      "description": "用于检索 Unsplash 图片。密钥只由 HiMind Agent 保管。",
+      "docs_url": "https://unsplash.com/developers",
+      "verify_capability": "",
+      "fields": [
+        {
+          "key": "access_key",
+          "label": "Access Key",
+          "type": "password",
+          "secret": true,
+          "required": true,
+          "placeholder": "粘贴 Unsplash Access Key",
+          "help": "在 Agent 账号与凭据中心配置。"
+        }
+      ]
+    },
+    {
+      "id": "freesound.api",
+      "label": "Freesound API",
+      "kind": "api_key",
+      "required": false,
+      "description": "用于检索 Freesound 音频和音效。密钥只由 HiMind Agent 保管。",
+      "docs_url": "https://freesound.org/apiv2/apply",
+      "verify_capability": "",
+      "fields": [
+        {
+          "key": "token",
+          "label": "API Token",
+          "type": "password",
+          "secret": true,
+          "required": true,
+          "placeholder": "粘贴 Freesound API Token",
+          "help": "在 Agent 账号与凭据中心配置。"
+        }
+      ]
+    }
+  ]
 }

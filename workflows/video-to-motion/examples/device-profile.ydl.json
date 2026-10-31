@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "device": "YDL-0",
+  "axes": [
+    {
+      "role": "heave",
+      "channel": "OAxis_06",
+      "value_type": "float",
+      "min": 0,
+      "max": 1000,
+      "neutral": 0,
+      "unit": "mm",
+      "max_slew_rate": 0.5,
+      "category": "motion"
+    },
+    {
+      "role": "wind",
+      "channel": "OAxis_18",
+      "value_type": "float",
+      "min": 0,
+      "max": 100,
+      "neutral": 0,
+      "unit": "percent",
+      "category": "environment"
+    },
+    {
+      "role": "water",
+      "channel": "OAxis_16",
+      "value_type": "bool",
+      "category": "environment"
+    },
+    {
+      "role": "hot",
+      "channel": "OAxis_20",
+      "value_type": "bool",
+      "category": "environment"
+    },
+    {
+      "role": "vibrate",
+      "channel": "OAxis_22",
+      "value_type": "bool",
+      "category": "environment"
+    },
+    {
+      "role": "scent",
+      "channel": "OAxis_24",
+      "value_type": "bool",
+      "category": "environment"
+    }
+  ]
+}

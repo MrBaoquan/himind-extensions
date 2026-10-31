@@ -1,0 +1,34 @@
+{
+  "id": "com.himind.skill.iostudio-debug-assistant",
+  "icon": "assets/icon.png",
+  "name": "IOStudio 调试助手",
+  "author": "马宝全",
+  "categories": ["system-device", "testing-quality"],
+  "version": "0.1.0",
+  "distribution_targets": ["workbench", "github"],
+  "scope": "organization",
+  "description": "定位 IOStudio 安装与生效设备表，查设备动作通道，预检与核对动作文件，执行协议测试场景并解释失败步骤。",
+  "release_notes": "0.1.0：首版，覆盖就绪与设备表判定、设备通道查询、动作文件排障与协议测试。",
+  "min_agent_version": "0.3.47",
+  "supported_clients": ["agent-skills"],
+  "capabilities": [
+    {"id": "iostudio.runtime.status", "required": true, "min_version": "1.0.0", "provider": "com.himind.iostudio"},
+    {"id": "iostudio.devices", "required": true, "min_version": "1.0.0", "provider": "com.himind.iostudio"},
+    {"id": "iostudio.motion.validate", "required": true, "min_version": "1.0.0", "provider": "com.himind.iostudio"},
+    {"id": "iostudio.motion.tracks", "required": true, "min_version": "1.0.0", "provider": "com.himind.iostudio"},
+    {"id": "iostudio.motion.plan", "required": false, "min_version": "1.0.0", "provider": "com.himind.iostudio"},
+    {"id": "iostudio.motion.build", "required": false, "min_version": "1.0.0", "provider": "com.himind.iostudio"},
+    {"id": "iostudio.protocol.test", "required": false, "min_version": "1.0.0", "provider": "com.himind.iostudio"}
+  ],
+  "plugin_dependencies": [
+    {"plugin_id": "com.himind.iostudio", "required": true, "min_version": "1.0.0"}
+  ],
+  "risk_summary": "默认只读检查；构建动作文件与执行协议测试会在工作区内写文件并真实收发报文，需要用户确认；不修改设备表与现场配置。",
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml",
+    "assets/icon.png",
+    "references/protocol-scenario.md"
+  ]
+}

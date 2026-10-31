@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "platform_profile_id": "mp-ydl-heave-v1",
+  "display_name": "MP-YDL 影动力升降平台",
+  "plugin": "MP-YDL",
+  "capability_class": "heave_only",
+  "protocol_variant": "ydl-v1.0.09",
+  "active_command": null,
+  "motion_axes": [
+    {
+      "role": "heave",
+      "channel": "OAxis_06",
+      "value_type": "float",
+      "unit": "mm",
+      "min": 0,
+      "max": 1000,
+      "neutral": 0,
+      "max_slew_rate": 0.5,
+      "slew_rate_status": "field_candidate",
+      "direction": "positive_up",
+      "direction_status": "provisional",
+      "notes": [
+        "SlewRate is a current device-table candidate, not a mechanical limit."
+      ]
+    }
+  ],
+  "controls": [],
+  "effects": [
+    {
+      "role": "wind",
+      "channel": "OAxis_18",
+      "mode": "continuous_percent",
+      "min": 0,
+      "max": 100,
+      "neutral": 0,
+      "unit": "percent",
+      "notes": [
+        "MP-YDL protocol supports FanStrength; declare float + engineering_range=100 to use variable wind."
+      ]
+    },
+    {
+      "role": "water",
+      "channel": "OAxis_16",
+      "mode": "bool",
+      "neutral": 0
+    },
+    {
+      "role": "hot",
+      "channel": "OAxis_20",
+      "mode": "bool",
+      "neutral": 0
+    },
+    {
+      "role": "vibrate",
+      "channel": "OAxis_22",
+      "mode": "bool",
+      "neutral": 0
+    },
+    {
+      "role": "scent",
+      "channel": "OAxis_24",
+      "mode": "bool",
+      "neutral": 0
+    },
+    {
+      "role": "shoot",
+      "channel": "OAxis_48",
+      "mode": "bool",
+      "neutral": 0
+    },
+    {
+      "role": "action",
+      "channel": "OAxis_49",
+      "mode": "bool",
+      "neutral": 0
+    }
+  ],
+  "protocol_constraints": {
+    "packed_effect_roles": [
+      "wind",
+      "water",
+      "scent"
+    ],
+    "command_roles": [
+      "game_ready",
+      "game_over"
+    ],
+    "single_packet_mix": true
+  },
+  "semantics": {
+    "flight_float": {
+      "status": "exact",
+      "output_roles": [
+        "heave"
+      ],
+      "requires_approval": false
+    },
+    "weightless_drop": {
+      "status": "exact",
+      "output_roles": [
+        "heave"
+      ],
+      "requires_approval": false
+    },
+    "impact": {
+      "status": "exact",
+      "output_roles": [
+        "heave"
+      ],
+      "requires_approval": false
+    },
+    "sharp_turn": {
+      "status": "unsupported",
+      "output_roles": [],
+      "requires_approval": false,
+      "reason": "No active pitch/roll/yaw axis."
+    },
+    "lateral_shift": {
+      "status": "unsupported",
+      "output_roles": [],
+      "requires_approval": false,
+      "reason": "No surge/sway axis."
+    },
+    "yaw_turn": {
+      "status": "unsupported",
+      "output_roles": [],
+      "requires_approval": false,
+      "reason": "No yaw axis."
+    }
+  },
+  "safety": {
+    "safe_stop_mode": "estimated",
+    "feedback": "estimated",
+    "tail_reset_required": true,
+    "tail_reset_margin_ms": 1500,
+    "reset_roles": [
+      "heave",
+      "wind",
+      "water",
+      "hot",
+      "vibrate",
+      "scent",
+      "shoot",
+      "action"
+    ]
+  },
+  "evidence": [
+    {
+      "kind": "plugin_source",
+      "path": "IOUI\\MP-YDL\\Source\\Private\\IOUI.cpp",
+      "observed": "2026-10-30"
+    },
+    {
+      "kind": "plugin_config",
+      "path": "IOUI\\Config\\MP-YDL\\config.xml",
+      "observed": "2026-10-30"
+    }
+  ],
+  "notes": [
+    "Heave-only platform; do not invent pitch/roll.",
+    "Wind/water/scent are packed into one CustomMixEffect packet."
+  ]
+}

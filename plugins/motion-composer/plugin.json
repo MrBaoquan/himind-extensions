@@ -1,0 +1,260 @@
+{
+  "id": "com.himind.motion-composer",
+  "icon": "assets/icon.png",
+  "name": "动作编排质量门禁",
+  "author": "马宝全",
+  "categories": [
+    "video-post",
+    "system-device"
+  ],
+  "description": "在动作意图与 IOStudio 构建之间解析平台能力并审计失重、动态范围、门控、片尾复位与三档一致性。",
+  "release_notes": "1.2.0：增加平台能力解析，按具体 IOUI 轴能力标注 exact/approximate/unsupported。",
+  "version": "1.2.0",
+  "entry": "bin/motion-composer.exe",
+  "runtime": "process-jsonrpc-stdio",
+  "platforms": [
+    "windows-x64"
+  ],
+  "min_agent_version": "0.3.47",
+  "governance": "optional",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
+  "capability_namespace": "motion.composer",
+  "capabilities": [
+    {
+      "id": "motion.composer.runtime.status",
+      "description": "查看动作编排质量门禁版本和能力",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "motion.composer.audit",
+      "description": "审计 ShowSpec 的失重脉冲、动态范围、边界连续性和环境门控",
+      "availability": "local",
+      "timeout_seconds": 120,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "spec_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "behavior_timeline_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "device_profile_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "thresholds": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "high_energy": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "min_high_energy_range": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "long_segment_ms": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "min_strong_drop": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "max_strong_drop_duration_ms": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "min_rebound": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "min_drop_rate_per_second": {
+                "type": "number",
+                "minimum": 0
+              },
+              "end_shutdown_margin_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "max_static_gap_ms": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "required": [
+          "workspace_root",
+          "spec_path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "motion.composer.compare",
+      "description": "比较 gentle/normal/intense 三套规格的结构和编排质量",
+      "availability": "local",
+      "timeout_seconds": 180,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "spec_paths": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 12,
+            "items": {
+              "type": "string",
+              "maxLength": 1000
+            }
+          },
+          "behavior_timeline_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "device_profile_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "thresholds": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "high_energy": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "min_high_energy_range": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "long_segment_ms": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "min_strong_drop": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "max_strong_drop_duration_ms": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "min_rebound": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "min_drop_rate_per_second": {
+                "type": "number",
+                "minimum": 0
+              },
+              "end_shutdown_margin_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "max_static_gap_ms": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "required": [
+          "workspace_root",
+          "spec_paths"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "motion.composer.platform.resolve",
+      "description": "按 IOUI 平台能力解析动作映射状态",
+      "availability": "local",
+      "timeout_seconds": 60,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "platform_profile_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "motion_intent_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "device_profile_path": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "workspace_root",
+          "platform_profile_path",
+          "motion_intent_path",
+          "device_profile_path"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "permissions": [],
+  "contributes": {
+    "views": [],
+    "commands": [
+      {
+        "id": "motion.composer.runtime.status",
+        "title": "检查动作编排门禁"
+      },
+      {
+        "id": "motion.composer.audit",
+        "title": "审计动作编排"
+      },
+      {
+        "id": "motion.composer.compare",
+        "title": "比较动作三档"
+      },
+      {
+        "id": "motion.composer.platform.resolve",
+        "title": "解析平台动作能力"
+      }
+    ]
+  }
+}

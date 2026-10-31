@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "device": "NJ-QK",
+  "viewpoint": "main_narrative_forward",
+  "design_basis": "pitch/roll-only platform",
+  "capability_constraints": {
+    "motion_axes": [
+      "pitch",
+      "roll"
+    ],
+    "environment_actions": [],
+    "normalized_peak": 0.7
+  },
+  "intensity_profiles": {},
+  "phrases": [
+    {
+      "id": "drop",
+      "intent": "weightless_drop",
+      "semantic": "weightless_drop",
+      "energy": 0.9,
+      "confidence": 0.9
+    },
+    {
+      "id": "bank",
+      "intent": "sharp_turn",
+      "semantic": "sharp_turn",
+      "energy": 0.7,
+      "confidence": 0.9
+    }
+  ]
+}

@@ -519,6 +519,36 @@ func TestGenericGitRootProject(t *testing.T) {
 	}
 }
 
+func TestWorkBuddyPresetScansProjectJSONL(t *testing.T) {
+	home := t.TempDir()
+	projectDir := filepath.Join(home, ".workbuddy", "projects", "f-market")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Join([]string{
+		`{"timestamp":"2026-10-09T09:09:00+08:00","type":"message","role":"user","sessionId":"wb-1","cwd":"F:\\WebProjects\\市场管理助手","content":[{"type":"input_text","text":"[SYSTEM NOTIFICATION - NOT USER INPUT]"}]}`,
+		`{"timestamp":"2026-10-09T09:10:00+08:00","type":"message","role":"user","sessionId":"wb-1","cwd":"F:\\WebProjects\\市场管理助手","content":[{"type":"input_text","text":"<system-reminder>identity context</system-reminder><user_query>实现免密登录 H5</user_query>"}]}`,
+		`{"timestamp":"2026-10-09T09:12:00+08:00","type":"message","role":"assistant","sessionId":"wb-1","cwd":"F:\\WebProjects\\市场管理助手","content":[{"type":"output_text","text":"已完成管理员免密链路"}]}`,
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(projectDir, "wb-1.jsonl"), []byte(lines), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	params := `{"home":` + quote(home) + `,"date":"2026-10-09","source":"workbuddy"}`
+	result := call(t, "work-log.session.scan", params)
+	entries := result["entries"].([]any)
+	if len(entries) != 1 {
+		t.Fatalf("WorkBuddy 预设应产出 1 条，实际 %d（skipped=%v）", len(entries), result["skipped"])
+	}
+	item := entries[0].(map[string]any)
+	if item["source"] != "workbuddy" || item["session_id"] != "wb-1" {
+		t.Fatalf("WorkBuddy 会话标识异常: %#v", item)
+	}
+	if item["title"] != "实现免密登录 H5" {
+		t.Fatalf("标题应只取 <user_query> 中的真实请求，实际 %v", item["title"])
+	}
+}
+
 func TestSourcesCapIncludesConfigured(t *testing.T) {
 	home := t.TempDir()
 	dir := filepath.Join(home, ".acidump")

@@ -2,18 +2,18 @@ package main
 
 // 素材来源适配层。
 //
-// 每个来源只回答三件事：能不能用（Configured）、能搜什么（Kinds）、怎么把
-// 结果翻译成统一形状（Search）。视图、落盘和索引都不认识具体来源，新增一个
-// 素材库（例如自建服务）只需要在这里加一个实现，其余代码不动。
+// 每个来源声明凭据需求、支持的媒体类型和统一检索结果。凭据值由 Agent
+// Broker 在单次能力调用内提供，来源适配器不直接读取任何长期配置文件。
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -55,9 +55,9 @@ type mediaProvider interface {
 	ID() string
 	Name() string
 	Kinds() []string
-	Configured() bool
+	CredentialID() string
 	Requirement() string
-	Search(ctx context.Context, query searchQuery) ([]assetItem, error)
+	Search(ctx context.Context, credential map[string]string, query searchQuery) ([]assetItem, error)
 }
 
 // providerRegistry 是全部已知来源。顺序即视图里的展示顺序。
@@ -104,7 +104,11 @@ func getJSON(ctx context.Context, request *http.Request, target any) error {
 	request = request.WithContext(ctx)
 	response, err := httpClient.Do(request)
 	if err != nil {
-		return err
+		var netErr net.Error
+		if errors.As(err, &netErr) && netErr.Timeout() {
+			return fmt.Errorf("来源连接超时，请稍后重试")
+		}
+		return fmt.Errorf("无法连接来源，请检查网络或来源状态")
 	}
 	defer response.Body.Close()
 	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
@@ -151,7 +155,7 @@ func truncate(value string, limit int) string {
 }
 
 // ---------------------------------------------------------------------------
-// Pexels：图片 + 视频，密钥走 HIMIND_MEDIA_LIBRARY_PEXELS_KEY。
+// Pexels：图片 + 视频，凭据 ID 为 pexels.api。
 // ---------------------------------------------------------------------------
 
 type pexelsProvider struct{}
@@ -163,11 +167,9 @@ func (pexelsProvider) Name() string { return "Pexels" }
 func (pexelsProvider) Kinds() []string {
 	return []string{"image", "video"}
 }
+func (pexelsProvider) CredentialID() string { return "pexels.api" }
 func (pexelsProvider) Requirement() string {
-	return "Pexels API Key（在扩展视图的来源设置里填写，或设环境变量 HIMIND_MEDIA_LIBRARY_PEXELS_KEY）"
-}
-func (pexelsProvider) Configured() bool {
-	return providerKey("pexels", "HIMIND_MEDIA_LIBRARY_PEXELS_KEY") != ""
+	return "Pexels API Key（请在 HiMind Agent 的账号与凭据中配置）"
 }
 
 type pexelsPhotoResponse struct {
@@ -206,10 +208,10 @@ type pexelsVideoResponse struct {
 	} `json:"videos"`
 }
 
-func (provider pexelsProvider) Search(ctx context.Context, query searchQuery) ([]assetItem, error) {
-	key := providerKey("pexels", "HIMIND_MEDIA_LIBRARY_PEXELS_KEY")
+func (provider pexelsProvider) Search(ctx context.Context, credential map[string]string, query searchQuery) ([]assetItem, error) {
+	key := strings.TrimSpace(credential["api_key"])
 	if key == "" {
-		return nil, fmt.Errorf("未配置 %s", provider.Requirement())
+		return nil, fmt.Errorf("Pexels 凭据缺少 api_key 字段")
 	}
 	items := []assetItem{}
 	if kindRequested(query.Kinds, "image") {
@@ -330,7 +332,7 @@ func (pexelsProvider) searchVideos(ctx context.Context, key string, query search
 }
 
 // ---------------------------------------------------------------------------
-// Unsplash：图片，密钥走 HIMIND_MEDIA_LIBRARY_UNSPLASH_KEY。
+// Unsplash：图片，凭据 ID 为 unsplash.api。
 // ---------------------------------------------------------------------------
 
 type unsplashProvider struct{}
@@ -342,20 +344,18 @@ func (unsplashProvider) Name() string { return "Unsplash" }
 func (unsplashProvider) Kinds() []string {
 	return []string{"image"}
 }
+func (unsplashProvider) CredentialID() string { return "unsplash.api" }
 func (unsplashProvider) Requirement() string {
-	return "Unsplash Access Key（在扩展视图的来源设置里填写，或设环境变量 HIMIND_MEDIA_LIBRARY_UNSPLASH_KEY）"
-}
-func (unsplashProvider) Configured() bool {
-	return providerKey("unsplash", "HIMIND_MEDIA_LIBRARY_UNSPLASH_KEY") != ""
+	return "Unsplash Access Key（请在 HiMind Agent 的账号与凭据中配置）"
 }
 
-func (provider unsplashProvider) Search(ctx context.Context, query searchQuery) ([]assetItem, error) {
+func (provider unsplashProvider) Search(ctx context.Context, credential map[string]string, query searchQuery) ([]assetItem, error) {
 	if !kindRequested(query.Kinds, "image") {
 		return nil, nil
 	}
-	key := providerKey("unsplash", "HIMIND_MEDIA_LIBRARY_UNSPLASH_KEY")
+	key := strings.TrimSpace(credential["access_key"])
 	if key == "" {
-		return nil, fmt.Errorf("未配置 %s", provider.Requirement())
+		return nil, fmt.Errorf("Unsplash 凭据缺少 access_key 字段")
 	}
 	params := url.Values{}
 	params.Set("query", query.Text)
@@ -424,7 +424,7 @@ func (provider unsplashProvider) Search(ctx context.Context, query searchQuery) 
 }
 
 // ---------------------------------------------------------------------------
-// Freesound：音频，令牌走 HIMIND_MEDIA_LIBRARY_FREESOUND_TOKEN。
+// Freesound：音频，凭据 ID 为 freesound.api。
 // ---------------------------------------------------------------------------
 
 type freesoundProvider struct{}
@@ -436,20 +436,18 @@ func (freesoundProvider) Name() string { return "Freesound" }
 func (freesoundProvider) Kinds() []string {
 	return []string{"audio"}
 }
+func (freesoundProvider) CredentialID() string { return "freesound.api" }
 func (freesoundProvider) Requirement() string {
-	return "Freesound API Token（在扩展视图的来源设置里填写，或设环境变量 HIMIND_MEDIA_LIBRARY_FREESOUND_TOKEN）"
-}
-func (freesoundProvider) Configured() bool {
-	return providerKey("freesound", "HIMIND_MEDIA_LIBRARY_FREESOUND_TOKEN") != ""
+	return "Freesound API Token（请在 HiMind Agent 的账号与凭据中配置）"
 }
 
-func (provider freesoundProvider) Search(ctx context.Context, query searchQuery) ([]assetItem, error) {
+func (provider freesoundProvider) Search(ctx context.Context, credential map[string]string, query searchQuery) ([]assetItem, error) {
 	if !kindRequested(query.Kinds, "audio") {
 		return nil, nil
 	}
-	token := providerKey("freesound", "HIMIND_MEDIA_LIBRARY_FREESOUND_TOKEN")
+	token := strings.TrimSpace(credential["token"])
 	if token == "" {
-		return nil, fmt.Errorf("未配置 %s", provider.Requirement())
+		return nil, fmt.Errorf("Freesound 凭据缺少 token 字段")
 	}
 	params := url.Values{}
 	params.Set("query", query.Text)
@@ -524,14 +522,12 @@ func (fakeProvider) Name() string { return "样例素材（离线）" }
 func (fakeProvider) Kinds() []string {
 	return []string{"image", "video", "audio"}
 }
+func (fakeProvider) CredentialID() string { return "" }
 func (fakeProvider) Requirement() string {
-	return "环境变量 HIMIND_MEDIA_LIBRARY_FAKE=1（仅用于离线联调）"
-}
-func (fakeProvider) Configured() bool {
-	return strings.TrimSpace(os.Getenv("HIMIND_MEDIA_LIBRARY_FAKE")) == "1"
+	return "内置离线来源，仅用于测试与演示"
 }
 
-func (fakeProvider) Search(_ context.Context, query searchQuery) ([]assetItem, error) {
+func (fakeProvider) Search(_ context.Context, _ map[string]string, query searchQuery) ([]assetItem, error) {
 	items := []assetItem{}
 	catalog := []assetItem{
 		{ID: "sample-image", Kind: "image", Title: "样例图片 " + query.Text, PreviewURL: "https://example.invalid/sample.png", DownloadURL: "https://example.invalid/sample.png", Width: 1920, Height: 1080},

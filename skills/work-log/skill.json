@@ -4,11 +4,11 @@
   "name": "工作日志助手",
   "author": "马宝全",
   "categories": ["collaboration-delivery", "docs-knowledge"],
-  "version": "0.6.1",
+  "version": "0.6.2",
   "distribution_targets": ["workbench", "github"],
   "scope": "organization",
   "description": "把 AI 会话整理成结构化工作日志，并维护当前工作台、工作项与每日计划：项目状态、优先级、下一步、预计耗时与时间块。",
-  "release_notes": "0.6.1：工作项能力统一改为 work-log.item.*，与插件清单保持一致。",
+  "release_notes": "0.6.2：季度与年度总结支持按公司财年起算月划分，报告键随口径变化。",
   "min_agent_version": "0.3.0",
   "supported_clients": ["himind-ai", "codex", "github-copilot", "workbuddy"],
   "capabilities": [
@@ -33,10 +33,12 @@
     {"id": "work-log.plan.save", "required": false, "min_version": "0.15.0", "provider": "com.himind.work-log"},
     {"id": "work-log.plan.validate", "required": false, "min_version": "0.15.0", "provider": "com.himind.work-log"},
     {"id": "work-log.plan.auto", "required": false, "min_version": "0.15.0", "provider": "com.himind.work-log"},
-    {"id": "work-log.plan.review", "required": false, "min_version": "0.15.0", "provider": "com.himind.work-log"}
+    {"id": "work-log.plan.review", "required": false, "min_version": "0.15.0", "provider": "com.himind.work-log"},
+    {"id": "work-log.preferences.get", "required": false, "min_version": "0.16.0", "provider": "com.himind.work-log"},
+    {"id": "work-log.preferences.save", "required": false, "min_version": "0.16.0", "provider": "com.himind.work-log"}
   ],
   "plugin_dependencies": [
-    {"plugin_id": "com.himind.work-log", "required": true, "min_version": "0.15.0"}
+    {"plugin_id": "com.himind.work-log", "required": true, "min_version": "0.16.0"}
   ],
   "risk_summary": "read_only_by_default; writing_logs_requires_user_confirmation",
   "contents": [
