@@ -131,7 +131,8 @@
     matrixEntries: null,
     matrixLoading: false,
     matrixMode: 'actual',
-    // matrixTable 是当前矩阵的纯文本副本（表头 / 各行 / 合计），供复制到 Excel。
+    // matrixTable 是当前矩阵的纯文本副本（日期表头 / 各行日期工时 / 当天合计），
+    // 只含日期列，项目名另存 rowNames 供提示文案使用。
     matrixTable: null,
     // 项目
     projectsMode: 'progress',
@@ -1395,7 +1396,7 @@
         : '');
 
     const catBars = flow.categories.length
-      ? '<section class="report-section"><h3>工作类型分布</h3><div class="cat-bars">' +
+      ? '<section class="report-section"><h2>工作类型分布</h2><div class="cat-bars">' +
         flow.categories
           .map((item) => {
             const percent = totalMinutes > 0 ? Math.round((item.minutes / totalMinutes) * 100) : 0;
@@ -1466,7 +1467,7 @@
     });
     const dateKeys = Object.keys(byDate).sort().reverse();
     const dateBlock =
-      '<section class="report-section"><h3>按日期</h3>' +
+      '<section class="report-section"><h2>按日期</h2>' +
       dateKeys
         .map((date) => {
           const dayEntries = byDate[date];
@@ -1503,12 +1504,12 @@
       (next.length || blockers.length
         ? '<div class="report-columns">' +
           (next.length
-            ? '<section class="report-section"><h3>后续事项</h3><ul class="plain">' +
+            ? '<section class="report-section"><h2>后续事项</h2><ul class="plain">' +
               next.map((v) => '<li>' + escapeHTML(v) + '</li>').join('') +
               '</ul></section>'
             : '') +
           (blockers.length
-            ? '<section class="report-section"><h3>阻塞与风险</h3><ul class="plain warn">' +
+            ? '<section class="report-section"><h2>阻塞与风险</h2><ul class="plain warn">' +
               blockers.map((v) => '<li>' + escapeHTML(v) + '</li>').join('') +
               '</ul></section>'
             : '') +
@@ -1518,7 +1519,7 @@
     body.innerHTML =
       stats +
       catBars +
-      '<section class="report-section"><h3>核心脉络</h3>' +
+      '<section class="report-section"><h2>核心脉络</h2>' +
       (flowBlocks || emptyBlock('本期没有可归类的条目', [])) +
       '</section>' +
       dateBlock +
@@ -1866,7 +1867,9 @@
       '<th scope="col" class="mx-total-col">合计</th></tr>';
 
     // 复制用的纯文本副本：表头用「1日」，单元格用小时数值（Excel 能直接求和）。
-    const tableHead = ['项目'].concat(dayCells((day) => day + '日')).concat(['合计']);
+    // 只输出日期列。项目列与合计列通常由使用方自己的工时模板提供（合计往往还是公式），
+    // 一起粘过去会和模板已有列错位，或把公式覆盖成死值。
+    const tableHead = dayCells((day) => day + '日');
 
     const rows = matrix.rows
       .map((row, rowIndex) => {
@@ -1877,9 +1880,13 @@
             .map((name) => name + ' ' + hoursShort(cats[name]) + 'h')
             .join('、');
           const title = state.matrixYear + '-' + pad2(state.matrixMonth) + '-' + pad2(day) + ' · ' + row.name + (catText ? ' · ' + catText : '');
+          // tabindex/role/aria-label：单元格点击会跳到当天日历，键盘用户需要等价入口。
+          // 没有 tabindex 的 td 不可聚焦，只用鼠标才点得到。
           return (
             '<td class="mx-cell' +
             (minutes > 0 ? ' has' : '') +
+            '" tabindex="0" role="button" aria-label="' +
+            escapeHTML(title) +
             '" data-date="' +
             escapeHTML(state.matrixYear + '-' + pad2(state.matrixMonth) + '-' + pad2(day)) +
             '" title="' +
@@ -1934,17 +1941,13 @@
       escapeHTML(hoursShort(grand) || '0') +
       '</td></tr>';
 
+    // 纯文本副本只要日期列：行首不再放项目名，行尾不再放合计。
+    // 项目名改由 state.matrixTable.rowNames 提供，仅用于复制后的提示文案。
     state.matrixTable = {
       head: tableHead,
-      rows: matrix.rows.map((row) => {
-        const total = rowTotal(row);
-        return [row.name]
-          .concat(dayCells((day) => hoursShort(row.cells[day]) || ''))
-          .concat([total > 0 ? hoursShort(total) : '']);
-      }),
-      total: ['当天合计']
-        .concat(dayCells((day) => hoursShort(matrix.dayTotals[day]) || ''))
-        .concat([hoursShort(grand) || '']),
+      rowNames: matrix.rows.map((row) => row.name),
+      rows: matrix.rows.map((row) => dayCells((day) => hoursShort(row.cells[day]) || '')),
+      total: dayCells((day) => hoursShort(matrix.dayTotals[day]) || ''),
     };
 
     body.innerHTML =
@@ -1957,9 +1960,16 @@
       '</tfoot></table>';
 
     body.querySelectorAll('.mx-cell[data-date]').forEach((cell) => {
-      cell.addEventListener('click', () => {
+      const open = () => {
         const date = cell.getAttribute('data-date');
         if (date) openDateFromMatrix(date);
+      };
+      cell.addEventListener('click', open);
+      // Enter / Space 与鼠标点击等价；Space 要阻止默认滚动。
+      cell.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        open();
       });
     });
     body.querySelectorAll('[data-mx-copy]').forEach((button) => {
@@ -1972,11 +1982,12 @@
   }
 
   // copyMatrixPart 复制工时表的一部分：表头行、某个项目行，或当天合计行。
+  // 复制内容只含日期列，项目名不进剪贴板，所以提示文案从 rowNames 取。
   function copyMatrixPart(kind, rowIndex) {
     const table = state.matrixTable;
     if (!table) return;
     if (kind === 'head') {
-      copyTableToClipboard([table.head], '已复制表头，可直接粘贴到 Excel');
+      copyTableToClipboard([table.head], '已复制日期表头，可直接粘贴到 Excel');
       return;
     }
     if (kind === 'total') {
@@ -1986,7 +1997,11 @@
     const index = Number(rowIndex);
     const row = Number.isInteger(index) ? table.rows[index] : null;
     if (!row) return;
-    copyTableToClipboard([row], '已复制「' + row[0] + '」这一行，可直接粘贴到 Excel');
+    const name = (table.rowNames && table.rowNames[index]) || '';
+    copyTableToClipboard(
+      [row],
+      '已复制「' + name + '」的日期工时（不含项目列），可直接粘贴到 Excel',
+    );
   }
 
   async function openDateFromMatrix(date) {
@@ -4725,6 +4740,8 @@
       const on = node.getAttribute('data-view') === state.view;
       node.classList.toggle('active', on);
       node.setAttribute('aria-selected', on ? 'true' : 'false');
+      // ARIA Tabs：tablist 只保留一个 Tab 停靠点，其余页签靠方向键进入。
+      node.tabIndex = on ? 0 : -1;
     });
     const search = el('search');
     if (search) {
@@ -4890,6 +4907,29 @@
       button.addEventListener('click', () => switchView(button.getAttribute('data-view')));
     });
 
+    // 页签方向键：←/→ 循环切换，Home/End 到首尾。配合 switchView 里的 roving tabindex，
+    // 键盘用户不必逐个 Tab 穿过 6 个页签才能到达内容区。
+    const tabList = document.querySelector('.view-switch');
+    if (tabList) {
+      tabList.addEventListener('keydown', (event) => {
+        const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+        if (keys.indexOf(event.key) < 0) return;
+        const tabs = Array.from(tabList.querySelectorAll('.switch'));
+        const current = tabs.indexOf(document.activeElement);
+        if (current < 0) return;
+        event.preventDefault();
+        let next = current;
+        if (event.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
+        if (event.key === 'ArrowRight') next = (current + 1) % tabs.length;
+        if (event.key === 'Home') next = 0;
+        if (event.key === 'End') next = tabs.length - 1;
+        const target = tabs[next];
+        const view = target.getAttribute('data-view');
+        if (view) switchView(view);
+        target.focus();
+      });
+    }
+
     el('cal-prev').addEventListener('click', () => shiftMonth(-1));
     el('cal-next').addEventListener('click', () => shiftMonth(1));
     el('cal-grid').addEventListener('click', onCalendarClick);
@@ -4964,7 +5004,11 @@
         notify('本月还没有可复制的工时数据', 'warn');
         return;
       }
-      copyTableToClipboard([table.head].concat(table.rows).concat([table.total]), '已复制整张工时表，可直接粘贴到 Excel');
+      // 表头行 + 各项目日期工时 + 当天合计行；不含项目列与合计列。
+      copyTableToClipboard(
+        [table.head].concat(table.rows).concat([table.total]),
+        '已复制本月工时（仅日期列），可直接粘贴到 Excel',
+      );
     });
 
     // 项目

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -9,6 +10,8 @@ import (
 
 	"himind-plugin/media-toolkit/internal/himindjsonrpc"
 	"himind-plugin/media-toolkit/internal/media/analysis"
+	"himind-plugin/media-toolkit/internal/media/ffmpeg"
+	"himind-plugin/media-toolkit/internal/media/image"
 	"himind-plugin/media-toolkit/internal/media/recipe"
 )
 
@@ -267,5 +270,44 @@ func TestDownsampleScenePreservesSpikeAtHead(t *testing.T) {
 	}
 	if peak != 25.0 {
 		t.Fatalf("首帧硬切被吃掉了：最高只剩 %.2f", peak)
+	}
+}
+
+func TestImageConvertCapabilityConvertsBatch(t *testing.T) {
+	tools, err := ffmpeg.Locate()
+	if err != nil {
+		t.Skipf("本机没有成对 ffmpeg/ffprobe: %v", err)
+	}
+	root := t.TempDir()
+	for _, name := range []string{"a.png", "b.png"} {
+		path := filepath.Join(root, name)
+		_, runErr := tools.Run(context.Background(), ffmpeg.RunOptions{Args: []string{
+			"-f", "lavfi", "-i", "color=c=red:s=160x90", "-frames:v", "1", path,
+		}})
+		if runErr != nil {
+			t.Skipf("无法合成测试图片: %v", runErr)
+		}
+	}
+	result, rpcError := call(t, &service{tools: tools}, capImageConvert, map[string]any{
+		"workspace_root": root,
+		"paths":          []string{"a.png", "b.png"},
+		"output_dir":     "converted",
+		"format":         "webp",
+		"width":          80,
+		"quality":        75,
+		"suffix":         "-web",
+	})
+	if rpcError != nil {
+		t.Fatal(rpcError)
+	}
+	payload := result.(map[string]any)
+	batch := payload["result"].(image.BatchResult)
+	if !batch.OK || batch.Count != 2 {
+		t.Fatalf("批量转换未完成: %+v", batch)
+	}
+	for _, output := range batch.Outputs {
+		if _, err := os.Stat(output.Output); err != nil {
+			t.Fatalf("产物不存在: %s (%v)", output.Output, err)
+		}
 	}
 }

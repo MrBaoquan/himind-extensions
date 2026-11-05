@@ -3,210 +3,299 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>媒体工具集</title>
+  <title>媒体处理</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main class="shell">
-    <header class="hero">
-      <div>
-        <p class="eyebrow">HiMind 媒体工具集</p>
-        <h1>媒体工具集</h1>
-        <p class="lede">选素材 → 选要做什么 → 运行 → 看进度与结果。转码、压缩、抽音频、图片转视频、画面与响度分析、缩略图网格。</p>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">M</span>
+        <div class="brand-copy">
+          <h1>媒体处理</h1>
+          <span>转换 · 合成 · 分析</span>
+        </div>
       </div>
-      <div class="hero-side">
-        <span id="runtime-badge" class="badge muted">未检查</span>
-        <button id="runtime-button" class="ghost" type="button">检查运行时</button>
+      <div class="topbar-actions">
+        <span id="runtime-badge" class="badge muted">运行时</span>
+        <button id="runtime-button" class="secondary compact" type="button">检查</button>
       </div>
     </header>
 
     <p id="notice" class="notice" hidden></p>
 
-    <!-- 素材 -->
-    <section class="card">
-      <div class="section-head">
-        <h2>素材</h2>
-        <span class="muted">从工作区里选一个文件</span>
-      </div>
-      <div class="row">
-        <select id="file-select"><option value="">正在读取工作区…</option></select>
-        <button id="reload-files" class="ghost" type="button">刷新</button>
-      </div>
-      <p class="hint" id="workspace-hint">工作区：<span id="workspace-root" class="mono">—</span></p>
-      <div class="row">
-        <input id="media-path" type="text" spellcheck="false" placeholder="或直接填写相对路径，例如 clip/demo.mp4">
-        <button id="probe-button" type="button">读取信息</button>
-      </div>
-      <div id="media-info" class="info-table" hidden></div>
-    </section>
+    <div class="layout">
+      <div class="main-column">
+        <section id="source-surface" class="surface source-surface">
+          <div class="surface-head">
+            <div class="source-title">
+              <h2>素材</h2>
+              <span id="selection-count" class="caption"></span>
+            </div>
+          </div>
+          <button id="pick-media" class="selection-empty" type="button" aria-live="polite">
+            <strong>点击选择或拖入素材</strong>
+            <span id="selection-empty-hint">打开本机文件选择器</span>
+          </button>
+          <div id="selection-list" class="selection-list" aria-live="polite" hidden></div>
+          <button id="pick-media-more" class="selection-more" type="button" hidden>添加更多</button>
+        </section>
 
-    <!-- 任务 -->
-    <section class="card">
-      <div class="section-head">
-        <h2>要做什么</h2>
-        <span class="muted">常见需求已给好默认值</span>
-      </div>
-      <nav class="tabs" id="tabs">
-        <button class="tab is-active" type="button" data-tab="convert">转换</button>
-        <button class="tab" type="button" data-tab="audio">抽音频</button>
-        <button class="tab" type="button" data-tab="images">图片转视频</button>
-        <button class="tab" type="button" data-tab="analyze">分析</button>
-        <button class="tab" type="button" data-tab="preview">预览</button>
-      </nav>
+        <section class="surface task-surface">
+          <nav class="tabs" id="tabs" aria-label="媒体任务">
+            <button class="tab is-active" type="button" data-tab="image">图片转换</button>
+            <button class="tab" type="button" data-tab="video">视频转换</button>
+            <button class="tab" type="button" data-tab="images">图片转视频</button>
+            <button class="tab" type="button" data-tab="analyze">媒体分析</button>
+          </nav>
 
-      <!-- 转换 -->
-      <div class="panel is-active" data-panel="convert">
-        <div class="grid2">
-          <label>方式
-            <select id="convert-mode">
-              <option value="compress">压缩（体积优先，适合分发）</option>
-              <option value="transcode">转码（指定编码与码率）</option>
-            </select>
-          </label>
-          <label>目标宽度
-            <input id="convert-width" type="number" min="0" step="2" value="1280">
-          </label>
-          <label>质量 CRF <span class="muted" id="convert-crf-hint">越小越清晰</span>
-            <input id="convert-crf" type="number" min="0" max="51" step="1" value="28">
-          </label>
-          <label>帧率上限 <span class="muted">留空保持</span>
-            <input id="convert-fps" type="number" min="1" max="120" step="1" placeholder="保持">
-          </label>
-        </div>
-        <label class="field">输出文件
-          <input id="convert-out" type="text" spellcheck="false" placeholder="留空则自动命名，例如 clip/demo-compressed.mp4">
-        </label>
+          <div class="panel is-active" data-panel="image">
+            <div class="form-grid cols-3">
+              <label>格式
+                <select id="image-format">
+                  <option value="jpeg">JPEG</option>
+                  <option value="png">PNG</option>
+                  <option value="webp">WebP</option>
+                  <option value="bmp">BMP</option>
+                  <option value="tiff">TIFF</option>
+                  <option value="gif">GIF</option>
+                </select>
+              </label>
+              <label>尺寸
+                <select id="image-size-preset">
+                  <option value="source" selected>原尺寸</option>
+                  <option value="1920">宽 1920</option>
+                  <option value="1280">宽 1280</option>
+                  <option value="640">宽 640</option>
+                  <option value="custom">自定义</option>
+                </select>
+              </label>
+              <label>质量
+                <select id="image-quality-preset">
+                  <option value="high">高</option>
+                  <option value="balanced" selected>标准</option>
+                  <option value="small">更小体积</option>
+                  <option value="custom">自定义</option>
+                </select>
+              </label>
+            </div>
+            <details id="image-advanced" class="advanced">
+              <summary>更多设置</summary>
+              <div class="form-grid cols-3">
+                <label>自定义宽度
+                  <input id="image-width" type="number" min="0" step="2" placeholder="自动">
+                </label>
+                <label>自定义高度
+                  <input id="image-height" type="number" min="0" step="2" placeholder="自动">
+                </label>
+                <label>自定义质量
+                  <span class="range-field">
+                    <input id="image-quality" type="range" min="1" max="100" step="1" value="82">
+                    <span id="image-quality-label" class="range-value">82</span>
+                  </span>
+                </label>
+                <label>背景
+                  <input id="image-background" type="color" value="#ffffff">
+                </label>
+                <label>后缀
+                  <input id="image-suffix" type="text" value="-converted" maxlength="80">
+                </label>
+                <label>输出目录
+                  <input id="image-output-dir" type="text" spellcheck="false" placeholder="源文件目录">
+                </label>
+                <label>命名模板
+                  <input id="image-name-template" type="text" spellcheck="false" placeholder="{name}{suffix}.{ext}">
+                </label>
+                <label class="check-row">
+                  <input id="image-overwrite" type="checkbox">
+                  <span>覆盖同名产物</span>
+                </label>
+              </div>
+            </details>
+          </div>
+
+          <div class="panel" data-panel="video">
+            <div class="form-grid cols-3">
+              <label>格式
+                <select id="video-format">
+                  <option value="mp4">MP4</option>
+                  <option value="mov">MOV</option>
+                  <option value="mkv">MKV</option>
+                  <option value="webm">WebM</option>
+                </select>
+              </label>
+              <label>尺寸
+                <select id="video-size-preset">
+                  <option value="source" selected>原尺寸</option>
+                  <option value="1080">1080p</option>
+                  <option value="720">720p</option>
+                  <option value="480">480p</option>
+                  <option value="custom">自定义</option>
+                </select>
+              </label>
+              <label>质量
+                <select id="video-quality-preset">
+                  <option value="high">高</option>
+                  <option value="balanced" selected>标准</option>
+                  <option value="small">更小体积</option>
+                  <option value="custom">自定义</option>
+                </select>
+              </label>
+            </div>
+            <label class="check-row inline-check">
+              <input id="audio-only" type="checkbox">
+              <span>仅提取音轨</span>
+            </label>
+            <div id="audio-only-options" class="form-grid cols-2 audio-options" hidden>
+              <label>音频格式
+                <select id="audio-format">
+                  <option value="mp3">MP3</option>
+                  <option value="m4a">M4A</option>
+                  <option value="wav">WAV</option>
+                </select>
+              </label>
+              <label>码率
+                <select id="audio-bitrate">
+                  <option value="128k">128 kbps</option>
+                  <option value="192k" selected>192 kbps</option>
+                  <option value="320k">320 kbps</option>
+                </select>
+              </label>
+            </div>
+            <details id="video-advanced" class="advanced">
+              <summary>更多设置</summary>
+              <div class="form-grid cols-3">
+                <label>视频编码
+                  <select id="video-codec"></select>
+                </label>
+                <label>音频编码
+                  <select id="video-audio-codec"></select>
+                </label>
+                <label>帧率
+                  <input id="video-fps" type="number" min="1" max="240" step="1" placeholder="保持">
+                </label>
+                <label>自定义宽度
+                  <input id="video-width" type="number" min="0" step="2" placeholder="自动">
+                </label>
+                <label>自定义高度
+                  <input id="video-height" type="number" min="0" step="2" placeholder="自动">
+                </label>
+                <label>CRF
+                  <input id="video-crf" type="number" min="0" max="51" step="1" placeholder="自动">
+                </label>
+                <label>视频码率
+                  <input id="video-bitrate" type="number" min="0" max="200000" step="100" placeholder="kbps">
+                </label>
+                <label>音频码率
+                  <input id="video-audio-bitrate" type="number" min="0" max="1024" step="16" placeholder="kbps">
+                </label>
+                <label>编码速度
+                  <select id="video-preset">
+                    <option value="veryfast">最快</option>
+                    <option value="fast">较快</option>
+                    <option value="medium" selected>均衡</option>
+                    <option value="slow">更小体积</option>
+                  </select>
+                </label>
+                <label>输出文件
+                  <input id="video-out" type="text" spellcheck="false" placeholder="自动命名">
+                </label>
+                <label class="check-row">
+                  <input id="video-overwrite" type="checkbox">
+                  <span>覆盖同名产物</span>
+                </label>
+              </div>
+            </details>
+          </div>
+
+          <div class="panel" data-panel="images">
+            <div class="form-grid cols-3">
+              <label>尺寸
+                <select id="images-size-preset">
+                  <option value="source" selected>原尺寸</option>
+                  <option value="1080">1080p</option>
+                  <option value="720">720p</option>
+                  <option value="480">480p</option>
+                  <option value="custom">自定义</option>
+                </select>
+              </label>
+              <label>时长（秒）
+                <input id="images-duration" type="number" min="0.1" step="0.5" value="5">
+              </label>
+              <div class="field">
+                <span>音轨</span>
+                <input id="images-audio" type="hidden">
+                <button id="pick-audio" class="secondary audio-picker" type="button">添加音轨</button>
+              </div>
+            </div>
+            <details id="images-advanced" class="advanced">
+              <summary>更多设置</summary>
+              <div class="form-grid cols-3">
+                <label>帧率
+                  <input id="images-fps" type="number" min="1" max="120" step="1" value="30">
+                </label>
+                <label>CRF
+                  <input id="images-crf" type="number" min="0" max="51" step="1" placeholder="20">
+                </label>
+                <label>自定义宽度
+                  <input id="images-width" type="number" min="0" step="2" placeholder="自动">
+                </label>
+                <label>自定义高度
+                  <input id="images-height" type="number" min="0" step="2" placeholder="自动">
+                </label>
+                <label>输出文件
+                  <input id="images-out" type="text" spellcheck="false" placeholder="自动命名">
+                </label>
+                <label class="check-row">
+                  <input id="images-overwrite" type="checkbox">
+                  <span>覆盖同名产物</span>
+                </label>
+              </div>
+            </details>
+          </div>
+
+          <div class="panel" data-panel="analyze">
+            <p class="caption analysis-caption">读取容器、视频、音频和码率信息。</p>
+            <div id="analysis-result" class="data-table" hidden></div>
+          </div>
+
+          <div class="actions">
+            <button id="run-button" type="button">开始处理</button>
+            <span id="run-hint" class="caption"></span>
+          </div>
+        </section>
       </div>
 
-      <!-- 抽音频 -->
-      <div class="panel" data-panel="audio">
-        <div class="grid2">
-          <label>格式
-            <select id="audio-format">
-              <option value="mp3">MP3</option>
-              <option value="m4a">M4A (AAC)</option>
-              <option value="wav">WAV</option>
-            </select>
-          </label>
-          <label>码率
-            <select id="audio-bitrate">
-              <option value="128k">128 kbps</option>
-              <option value="192k" selected>192 kbps</option>
-              <option value="320k">320 kbps</option>
-            </select>
-          </label>
-          <label>起始（毫秒，可留空）
-            <input id="audio-start" type="number" min="0" step="100" placeholder="0">
-          </label>
-          <label>结束（毫秒，可留空）
-            <input id="audio-end" type="number" min="0" step="100" placeholder="整段">
-          </label>
-        </div>
-        <label class="field">输出文件
-          <input id="audio-out" type="text" spellcheck="false" placeholder="留空则自动命名，例如 clip/demo.mp3">
-        </label>
-      </div>
+      <aside class="side-column">
+        <section class="surface jobs-surface">
+          <div class="surface-head">
+            <h2>任务</h2>
+            <button id="refresh-jobs" class="secondary compact" type="button">刷新</button>
+          </div>
+          <div id="current-job" class="job" hidden>
+            <div class="job-head">
+              <strong id="job-title">—</strong>
+              <span id="job-state" class="badge muted">—</span>
+            </div>
+            <div class="bar"><div id="job-bar" class="bar-fill" style="width:0%"></div></div>
+            <div class="job-meta">
+              <span id="job-percent">0%</span>
+              <span id="job-speed" class="muted"></span>
+              <span id="job-output" class="mono muted"></span>
+            </div>
+            <div class="job-actions">
+              <button id="cancel-button" class="secondary compact" type="button">取消</button>
+            </div>
+          </div>
+          <div id="job-history" class="history"></div>
+        </section>
+      </aside>
+    </div>
 
-      <!-- 图片转视频 -->
-      <div class="panel" data-panel="images">
-        <div class="grid2">
-          <label>帧率
-            <input id="images-fps" type="number" min="1" max="120" step="1" value="30">
-          </label>
-          <label>时长（毫秒，仅单图用）
-            <input id="images-duration" type="number" min="100" step="500" value="5000">
-          </label>
-          <label>宽度
-            <input id="images-width" type="number" min="0" step="2" value="1920">
-          </label>
-          <label>高度 <span class="muted">留空按比例</span>
-            <input id="images-height" type="number" min="0" step="2" placeholder="自动">
-          </label>
-        </div>
-        <p class="hint">序列帧请填通配符路径，例如 <span class="mono">frames/shot_%04d.png</span>；单张图会循环该时长。</p>
-        <label class="field">输出文件
-          <input id="images-out" type="text" spellcheck="false" placeholder="留空则自动命名，例如 clip/from-images.mp4">
-        </label>
-      </div>
-
-      <!-- 分析 -->
-      <div class="panel" data-panel="analyze">
-        <div class="grid2">
-          <label>分析内容
-            <select id="analyze-kind">
-              <option value="scene">画面活动强度（找节奏与段落）</option>
-              <option value="loudness">音频响度（找冲击与静场）</option>
-            </select>
-          </label>
-          <label>采样点上限
-            <input id="analyze-points" type="number" min="100" max="200000" step="100" value="2000">
-          </label>
-        </div>
-        <p class="hint">画面活动分数的<strong>绝对值没有普适阈值</strong>，请看曲线相对自身中位数的起伏。</p>
-        <div id="chart-wrap" class="chart-wrap" hidden>
-          <canvas id="chart" width="900" height="240"></canvas>
-          <p id="chart-summary" class="hint"></p>
-        </div>
-      </div>
-
-      <!-- 预览 -->
-      <div class="panel" data-panel="preview">
-        <div class="grid2">
-          <label>列数
-            <input id="sheet-columns" type="number" min="1" max="20" step="1" value="6">
-          </label>
-          <label>行数
-            <input id="sheet-rows" type="number" min="1" max="20" step="1" value="4">
-          </label>
-          <label>每格宽度
-            <input id="sheet-tile" type="number" min="16" max="1920" step="16" value="320">
-          </label>
-          <label>采样间隔（毫秒，留空自动铺满）
-            <input id="sheet-interval" type="number" min="0" step="500" placeholder="自动">
-          </label>
-        </div>
-        <div class="row">
-          <input id="extract-times" type="text" spellcheck="false" placeholder="抽帧时刻（毫秒，逗号分隔），例如 1000,5000,12000">
-          <button id="extract-button" class="ghost" type="button">抽取帧</button>
-        </div>
-        <div id="preview-grid" class="preview-grid" hidden></div>
-      </div>
-
-      <div class="actions">
-        <button id="plan-button" class="ghost" type="button">预览参数</button>
-        <button id="run-button" type="button">开始</button>
-      </div>
-      <pre id="plan-output" class="plan" hidden></pre>
-    </section>
-
-    <!-- 作业 -->
-    <section class="card">
-      <div class="section-head">
-        <h2>处理进度</h2>
-        <button id="refresh-jobs" class="ghost small" type="button">刷新</button>
-      </div>
-      <div id="current-job" class="job" hidden>
-        <div class="job-head">
-          <strong id="job-title">—</strong>
-          <span id="job-state" class="badge muted">—</span>
-        </div>
-        <div class="bar"><div id="job-bar" class="bar-fill" style="width:0%"></div></div>
-        <div class="job-meta">
-          <span id="job-percent">0%</span>
-          <span id="job-speed" class="muted"></span>
-          <span id="job-output" class="mono muted"></span>
-        </div>
-        <div class="actions">
-          <button id="cancel-button" class="ghost" type="button">取消</button>
-        </div>
-      </div>
-      <div id="job-history" class="history"></div>
-    </section>
-
-    <footer class="foot">
-      <span class="muted">需要本机有 ffmpeg（含 ffprobe）。没有时只有「检查运行时」可用。</span>
-    </footer>
+    <footer class="app-foot">本地处理 · 不覆盖原文件</footer>
   </main>
   <script src="app.js"></script>
 </body>
 </html>
+
+

@@ -18,38 +18,43 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	mediaruntime "himind-plugin/media-toolkit/internal/media/runtime"
 )
 
-// Tools 一次会话内已定位的可执行文件。
+// Tools 一次会话内已定位的可执行文件及其来源。
 type Tools struct {
-	FFmpeg  string
-	FFprobe string
-	Version string
+	FFmpeg          string
+	FFprobe         string
+	Version         string
+	Source          string
+	RuntimeRoot     string
+	ManifestVersion string
+	Warnings        []string
 }
 
-// ErrNotAvailable 表示本机没有可用的 ffmpeg。
-var ErrNotAvailable = errors.New("未找到 ffmpeg，请先安装或通过 runtime.install 获取")
+// ErrNotAvailable 表示三级运行时位置都没有可用的 ffmpeg / ffprobe。
+var ErrNotAvailable = errors.New("未找到成对的 ffmpeg / ffprobe，请先配置插件运行时或安装到 PATH")
 
-// Locate 在 PATH 与常见安装位置里查找 ffmpeg / ffprobe。
+// Locate 按“插件包内置 -> 插件数据目录 -> PATH”定位 ffmpeg / ffprobe。
 func Locate() (Tools, error) {
-	var tools Tools
-	ffmpegPath, err := lookPath("ffmpeg")
+	located, err := mediaruntime.DefaultLocator().Locate()
 	if err != nil {
-		return Tools{}, ErrNotAvailable
+		return Tools{}, fmt.Errorf("%w: %v", ErrNotAvailable, err)
 	}
-	tools.FFmpeg = ffmpegPath
-	if probePath, probeErr := lookPath("ffprobe"); probeErr == nil {
-		tools.FFprobe = probePath
+	tools := Tools{
+		FFmpeg:          located.FFmpeg,
+		FFprobe:         located.FFprobe,
+		Source:          located.Source,
+		RuntimeRoot:     located.RuntimeRoot,
+		ManifestVersion: located.ManifestVersion,
+		Warnings:        append([]string(nil), located.Warnings...),
 	}
-	tools.Version = probeVersion(ffmpegPath)
+	tools.Version = probeVersion(located.FFmpeg)
+	if tools.Version == "" && located.ManifestVersion != "" {
+		tools.Version = "manifest:" + located.ManifestVersion
+	}
 	return tools, nil
-}
-
-func lookPath(name string) (string, error) {
-	if path, err := exec.LookPath(name + ".exe"); err == nil {
-		return path, nil
-	}
-	return exec.LookPath(name)
 }
 
 func probeVersion(ffmpegPath string) string {
@@ -219,8 +224,11 @@ func parseProgress(reader io.Reader, onProgress func(Progress)) {
 		switch key {
 		case "frame":
 			current.Frame, _ = strconv.ParseInt(value, 10, 64)
-		case "out_time_ms":
-			current.OutTimeMs, _ = strconv.ParseInt(value, 10, 64)
+		case "out_time_us", "out_time_ms":
+			// FFmpeg 的 out_time_ms 历史命名有误导，值实际是微秒。
+			// 统一换算为毫秒后再交给作业层计算百分比。
+			microseconds, _ := strconv.ParseInt(value, 10, 64)
+			current.OutTimeMs = microseconds / 1000
 			current.RawOutTime = value
 		case "total_size":
 			current.TotalSize, _ = strconv.ParseInt(value, 10, 64)

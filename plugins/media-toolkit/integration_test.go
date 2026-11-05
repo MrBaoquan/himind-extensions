@@ -10,6 +10,7 @@ import (
 	"himind-plugin/media-toolkit/internal/media/analysis"
 	"himind-plugin/media-toolkit/internal/media/ffmpeg"
 	"himind-plugin/media-toolkit/internal/media/frames"
+	"himind-plugin/media-toolkit/internal/media/job"
 	"himind-plugin/media-toolkit/internal/media/probe"
 	"himind-plugin/media-toolkit/internal/media/projection"
 	"himind-plugin/media-toolkit/internal/media/recipe"
@@ -230,4 +231,111 @@ func TestIntegrationEquirectProjectionProducesFlatVideo(t *testing.T) {
 	if !info.HasVideo || !info.HasAudio || info.Video.Width != 640 || info.Video.Height != 360 {
 		t.Fatalf("投影产物流信息异常: %+v", info)
 	}
+}
+
+func TestIntegrationVideoConvertAndTechnicalAnalysis(t *testing.T) {
+	t.Setenv(job.InlineWorkerEnv, "1")
+	tools := requireTools(t)
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	store, err := job.NewStore(tools)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	source := buildSample(t, tools, dir)
+	output := filepath.Join(dir, "converted.mp4")
+	service := &service{tools: tools, store: store}
+	result, rpcError := call(t, service, capVideoConvert, map[string]any{
+		"workspace_root": dir,
+		"path":           source,
+		"output":         output,
+		"format":         "mp4",
+		"video_codec":    "h264",
+		"audio_codec":    "aac",
+		"width":          160,
+		"crf":            30,
+		"preset":         "veryfast",
+	})
+	if rpcError != nil {
+		t.Fatal(rpcError)
+	}
+	record := result.(map[string]any)["job"].(*job.Record)
+	deadline := time.Now().Add(90 * time.Second)
+	for time.Now().Before(deadline) {
+		current, statusErr := store.Get(record.ID)
+		if statusErr != nil {
+			t.Fatal(statusErr)
+		}
+		switch current.Status {
+		case job.StatusCompleted:
+			goto completed
+		case job.StatusFailed, job.StatusCancelled:
+			t.Fatalf("视频转换未成功: %+v", current)
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	t.Fatal("视频转换超时")
+
+completed:
+	analysisResult, rpcError := call(t, service, capMediaAnalyze, map[string]any{
+		"workspace_root": dir,
+		"path":           output,
+	})
+	if rpcError != nil {
+		t.Fatal(rpcError)
+	}
+	payload := analysisResult.(map[string]any)
+	report := payload["report"].(analysis.TechnicalReport)
+	if report.Container != "mp4" || report.Video == nil || report.Video.Width != 160 || report.Audio == nil {
+		t.Fatalf("归一化媒体报告异常: %+v", report)
+	}
+}
+
+func TestIntegrationImagesToVideoCapability(t *testing.T) {
+	t.Setenv(job.InlineWorkerEnv, "1")
+	tools := requireTools(t)
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	store, err := job.NewStore(tools)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	for index, color := range []string{"red", "blue"} {
+		path := filepath.Join(dir, "frame_"+string(rune('0'+index))+".png")
+		if _, err := tools.Run(context.Background(), ffmpeg.RunOptions{Args: []string{
+			"-f", "lavfi", "-i", "color=c=" + color + ":s=160x90", "-frames:v", "1", path,
+		}}); err != nil {
+			t.Skipf("无法合成图片: %v", err)
+		}
+	}
+	service := &service{tools: tools, store: store}
+	result, rpcError := call(t, service, capImagesToVideo, map[string]any{
+		"workspace_root": dir,
+		"image_path":     "frame_%d.png",
+		"output":         "slideshow.mp4",
+		"fps":            2,
+		"width":          160,
+		"height":         90,
+		"crf":            28,
+	})
+	if rpcError != nil {
+		t.Fatal(rpcError)
+	}
+	record := result.(map[string]any)["job"].(*job.Record)
+	deadline := time.Now().Add(60 * time.Second)
+	for time.Now().Before(deadline) {
+		current, _ := store.Get(record.ID)
+		if current.Status == job.StatusCompleted {
+			info, err := probe.Read(context.Background(), tools, filepath.Join(dir, "slideshow.mp4"))
+			if err != nil || info.Video == nil || info.Video.Width != 160 {
+				t.Fatalf("图片转视频产物异常: %+v (%v)", info, err)
+			}
+			return
+		}
+		if current.Status == job.StatusFailed {
+			t.Fatalf("图片转视频失败: %+v", current)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	t.Fatal("图片转视频超时")
 }

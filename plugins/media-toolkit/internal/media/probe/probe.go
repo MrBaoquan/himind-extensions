@@ -31,25 +31,31 @@ type Info struct {
 
 // Stream 一个轨道。
 type Stream struct {
-	Index      int     `json:"index"`
-	CodecType  string  `json:"codec_type"`
-	CodecName  string  `json:"codec_name,omitempty"`
-	Width      int     `json:"width,omitempty"`
-	Height     int     `json:"height,omitempty"`
-	Fps        float64 `json:"fps,omitempty"`
-	SampleRate int     `json:"sample_rate,omitempty"`
-	Channels   int     `json:"channels,omitempty"`
-	DurationMs int64   `json:"duration_ms,omitempty"`
+	Index       int     `json:"index"`
+	CodecType   string  `json:"codec_type"`
+	CodecName   string  `json:"codec_name,omitempty"`
+	Profile     string  `json:"profile,omitempty"`
+	Width       int     `json:"width,omitempty"`
+	Height      int     `json:"height,omitempty"`
+	Fps         float64 `json:"fps,omitempty"`
+	PixelFormat string  `json:"pixel_format,omitempty"`
+	BitRate     int64   `json:"bit_rate,omitempty"`
+	SampleRate  int     `json:"sample_rate,omitempty"`
+	Channels    int     `json:"channels,omitempty"`
+	DurationMs  int64   `json:"duration_ms,omitempty"`
 }
 
 type rawProbe struct {
 	Streams []struct {
-		Index     int    `json:"index"`
-		CodecType string `json:"codec_type"`
-		CodecName string `json:"codec_name"`
-		Width     int    `json:"width"`
-		Height    int    `json:"height"`
+		Index      int    `json:"index"`
+		CodecType  string `json:"codec_type"`
+		CodecName  string `json:"codec_name"`
+		Width      int    `json:"width"`
+		Height     int    `json:"height"`
+		Profile    string `json:"profile"`
+		PixFmt     string `json:"pix_fmt"`
 		RFrameRate string `json:"r_frame_rate"`
+		BitRate    string `json:"bit_rate"`
 		SampleRate string `json:"sample_rate"`
 		Channels   int    `json:"channels"`
 		Duration   string `json:"duration"`
@@ -83,15 +89,18 @@ func Read(ctx context.Context, tools ffmpeg.Tools, path string) (Info, error) {
 	}
 	for _, item := range raw.Streams {
 		stream := Stream{
-			Index:      item.Index,
-			CodecType:  item.CodecType,
-			CodecName:  item.CodecName,
-			Width:      item.Width,
-			Height:     item.Height,
-			Fps:        parseFps(item.RFrameRate),
-			SampleRate: parseInt(item.SampleRate),
-			Channels:   item.Channels,
-			DurationMs: parseDurationMs(item.Duration),
+			Index:       item.Index,
+			CodecType:   item.CodecType,
+			CodecName:   item.CodecName,
+			Width:       item.Width,
+			Height:      item.Height,
+			Profile:     item.Profile,
+			PixelFormat: item.PixFmt,
+			BitRate:     parseInt64(item.BitRate),
+			Fps:         parseFps(item.RFrameRate),
+			SampleRate:  parseInt(item.SampleRate),
+			Channels:    item.Channels,
+			DurationMs:  parseDurationMs(item.Duration),
 		}
 		info.Streams = append(info.Streams, stream)
 		switch item.CodecType {

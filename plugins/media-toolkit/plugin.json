@@ -7,9 +7,9 @@
     "video-post",
     "audio-sound"
   ],
-  "description": "对视频与音频做确定性处理与测量：探测、全景主前向投影、转码压缩、抽帧拼图、画面活动与响度曲线。",
-  "release_notes": "1.4.0：新增全景主前向投影，补齐视频动作编排的前向视图分析链路。",
-  "version": "1.4.0",
+  "description": "对图片、视频与音频做确定性处理与测量：图片批量转换、视频转换、图片转视频、媒体参数分析、抽帧拼图与响度曲线。",
+  "release_notes": "2.3.2：素材区合并为单一拖拽/点击目标；移除独立选择按钮与手动路径；修复原生文件选择器兼容性和拖拽窗口事件绑定。",
+  "version": "2.3.2",
   "entry": "bin/media-toolkit.exe",
   "runtime": "process-jsonrpc-stdio",
   "platforms": [
@@ -36,8 +36,271 @@
       }
     },
     {
+      "id": "media.toolkit.image.convert",
+      "description": "批量转换图片格式，并可缩放、控制质量和输出命名",
+      "availability": "local",
+      "timeout_seconds": 900,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "paths": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "items": {
+              "type": "string",
+              "maxLength": 1000
+            }
+          },
+          "output_dir": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "format": {
+            "enum": [
+              "jpeg",
+              "jpg",
+              "png",
+              "webp",
+              "bmp",
+              "tiff",
+              "tif",
+              "gif"
+            ]
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16384
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16384
+          },
+          "quality": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "background": {
+            "type": "string",
+            "maxLength": 7
+          },
+          "suffix": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "name_template": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "overwrite": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "paths",
+          "output_dir",
+          "format"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.toolkit.images.to-video",
+      "description": "把单张图片或编号图片序列合成为视频，可选加入音轨",
+      "availability": "local",
+      "timeout_seconds": 1800,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "image_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "output": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "audio_path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "fps": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 120
+          },
+          "duration_ms": {
+            "type": "integer",
+            "minimum": 100
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 7680
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4320
+          },
+          "crf": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 51
+          },
+          "overwrite": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "image_path",
+          "output"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "id": "media.toolkit.probe",
       "description": "读取媒体的时长、帧率、分辨率与轨道信息",
+      "availability": "local",
+      "timeout_seconds": 60,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "workspace_root",
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.toolkit.video.convert",
+      "description": "把视频转换为 MP4/MOV/MKV/WebM，并控制编码、尺寸、帧率与质量",
+      "availability": "local",
+      "timeout_seconds": 1800,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "output": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "format": {
+            "enum": [
+              "mp4",
+              "mov",
+              "mkv",
+              "webm"
+            ]
+          },
+          "video_codec": {
+            "enum": [
+              "h264",
+              "h265",
+              "vp9",
+              "copy"
+            ]
+          },
+          "audio_codec": {
+            "enum": [
+              "aac",
+              "opus",
+              "mp3",
+              "copy",
+              "none"
+            ]
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 7680
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4320
+          },
+          "fps": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 240
+          },
+          "crf": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 51
+          },
+          "video_bitrate_kbps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200000
+          },
+          "audio_bitrate_kbps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1024
+          },
+          "preset": {
+            "enum": [
+              "veryfast",
+              "fast",
+              "medium",
+              "slow",
+              "slower",
+              "veryslow"
+            ]
+          },
+          "overwrite": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "path",
+          "output",
+          "format"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.toolkit.media.analyze",
+      "description": "返回归一化的容器、视频、音频与文件参数及告警",
       "availability": "local",
       "timeout_seconds": 60,
       "risk_level": "read_only",
@@ -440,6 +703,46 @@
       }
     },
     {
+      "id": "media.toolkit.files.pick",
+      "description": "打开原生文件选择器，或导入拖入的文件；工作区外文件自动进入受控收件目录",
+      "availability": "local",
+      "timeout_seconds": 900,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "mode": {
+            "enum": [
+              "image",
+              "video",
+              "audio",
+              "media"
+            ]
+          },
+          "multiple": {
+            "type": "boolean"
+          },
+          "paths": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "items": {
+              "type": "string",
+              "maxLength": 1000
+            }
+          }
+        },
+        "required": [
+          "workspace_root"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "id": "media.toolkit.preview.image",
       "description": "把工作区内的图片读成可显示的预览",
       "availability": "local",
@@ -489,12 +792,32 @@
         "title": "检查媒体运行时"
       },
       {
+        "id": "media.toolkit.image.convert",
+        "title": "转换图片格式"
+      },
+      {
+        "id": "media.toolkit.video.convert",
+        "title": "转换视频格式"
+      },
+      {
+        "id": "media.toolkit.media.analyze",
+        "title": "分析媒体参数"
+      },
+      {
         "id": "media.toolkit.video.project",
         "title": "投影全景主前向"
       },
       {
+        "id": "media.toolkit.files.pick",
+        "title": "选择媒体素材"
+      },
+      {
         "id": "media.toolkit.files.list",
         "title": "列出工作区素材"
+      },
+      {
+        "id": "media.toolkit.images.to-video",
+        "title": "图片合成视频"
       },
       {
         "id": "media.toolkit.probe",

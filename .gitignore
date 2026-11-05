@@ -47,3 +47,6 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# PS7 迁移时留下的本机环境备份（PATH、PowerShell 路径、MCP 管道名），不进入扩展源码仓。
+.ps7-migration-backup/

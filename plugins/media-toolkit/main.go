@@ -23,17 +23,25 @@ import (
 	"himind-plugin/media-toolkit/internal/himindjsonrpc"
 	"himind-plugin/media-toolkit/internal/media/analysis"
 	"himind-plugin/media-toolkit/internal/media/ffmpeg"
+	"himind-plugin/media-toolkit/internal/media/filepicker"
 	"himind-plugin/media-toolkit/internal/media/frames"
+	"himind-plugin/media-toolkit/internal/media/image"
+	"himind-plugin/media-toolkit/internal/media/imagevideo"
 	"himind-plugin/media-toolkit/internal/media/job"
 	"himind-plugin/media-toolkit/internal/media/probe"
 	"himind-plugin/media-toolkit/internal/media/projection"
 	"himind-plugin/media-toolkit/internal/media/recipe"
+	"himind-plugin/media-toolkit/internal/media/transcode"
 	"himind-plugin/media-toolkit/internal/media/workspace"
 )
 
 // 能力 ID。集中定义，避免字符串散落各处导致改名时漏改。
 const (
 	capRuntimeStatus = "media.toolkit.runtime.status"
+	capImageConvert  = "media.toolkit.image.convert"
+	capVideoConvert  = "media.toolkit.video.convert"
+	capMediaAnalyze  = "media.toolkit.media.analyze"
+	capImagesToVideo = "media.toolkit.images.to-video"
 	capProbe         = "media.toolkit.probe"
 	capVideoProject  = "media.toolkit.video.project"
 	capRecipePlan    = "media.toolkit.recipe.plan"
@@ -47,6 +55,7 @@ const (
 	capFrameExtract  = "media.toolkit.frames.extract"
 	capPreviewImage  = "media.toolkit.preview.image"
 	capFilesList     = "media.toolkit.files.list"
+	capFilesPick     = "media.toolkit.files.pick"
 )
 
 // service 一次进程内的服务状态。外部工具只定位一次并复用。
@@ -72,7 +81,7 @@ func (s *service) toolsOrError() (ffmpeg.Tools, *himindjsonrpc.Error) {
 	if s.toolsErr != nil || s.tools.FFmpeg == "" {
 		return ffmpeg.Tools{}, &himindjsonrpc.Error{
 			Code:    -32000,
-			Message: "未找到 ffmpeg。请在本机安装 ffmpeg 并确保它在 PATH 中，然后重试。",
+			Message: "未找到成对的 ffmpeg / ffprobe。请配置插件内置或数据目录运行时；开发环境也可安装到 PATH 后重试。",
 		}
 	}
 	return s.tools, nil
@@ -81,6 +90,13 @@ func (s *service) toolsOrError() (ffmpeg.Tools, *himindjsonrpc.Error) {
 var defaultService = newService()
 
 func main() {
+	if len(os.Args) == 3 && os.Args[1] == "--media-toolkit-job-worker" {
+		if err := job.RunWorker(os.Args[2]); err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	_ = himindjsonrpc.Serve(os.Stdin, os.Stdout, defaultService.handle)
 }
 
@@ -89,6 +105,34 @@ func (s *service) handle(request himindjsonrpc.Request) (any, *himindjsonrpc.Err
 
 	case capRuntimeStatus:
 		return s.runtimeStatus()
+
+	case capImageConvert:
+		var input imageConvertInput
+		if rpcError := himindjsonrpc.DecodeParams(request, &input); rpcError != nil {
+			return nil, rpcError
+		}
+		return s.imageConvert(input)
+
+	case capVideoConvert:
+		var input videoConvertInput
+		if rpcError := himindjsonrpc.DecodeParams(request, &input); rpcError != nil {
+			return nil, rpcError
+		}
+		return s.videoConvert(input)
+
+	case capMediaAnalyze:
+		var input mediaAnalyzeInput
+		if rpcError := himindjsonrpc.DecodeParams(request, &input); rpcError != nil {
+			return nil, rpcError
+		}
+		return s.mediaAnalyze(input)
+
+	case capImagesToVideo:
+		var input imagesToVideoInput
+		if rpcError := himindjsonrpc.DecodeParams(request, &input); rpcError != nil {
+			return nil, rpcError
+		}
+		return s.imagesToVideo(input)
 
 	case capProbe:
 		var input probeInput
@@ -180,6 +224,13 @@ func (s *service) handle(request himindjsonrpc.Request) (any, *himindjsonrpc.Err
 			return nil, rpcError
 		}
 		return s.filesList(input)
+
+	case capFilesPick:
+		var input filesPickInput
+		if rpcError := himindjsonrpc.DecodeParams(request, &input); rpcError != nil {
+			return nil, rpcError
+		}
+		return s.filesPick(input)
 	}
 
 	return nil, &himindjsonrpc.Error{
@@ -190,7 +241,56 @@ func (s *service) handle(request himindjsonrpc.Request) (any, *himindjsonrpc.Err
 
 // ── 输入 ──────────────────────────────────────────────
 
+type imagesToVideoInput struct {
+	WorkspaceRoot string  `json:"workspace_root"`
+	ImagePath     string  `json:"image_path"`
+	Output        string  `json:"output"`
+	AudioPath     string  `json:"audio_path,omitempty"`
+	FPS           float64 `json:"fps,omitempty"`
+	DurationMs    int64   `json:"duration_ms,omitempty"`
+	Width         int     `json:"width,omitempty"`
+	Height        int     `json:"height,omitempty"`
+	CRF           int     `json:"crf,omitempty"`
+	Overwrite     bool    `json:"overwrite,omitempty"`
+}
+
 type probeInput struct {
+	WorkspaceRoot string `json:"workspace_root"`
+	Path          string `json:"path"`
+}
+
+type imageConvertInput struct {
+	WorkspaceRoot string   `json:"workspace_root"`
+	Paths         []string `json:"paths"`
+	OutputDir     string   `json:"output_dir"`
+	Format        string   `json:"format"`
+	Width         int      `json:"width,omitempty"`
+	Height        int      `json:"height,omitempty"`
+	Quality       int      `json:"quality,omitempty"`
+	Background    string   `json:"background,omitempty"`
+	Suffix        string   `json:"suffix,omitempty"`
+	NameTemplate  string   `json:"name_template,omitempty"`
+	Overwrite     bool     `json:"overwrite,omitempty"`
+}
+
+type videoConvertInput struct {
+	WorkspaceRoot    string  `json:"workspace_root"`
+	Path             string  `json:"path"`
+	Output           string  `json:"output"`
+	Format           string  `json:"format"`
+	VideoCodec       string  `json:"video_codec,omitempty"`
+	AudioCodec       string  `json:"audio_codec,omitempty"`
+	Width            int     `json:"width,omitempty"`
+	Height           int     `json:"height,omitempty"`
+	FPS              float64 `json:"fps,omitempty"`
+	CRF              int     `json:"crf,omitempty"`
+	VideoBitrateKbps int     `json:"video_bitrate_kbps,omitempty"`
+	AudioBitrateKbps int     `json:"audio_bitrate_kbps,omitempty"`
+	Preset           string  `json:"preset,omitempty"`
+	Overwrite        bool    `json:"overwrite,omitempty"`
+}
+
+type mediaAnalyzeInput struct {
 	WorkspaceRoot string `json:"workspace_root"`
 	Path          string `json:"path"`
 }
@@ -259,6 +359,13 @@ type filesInput struct {
 	Limit         int    `json:"limit"`
 }
 
+type filesPickInput struct {
+	WorkspaceRoot string   `json:"workspace_root"`
+	Mode          string   `json:"mode"`
+	Multiple      bool     `json:"multiple"`
+	Paths         []string `json:"paths,omitempty"`
+}
+
 type previewInput struct {
 	WorkspaceRoot string `json:"workspace_root"`
 	Path          string `json:"path"`
@@ -278,7 +385,13 @@ type extractInput struct {
 
 func (s *service) runtimeStatus() (any, *himindjsonrpc.Error) {
 	status := map[string]any{
-		"available": s.toolsErr == nil && s.tools.FFmpeg != "",
+		"available":            s.toolsErr == nil && s.tools.FFmpeg != "" && s.tools.FFprobe != "",
+		"resolution_order":     []string{"plugin_bundle", "plugin_data", "path"},
+		"runtime_source":       s.tools.Source,
+		"runtime_root":         s.tools.RuntimeRoot,
+		"manifest_version":     s.tools.ManifestVersion,
+		"runtime_warnings":     append([]string(nil), s.tools.Warnings...),
+		"requires_ffmpeg_pair": true,
 	}
 	if s.tools.FFmpeg != "" {
 		status["ffmpeg_path"] = s.tools.FFmpeg
@@ -286,15 +399,15 @@ func (s *service) runtimeStatus() (any, *himindjsonrpc.Error) {
 		status["version"] = s.tools.Version
 	}
 	pipelines := []string{
-		"probe", "video.project", "recipe.plan", "recipe.run",
+		"runtime.status", "image.convert", "video.convert", "media.analyze", "images.to-video", "probe", "video.project", "recipe.plan", "recipe.run",
 		"job.status", "job.cancel", "job.list",
 		"scene.score", "audio.loudness",
-		"frames.contact-sheet", "frames.extract", "preview.image", "files.list",
+		"frames.contact-sheet", "frames.extract", "preview.image", "files.list", "files.pick",
 	}
 	status["capabilities_ready"] = pipelines
 	status["presets"] = recipe.PresetNames()
 	if !status["available"].(bool) {
-		status["message"] = "未找到 ffmpeg，绝大多数能力不可用。安装 ffmpeg 并加入 PATH 后即可恢复。"
+		status["message"] = "未找到成对的 ffmpeg / ffprobe，绝大多数能力不可用。请放入插件运行时目录，或安装到 PATH 后重试。"
 		if s.toolsErr != nil {
 			status["error"] = s.toolsErr.Error()
 		}
@@ -306,6 +419,194 @@ func (s *service) runtimeStatus() (any, *himindjsonrpc.Error) {
 		status["jobs_available"] = true
 	}
 	return status, nil
+}
+
+func (s *service) imageConvert(input imageConvertInput) (any, *himindjsonrpc.Error) {
+	tools, rpcError := s.toolsOrError()
+	if rpcError != nil {
+		return nil, rpcError
+	}
+	root, err := workspace.Open(input.WorkspaceRoot)
+	if err != nil {
+		return nil, &himindjsonrpc.Error{Code: -32602, Message: err.Error()}
+	}
+	paths := make([]string, 0, len(input.Paths))
+	for _, raw := range input.Paths {
+		path, resolveErr := root.Resolve(raw)
+		if resolveErr != nil {
+			return nil, &himindjsonrpc.Error{Code: -32602, Message: resolveErr.Error()}
+		}
+		paths = append(paths, path)
+	}
+	outputDir, resolveErr := root.Resolve(input.OutputDir)
+	if resolveErr != nil {
+		return nil, &himindjsonrpc.Error{Code: -32602, Message: resolveErr.Error()}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+	result, convertErr := image.ConvertBatch(ctx, tools, paths, outputDir, image.Options{
+		Format: input.Format, Width: input.Width, Height: input.Height,
+		Quality: input.Quality, Background: input.Background,
+		Suffix: input.Suffix, NameTemplate: input.NameTemplate, Overwrite: input.Overwrite,
+	})
+	if convertErr != nil {
+		return nil, &himindjsonrpc.Error{Code: -32602, Message: convertErr.Error()}
+	}
+	return map[string]any{
+		"workspace_root": root.Abs(),
+		"output_dir":     outputDir,
+		"result":         result,
+	}, nil
+}
+
+func (s *service) videoConvert(input videoConvertInput) (any, *himindjsonrpc.Error) {
+	if strings.TrimSpace(input.WorkspaceRoot) == "" {
+		return nil, &himindjsonrpc.Error{Code: -32602, Message: "video.convert 必须提供 workspace_root"}
+	}
+	tools, rpcError := s.toolsOrError()
+	if rpcError != nil {
+		return nil, rpcError
+	}
+	if s.store == nil {
+		return nil, &himindjsonrpc.Error{Code: -32000, Message: "作业存储不可用，无法提交视频转换"}
+	}
+	root, source, rpcError := resolveInputPath(input.WorkspaceRoot, input.Path)
+	if rpcError != nil {
+		return nil, rpcError
+	}
+	output, rpcError := resolveOutputPath(root, input.Output)
+	if rpcError != nil {
+		return nil, rpcError
+	}
+	if strings.EqualFold(filepath.Clean(source), filepath.Clean(output)) {
+		return nil, &himindjsonrpc.Error{Code: -32602, Message: "output 不能覆盖输入文件"}
+	}
+	if !input.Overwrite {
+		if _, statErr := os.Stat(output); statErr == nil {
+			return nil, &himindjsonrpc.Error{Code: -32602, Message: "输出已存在，未开启覆盖: " + input.Output}
+		} else if !os.IsNotExist(statErr) {
+			return nil, &himindjsonrpc.Error{Code: -32000, Message: "检查输出文件失败: " + statErr.Error()}
+		}
+	}
+	target, err := transcode.Build(source, output, transcode.Options{
+		Format: input.Format, VideoCodec: input.VideoCodec, AudioCodec: input.AudioCodec,
+		Width: input.Width, Height: input.Height, FPS: input.FPS, CRF: input.CRF,
+		VideoBitrateKbps: input.VideoBitrateKbps, AudioBitrateKbps: input.AudioBitrateKbps,
+		Preset: input.Preset,
+	})
+	if err != nil {
+		return nil, &himindjsonrpc.Error{Code: -32602, Message: err.Error()}
+	}
+	args, err := recipe.Compile(target)
+	if err != nil {
+		return nil, &himindjsonrpc.Error{Code: -32602, Message: err.Error()}
+	}
+	if err := workspace.EnsureParentDir(output); err != nil {
+		return nil, &himindjsonrpc.Error{Code: -32000, Message: "无法创建输出目录: " + err.Error()}
+	}
+	totalMs := int64(0)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	if info, probeErr := probe.Read(ctx, tools, source); probeErr == nil {
+		totalMs = info.DurationMs
+	}
+	cancel()
+	record, err := s.store.Submit("video.convert", source, output, target.Describe(), args, totalMs)
+	if err != nil {
+		return nil, &himindjsonrpc.Error{Code: -32000, Message: "提交作业失败: " + err.Error()}
+	}
+	return map[string]any{
+		"job": record, "description": target.Describe(),
+		"workspace_root": root.Abs(), "source": source, "output": output,
+	}, nil
+}
+
+func (s *service) imagesToVideo(input imagesToVideoInput) (any, *himindjsonrpc.Error) {
+	if strings.TrimSpace(input.WorkspaceRoot) == "" {
+		return nil, &himindjsonrpc.Error{Code: -32602, Message: "images.to-video 必须提供 workspace_root"}
+	}
+	if _, rpcError := s.toolsOrError(); rpcError != nil {
+		return nil, rpcError
+	}
+	if s.store == nil {
+		return nil, &himindjsonrpc.Error{Code: -32000, Message: "作业存储不可用，无法提交图片转视频"}
+	}
+	root, err := workspace.Open(input.WorkspaceRoot)
+	if err != nil {
+		return nil, &himindjsonrpc.Error{Code: -32602, Message: err.Error()}
+	}
+	imagePath, resolveErr := root.Resolve(input.ImagePath)
+	if resolveErr != nil {
+		return nil, &himindjsonrpc.Error{Code: -32602, Message: resolveErr.Error()}
+	}
+	output, resolveErr := root.Resolve(input.Output)
+	if resolveErr != nil {
+		return nil, &himindjsonrpc.Error{Code: -32602, Message: resolveErr.Error()}
+	}
+	if !input.Overwrite {
+		if _, statErr := os.Stat(output); statErr == nil {
+			return nil, &himindjsonrpc.Error{Code: -32602, Message: "输出已存在，未开启覆盖: " + input.Output}
+		} else if !os.IsNotExist(statErr) {
+			return nil, &himindjsonrpc.Error{Code: -32000, Message: "检查输出文件失败: " + statErr.Error()}
+		}
+	}
+	source, inspectErr := imagevideo.InspectSource(imagePath, input.FPS)
+	if inspectErr != nil {
+		return nil, &himindjsonrpc.Error{Code: -32602, Message: inspectErr.Error()}
+	}
+	plan, buildErr := imagevideo.Build(source, output, imagevideo.Options{
+		FPS: input.FPS, DurationMs: input.DurationMs, Width: input.Width, Height: input.Height, CRF: input.CRF,
+	})
+	if buildErr != nil {
+		return nil, &himindjsonrpc.Error{Code: -32602, Message: buildErr.Error()}
+	}
+	warnings := []string{}
+	if strings.TrimSpace(input.AudioPath) != "" {
+		audioPath, audioErr := root.Resolve(input.AudioPath)
+		if audioErr != nil {
+			return nil, &himindjsonrpc.Error{Code: -32602, Message: audioErr.Error()}
+		}
+		info, statErr := os.Stat(audioPath)
+		if statErr != nil || !info.Mode().IsRegular() {
+			return nil, &himindjsonrpc.Error{Code: -32602, Message: "音轨文件不存在或不是文件"}
+		}
+		plan = imagevideo.AttachAudio(plan, audioPath)
+		warnings = append(warnings, "加入音轨后，视频会在画面与音频中较短的一条结束时结束")
+	}
+	args, compileErr := recipe.Compile(plan.Recipe)
+	if compileErr != nil {
+		return nil, &himindjsonrpc.Error{Code: -32602, Message: compileErr.Error()}
+	}
+	if err := workspace.EnsureParentDir(output); err != nil {
+		return nil, &himindjsonrpc.Error{Code: -32000, Message: "无法创建输出目录: " + err.Error()}
+	}
+	record, err := s.store.Submit("images.to-video", source.FirstFrame, output, plan.Recipe.Describe(), args, plan.EstimatedDurationMs)
+	if err != nil {
+		return nil, &himindjsonrpc.Error{Code: -32000, Message: "提交作业失败: " + err.Error()}
+	}
+	return map[string]any{
+		"job": record, "plan": map[string]any{
+			"source": source, "estimated_duration_ms": plan.EstimatedDurationMs, "warnings": warnings,
+		},
+		"workspace_root": root.Abs(), "output": output,
+	}, nil
+}
+func (s *service) mediaAnalyze(input mediaAnalyzeInput) (any, *himindjsonrpc.Error) {
+	tools, rpcError := s.toolsOrError()
+	if rpcError != nil {
+		return nil, rpcError
+	}
+	root, path, rpcError := resolveInputPath(input.WorkspaceRoot, input.Path)
+	if rpcError != nil {
+		return nil, rpcError
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	report, err := analysis.Technical(ctx, tools, path)
+	if err != nil {
+		return nil, &himindjsonrpc.Error{Code: -32000, Message: "媒体分析失败: " + err.Error()}
+	}
+	return map[string]any{"workspace_root": root.Abs(), "report": report}, nil
 }
 
 func (s *service) probe(input probeInput) (any, *himindjsonrpc.Error) {
@@ -621,6 +922,26 @@ func (s *service) filesList(input filesInput) (any, *himindjsonrpc.Error) {
 		"count":          len(files),
 		"truncated":      truncated,
 	}, nil
+}
+
+// filesPick opens a native picker and returns workspace-relative files. The
+// view should use this instead of presenting the whole workspace as a dropdown.
+func (s *service) filesPick(input filesPickInput) (any, *himindjsonrpc.Error) {
+	root, err := workspace.Open(input.WorkspaceRoot)
+	if err != nil {
+		return nil, &himindjsonrpc.Error{Code: -32602, Message: err.Error()}
+	}
+	options := filepicker.Options{Mode: input.Mode, Multiple: input.Multiple}
+	var result filepicker.Result
+	if len(input.Paths) > 0 {
+		result, err = filepicker.ImportPaths(context.Background(), root, input.Paths, options)
+	} else {
+		result, err = filepicker.Pick(context.Background(), root, options)
+	}
+	if err != nil {
+		return nil, &himindjsonrpc.Error{Code: -32602, Message: err.Error()}
+	}
+	return result, nil
 }
 
 // ── 辅助 ──────────────────────────────────────────────

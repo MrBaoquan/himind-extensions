@@ -235,6 +235,8 @@ body {
   border: 1px solid var(--line);
   background: var(--panel);
   border-radius: var(--radius-md);
+  /* 不参与 flex 收缩：窄窗下父容器是 nowrap，曾把 28px 压到 20.8px。 */
+  flex: 0 0 auto;
   width: 28px;
   height: 28px;
   cursor: pointer;
@@ -357,7 +359,9 @@ body {
   min-width: 0;
   border: none;
   background: transparent;
-  padding: 2px 0;
+  /* 命中区 ≥24px：原来 2px 上下内边距让它在 11px 字号下只有 21.6px 高。 */
+  padding: 4px 0;
+  min-height: 24px;
   text-align: left;
   color: var(--meta);
   font: inherit;
@@ -619,7 +623,8 @@ body {
   color: var(--warn);
 }
 
-/* 条目精简 / 展开：默认只显示一行摘要，展开后显示完整明细。 */
+/* 条目精简 / 展开：默认只显示一行摘要，展开后显示完整明细。
+   命中区撑到 24px，视觉尺寸不变（padding 透明）。 */
 .entry .entry-toggle {
   border: none;
   background: transparent;
@@ -627,7 +632,8 @@ body {
   cursor: pointer;
   font: inherit;
   font-size: 12px;
-  padding: 0;
+  padding: 2px 0 3px;
+  min-height: 24px;
   margin-left: 8px;
 }
 
@@ -1442,6 +1448,8 @@ pre.source {
   gap: 10px;
 }
 
+/* 文字型按钮：视觉仍是紧凑的行内文字，但命中区撑到 24px（WCAG 2.5.8）。
+   原来 padding:0 让命中区等于文字行高（19.2px），触摸与精准点击都偏难。 */
 .link-btn {
   border: none;
   background: transparent;
@@ -1449,7 +1457,8 @@ pre.source {
   cursor: pointer;
   font: inherit;
   font-size: 12px;
-  padding: 0;
+  padding: 2px 0 3px;
+  min-height: 24px;
 }
 
 .link-btn:hover {
@@ -1479,6 +1488,21 @@ pre.source {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* 焦点环被裁切容器吃掉：.view-switch / .seg 用 overflow:hidden 裁圆角，会把子按钮
+   外侧的 outline（offset 2px + 2px 环体，共外扩 4px）切掉上、左、下三边，键盘用户
+   只剩半圈焦点提示。这两类容器内的子控件改用盒内 inset 环，环体不参与裁切。
+   深色填充的激活项与 --accent 同色，inset 环会消失，改用白色内环。 */
+.view-switch .switch:focus-visible,
+.seg .seg-btn:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.view-switch .switch.active:focus-visible,
+.seg .seg-btn.active:focus-visible {
+  box-shadow: inset 0 0 0 2px #fff;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -1907,7 +1931,8 @@ body.modal-open {
 .agg-jump {
   border: none;
   background: none;
-  padding: 0;
+  padding: 2px 0 3px;
+  min-height: 24px;
   color: var(--accent);
   font: inherit;
   font-weight: 600;
@@ -1915,10 +1940,16 @@ body.modal-open {
   white-space: nowrap;
 }
 
-.agg-jump:hover,
+/* 下划线表示 hover；焦点不再用 outline:none 一刀切掉，改为与全局一致的外环。
+   历史上这里把 outline 关掉却没补替代提示，键盘聚焦时完全看不到位置。 */
+.agg-jump:hover {
+  text-decoration: underline;
+}
+
 .agg-jump:focus-visible {
   text-decoration: underline;
-  outline: none;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .agg-range,
@@ -1988,7 +2019,9 @@ body.modal-open {
   margin-top: 20px;
 }
 
-.report-section > h3 {
+/* 报告分节标题用 h2：视图标题是 h1，原先直接跳到 h3 会被读屏当作缺少一层结构。
+   视觉规格不变，仍是 14px 带下边框的小节标题。 */
+.report-section > h2 {
   font-size: 14px;
   margin: 0 0 10px;
   color: #1f2937;
@@ -2315,6 +2348,7 @@ body.modal-open {
   white-space: nowrap;
 }
 
+/* 复制按钮：24×24 命中区（原 24×20），图标观感不变。 */
 .matrix .mx-copy {
   flex: 0 0 auto;
   border: 1px solid var(--line);
@@ -2324,6 +2358,8 @@ body.modal-open {
   font-size: 12px;
   line-height: 1;
   padding: 3px 5px;
+  min-width: 24px;
+  min-height: 24px;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s ease, color 0.12s ease, border-color 0.12s ease;
@@ -2363,6 +2399,14 @@ body.modal-open {
 }
 
 .matrix .mx-cell[data-date]:hover {
+  background: var(--accent-soft);
+}
+
+/* 单元格可聚焦（跳到当天日历），键盘焦点要与 hover 同样可见。
+   表格内不能用外侧 outline（会被 .matrix-scroll 与相邻单元格吃掉），改用内环。 */
+.matrix .mx-cell[data-date]:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent);
   background: var(--accent-soft);
 }
 
@@ -2450,7 +2494,8 @@ body.modal-open {
 
 .pi-meta {
   font-size: 11px;
-  color: var(--meta);
+  /* 选中行底色是 --accent-soft，--meta(#64748b) 压在上面只有 4.37:1，加深一档到 6.1:1。 */
+  color: #475569;
   font-variant-numeric: tabular-nums;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3247,6 +3292,10 @@ body.modal-open {
   display: flex;
   align-items: center;
   gap: 8px;
+  /* 允许换行：内容固定约 301px，窗口收到 ≤340px 时「今天」会被推出视口。 */
+  flex-wrap: wrap;
+  row-gap: 6px;
+  min-width: 0;
 }
 
 .plan-date-nav input[type='date'] {
@@ -3593,7 +3642,9 @@ body.modal-open {
 .stage-pill.stage-delivery { background: #ecfdf5; color: #047857; }
 .stage-pill.stage-maintenance { background: #f1f5f9; color: #334155; }
 .stage-pill.stage-done { background: #ecfdf5; color: #047857; }
-.stage-pill.stage-unknown { background: #f8fafc; color: #94a3b8; }
+/* 「未判断」需要弱化观感，但 #94a3b8 on #f8fafc 只有 2.45:1，低于正文下限。
+   保留灰调，把前景加深到 #475569（6.9:1），弱化交给无彩色而非降低对比。 */
+.stage-pill.stage-unknown { background: #f1f5f9; color: #475569; }
 
 /* ---------- 极简当前工作列表 ---------- */
 .wb-simple-list {
@@ -3788,6 +3839,8 @@ body.modal-open {
   flex: 0 0 auto;
 }
 
+/* 计数徽标：激活态原来用 22% 白叠加在 --accent 上，实际底色被冲淡成 #5585ef，
+   白字只有 3.49:1。改成深色半透明叠加，底色变深、白字回到 ≥4.5:1。 */
 .wb-mode-head .seg-btn span {
   display: inline-flex;
   min-width: 18px;
@@ -3795,13 +3848,14 @@ body.modal-open {
   margin-left: 4px;
   padding: 0 5px;
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(0, 0, 0, 0.28);
   font-size: 11px;
 }
 
+/* 非激活态：#64748b on #eef2f7 只有 4.23:1，加深到 #475569（6.4:1）。 */
 .wb-mode-head .seg-btn:not(.active) span {
   background: #eef2f7;
-  color: var(--meta);
+  color: #475569;
 }
 
 /* ---------- 项目编辑弹窗：轻量下一步编辑器 ---------- */

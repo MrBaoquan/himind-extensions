@@ -142,6 +142,11 @@ type OutputSpec struct {
 	Format string `json:"format,omitempty"`
 	// FastStart 把 moov 前置（网络流式播放必需）。
 	FastStart bool `json:"fast_start,omitempty"`
+	// Shortest 让输出在所有流中较短的一条结束时结束。
+	// 单图 + 音轨场景需要它，否则静帧视频结束后音轨仍可能把容器拉长。
+	Shortest bool `json:"shortest,omitempty"`
+	// DurationMs 限制输出总时长。单图循环必须靠它结束输入，否则 ffmpeg 会持续生成帧。
+	DurationMs *int64 `json:"duration_ms,omitempty"`
 }
 
 // Compile 把 recipe 编译成 ffmpeg 参数（不含可执行文件本身）。
@@ -180,6 +185,12 @@ func Compile(r Recipe) ([]string, error) {
 	}
 	if r.Output.FastStart {
 		args = append(args, "-movflags", "+faststart")
+	}
+	if r.Output.Shortest {
+		args = append(args, "-shortest")
+	}
+	if r.Output.DurationMs != nil {
+		args = append(args, "-t", formatSeconds(*r.Output.DurationMs))
 	}
 
 	args = append(args, r.Output.Path)

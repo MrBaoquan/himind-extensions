@@ -7,14 +7,14 @@
     "software-engineering",
     "collaboration-delivery"
   ],
-  "version": "0.1.0",
+  "version": "0.1.1",
   "scope": "organization",
   "distribution_targets": [
     "workbench",
     "github"
   ],
-  "description": "把跨多轮的长任务拆成可验证轮次，记录进度与交接状态，支持多客户端续跑。",
-  "release_notes": "首版：立项契约、轮次推进与跨客户端续跑协议。",
+  "description": "把跨多轮的长任务收敛成可确认契约，确认后优先用客户端原生目标推进并续跑。",
+  "release_notes": "0.1.1：确认后优先建立客户端原生目标，修复有目标却需手动续跑的问题。",
   "min_agent_version": "0.2.0",
   "supported_clients": [
     "agent-skills"

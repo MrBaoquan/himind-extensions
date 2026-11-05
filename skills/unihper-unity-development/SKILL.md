@@ -1,6 +1,6 @@
 ---
 name: unihper-unity-development
-description: 指导基于 UNIHper 的 Unity 项目开发，覆盖生命周期、UI、资源、UConfig、Managements、待机、UniRx 自闭环与 MCP 自动化测试。
+description: 指导基于 UNIHper 的 Unity 项目开发，覆盖 MCP 就绪门禁、生命周期、UI、资源、UConfig、Managements、待机、UniRx 自闭环与自动化测试。
 ---
 
 # UNIHper 开发助手
@@ -22,6 +22,7 @@ description: 指导基于 UNIHper 的 Unity 项目开发，覆盖生命周期、
 
 ## 开始前检查
 
+0. **先确认 MCP 就绪**：读 `%USERPROFILE%\.unity-mcp\unity-mcp-status-*.json` 心跳，确认工程已打开、`reloading: false`、端口与版本都对得上。工程未打开时按 `ProjectVersion.txt` 的版本启动 Unity 并等到就绪。完整判定见十三、13.1。MCP 不可用而坚持继续，等于放弃全部自动化验证。
 1. 确认目标是 Unity 工程，定位 `Packages/manifest.json`、`Assets`、嵌入包或 Package Cache 中的 UNIHper 源码。
 2. 读取实际 `package.json`、`UNIHperEntry`、`UNIHperSettings`、`SceneScriptManager`、`ConfigManager`、`ResourceManager`、`UIManager`、`Managements` 与相关 `.asmdef`。
 3. 检查 `Assets/Resources/UNIHper/assemblies.json` 和 `Assets/Resources/UNIHper/resources.json`，不要把路径写成 `Configs`。
@@ -437,39 +438,87 @@ UNIHper 的 `Framework` 持有一个全局 `LongTimeNoOperation`：
 
 ## 十三、自动化开发与测试 harness
 
-### 13.1 MCP 前置检查
+### 13.1 MCP 就绪门禁（每次开工第一件事）
 
-涉及 Unity C#、场景、Prefab、资源、UPM 或 PlayMode 的自动化开发与测试时，先检查目标工程是否安装了 CoplayDev Unity MCP：
+涉及 Unity C#、场景、Prefab、资源、UPM 或 PlayMode 时，MCP 可用性是全部自动化工作的前提。**必须先通过本节四步确认 MCP 就绪，再开始任何读写。** MCP 不可用时的所谓"验证通过"没有意义。
 
-- 包名：`com.coplaydev.unity-mcp`
-- 仓库：`https://github.com/CoplayDev/unity-mcp`
-- 当前参考版本：`10.3.0`
-- 最低 Unity：`2021.3`
-- 依赖 Python `3.10+` 和 `uv`
+需要的组件：
 
-如果工程没有安装：
+- 包名：`com.coplaydev.unity-mcp`（仓库 `https://github.com/CoplayDev/unity-mcp`）
+- 最低 Unity：`2021.3`；依赖 Python `3.10+` 和 `uv`
+- 参考版本以工程实际 pin 为准，不要用技能里的示例版本去替换工程版本
 
-1. 在 `Packages/manifest.json` 增加 Git URL 依赖。
-2. 优先使用发布 tag 或固定 commit，不要长期直接依赖 `#main`。
-3. 在 Unity 打开 `Window > MCP for Unity`，完成客户端配置并启动 Unity Bridge。
-4. 确认 MCP 能查询 Editor 状态、读取 Console、执行测试，再开始自动化修改。
+#### 步骤 1｜先读心跳文件，不要先试工具
 
-推荐固定版本写法：
+Bridge 就绪时会在用户目录写状态文件：
 
-```json
-{
-  "dependencies": {
-    "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#v10.3.0"
-  }
-}
+```text
+%USERPROFILE%\.unity-mcp\unity-mcp-status-<projectHash>.json
 ```
 
-注意：
+字段：`unity_port`、`reloading`、`reason`、`project_path`、`project_name`、`unity_version`、`last_heartbeat`。
 
-- Unity 低于 `2021.3` 时不能使用当前 MCP，改用 Unity 批处理和 Test Runner。
-- 工程已使用 `#main` 时提示可复现性风险，建议切换到明确发布 tag 或 commit；不要在未确认范围时擅自升级大版本。
-- MCP 客户端配置、Token 和本机路径不写入项目仓库。
-- 连接失败、Bridge 停止或 Tool 未加载时，不能假装自动化成功，必须降级并明确说明。
+判定：
+
+| 情况 | 结论 | 动作 |
+| --- | --- | --- |
+| 有文件且 `project_path` 指向当前工程、`reloading: false` | 已就绪 | 读 `unity_port` 记下端口，进步骤 3 |
+| 有文件但 `reloading: true` | 正在域重载 | 等它变 `false`，别在此期间调用工具 |
+| 没有本工程的 status 文件 | 工程未打开 | 进步骤 2 |
+| 同时存在多个工程的 status 文件 | 多实例 | 先 `set_active_instance` 显式指定，禁止依赖默认路由 |
+| `unity_version` 与 `ProjectVersion.txt` 不一致 | 版本错配 | 停止，先解决版本再继续 |
+
+读文件是毫秒级的；直接试 MCP 工具失败会阻塞数十秒且信息量更少，所以永远先读文件。
+
+#### 步骤 2｜工程未打开时按 ProjectVersion 精确启动
+
+```bash
+"<Unity 安装根>/<版本号>/Editor/Unity.exe" -projectPath "<工程根>" -logFile -
+```
+
+硬约束：
+
+1. **版本号只能读 `<工程>/ProjectSettings/ProjectVersion.txt` 的 `m_EditorVersion`**。不得凭印象、不得用本机最新装的那个版本——同一台机器常装多个 Editor，拿错版本会触发不可逆的工程升级。
+2. 启动是分钟级操作，必须后台进行并轮询心跳文件，禁止同步阻塞等待。
+3. 心跳出现 `ready` 不等于可用：首次打开还在导入资源。要再确认 `refresh_unity` 返回且 Editor 状态 `ready_for_tools` 为真。
+4. 启动后先 `refresh_unity` + `read_console`，确认导入完成再跑测试，避免在导入中途触发域重载。
+5. **不要为了"干净启动"关闭用户已打开的 Unity**：会丢失未保存的场景与 Prefab 改动。确需重启必须由用户确认。
+
+#### 步骤 3｜版本三处必须一致
+
+| 位置 | 检查方式 |
+| --- | --- |
+| 工程 `Packages/manifest.json` | `com.coplaydev.unity-mcp` 的 tag / commit |
+| 客户端 `mcpServers` 配置 | `mcpforunityserver==<版本>` |
+| 实际加载的包 | `Library/PackageCache/com.coplaydev.unity-mcp@*` |
+
+三者不一致不会报"连接失败"，而是工具存在但 schema 不匹配，表现为参数校验错误，排查成本极高。三处版本写进交付输出。
+
+#### 步骤 4｜连不上要分类，不要一次失败就判阻塞
+
+| 现象 | 真实原因 | 处理 |
+| --- | --- | --- |
+| `No Unity Editor instances found` | Bridge 正在重启（域重载、测试结束后常见） | 不是没装。等 10–30s 重试 |
+| `Request timed out` | 同上，或主线程被阻塞 | 同上；连续 3 次失败才判定不可用 |
+| `Cannot start a test run while the Editor is in or entering Play Mode` | 上一轮 PlayMode 未退出 | 先 `manage_editor stop`，否则永远起不来 |
+| `tests_running` / `Unknown job_id` | 测试任务残留 | `run_tests clear_stuck=true` 后重跑 |
+| 端口被其它工程占用 | 见下节 | 不要盲试，先查端口归属 |
+
+**判定规则：3 次重试 + 心跳文件交叉验证。** 只有两者同时失败才判阻塞；判阻塞时原样报告现象、心跳内容与已重试次数。
+
+#### 端口归属与多工程并行
+
+Bridge 端口来自 EditorPrefs `MCPForUnity.UnitySocketPort`，是**机器级配置，不是工程级**。
+
+- 同时打开两个 Unity 工程时，第二个会因端口占用起不来，MCP 会静默路由到第一个工程。
+- 这种错误比"连不上"危险得多：写入会落到错误的工程。
+- 多工程并行时，为每个工程配置独立端口，并在每次操作前用 `set_active_instance` 显式指定目标实例。
+
+#### 降级
+
+- Unity 低于 `2021.3`：不能用当前 MCP，改用 13.5 的批处理。
+- 用户拒绝启动 Unity、或环境确实无法提供 Editor：改用 13.5，并在交付中明确写"未经 MCP 验证"，不得省略。
+- 任何降级都要说明原因；不允许把未验证的结果表述为通过。
 
 ### 13.2 主流 harness 矩阵
 
@@ -543,13 +592,88 @@ PlayMode 同理替换：
 
 至少列出：
 
-- MCP 是否安装、版本和 Bridge 状态
+- **MCP 就绪结论**：bridge 端口、心跳 `reason`、工程 pin 版本、客户端版本、三处是否一致
 - Unity Editor 版本
 - 执行的编译、EditMode、PlayMode、构建和截图步骤
 - 每个测试的通过/失败结果
 - Console 错误与已修复问题
 - 目标平台与未覆盖的真机/设备测试
 - 修改文件、配置文件和程序集注册变化
+
+### 13.7 编辑器自动化常见陷阱
+
+以下每条都会让自动化给出"看起来成功、实际错误"的结论，必须提前规避。
+
+#### Prefab 动效共用 controller
+
+多个控件（例如一排工具按钮）常常共用同一个 AnimatorController。绑定前必须先读出每个状态片段真正写入的值：
+
+```csharp
+foreach (var clip in animator.runtimeAnimatorController.animationClips)
+{
+    foreach (var b in AnimationUtility.GetObjectReferenceCurveBindings(clip))
+    {
+        var keys = AnimationUtility.GetObjectReferenceCurve(clip, b);
+        // b.propertyName == "m_Sprite" 时，keys 里的 value 才是真正会被换上的贴图
+    }
+}
+```
+
+- 若该状态片段写入的 sprite 与使用它的控件语义不符，说明是**共用 controller 的副作用**，不是美术放错。
+- 语义不符时不要硬改 clip：禁用该 Animator，改用配置资源（如 ScriptableObject 贴图表）+ 代码直设 `Image.sprite`，把状态与贴图的对应关系显式化。
+- 判定依据只能是 clip 里的实际曲线值，不能靠状态名推断。
+
+#### EditMode 下查 Animator 会给出错误答案
+
+`AssetDatabase.LoadAssetAtPath<GameObject>` 得到的是预制体资产，对其上的 Animator 调用 `HasState(0, hash)` 一律返回 `false`——不论状态是否存在。
+
+需要判断状态时必须先实例化：
+
+```csharp
+var instance = PrefabUtility.InstantiatePrefab(prefabAsset) as GameObject;
+// 此时 HasState / GetCurrentAnimatorStateInfo 才有效
+Object.DestroyImmediate(instance);
+```
+
+否则会误判"预制体缺少这些状态"，进而改错配置。
+
+#### SerializedObject 写 ScriptableObject 后要回读磁盘
+
+`ApplyModifiedProperties()` + `SaveAssets()` 返回后，内存中的值正确，但文件可能仍未落盘（实测出现过写完后 YAML 里仍是 `fileID: 0`）。写完后必须直接读磁盘文件确认，不能只看调用返回值。必要时再写一次。
+
+#### 新建脚本后类型不可立刻引用
+
+新建 `.cs` 后 Unity 尚未导入，`.csproj` 不会更新，`Type.GetType("..., 程序集名")` 返回 null。必须先 `refresh_unity`（`scope=all`）让 Unity 生成 `.meta` 并重新编译，再引用该类型。
+
+#### PlayMode 必须走真实指针链
+
+直接调用业务方法等于没测 UI。点击测试的最小完整链路：
+
+```csharp
+var position = RectTransformUtility.WorldToScreenPoint(canvas.worldCamera, rect.TransformPoint(rect.rect.center));
+var eventData = new PointerEventData(eventSystem) { position = position, button = PointerEventData.InputButton.Left };
+var hits = new List<RaycastResult>();
+eventSystem.RaycastAll(eventData, hits);           // 1. 真实射线
+var target = ExecuteEvents.GetEventHandler<IPointerClickHandler>(hits[0].gameObject); // 2. 真实事件处理器
+eventData.pointerPress = target;
+ExecuteEvents.Execute(target, eventData, ExecuteEvents.pointerDownHandler);   // 3. 完整事件顺序
+ExecuteEvents.Execute(target, eventData, ExecuteEvents.pointerUpHandler);
+ExecuteEvents.Execute(target, eventData, ExecuteEvents.pointerClickHandler);
+```
+
+缺任何一环都会绕过 UI 遮罩、射线顺序与事件传递逻辑，测试失去意义。同时要断言"射线命中的就是我期望的那个对象"，否则等于只测了业务层。
+
+#### `execute_code` 的 C# 语言版本
+
+动态执行默认走 CodeDom 后端，仅支持 C# 6：局部函数、方法内 `static`、部分表达式简写都不可用。复杂逻辑应改用 `roslyn` 后端，或把代码整理成内联表达式。
+
+#### 测试残留
+
+PlayMode 结束后可能在 `Assets/` 留下 `InitTestScene*.unity`。收尾要清理，否则会混进版本库。
+
+#### 中文路径编码
+
+工程路径含中文时，终端直出 YAML 的 `m_Name` 会是乱码。解析资源名一律按 UTF-8 读取，不要依赖终端显示。
 
 ## 十四、实施与验证
 

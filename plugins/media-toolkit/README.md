@@ -1,178 +1,140 @@
-# 媒体处理工具
+# 媒体处理工具（com.himind.media-toolkit）
 
-对视频与音频做**确定性处理与测量**：探测、转码压缩、抽帧拼图、画面活动与响度曲线。
+HiMind Agent 的本地通用媒体工具。目标不是把 ffmpeg 参数摊给用户，而是把常见媒体任务收敛成四个清晰入口：
 
-## 边界：确定性，不含模型
+1. **图片转换**：JPEG / PNG / WebP / BMP / TIFF / GIF 批量转换；首屏只保留格式、尺寸和质量预设。
+2. **视频转换**：MP4 / MOV / MKV / WebM；首屏只保留格式、尺寸和质量预设，支持提取音轨。
+3. **图片转视频**：单张图片循环，或 `%04d` 编号图片序列合成视频；首屏只保留尺寸、时长和可选音轨。
+4. **媒体分析**：返回归一化的容器、时长、体积、视频/音频参数和告警，不暴露原始 ffprobe JSON。
 
-与 `media-ai` 的分界是**要不要模型**（这条线同时决定了安装体积与离线可用性）：
+旧的专业能力仍保留给 AI 或高级调用：全景主前向投影、抽帧拼图、画面活动曲线、响度曲线、通用 recipe 作业等。
 
-| | **media-toolkit** | media-ai |
-| --- | --- | --- |
-| 做什么 | **确定性处理与测量** | 模型推理 |
-| 依赖 | 只要 ffmpeg | 模型运行时 + 权重（按需下载） |
-| 安装体积 | 几 MB | 75MB–1.5GB（按所选模型） |
-| 离线 | 装好 ffmpeg 即可 | 需先获取模型 |
+## 设计边界
 
-同一条线上的判断：**同一份输入必得同一份输出**，且不需要下载任何权重。
-转码、压缩、抽音频、图转视频、GIF、拼图、抽帧、画面活动、响度 —— 都属这一类。
+- 模型推理属于 `media-ai`，本插件只做确定性媒体处理。
+- 不提供任意 ffmpeg 参数透传，不通过 Shell 拼接命令。
+- 所有输入、输出必须落在调用方提供的 `workspace_root`。
+- 默认不覆盖输入文件；高价值产物先写同目录临时文件，成功后原子替换。
+- 长任务有 `job_id`、进度、取消、持久化和进程重启后的 `interrupted` 状态。
+- FFmpeg 构建若含 GPL/额外编解码器，市场发布或对外分发前必须完成许可证评审。
 
-**一条规则**：加功能加能力，**加运行时才加插件**。所以这里的需求都落成本插件的新预设或新能力，
-不新建插件：
+## 独立运行
 
-| 需求 | 落点 |
-| --- | --- |
-| 加水印 / 拼接 / 变速 / 旋转 | `media.toolkit.recipe` 的新预设（约十几行） |
-| 超分 / 插帧 / 抠像 | 同上（若需模型，则归 `media-ai`） |
-| 新的测量量（如色彩统计） | 新能力，与 `scene.score` / `audio.loudness` 同级 |
+插件进程通过 JSON-RPC/stdio 调用 ffmpeg / ffprobe。运行时按以下顺序查找：
 
-> 需要**模型**的能力（转写、音频事件分类、画面理解）归 `media-ai`，不在这里 ——
-> 否则本插件会被拖上几百 MB 的模型权重，而它的绝大多数能力根本不需要。
+```text
+插件包内置 → 插件私有数据目录 → 系统 PATH
+```
 
-## 它解决什么
+推荐分发结构：
 
-媒体处理需求的形态是**持续增加**的：转码、压缩、图转视频、抽音频、GIF，之后还会有加水印、
-拼接、变速。如果每来一个需求就写一套 ffmpeg 参数拼装，第 N 个需求就要读 N-1 份同类代码，
-参数校验散落各处。因此这个插件的心脏不是"一堆命令"，而是**声明式步骤 + 编译器**：
-把「要做什么」写成 recipe，由引擎编译成 ffmpeg 参数。
+```text
+media-toolkit/
+├─ bin/media-toolkit.exe
+├─ ui/
+└─ runtime/
+   └─ windows-x64/
+      ├─ ffmpeg.exe
+      ├─ ffprobe.exe
+      └─ manifest.json
+```
 
-新增一个需求通常只是新增一个预设（十几行），而不是新增一套参数逻辑。
+`manifest.json` 可选。一旦存在，插件会校验平台、文件大小和 SHA-256；缺失 manifest 时仍可使用本地开发构建，但 `runtime.status` 会明确提示“无法证明来源与完整性”。
 
-## 依赖
+```json
+{
+  "version": "6.1-full",
+  "platform": "windows-x64",
+  "files": {
+    "ffmpeg.exe": { "sha256": "<64位sha256>", "size": 123456 },
+    "ffprobe.exe": { "sha256": "<64位sha256>", "size": 123456 }
+  }
+}
+```
 
-需要本机有 **ffmpeg**（含 ffprobe）并在 `PATH` 中。没有时除 `runtime.status` 外的能力都会
-明确报错，不会静默失败。用 `media.toolkit.runtime.status` 可先确认就绪情况。
+插件数据目录也可放同一结构，用于不便重新打包时的本机运行时托管。`media.toolkit.runtime.status` 会返回实际来源、根目录、版本、风险提示和解析顺序。
 
 ## 能力
 
 | 能力 | 说明 |
 | --- | --- |
-| `media.toolkit.runtime.status` | ffmpeg 是否就绪、可用能力与内置预设 |
-| `media.toolkit.files.list` | 列出工作区里的媒体文件（跳过运行期产物目录） |
-| `media.toolkit.probe` | 时长 / 帧率 / 分辨率 / 轨道信息 |
-| `media.toolkit.video.project` | 把等距柱状全景视频展开成固定主前向视图 |
-| `media.toolkit.recipe.plan` | 只编译成 ffmpeg 参数，**不执行**（长任务开跑前复核） |
-| `media.toolkit.recipe.run` | 执行并返回可跟踪的作业 |
-| `media.toolkit.job.status` / `job.cancel` / `job.list` | 作业查询、取消、列举 |
-| `media.toolkit.scene.score` | 逐帧**画面活动强度曲线** |
-| `media.toolkit.audio.loudness` | **响度曲线** + 整体响度 / 响度范围 |
-| `media.toolkit.frames.contact-sheet` | 整段视频拼成一张缩略图网格 |
-| `media.toolkit.frames.extract` | 在指定时刻抽帧 |
-| `media.toolkit.preview.image` | 把工作区内的图片读成可显示的预览（**仅供视图与人工核对**） |
+| `media.toolkit.runtime.status` | 运行时来源、版本、风险与可用能力 |
+| `media.toolkit.image.convert` | 图片格式批量转换 |
+| `media.toolkit.video.convert` | 高层视频转换，返回可跟踪作业 |
+| `media.toolkit.images.to-video` | 单图/序列转视频，返回可跟踪作业 |
+| `media.toolkit.media.analyze` | 归一化媒体参数报告 |
+| `media.toolkit.probe` | 原始探测结果，供 AI 或兼容调用 |
+| `media.toolkit.files.pick` | 打开原生文件选择器，并把工作区外素材导入受控收件目录 |
+| `media.toolkit.files.list` | 列出工作区媒体素材（供 AI/兼容调用，不在主界面展示） |
+| `media.toolkit.recipe.plan` | 只编译 recipe，不执行 |
+| `media.toolkit.recipe.run` | 执行通用 recipe 作业 |
+| `media.toolkit.job.status / cancel / list` | 作业查询、取消和历史 |
+| `media.toolkit.video.project` | 全景等距柱状视频主前向投影 |
+| `media.toolkit.scene.score` | 画面活动强度曲线 |
+| `media.toolkit.audio.loudness` | 响度曲线与整体响度 |
+| `media.toolkit.frames.contact-sheet` | 缩略图网格 |
+| `media.toolkit.frames.extract` | 指定时刻抽帧 |
+| `media.toolkit.preview.image` | 受约束的图片预览 |
 
+## 工作区是什么
 
-## 全景主前向投影
+`workspace_root` 是 HiMind Agent 注入给插件的内部安全边界，不是要求用户选择或管理的文件夹。插件只允许在这个根目录内读写，避免越界访问；主界面不展示该路径。工作区外的素材由原生文件选择器导入受控 inbox 后再处理。
 
-等距柱状全景不是普通平面画面：画面中心不等于观看前向，镜头转向也会污染普通的画面活动分数。
-`media.toolkit.video.project` 用 ffmpeg `v360` 将全景视频展开成固定主前向视图，后续探片、拼图和信号分析都应使用该代理片：
+## 素材选择
 
-```text
-media.toolkit.video.project {
-  workspace_root, path, output,
-  yaw_deg: 0, pitch_deg: 0,
-  h_fov_deg: 100, v_fov_deg: 65,
-  width: 640, height: 360
-}
+- 主界面不再把整个工作区塞进下拉框。
+- 素材区本身是唯一的拖拽与点击入口：点击可打开 Windows 原生文件对话框，也可直接把文件拖入。
+- 图片转换支持一次选择多张；其他任务一次选择一个素材。
+- 已选素材单独展示，可逐项移除；切换任务时保留各任务自己的选择。
+- 选择素材后不自动展开参数表，避免主任务被挤出视野。
+- 工作区内的文件直接引用；工作区外的文件复制到 `.himind/media-toolkit/inbox/` 后再处理。
+- 图片转视频的可选音轨也只通过“添加音轨”按钮选择，不再提供手填路径。
+
+## 少参数原则
+
+- 默认保持原尺寸，不自动放大素材。
+- 质量使用“高 / 标准 / 更小体积”三档意图，不要求普通用户理解 CRF 或编码器质量参数。
+- 编码器、码率、帧率、命名模板、输出路径和覆盖策略均位于“更多设置”。
+- 手工修改专业字段时会自动切换为“自定义”并展开高级设置。
+
+## 图片转换约定
+
+- 输入扩展名：`.jpg`、`.jpeg`、`.png`、`.webp`、`.bmp`、`.tif`、`.tiff`、`.gif`。
+- 输出扩展名由目标格式决定，例如 JPEG → `.jpg`、TIFF → `.tiff`。
+- 默认后缀 `-converted`，可用 `name_template` 覆盖，占位符为 `{name}`、`{index}`、`{ext}`。
+- 同时设置宽高时按比例缩放并用背景色留白；只设置一边时保持另一边比例。
+- 宽高必须是偶数，避免部分编码器静默取整。
+- 批量任务先预检全部输出名；命名碰撞、路径穿越、覆盖输入或同名产物都会在开始前拒绝。
+
+## 视频转换约定
+
+- MP4 / MOV：H.264、H.265 或流复制；音频 AAC、复制或移除。
+- MKV：H.264、H.265、VP9 或流复制；音频 AAC、Opus、MP3、复制或移除。
+- WebM：VP9 或流复制；音频 Opus、复制或移除。
+- CRF 与目标码率互斥；流复制时不能同时缩放、改帧率或重设质量。
+- 输出扩展名必须与声明容器一致。
+- “只提取音轨”走受控 recipe，输出 MP3 / M4A / WAV。
+
+## 图片转视频约定
+
+- 单张图片默认循环 5 秒，可指定毫秒时长。
+- 序列使用 ffmpeg 占位符，例如 `frames/shot_%04d.png`。
+- 输出 `.mp4` / `.mov` / `.mkv`。
+- 可选音轨；加入音轨后，输出以画面和音频中较短的一条结束，并会返回提示。
+
+## 开发与验证
+
+```powershell
+cd plugins/media-toolkit
+go test ./...
+
+go build -o bin/media-toolkit.exe .
+
+cd ../..
+go run ./tools/cmd/himind-plugin-validate-cli -path ./plugins/media-toolkit
+go run ./tools/cmd/himind-plugin-package -path ./plugins/media-toolkit -output ./dist/media-toolkit-2.3.2.hmpkg
 ```
 
-输出为 H.264/AAC `.mp4`，保留音轨。它只做投影校准，不做语义判断；平台姿态仍应根据动作意图和设备能力生成。
+测试包含真实 ffmpeg 合成素材的图片转换、视频转换、图片转视频、参数分析和作业原子写入；没有成对 ffmpeg/ffprobe 时相关集成测试自动跳过。
 
-所有路径（输入与产物）都必须落在调用方给出的 `workspace_root` 内，越界一律拒绝。
-
-## 操作视图
-
-插件带一个操作视图（`ui/`），把上面的能力组织成**任务流程**，而不是十一个按钮：
-
-```
-选素材（从工作区列表选） → 选要做什么 → 预览参数 → 开始 → 看进度 → 看结果
-```
-
-| 标签页 | 做什么 |
-| --- | --- |
-| 转换 | 压缩（体积优先）/ 转码，可设宽度、CRF、帧率上限 |
-| 抽音频 | MP3 / M4A / WAV，可设码率与时间区间 |
-| 图片转视频 | 单图循环或序列帧（`frames/shot_%04d.png`） |
-| 分析 | 画面活动 / 响度，**画成曲线** |
-| 预览 | 缩略图网格、指定时刻抽帧，**直接显示图** |
-
-几个刻意的取舍：
-
-- **`预览参数` 在执行前把 ffmpeg 命令摊开**。这是本插件区别于"一堆脚本"的地方 ——
-  长任务开跑前能看清它到底要跑什么。
-- **输出路径自动按源文件命名**，用户不必手打；手填过的不会被覆盖。
-- **曲线要看相对中位数，不是绝对值**。所以图上画了中位线，摘要里也写明这一点 ——
-  画面活动分数的绝对值没有普适阈值（见下方"取信号"一节）。
-- **抽帧时刻留空 = 生成缩略图网格**。`Number('') === 0`，空串不先过滤就会被当成
-  "抽第 0 毫秒一帧"，于是这条默认路径永远走不到（这个坑是实测踩到的）。
-
-### 视图为什么要一个"预览"能力
-
-扩展视图的桥接**只暴露能力调用**，没有"直接读工作区文件"的通道。而拼图与抽帧的价值
-恰恰在于看见。所以补了 `media.toolkit.preview.image`，并把它约束住：只读、只允许图片
-扩展名、有体积上限（默认 12MB，base64 后还要涨三分之一）。不加限制的话，
-它就是一个越权读取通道。
-
-## 依赖
-
-需要本机有 **ffmpeg**（含 ffprobe）并在 `PATH` 中。没有时除 `runtime.status` 与视图的
-「检查运行时」外都不可用，且会明确报缺失项，不会静默失败。
-
-## recipe 结构
-
-```jsonc
-{
-  "inputs": [{ "path": "in.mov", "framerate": "24", "loop": false }],
-  "video": {
-    "trim":  { "start_ms": 1500, "end_ms": 3000 },   // 与 duration_ms 互斥
-    "crop":  { "width": 1920, "height": 1080, "x": 0, "y": 0 },
-    "scale": { "width": 1280, "height": 0 },         // 0 = 自动（编译成 -2，保证偶数）
-    "fps":   { "value": 30 },
-    "encode": {
-      "codec": "libx264", "crf": 23,                 // crf 与 bitrate 互斥
-      "preset": "veryfast", "pixel_format": "yuv420p",
-      "copy": false                                  // copy 与 codec/crf/bitrate 互斥
-    },
-    "disable": false                                 // true = -vn
-  },
-  "audio": {
-    "trim":     { "start_ms": 0, "duration_ms": 5000 },
-    "volume":   { "gain_db": -3 },                   // 或 factor
-    "resample": { "sample_rate": 48000 },
-    "encode":   { "codec": "aac", "bitrate": "160k" },
-    "disable":  false                                // true = -an
-  },
-  "output": { "path": "out.mp4", "fast_start": true }
-}
-```
-
-内置预设（用 `code` 侧构造函数生成同样的 recipe）：`transcode`、`compress-web`、
-`extract-audio`、`images-to-video`、`gif`。
-
-## 几个刻意的设计取舍
-
-**时间裁剪用滤镜而不是 `-ss`/`-t`。** 滤镜是帧精确的，且能与缩放裁剪自由组合；
-`-ss` 放在 `-i` 前虽快，但落点随关键帧漂移，做内容交付不可接受。同时会重置时间戳
-（`setpts=PTS-STARTPTS`），否则产物开头会带一段"空时间"，播放器进度条不从 0 开始。
-
-**缩放自动值编译成 `-2` 而不是 `-1`。** 实测：`-1` 时高度可能取到奇数，紧接着的 `tile`
-会**静默**产出一张全黑图——退出码 0、文件大小正常、毫无警告，只是内容是黑的。
-`-2` 恒定取偶数，从源头消除这类"看起来成功、其实全错"的失败。
-
-**拼图产出一律复核平均亮度。** 同上原因，产物会被读回校验；接近全黑时会连同告警一起返回，
-而不是把一张黑图当成成功交付。
-
-**画面分数交付为曲线，而不是切点表。** 实测一条真实的音乐视频（大量叠化转场）逐帧变化分数
-最高只有 9.0，按常规阈值 10 得到 **0 个切点**——阈值式硬切检测对真实内容并不可靠。
-但同一个信号当成"画面活动强度"使用始终有效，因此 `scene.score` 把分数原样交出去，
-让调用方决定用途；`cut_count` 只是附带信息。
-
-**长任务一律走作业。** 转码可能跑几十分钟，调用方无法一直阻塞，也需要中途查进度和取消。
-进度从 `-progress pipe:1` 的键值对解析，而不是去读 ffmpeg 给人看的输出。
-
-## 开发
-
-```bash
-go test ./...          # 含集成测试：用 ffmpeg 自己合成素材，不依赖外部视频
-```
-
-集成测试会实际执行 ffmpeg（合成 6 秒样片 → 探测 / 画面曲线 / 响度 / 拼图 / 转码 / 抽帧），
-本机没有 ffmpeg 时自动跳过。
+独立的运行时测试会把测试进程复制成假的 `ffmpeg.exe` / `ffprobe.exe`，清空 PATH 后验证“插件内置运行时”仍能定位并执行，避免把 PATH 回退误当成独立运行能力。

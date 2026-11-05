@@ -36,7 +36,9 @@ func boardProject(t *testing.T, board map[string]any, name string) map[string]an
 func TestProjectBoardAndWorkUpdate(t *testing.T) {
 	withDataRoot(t)
 	root := t.TempDir()
-	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-19","entries":[{"project":"当前工作台","category":"开发","title":"调研项目状态","minutes":60,"next":["实现看板"]}]}`)
+	// 用当天日期：工作台默认只看最近 14 天，写死日期会让测试随时间变成 dormant。
+	today := time.Now().Format("2006-01-02")
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":`+quote(today)+`,"entries":[{"project":"当前工作台","category":"开发","title":"调研项目状态","minutes":60,"next":["实现看板"]}]}`)
 
 	board := call(t, "work-log.project.board", `{"log_root":`+quote(root)+`}`)
 	project := boardProject(t, board, "当前工作台")
@@ -184,7 +186,8 @@ func TestLegacyProjectsWithoutWork(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "projects.json"), []byte(legacy), 0o644); err != nil {
 		t.Fatalf("写入旧登记表失败: %v", err)
 	}
-	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-19","entries":[{"project":"旧项目","category":"开发","title":"旧日志","minutes":30}]}`)
+	recentDate := time.Now().Format("2006-01-02")
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":`+quote(recentDate)+`,"entries":[{"project":"旧项目","category":"开发","title":"旧日志","minutes":30}]}`)
 	board := call(t, "work-log.project.board", `{"log_root":`+quote(root)+`}`)
 	project := boardProject(t, board, "旧项目")
 	if project["state"] != workStateInProgress {

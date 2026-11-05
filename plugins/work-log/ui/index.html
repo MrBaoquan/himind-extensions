@@ -6,7 +6,7 @@
     <title>工作日志 · 当前工作</title>
     <!-- 资源带版本后缀：插件 UI 由 Agent 直接按路径提供，不带缓存头；版本号变化会让 WebView
          重新拉取 app.js/app.css，避免界面改版后仍显示旧脚本。改动前端资源时请同步提升。 -->
-    <link rel="stylesheet" href="app.css?v=0.16.0" />
+    <link rel="stylesheet" href="app.css?v=0.17.0" />
   </head>
   <body>
     <header class="topbar">
@@ -270,11 +270,11 @@
               <button type="button" class="seg-btn active" data-mode="actual" aria-pressed="true">实际工时</button>
               <button type="button" class="seg-btn" data-mode="aligned" aria-pressed="false">8 小时对齐</button>
             </div>
-            <button type="button" class="btn" id="mx-copy-all" title="复制整张工时表（含表头与合计），可直接粘贴到 Excel">复制整表</button>
+            <button type="button" class="btn" id="mx-copy-all" title="复制本月工时（仅日期列，不含项目列与合计列），可直接粘贴到 Excel">复制整表</button>
           </div>
         </div>
         <p class="meta" id="matrix-note"></p>
-        <p class="meta matrix-hint">按行复制：鼠标移到项目名或「当天合计」上，点出现的 ⧉ 按钮；粘贴到 Excel 即为表格。</p>
+        <p class="meta matrix-hint">按行复制：鼠标移到项目名或「当天合计」上，点出现的 ⧉ 按钮。复制内容只有日期工时列，不含项目列与合计列，方便直接贴进自己的工时模板。</p>
         <div id="matrix-body" class="matrix-scroll"></div>
       </section>
     </div>
@@ -411,6 +411,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=0.16.0"></script>
+    <script src="app.js?v=0.17.0"></script>
   </body>
 </html>

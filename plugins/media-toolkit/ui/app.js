@@ -3,18 +3,15 @@
 
   const state = {
     workspaceRoot: '',
-    media: null,        // 最近一次 probe 的结果
+    selections: { image: [], video: [], images: [], analyze: [] },
     runtime: null,
-    job: null,          // 当前跟踪的作业
+    activeTab: 'image',
+    job: null,
     timer: null,
     busy: false,
   };
 
   const el = (id) => document.getElementById(id);
-
-  // ── 桥接 ────────────────────────────────────────────
-  // 扩展视图只能通过能力调用与插件通信（没有直接读文件的通道），
-  // 所以产物预览走 media.toolkit.preview.image 这个受约束的能力。
 
   function bridgeInvoke(capabilityId, input) {
     const internals = window.__TAURI_INTERNALS__ || {};
@@ -59,125 +56,33 @@
 
   function setBusy(busy) {
     state.busy = busy;
-    for (const id of ['runtime-button', 'reload-files', 'probe-button', 'plan-button',
-                      'run-button', 'extract-button', 'refresh-jobs', 'cancel-button']) {
+    for (const id of ['runtime-button', 'pick-media', 'pick-media-more', 'pick-audio', 'run-button',
+                      'refresh-jobs', 'cancel-button']) {
       const node = el(id);
       if (node) node.disabled = busy;
     }
   }
 
-  function activeTab() {
-    const tab = document.querySelector('.tab.is-active');
-    return tab ? tab.dataset.tab : 'convert';
-  }
-
-  const isRecipeTab = (tab) => ['convert', 'audio', 'images'].includes(tab);
-
-  // ── 路径与命名 ──────────────────────────────────────
-
-  function currentPath() {
-    return (el('media-path').value || '').trim();
-  }
-
-  function baseName(path) {
-    const slash = path.lastIndexOf('/');
-    return slash >= 0 ? path.slice(slash + 1) : path;
-  }
-
-  function dirName(path) {
-    const slash = path.lastIndexOf('/');
-    return slash >= 0 ? path.slice(0, slash + 1) : '';
-  }
-
-  function stripExt(name) {
-    const dot = name.lastIndexOf('.');
-    return dot > 0 ? name.slice(0, dot) : name;
-  }
-
-  // 输出默认落在源文件旁边、带后缀 —— 省掉手打路径。
-  function suggestOutput(suffix, extension) {
-    const path = currentPath();
-    if (!path) return '';
-    return dirName(path) + stripExt(baseName(path)) + suffix + extension;
-  }
-
-  function audioExtension() {
-    const format = el('audio-format').value;
-    return format === 'm4a' ? '.m4a' : (format === 'wav' ? '.wav' : '.mp3');
-  }
-
-  function prefillOutputs() {
-    const path = currentPath();
-    const suggestions = {
-      'convert-out': suggestOutput(
-        el('convert-mode').value === 'compress' ? '-compressed' : '-transcoded', '.mp4'),
-      'audio-out': suggestOutput('', audioExtension()),
-      'images-out': suggestOutput('-from-images', '.mp4'),
-    };
-    for (const id of Object.keys(suggestions)) {
-      const node = el(id);
-      // 只填空白项：用户手填过的路径不该被覆盖。
-      if (node && !node.value.trim()) node.value = path ? suggestions[id] : '';
-    }
-  }
-
-  // ── 素材列表 ────────────────────────────────────────
-
-  async function loadWorkspace() {
-    try {
-      const context = await window.__TAURI_INTERNALS__.invoke('get_plugin_view_context', {});
-      state.workspaceRoot = (context && context.workspace_root) || '';
-    } catch (_) {
-      state.workspaceRoot = '';
-    }
-    el('workspace-root').textContent = state.workspaceRoot || '（未获取到，无法列出素材）';
-  }
-
-  async function loadFiles() {
-    const select = el('file-select');
-    if (!state.workspaceRoot) {
-      select.innerHTML = '<option value="">未获取到工作区</option>';
-      return;
-    }
-    select.innerHTML = '<option value="">正在读取…</option>';
-    try {
-      const result = await bridgeInvoke('media.toolkit.files.list', {
-        workspace_root: state.workspaceRoot,
-        limit: 300,
-      });
-      const files = (result && result.files) || [];
-      if (!files.length) {
-        select.innerHTML = '<option value="">工作区里没有媒体文件</option>';
-        return;
-      }
-      const parts = ['<option value="">从列表选择…</option>'];
-      for (const file of files) {
-        const size = file.size_bytes ? ' · ' + formatSize(file.size_bytes) : '';
-        parts.push(
-          '<option value="' + escapeHtml(file.path) + '">' +
-          escapeHtml(file.path) + '（' + escapeHtml(file.kind) + size + '）</option>'
-        );
-      }
-      select.innerHTML = parts.join('');
-      if (result.truncated) {
-        notify('素材较多，列表只显示了前 ' + files.length + ' 个。可直接填写相对路径。');
-      }
-    } catch (error) {
-      select.innerHTML = '<option value="">读取失败</option>';
-      notify('读取素材列表失败：' + describe(error), 'bad');
-    }
-  }
-
   function formatSize(bytes) {
-    if (bytes >= 1024 * 1024 * 1024) return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
-    if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
-    if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
-    return bytes + ' B';
+    const value = Number(bytes || 0);
+    if (!Number.isFinite(value) || value <= 0) return '0 B';
+    if (value >= 1024 * 1024 * 1024) return (value / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+    if (value >= 1024 * 1024) return (value / 1024 / 1024).toFixed(1) + ' MB';
+    if (value >= 1024) return (value / 1024).toFixed(0) + ' KB';
+    return value + ' B';
+  }
+
+  function formatBitrate(bits) {
+    const value = Number(bits || 0);
+    if (!Number.isFinite(value) || value <= 0) return '—';
+    if (value >= 1000000) return (value / 1000000).toFixed(2) + ' Mbps';
+    return Math.round(value / 1000) + ' kbps';
   }
 
   function formatDuration(ms) {
-    if (!ms) return '—';
-    const total = Math.round(ms / 1000);
+    const value = Number(ms || 0);
+    if (!Number.isFinite(value) || value <= 0) return '—';
+    const total = Math.round(value / 1000);
     const h = Math.floor(total / 3600);
     const m = Math.floor((total % 3600) / 60);
     const s = total % 60;
@@ -186,7 +91,434 @@
     return h > 0 ? h + ':' + mm + ':' + ss : m + ':' + ss;
   }
 
-  // ── 运行时 ──────────────────────────────────────────
+  function baseName(path) {
+    const slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+    return slash >= 0 ? path.slice(slash + 1) : path;
+  }
+
+  function dirName(path) {
+    const slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+    return slash >= 0 ? path.slice(0, slash + 1) : '';
+  }
+
+  function stripExt(name) {
+    const dot = name.lastIndexOf('.');
+    return dot > 0 ? name.slice(0, dot) : name;
+  }
+
+  function currentSelection() {
+    return state.selections[state.activeTab] || [];
+  }
+
+  function currentPath() {
+    const selected = currentSelection();
+    return selected.length ? selected[0].path : '';
+  }
+
+  function positiveNumber(id) {
+    const raw = (el(id).value || '').trim();
+    if (!raw) return 0;
+    const value = Number(raw);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  }
+
+  function integerOrZero(id) {
+    return Math.max(0, Math.round(positiveNumber(id)));
+  }
+
+  function resolveSizePreset(presetId, widthId, heightId, fixedWidths) {
+    const preset = el(presetId).value;
+    if (preset === 'source') return { width: 0, height: 0 };
+    if (preset === 'custom') {
+      return { width: integerOrZero(widthId), height: integerOrZero(heightId) };
+    }
+    return { width: fixedWidths[preset] || 0, height: 0 };
+  }
+
+  function imageDimensions() {
+    return resolveSizePreset('image-size-preset', 'image-width', 'image-height', {
+      '1920': 1920, '1280': 1280, '640': 640,
+    });
+  }
+
+  function heightPreset(presetId, widthId, heightId) {
+    const preset = el(presetId).value;
+    if (preset === 'source') return { width: 0, height: 0 };
+    if (preset === 'custom') {
+      return { width: integerOrZero(widthId), height: integerOrZero(heightId) };
+    }
+    const height = Number(preset);
+    return { width: 0, height: Number.isFinite(height) && height > 0 ? Math.round(height) : 0 };
+  }
+
+  function videoDimensions() {
+    return heightPreset('video-size-preset', 'video-width', 'video-height');
+  }
+
+  function imagesDimensions() {
+    return heightPreset('images-size-preset', 'images-width', 'images-height');
+  }
+
+  function openAdvanced(id) {
+    const node = el(id);
+    if (node) node.open = true;
+  }
+
+  function chooseCustom(presetId, advancedId) {
+    el(presetId).value = 'custom';
+    openAdvanced(advancedId);
+  }
+
+  function requireCustomDimensions(presetId, dimensions) {
+    if (el(presetId).value === 'custom' && !dimensions.width && !dimensions.height) {
+      throw new Error('自定义尺寸至少填写宽度或高度。');
+    }
+    return dimensions;
+  }
+
+  function syncImageSizePreset() {
+    if (el('image-size-preset').value === 'custom') {
+      openAdvanced('image-advanced');
+      return;
+    }
+    const dimensions = imageDimensions();
+    el('image-width').value = dimensions.width || '';
+    el('image-height').value = dimensions.height || '';
+  }
+
+  function syncVideoSizePreset() {
+    if (el('video-size-preset').value === 'custom') {
+      openAdvanced('video-advanced');
+      return;
+    }
+    const dimensions = videoDimensions();
+    el('video-width').value = dimensions.width || '';
+    el('video-height').value = dimensions.height || '';
+  }
+
+  function syncImagesSizePreset() {
+    if (el('images-size-preset').value === 'custom') {
+      openAdvanced('images-advanced');
+      return;
+    }
+    const dimensions = imagesDimensions();
+    el('images-width').value = dimensions.width || '';
+    el('images-height').value = dimensions.height || '';
+  }
+
+  function imageQualityValue() {
+    const preset = el('image-quality-preset').value;
+    if (preset === 'custom') return Math.max(1, integerOrZero('image-quality'));
+    return ({ high: 92, balanced: 82, small: 65 })[preset] || 82;
+  }
+
+  function syncImageQualityPreset() {
+    if (el('image-quality-preset').value === 'custom') {
+      openAdvanced('image-advanced');
+      return;
+    }
+    el('image-quality').value = imageQualityValue();
+    el('image-quality-label').textContent = el('image-quality').value;
+  }
+
+  function videoQualitySettings() {
+    const preset = el('video-quality-preset').value;
+    if (preset === 'custom') {
+      return { crf: integerOrZero('video-crf'), speed: el('video-preset').value };
+    }
+    return ({
+      high: { crf: 18, speed: 'slow' },
+      balanced: { crf: 23, speed: 'medium' },
+      small: { crf: 28, speed: 'slow' },
+    })[preset] || { crf: 23, speed: 'medium' };
+  }
+
+  function syncVideoQualityPreset() {
+    if (el('video-quality-preset').value === 'custom') {
+      openAdvanced('video-advanced');
+      return;
+    }
+    const quality = videoQualitySettings();
+    el('video-crf').value = quality.crf;
+    el('video-bitrate').value = '';
+    el('video-preset').value = quality.speed;
+  }
+
+  function updateVideoPresetAvailability() {
+    const locked = el('audio-only').checked || el('video-codec').value === 'copy';
+    for (const id of ['video-size-preset', 'video-quality-preset']) {
+      el(id).disabled = locked;
+      el(id).title = locked ? '流复制或提取音轨时不改变尺寸与质量。' : '';
+    }
+  }
+
+  function setAutoValue(id, value) {
+    const node = el(id);
+    if (!node) return;
+    if (!node.value || node.dataset.auto === 'true') {
+      node.value = value || '';
+      node.dataset.auto = 'true';
+    }
+  }
+
+  function markManual(id) {
+    const node = el(id);
+    if (node) node.dataset.auto = 'false';
+  }
+
+  function suggestOutput(suffix, extension, sourcePath) {
+    const path = sourcePath || currentPath();
+    if (!path) return '';
+    return dirName(path) + stripExt(baseName(path)) + suffix + extension;
+  }
+
+  function outputExtension(format) {
+    return format === 'jpeg' ? '.jpg' : '.' + format;
+  }
+
+  function videoExtension(format) {
+    return '.' + format;
+  }
+
+  function prefillOutputs() {
+    const path = currentPath();
+    if (!path) return;
+    if (state.activeTab === 'image') {
+      setAutoValue('image-output-dir', dirName(path).replace(/[\\/]$/, ''));
+    }
+    if (state.activeTab === 'video') {
+      if (el('audio-only').checked) {
+        const format = el('audio-format').value;
+        setAutoValue('video-out', suggestOutput('', format === 'm4a' ? '.m4a' : '.' + format, path));
+      } else {
+        setAutoValue('video-out', suggestOutput('-converted', videoExtension(el('video-format').value), path));
+      }
+    }
+    if (state.activeTab === 'images') {
+      setAutoValue('images-out', suggestOutput('-slideshow', '.mp4', path));
+    }
+  }
+
+  async function loadWorkspace() {
+    try {
+      const context = await window.__TAURI_INTERNALS__.invoke('get_plugin_view_context', {});
+      state.workspaceRoot = (context && context.workspace_root) || '';
+    } catch (_) {
+      state.workspaceRoot = '';
+    }
+  }
+
+  function kindText(kind) {
+    return ({ image: '图片', video: '视频', audio: '音频' })[kind] || '文件';
+  }
+
+  function pickerConfig(tab) {
+    return ({
+      image: { mode: 'image', multiple: true },
+      video: { mode: 'video', multiple: false },
+      images: { mode: 'image', multiple: false },
+      analyze: { mode: 'media', multiple: false },
+    })[tab] || { mode: 'media', multiple: false };
+  }
+
+  function emptyHint(tab) {
+    return ({
+      image: '可一次选择多张图片',
+      video: '选择一个视频文件',
+      images: '选择一张图片',
+      analyze: '选择图片、视频或音频',
+    })[tab] || '点击选择文件';
+  }
+
+  function renderSelection() {
+    const items = currentSelection();
+    const list = el('selection-list');
+    const empty = el('pick-media');
+    const more = el('pick-media-more');
+    const count = el('selection-count');
+    const moreLabels = {
+      image: '+ 添加更多图片',
+      video: '更换视频',
+      images: '更换图片',
+      analyze: '更换文件',
+    };
+    count.textContent = items.length ? items.length + ' 个文件' : '';
+    el('selection-empty-hint').textContent = emptyHint(state.activeTab);
+    empty.hidden = items.length > 0;
+    more.hidden = items.length === 0;
+    more.textContent = moreLabels[state.activeTab] || '添加更多';
+    list.hidden = items.length === 0;
+    if (!items.length) {
+      list.innerHTML = '';
+      return;
+    }
+    list.innerHTML = items.map((file) => {
+      const detail = file.imported ? '已导入到项目' : file.path;
+      return '<div class="selection-item">' +
+        '<span class="file-kind">' + escapeHtml(kindText(file.kind)) + '</span>' +
+        '<span class="selection-copy">' +
+        '<strong>' + escapeHtml(file.name || baseName(file.path)) + '</strong>' +
+        '<span class="mono" title="' + escapeHtml(detail) + '">' + escapeHtml(detail) + '</span>' +
+        '</span>' +
+        '<span class="selection-size">' + escapeHtml(formatSize(file.size_bytes)) + '</span>' +
+        '<button class="remove-selection" type="button" data-remove-path="' + escapeHtml(file.path) + '" aria-label="移除 ' + escapeHtml(file.name || file.path) + '">×</button>' +
+        '</div>';
+    }).join('');
+  }
+
+  function applyPickedFiles(picked, tab) {
+    if (!picked.length) return;
+    if (tab === 'image') {
+      const known = new Set(state.selections.image.map((file) => file.path));
+      state.selections.image = state.selections.image.concat(picked.filter((file) => !known.has(file.path)));
+    } else {
+      state.selections[tab] = picked.slice(0, 1);
+    }
+    renderSelection();
+    prefillOutputs();
+    const imported = picked.filter((file) => file.imported).length;
+    notify(imported ? '已导入 ' + imported + ' 个文件。' : '', imported ? 'ok' : '');
+  }
+
+  async function pickMedia() {
+    if (!state.workspaceRoot) {
+      notify('当前项目没有可用的文件目录。', 'bad');
+      return;
+    }
+    const tab = state.activeTab;
+    const config = pickerConfig(tab);
+    setBusy(true);
+    try {
+      const result = await bridgeInvoke('media.toolkit.files.pick', {
+        workspace_root: state.workspaceRoot,
+        mode: config.mode,
+        multiple: config.multiple,
+      });
+      if (!result || result.canceled) return;
+      applyPickedFiles(result.files || [], tab);
+    } catch (error) {
+      notify('选择素材失败：' + describe(error), 'bad');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function importDroppedPaths(paths) {
+    if (!state.workspaceRoot) {
+      notify('当前项目没有可用的文件目录。', 'bad');
+      return;
+    }
+    const tab = state.activeTab;
+    const config = pickerConfig(tab);
+    if (!config.multiple && paths.length > 1) {
+      notify('当前任务一次只能放入一个文件。', 'bad');
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await bridgeInvoke('media.toolkit.files.pick', {
+        workspace_root: state.workspaceRoot,
+        mode: config.mode,
+        multiple: config.multiple,
+        paths: paths,
+      });
+      if (!result || result.canceled) return;
+      applyPickedFiles(result.files || [], tab);
+    } catch (error) {
+      notify('导入拖入文件失败：' + describe(error), 'bad');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function setDragActive(active) {
+    el('source-surface').classList.toggle('is-dragging', active);
+  }
+
+  function domDroppedPaths(event) {
+    return Array.from((event.dataTransfer && event.dataTransfer.files) || [])
+      .map((file) => file.path || '')
+      .filter(Boolean);
+  }
+
+  function bindSelectionDropTarget() {
+    const zone = el('source-surface');
+    zone.addEventListener('dragenter', (event) => {
+      event.preventDefault();
+      setDragActive(true);
+    });
+    zone.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+    });
+    zone.addEventListener('dragleave', (event) => {
+      if (!zone.contains(event.relatedTarget)) setDragActive(false);
+    });
+    zone.addEventListener('drop', (event) => {
+      event.preventDefault();
+      setDragActive(false);
+      const paths = domDroppedPaths(event);
+      if (paths.length) void importDroppedPaths(paths);
+      else notify('无法读取拖入文件路径，请点击素材区选择。', 'warn');
+    });
+  }
+
+  async function registerTauriDragEvents() {
+    const internals = window.__TAURI_INTERNALS__ || {};
+    if (typeof internals.invoke !== 'function' || typeof internals.transformCallback !== 'function') return;
+    const label = internals.metadata && internals.metadata.currentWindow && internals.metadata.currentWindow.label;
+    const target = label ? { kind: 'Window', label: label } : { kind: 'Any' };
+    const listen = (event, handler) => internals.invoke('plugin:event|listen', {
+      event: event,
+      target: target,
+      handler: internals.transformCallback(handler),
+    });
+    try {
+      await listen('tauri://drag-enter', () => setDragActive(true));
+      await listen('tauri://drag-over', () => setDragActive(true));
+      await listen('tauri://drag-leave', () => setDragActive(false));
+      await listen('tauri://drag-drop', (event) => {
+        setDragActive(false);
+        const payload = event && event.payload ? event.payload : event;
+        const paths = (payload && payload.paths) || [];
+        if (paths.length) void importDroppedPaths(paths);
+      });
+    } catch (_) {
+      // HTML5 drag/drop remains available where the host allows DOM drops.
+    }
+  }
+
+  async function pickAudio() {
+    if (!state.workspaceRoot) {
+      notify('当前项目没有可用的文件目录。', 'bad');
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await bridgeInvoke('media.toolkit.files.pick', {
+        workspace_root: state.workspaceRoot,
+        mode: 'audio',
+        multiple: false,
+      });
+      if (!result || result.canceled || !(result.files || []).length) return;
+      const audio = result.files[0];
+      el('images-audio').value = audio.path;
+      el('pick-audio').textContent = audio.name || baseName(audio.path);
+      el('pick-audio').title = audio.imported ? '已导入到项目' : audio.path;
+      notify(audio.imported ? '音轨已导入。' : '已选择音轨。', 'ok');
+    } catch (error) {
+      notify('选择音轨失败：' + describe(error), 'bad');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function removeSelection(path) {
+    const tab = state.activeTab;
+    state.selections[tab] = (state.selections[tab] || []).filter((file) => file.path !== path);
+    renderSelection();
+    prefillOutputs();
+  }
 
   async function loadRuntime() {
     setBusy(true);
@@ -208,594 +540,406 @@
     const badge = el('runtime-badge');
     if (runtime && runtime.available) {
       badge.className = 'badge ok';
-      badge.textContent = 'ffmpeg 就绪';
-      const version = (runtime.version || '').split(' ').slice(0, 3).join(' ');
-      notify('ffmpeg 已就绪：' + version, 'ok');
-    } else {
-      badge.className = 'badge bad';
-      badge.textContent = '缺 ffmpeg';
-      notify((runtime && runtime.message) || '未找到 ffmpeg。装好并加入 PATH 后重新检查。', 'bad');
-    }
-  }
-
-  // ── 读取素材信息 ────────────────────────────────────
-
-  async function probe() {
-    const path = currentPath();
-    if (!path) {
-      notify('先选一个素材，或填写相对路径。', 'bad');
+      const sourceText = ({
+        plugin_bundle: '内置',
+        plugin_data: '本地',
+        path: 'PATH',
+      })[runtime.runtime_source] || '就绪';
+      badge.textContent = sourceText + ' FFmpeg';
+      badge.title = (runtime.runtime_warnings || []).join('\n');
+      notify('');
       return;
     }
-    setBusy(true);
-    try {
-      const info = await bridgeInvoke('media.toolkit.probe', {
-        workspace_root: state.workspaceRoot,
-        path: path,
-      });
-      if (info && info.error) {
-        state.media = null;
-        el('media-info').hidden = true;
-        notify('读取失败：' + info.error, 'bad');
-        return;
-      }
-      state.media = info;
-      renderMedia(info);
-      prefillOutputs();
-      notify('');
-    } catch (error) {
-      notify('读取失败：' + describe(error), 'bad');
-    } finally {
-      setBusy(false);
-    }
+    badge.className = 'badge bad';
+    badge.textContent = '缺少媒体运行时';
+    notify((runtime && runtime.message) || '没有找到成对的 ffmpeg / ffprobe。', 'bad');
   }
 
-  function renderMedia(info) {
-    const rows = [
-      ['文件', info.path],
-      ['时长', formatDuration(info.duration_ms) + '（' + info.duration_ms + ' ms）'],
-      ['体积', formatSize(info.size_bytes || 0)],
-      ['容器', info.format_name || '—'],
-    ];
-    if (info.video) {
-      rows.push(['视频', (info.video.codec_name || '?') + ' · ' +
-        info.video.width + '×' + info.video.height + ' · ' +
-        (info.video.fps ? info.video.fps.toFixed(2) + ' fps' : '帧率未知')]);
-    } else {
-      rows.push(['视频', '无']);
-    }
-    if (info.audio) {
-      rows.push(['音频', (info.audio.codec_name || '?') + ' · ' +
-        (info.audio.sample_rate || '?') + ' Hz · ' + (info.audio.channels || '?') + ' 声道']);
-    } else {
-      rows.push(['音频', '无（不能抽音频，也无法做响度分析）']);
-    }
-    if (info.warnings && info.warnings.length) {
-      rows.push(['提醒', info.warnings.join('；')]);
-    }
-
+  function rowsTable(rows) {
     const html = ['<table>'];
-    for (const [key, value] of rows) {
-      html.push('<tr><th>' + escapeHtml(key) + '</th><td>' + escapeHtml(value) + '</td></tr>');
+    for (const row of rows) {
+      if (row.group) {
+        html.push('<tr class="group"><td colspan="2">' + escapeHtml(row.group) + '</td></tr>');
+        continue;
+      }
+      html.push('<tr><th>' + escapeHtml(row[0]) + '</th><td>' + escapeHtml(row[1]) + '</td></tr>');
     }
     html.push('</table>');
-    const node = el('media-info');
-    node.innerHTML = html.join('');
-    node.hidden = false;
+    return html.join('');
   }
 
-  // ── 构造 recipe ─────────────────────────────────────
-  // 与插件的声明式模型对应：只描述"要做什么"，参数由插件编译成 ffmpeg 参数。
-
-  function numberOrNull(id) {
-    const raw = (el(id).value || '').trim();
-    if (!raw) return null;
-    const value = Number(raw);
-    return Number.isFinite(value) && value > 0 ? value : null;
-  }
-
-  function buildRecipe(tab) {
+  function selectedImagePaths() {
+    const selected = state.selections.image.map((file) => file.path).filter(Boolean);
+    if (selected.length) return selected;
     const path = currentPath();
-    if (!path) throw new Error('先选一个素材，或填写相对路径。');
-
-    if (tab === 'convert') {
-      const mode = el('convert-mode').value;
-      const width = numberOrNull('convert-width');
-      const crf = numberOrNull('convert-crf');
-      const fps = numberOrNull('convert-fps');
-      const output = (el('convert-out').value || '').trim() ||
-        suggestOutput(mode === 'compress' ? '-compressed' : '-transcoded', '.mp4');
-
-      const video = {
-        encode: {
-          codec: 'libx264',
-          crf: crf === null ? (mode === 'compress' ? 28 : 23) : crf,
-          preset: mode === 'compress' ? 'slow' : 'veryfast',
-          pixel_format: 'yuv420p',
-        },
-      };
-      if (width) video.scale = { width: width };
-      if (fps) video.fps = { value: fps };
-      return {
-        inputs: [{ path: path }],
-        video: video,
-        audio: { encode: { codec: 'aac', bitrate: mode === 'compress' ? '128k' : '160k' } },
-        output: { path: output, fast_start: true },
-      };
-    }
-
-    if (tab === 'audio') {
-      const format = el('audio-format').value;
-      const codec = format === 'm4a' ? 'aac' : (format === 'wav' ? 'pcm_s16le' : 'libmp3lame');
-      const ext = format === 'm4a' ? '.m4a' : (format === 'wav' ? '.wav' : '.mp3');
-      const output = (el('audio-out').value || '').trim() || suggestOutput('', ext);
-      const audio = { encode: { codec: codec } };
-      if (format !== 'wav') audio.encode.bitrate = el('audio-bitrate').value;
-      const start = numberOrNull('audio-start');
-      const end = numberOrNull('audio-end');
-      if (start !== null || end !== null) {
-        audio.trim = {};
-        if (start !== null) audio.trim.start_ms = start;
-        if (end !== null) audio.trim.end_ms = end;
-      }
-      return {
-        inputs: [{ path: path }],
-        video: { disable: true },
-        audio: audio,
-        output: { path: output },
-      };
-    }
-
-    if (tab === 'images') {
-      const output = (el('images-out').value || '').trim() || suggestOutput('-from-images', '.mp4');
-      const fps = numberOrNull('images-fps') || 30;
-      const video = {
-        fps: { value: fps },
-        encode: { codec: 'libx264', crf: 20, preset: 'medium', pixel_format: 'yuv420p' },
-      };
-      const width = numberOrNull('images-width');
-      const height = numberOrNull('images-height');
-      if (width || height) {
-        video.scale = { width: width || 0, height: height || 0 };
-      }
-      // 通配符路径是序列帧，交给 ffmpeg 自己展开；单张图则循环给定时长。
-      const isSequence = /%0?\d*d/.test(path);
-      const input = { path: path, framerate: String(fps) };
-      if (!isSequence) {
-        input.loop = true;
-        const duration = numberOrNull('images-duration');
-        video.trim = { duration_ms: duration || 5000 };
-      }
-      return {
-        inputs: [input],
-        video: video,
-        audio: { disable: true },
-        output: { path: output, fast_start: true },
-      };
-    }
-
-    throw new Error('这个标签页不出参数。');
+    return path ? [path] : [];
   }
 
-  // ── 预览参数 / 开始 ─────────────────────────────────
-
-  async function planRecipe() {
-    let recipe;
-    try {
-      recipe = buildRecipe(activeTab());
-    } catch (error) {
-      notify(describe(error), 'bad');
-      return;
-    }
-    setBusy(true);
-    try {
-      const result = await bridgeInvoke('media.toolkit.recipe.plan', { recipe: recipe });
-      if (!result || !result.ok) {
-        notify('参数不合法：' + ((result && result.message) || '未知原因'), 'bad');
-        return;
-      }
-      el('plan-output').hidden = false;
-      el('plan-output').textContent =
-        result.description + '\n\nffmpeg ' + (result.args || []).join(' ') +
-        '\n\n输出：' + result.output;
-      notify('');
-    } catch (error) {
-      notify('预览参数失败：' + describe(error), 'bad');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function runCurrent() {
-    const tab = activeTab();
-    if (tab === 'analyze') return runAnalyze();
-    if (tab === 'preview') return runPreview();
-
-    let recipe;
-    try {
-      recipe = buildRecipe(tab);
-    } catch (error) {
-      notify(describe(error), 'bad');
-      return;
-    }
-    setBusy(true);
-    try {
-      const result = await bridgeInvoke('media.toolkit.recipe.run', {
-        workspace_root: state.workspaceRoot,
-        recipe: recipe,
-        kind: tab,
-      });
-      const job = result && result.job;
-      if (!job) {
-        notify('提交失败：未返回作业。', 'bad');
-        return;
-      }
-      state.job = job;
-      renderJob(job);
-      notify('已开始处理。');
-      startPolling();
-    } catch (error) {
-      notify('提交失败：' + describe(error), 'bad');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // ── 分析 ────────────────────────────────────────────
-
-  async function runAnalyze() {
-    const path = currentPath();
-    if (!path) {
-      notify('先选一个素材。', 'bad');
-      return;
-    }
-    const kind = el('analyze-kind').value;
-    const points = numberOrNull('analyze-points') || 2000;
-    setBusy(true);
-    notify('分析中，长片的逐帧分析可能需要一段时间…');
-    try {
-      const result = await bridgeInvoke(
-        kind === 'scene' ? 'media.toolkit.scene.score' : 'media.toolkit.audio.loudness',
-        { workspace_root: state.workspaceRoot, path: path, max_points: points }
-      );
-      if (result && result.error) {
-        notify('分析失败：' + result.error, 'bad');
-        return;
-      }
-      if (kind === 'scene') drawSceneChart(result);
-      else drawLoudnessChart(result);
-      notify('');
-    } catch (error) {
-      notify('分析失败：' + describe(error), 'bad');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function chartContext() {
-    el('chart-wrap').hidden = false;
-    const canvas = el('chart');
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    return { canvas: canvas, ctx: ctx };
-  }
-
-  // 画一条时间序列。坐标轴与中位线是重点：
-  // 画面活动的绝对值没有普适阈值，只有相对自身分布看才有意义。
-  function drawSeries(points, pick, options) {
-    const { canvas, ctx } = chartContext();
-    const pad = { left: 46, right: 12, top: 12, bottom: 24 };
-    const width = canvas.width - pad.left - pad.right;
-    const height = canvas.height - pad.top - pad.bottom;
-
-    const values = points.map(pick).filter((v) => Number.isFinite(v));
-    if (!values.length) {
-      el('chart-summary').textContent = '没有采样点。';
-      return null;
-    }
-    // 用 reduce 而不是展开：采样点可达 20 万个，展开会把调用栈撑爆。
-    let minValue = options.min !== undefined ? options.min : Infinity;
-    let maxValue = -Infinity;
-    for (const value of values) {
-      if (value < minValue) minValue = value;
-      if (value > maxValue) maxValue = value;
-    }
-    if (!Number.isFinite(minValue)) minValue = 0;
-    if (!Number.isFinite(maxValue)) maxValue = 1;
-    const span = maxValue - minValue || 1;
-    const maxTime = points[points.length - 1].time_ms || 1;
-
-    const x = (t) => pad.left + (t / maxTime) * width;
-    const y = (v) => pad.top + height - ((v - minValue) / span) * height;
-
-    // 网格与刻度
-    ctx.strokeStyle = '#e6ebf2';
-    ctx.fillStyle = '#68758c';
-    ctx.font = '11px "Segoe UI", sans-serif';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) {
-      const value = minValue + (span * i) / 4;
-      const yy = y(value);
-      ctx.beginPath();
-      ctx.moveTo(pad.left, yy);
-      ctx.lineTo(pad.left + width, yy);
-      ctx.stroke();
-      ctx.fillText(value.toFixed(options.digits === undefined ? 1 : options.digits), 4, yy + 4);
-    }
-    const totalSeconds = maxTime / 1000;
-    for (let i = 0; i <= 4; i++) {
-      const t = (maxTime * i) / 4;
-      ctx.fillText(formatDuration(t), x(t) - 14, canvas.height - 6);
-    }
-
-    ctx.strokeStyle = options.color || '#2563eb';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    points.forEach((point, index) => {
-      const value = pick(point);
-      if (!Number.isFinite(value)) return;
-      const px = x(point.time_ms);
-      const py = y(value);
-      if (index === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    });
-    ctx.stroke();
-
-    // 中位线：判断"哪里异常"的基准
-    const sorted = values.slice().sort((a, b) => a - b);
-    const median = sorted[Math.floor(sorted.length / 2)];
-    ctx.strokeStyle = '#a15c07';
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(pad.left, y(median));
-    ctx.lineTo(pad.left + width, y(median));
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#a15c07';
-    ctx.fillText('中位 ' + median.toFixed(2), pad.left + 6, y(median) - 4);
-
-    return { median: median, min: minValue, max: maxValue, count: points.length, totalSeconds: totalSeconds };
-  }
-
-  function drawSceneChart(result) {
-    const points = (result && result.points) || [];
-    const stats = drawSeries(points, (p) => p.score, { color: '#2563eb', min: 0 });
-    if (!stats) return;
-    const notes = (result.notes || []).join('；');
-    el('chart-summary').textContent =
-      '采样 ' + stats.count + ' 点 / ' + stats.totalSeconds.toFixed(0) + ' 秒；' +
-      '中位 ' + stats.median.toFixed(2) + '，峰值 ' + (result.peak_score || 0).toFixed(2) +
-      '，按阈值 ' + (result.threshold || 0) + ' 命中切点 ' + (result.cut_count || 0) + ' 个。' +
-      ' 看"远高于中位线"的尖峰，不要盯着绝对值。' + (notes ? ' ' + notes : '');
-  }
-
-  function drawLoudnessChart(result) {
-    const points = (result && result.points) || [];
-    const stats = drawSeries(points, (p) => p.momentary_lufs, {
-      color: '#7c3aed', digits: 0,
-    });
-    if (!stats) return;
-    el('chart-summary').textContent =
-      '采样 ' + stats.count + ' 点 / ' + stats.totalSeconds.toFixed(0) + ' 秒；' +
-      '整体响度 ' + (result.integrated_lufs || 0).toFixed(1) + ' LUFS，' +
-      '响度范围 ' + (result.loudness_range_lu || 0).toFixed(1) + ' LU。' +
-      ' 骤升处多为撞击/重音（事件的可靠依据），显著低于中位处为静场。';
-  }
-
-  // ── 预览 ────────────────────────────────────────────
-
-  async function runPreview() {
-    const path = currentPath();
-    if (!path) {
-      notify('先选一个素材。', 'bad');
-      return;
-    }
-    const times = parseTimes(el('extract-times').value);
-    setBusy(true);
-    try {
-      if (times.length) {
-        await extractFrames(path, times);
-      } else {
-        await contactSheet(path);
-      }
-      notify('');
-    } catch (error) {
-      notify('预览失败：' + describe(error), 'bad');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // 注意：Number('') === 0，空串不做过滤会被当成"抽第 0 毫秒一帧"，
-  // 于是"留空 = 生成缩略图网格"这条默认路径永远走不到。
-  function parseTimes(raw) {
-    return (raw || '')
-      .split(/[,，\s]+/)
-      .map((piece) => piece.trim())
-      .filter((piece) => piece.length > 0)
-      .map((piece) => Number(piece))
-      .filter((value) => Number.isFinite(value) && value >= 0);
-  }
-
-  async function contactSheet(path) {
-    const output = suggestOutput('-sheet', '.jpg') || 'sheet.jpg';
-    const interval = numberOrNull('sheet-interval');
+  async function runImageConversion() {
+    const paths = selectedImagePaths();
+    if (!paths.length) throw new Error('先选择至少一张图片。');
+    const firstDir = dirName(paths[0]).replace(/[\\/]$/, '');
+    const dimensions = requireCustomDimensions('image-size-preset', imageDimensions());
     const input = {
       workspace_root: state.workspaceRoot,
-      path: path,
-      output: output,
-      columns: numberOrNull('sheet-columns') || 6,
-      rows: numberOrNull('sheet-rows') || 4,
-      tile_width: numberOrNull('sheet-tile') || 320,
+      paths: paths,
+      output_dir: (el('image-output-dir').value || '').trim() || firstDir || '.',
+      format: el('image-format').value,
+      quality: imageQualityValue(),
+      background: el('image-background').value,
+      suffix: (el('image-suffix').value || '').trim(),
+      overwrite: el('image-overwrite').checked,
     };
-    if (interval) input.interval_ms = interval;
+    if (dimensions.width > 0) input.width = dimensions.width;
+    if (dimensions.height > 0) input.height = dimensions.height;
+    const template = (el('image-name-template').value || '').trim();
+    if (template) input.name_template = template;
 
-    notify('正在生成缩略图网格…');
-    const result = await bridgeInvoke('media.toolkit.frames.contact-sheet', input);
-    if (result && result.error) {
-      notify('生成失败：' + result.error, 'bad');
-      return;
+    notify('正在转换 ' + paths.length + ' 张图片…');
+    const response = await bridgeInvoke('media.toolkit.image.convert', input);
+    const result = response && response.result;
+    if (!result) throw new Error('插件没有返回转换结果。');
+    const failed = result.failed || [];
+    if (failed.length) {
+      notify('完成 ' + result.count + ' 张，失败 ' + failed.length + ' 张：\n' +
+        failed.map((item) => item.input + '：' + item.error).join('\n'), 'warn');
+    } else {
+      notify('已转换 ' + result.count + ' 张图片。', 'ok');
     }
-    const warnings = (result.warnings || []).join('；');
-    await showImages([result.path], '缩略图网格 · 平均亮度 ' +
-      (result.mean_luminance || 0).toFixed(1) + (warnings ? ' · ' + warnings : ''));
-    if (warnings) notify('注意：' + warnings, 'bad');
+    const pathsOut = (result.outputs || []).map((item) => item.output);
+    if (pathsOut.length) await showPreviewImages(pathsOut);
   }
 
-  async function extractFrames(path, times) {
-    const outputDir = dirName(path) + stripExt(baseName(path)) + '-frames';
-    notify('正在抽取 ' + times.length + ' 帧…');
-    const result = await bridgeInvoke('media.toolkit.frames.extract', {
-      workspace_root: state.workspaceRoot,
-      path: path,
-      output_dir: outputDir,
-      times_ms: times,
-      width: 480,
-    });
-    if (result && result.error) {
-      notify('抽帧失败：' + result.error, 'bad');
-      return;
-    }
-    await showImages((result && result.files) || [], '抽取 ' + times.length + ' 帧');
-  }
-
-  // 图片通过受约束的预览能力取回（视图没有直接读文件的通道）。
-  async function showImages(paths, caption) {
-    const grid = el('preview-grid');
-    grid.innerHTML = '';
-    grid.hidden = false;
-    if (!paths.length) return;
-
-    let shown = 0;
-    for (const path of paths) {
+  async function showPreviewImages(paths) {
+    for (const path of paths.slice(0, 6)) {
       try {
         const preview = await bridgeInvoke('media.toolkit.preview.image', {
           workspace_root: state.workspaceRoot,
           path: path,
         });
-        const figure = document.createElement('figure');
-        if (paths.length === 1) figure.className = 'wide';
-        const image = document.createElement('img');
-        image.src = preview.data_url;
-        image.alt = caption;
-        const label = document.createElement('figcaption');
-        label.textContent = preview.path + ' · ' + formatSize(preview.size_bytes);
-        figure.appendChild(image);
-        figure.appendChild(label);
-        grid.appendChild(figure);
-        shown++;
-      } catch (error) {
-        notify('有产物无法预览：' + describe(error), 'bad');
+        notify('已生成 ' + baseName(preview.path), 'ok');
+        return;
+      } catch (_) {
+        // 非图片产物或不支持预览时不打断主流程。
       }
     }
-    if (!shown) grid.hidden = true;
   }
 
-  // ── 作业 ────────────────────────────────────────────
+  function codecLabel(value) {
+    return ({
+      h264: 'H.264', h265: 'H.265 / HEVC', vp9: 'VP9', copy: '直接复制，不重编码',
+    })[value] || value;
+  }
+
+  function audioLabel(value) {
+    return ({
+      aac: 'AAC', opus: 'Opus', mp3: 'MP3', copy: '直接复制', none: '移除音轨',
+    })[value] || value;
+  }
+
+  function setOptions(select, values, selected) {
+    select.innerHTML = values.map((value) =>
+      '<option value="' + escapeHtml(value) + '">' + escapeHtml(value === 'copy' ? '直接复制' : audioLabel(value)) + '</option>'
+    ).join('');
+    if (values.includes(selected)) select.value = selected;
+  }
+
+  function syncVideoCodecs() {
+    const format = el('video-format').value;
+    const video = el('video-codec');
+    const audio = el('video-audio-codec');
+    const previousVideo = video.value;
+    const previousAudio = audio.value;
+    const videoValues = format === 'webm' ? ['vp9', 'copy'] : (format === 'mkv' ? ['h264', 'h265', 'vp9', 'copy'] : ['h264', 'h265', 'copy']);
+    const audioValues = format === 'webm' ? ['opus', 'copy', 'none'] : (format === 'mkv' ? ['aac', 'opus', 'mp3', 'copy', 'none'] : ['aac', 'copy', 'none']);
+    video.innerHTML = videoValues.map((value) =>
+      '<option value="' + escapeHtml(value) + '">' + escapeHtml(codecLabel(value)) + '</option>').join('');
+    audio.innerHTML = audioValues.map((value) =>
+      '<option value="' + escapeHtml(value) + '">' + escapeHtml(audioLabel(value)) + '</option>').join('');
+    video.value = videoValues.includes(previousVideo) ? previousVideo : videoValues[0];
+    audio.value = audioValues.includes(previousAudio) ? previousAudio : audioValues[0];
+    updateVideoPresetAvailability();
+  }
+
+  function toggleAudioOnly() {
+    const audioOnly = el('audio-only').checked;
+    el('audio-only-options').hidden = !audioOnly;
+    for (const id of ['video-format', 'video-codec', 'video-audio-codec', 'video-width',
+                      'video-height', 'video-fps', 'video-crf', 'video-bitrate', 'video-preset']) {
+      el(id).disabled = audioOnly;
+    }
+    el('video-audio-codec').disabled = audioOnly;
+    updateVideoPresetAvailability();
+    const path = currentPath();
+    if (audioOnly) {
+      const format = el('audio-format').value;
+      setAutoValue('video-out', suggestOutput('', format === 'm4a' ? '.m4a' : '.' + format, path));
+      el('run-hint').textContent = '';
+    } else {
+      setAutoValue('video-out', suggestOutput('-converted', videoExtension(el('video-format').value), path));
+      el('run-hint').textContent = '';
+    }
+  }
+
+  async function runVideoConversion() {
+    const path = currentPath();
+    if (!path) throw new Error('先选择一个视频文件。');
+    if (el('audio-only').checked) {
+      const format = el('audio-format').value;
+      const codec = format === 'm4a' ? 'aac' : (format === 'wav' ? 'pcm_s16le' : 'libmp3lame');
+      const extension = format === 'm4a' ? '.m4a' : '.' + format;
+      const output = (el('video-out').value || '').trim() || suggestOutput('', extension, path);
+      const audio = { encode: { codec: codec } };
+      if (format !== 'wav') audio.encode.bitrate = el('audio-bitrate').value;
+      const recipe = {
+        inputs: [{ path: path }],
+        video: { disable: true },
+        audio: audio,
+        output: { path: output },
+      };
+      notify('正在提交音频提取…');
+      const response = await bridgeInvoke('media.toolkit.recipe.run', {
+        workspace_root: state.workspaceRoot,
+        recipe: recipe,
+        kind: 'extract-audio',
+      });
+      beginJob(response && response.job);
+      return;
+    }
+
+    const output = (el('video-out').value || '').trim() ||
+      suggestOutput('-converted', videoExtension(el('video-format').value), path);
+    const videoCodec = el('video-codec').value;
+    const input = {
+      workspace_root: state.workspaceRoot,
+      path: path,
+      output: output,
+      format: el('video-format').value,
+      video_codec: videoCodec,
+      audio_codec: el('video-audio-codec').value,
+      overwrite: el('video-overwrite').checked,
+    };
+    if (videoCodec !== 'copy') {
+      const dimensions = requireCustomDimensions('video-size-preset', videoDimensions());
+      const quality = videoQualitySettings();
+      if (dimensions.width > 0) input.width = dimensions.width;
+      if (dimensions.height > 0) input.height = dimensions.height;
+      const fps = positiveNumber('video-fps');
+      const videoBitrate = integerOrZero('video-bitrate');
+      const audioBitrate = integerOrZero('video-audio-bitrate');
+      if (fps > 0) input.fps = fps;
+      if (videoBitrate > 0) input.video_bitrate_kbps = videoBitrate;
+      else if (quality.crf > 0) input.crf = quality.crf;
+      if (audioBitrate > 0) input.audio_bitrate_kbps = audioBitrate;
+      input.preset = quality.speed;
+    }
+    notify('正在提交视频转换…');
+    const response = await bridgeInvoke('media.toolkit.video.convert', input);
+    beginJob(response && response.job);
+  }
+
+  async function runImagesToVideo() {
+    const path = currentPath();
+    if (!path) throw new Error('先选择一张图片或填写图片序列路径。');
+    const output = (el('images-out').value || '').trim() || suggestOutput('-slideshow', '.mp4', path);
+    const dimensions = requireCustomDimensions('images-size-preset', imagesDimensions());
+    const input = {
+      workspace_root: state.workspaceRoot,
+      image_path: path,
+      output: output,
+      fps: positiveNumber('images-fps') || 30,
+      overwrite: el('images-overwrite').checked,
+    };
+    const durationMs = Math.round(positiveNumber('images-duration') * 1000);
+    const crf = integerOrZero('images-crf');
+    if (durationMs > 0) input.duration_ms = durationMs;
+    if (dimensions.width > 0) input.width = dimensions.width;
+    if (dimensions.height > 0) input.height = dimensions.height;
+    if (crf > 0) input.crf = crf;
+    const audioPath = (el('images-audio').value || '').trim();
+    if (audioPath) input.audio_path = audioPath;
+    notify('正在提交图片转视频…');
+    const response = await bridgeInvoke('media.toolkit.images.to-video', input);
+    beginJob(response && response.job);
+    const warnings = response && response.plan && response.plan.warnings;
+    if (warnings && warnings.length) notify(warnings.join('；'), 'warn');
+  }
+
+  async function runAnalysis() {
+    const path = currentPath();
+    if (!path) throw new Error('先选择要分析的媒体文件。');
+    notify('正在分析媒体参数…');
+    const response = await bridgeInvoke('media.toolkit.media.analyze', {
+      workspace_root: state.workspaceRoot,
+      path: path,
+    });
+    if (!response || !response.report) throw new Error('插件没有返回分析结果。');
+    renderAnalysis(response.report);
+    notify('参数分析完成。', 'ok');
+  }
+
+  function renderAnalysis(report) {
+    const rows = [
+      ['文件', report.file_name || baseName(report.path || '')],
+      ['类型', report.media_type || '—'],
+      ['容器', report.container || '—'],
+      ['时长', formatDuration(report.duration_ms)],
+      ['体积', formatSize(report.size_bytes)],
+      ['总码率', formatBitrate(report.bit_rate)],
+    ];
+    if (report.video) {
+      rows.push({ group: '视频' });
+      rows.push(['编码', report.video.codec || '—']);
+      if (report.video.profile) rows.push(['编码档次', report.video.profile]);
+      rows.push(['尺寸', report.video.width + '×' + report.video.height]);
+      rows.push(['帧率', report.video.fps ? report.video.fps.toFixed(2) + ' fps' : '—']);
+      rows.push(['码率', formatBitrate(report.video.bit_rate)]);
+      rows.push(['像素格式', report.video.pixel_format || '—']);
+    }
+    if (report.audio) {
+      rows.push({ group: '音频' });
+      rows.push(['编码', report.audio.codec || '—']);
+      rows.push(['采样率', report.audio.sample_rate ? report.audio.sample_rate + ' Hz' : '—']);
+      rows.push(['声道', report.audio.channels ? report.audio.channels + ' 声道' : '—']);
+      rows.push(['码率', formatBitrate(report.audio.bit_rate)]);
+    }
+    if ((report.warnings || []).length) rows.push(['提醒', report.warnings.join('；')]);
+    const node = el('analysis-result');
+    node.innerHTML = rowsTable(rows);
+    node.hidden = false;
+  }
+
+  async function runCurrent() {
+    if (!state.workspaceRoot) {
+      notify('当前项目没有可用的文件目录。', 'bad');
+      return;
+    }
+    setBusy(true);
+    try {
+      if (state.activeTab === 'image') await runImageConversion();
+      else if (state.activeTab === 'video') await runVideoConversion();
+      else if (state.activeTab === 'images') await runImagesToVideo();
+      else if (state.activeTab === 'analyze') await runAnalysis();
+    } catch (error) {
+      notify('处理失败：' + describe(error), 'bad');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function renderJob(job) {
+    if (!job) return;
     const box = el('current-job');
     box.hidden = false;
-    el('job-title').textContent = job.kind ? '处理 · ' + job.kind : '处理';
+    el('job-title').textContent = jobKindText(job.kind);
     const stateNode = el('job-state');
     stateNode.textContent = jobStateText(job.status);
     stateNode.className = 'badge ' + jobStateTone(job.status);
-    const percent = Math.max(0, Math.min(100, job.progress || 0));
+    const percent = Math.max(0, Math.min(100, Number(job.progress || 0)));
     const bar = el('job-bar');
     bar.style.width = percent + '%';
-    bar.className = 'bar-fill' +
-      (job.status === 'completed' ? ' done' : (job.status === 'failed' ? ' bad' : ''));
+    bar.className = 'bar-fill' + (job.status === 'completed' ? ' done' : (job.status === 'failed' ? ' bad' : (job.status === 'interrupted' ? ' warn' : '')));
     el('job-percent').textContent = percent.toFixed(1) + '%';
     el('job-speed').textContent = job.speed ? job.speed : '';
-    el('job-output').textContent = job.output || '';
-    if (job.error) el('job-output').textContent = job.error;
+    el('job-output').textContent = job.error || job.output || '';
+    el('cancel-button').hidden = terminal(job.status);
+  }
+
+  function jobKindText(kind) {
+    return ({
+      'video.convert': '视频转换',
+      'images.to-video': '图片转视频',
+      'extract-audio': '提取音轨',
+      recipe: '媒体处理',
+    })[kind] || (kind ? '处理 · ' + kind : '媒体处理');
   }
 
   function jobStateText(status) {
     return ({
       queued: '排队中', running: '处理中', completed: '已完成',
-      failed: '失败', cancelled: '已取消',
+      failed: '失败', cancelled: '已取消', interrupted: '已中断',
     })[status] || (status || '—');
   }
 
   function jobStateTone(status) {
     if (status === 'completed') return 'ok';
     if (status === 'failed') return 'bad';
-    if (status === 'cancelled') return 'warn';
+    if (status === 'cancelled' || status === 'interrupted') return 'warn';
     return 'muted';
   }
 
-  const terminal = (status) => ['completed', 'failed', 'cancelled'].includes(status);
+  function terminal(status) {
+    return ['completed', 'failed', 'cancelled', 'interrupted'].includes(status);
+  }
+
+  function beginJob(job) {
+    if (!job || !job.id) throw new Error('插件没有返回作业 ID。');
+    state.job = job;
+    renderJob(job);
+    startPolling();
+    notify('已提交：' + jobKindText(job.kind) + '。', 'ok');
+    void loadHistory();
+  }
 
   function startPolling() {
     stopPolling();
-    state.timer = window.setInterval(() => { void pollJob(); }, 1200);
+    state.timer = window.setInterval(() => { void pollJob(); }, 1000);
+    void pollJob();
   }
 
   function stopPolling() {
-    if (state.timer) {
-      window.clearInterval(state.timer);
-      state.timer = null;
-    }
+    if (state.timer) window.clearInterval(state.timer);
+    state.timer = null;
   }
 
   async function pollJob() {
-    const job = state.job;
-    if (!job || !job.id) { stopPolling(); return; }
+    if (!state.job || !state.job.id) return;
     try {
-      const fresh = await bridgeInvoke('media.toolkit.job.status', { job_id: job.id });
+      const response = await bridgeInvoke('media.toolkit.job.status', { job_id: state.job.id });
+      const fresh = response && (response.job || response);
       if (!fresh) return;
       state.job = fresh;
       renderJob(fresh);
       if (terminal(fresh.status)) {
         stopPolling();
-        if (fresh.status === 'completed') {
-          notify('处理完成：' + (fresh.output || ''), 'ok');
-          // 产物是媒体文件，直接给个预览（不是图片就不显示）
-          if (/\.(jpg|jpeg|png|webp|bmp|gif)$/i.test(fresh.output || '')) {
-            await showImages([fresh.output], '产物');
-          }
-        } else if (fresh.status === 'failed') {
-          notify('处理失败：' + (fresh.error || '未知原因'), 'bad');
-        }
+        if (fresh.status === 'completed') notify('处理完成', 'ok');
+        if (fresh.status === 'failed') notify('处理失败：' + (fresh.error || '未知原因'), 'bad');
+        if (fresh.status === 'cancelled') notify('处理已取消。', 'warn');
+        if (fresh.status === 'interrupted') notify('上次处理因插件进程重启而中断。', 'warn');
         void loadHistory();
       }
     } catch (_) {
-      // 轮询失败不打断：下一拍再试。
+      // 短暂断线不打断作业，下一拍继续。
     }
   }
 
   async function loadHistory() {
     try {
-      const result = await bridgeInvoke('media.toolkit.job.list', { limit: 10 });
+      const result = await bridgeInvoke('media.toolkit.job.list', { limit: 12 });
       const jobs = (result && result.jobs) || [];
       const box = el('job-history');
       if (!jobs.length) {
-        box.innerHTML = '<p class="hint">还没有处理记录。</p>';
+        box.innerHTML = '<p class="history-empty">暂无任务</p>';
         return;
       }
-      const parts = [];
-      for (const job of jobs) {
-        parts.push(
-          '<div class="history-item">' +
-          '<span class="badge ' + jobStateTone(job.status) + '">' + escapeHtml(jobStateText(job.status)) + '</span>' +
-          '<span class="grow mono">' + escapeHtml(job.output || job.input || job.id) + '</span>' +
-          '<span class="muted">' + escapeHtml(jobStateText(job.status)) + '</span>' +
-          '</div>'
-        );
-      }
-      box.innerHTML = parts.join('');
+      box.innerHTML = jobs.map((job) =>
+        '<div class="history-item">' +
+        '<span class="badge ' + jobStateTone(job.status) + '">' + escapeHtml(jobStateText(job.status)) + '</span>' +
+        '<span class="grow mono">' + escapeHtml(job.output || job.input || job.id) + '</span>' +
+        '<span class="muted">' + escapeHtml(jobKindText(job.kind)) + '</span>' +
+        '</div>'
+      ).join('');
     } catch (_) {
-      /* 历史不是关键路径 */
+      // 历史不是关键路径。
     }
   }
 
   async function cancelJob() {
-    const job = state.job;
-    if (!job || !job.id) return;
+    if (!state.job || !state.job.id) return;
     setBusy(true);
     try {
-      await bridgeInvoke('media.toolkit.job.cancel', { job_id: job.id });
-      notify('已请求取消。');
+      await bridgeInvoke('media.toolkit.job.cancel', { job_id: state.job.id });
+      notify('已请求取消。', 'warn');
     } catch (error) {
       notify('取消失败：' + describe(error), 'bad');
     } finally {
@@ -803,54 +947,94 @@
     }
   }
 
-  // ── 事件绑定 ────────────────────────────────────────
-
-  function bindTabs() {
-    for (const tab of document.querySelectorAll('.tab')) {
-      tab.addEventListener('click', () => {
-        for (const node of document.querySelectorAll('.tab')) node.classList.remove('is-active');
-        for (const node of document.querySelectorAll('.panel')) node.classList.remove('is-active');
-        tab.classList.add('is-active');
-        const panel = document.querySelector('.panel[data-panel="' + tab.dataset.tab + '"]');
-        if (panel) panel.classList.add('is-active');
-        // recipe 之外的标签页没有"预览参数"这一步
-        const recipeTab = isRecipeTab(tab.dataset.tab);
-        el('plan-button').hidden = !recipeTab;
-        el('plan-output').hidden = true;
-        el('run-button').textContent = recipeTab ? '开始' : '运行';
-        prefillOutputs();
-      });
+  function activateTab(tab) {
+    state.activeTab = tab;
+    for (const node of document.querySelectorAll('.tab')) {
+      node.classList.toggle('is-active', node.dataset.tab === tab);
     }
+    for (const node of document.querySelectorAll('.panel')) {
+      node.classList.toggle('is-active', node.dataset.panel === tab);
+    }
+    const labels = {
+      image: '开始转换',
+      video: '开始转换',
+      images: '生成视频',
+      analyze: '分析参数',
+    };
+    el('run-button').textContent = labels[tab] || '开始处理';
+    el('run-hint').textContent = '';
+    renderSelection();
+    prefillOutputs();
   }
 
-  async function boot() {
-    bindTabs();
+  function bindEvents() {
+    for (const tab of document.querySelectorAll('.tab')) {
+      tab.addEventListener('click', () => activateTab(tab.dataset.tab));
+    }
     el('runtime-button').addEventListener('click', () => { void loadRuntime(); });
-    el('reload-files').addEventListener('click', () => { void loadFiles(); });
-    el('probe-button').addEventListener('click', () => { void probe(); });
-    el('plan-button').addEventListener('click', () => { void planRecipe(); });
+    bindSelectionDropTarget();
+    el('pick-media').addEventListener('click', () => { void pickMedia(); });
+    el('pick-media-more').addEventListener('click', () => { void pickMedia(); });
+    el('pick-audio').addEventListener('click', () => { void pickAudio(); });
+    el('selection-list').addEventListener('click', (event) => {
+      const remove = event.target.closest('[data-remove-path]');
+      if (remove) removeSelection(remove.dataset.removePath);
+    });
     el('run-button').addEventListener('click', () => { void runCurrent(); });
-    el('extract-button').addEventListener('click', () => { void runPreview(); });
     el('refresh-jobs').addEventListener('click', () => { void loadHistory(); });
     el('cancel-button').addEventListener('click', () => { void cancelJob(); });
 
-    el('file-select').addEventListener('change', (event) => {
-      if (!event.target.value) return;
-      el('media-path').value = event.target.value;
-      el('convert-out').value = '';
-      el('audio-out').value = '';
-      el('images-out').value = '';
-      state.media = null;
-      el('media-info').hidden = true;
-      void probe();
-    });
-    el('media-path').addEventListener('change', () => { prefillOutputs(); });
-    el('convert-mode').addEventListener('change', () => { prefillOutputs(); });
-    el('audio-format').addEventListener('change', () => { prefillOutputs(); });
-    el('run-button').textContent = '开始';
+    el('image-output-dir').addEventListener('input', () => { markManual('image-output-dir'); });
+    el('video-out').addEventListener('input', () => { markManual('video-out'); });
+    el('images-out').addEventListener('input', () => { markManual('images-out'); });
 
+    el('image-size-preset').addEventListener('change', syncImageSizePreset);
+    el('image-quality-preset').addEventListener('change', syncImageQualityPreset);
+    el('video-size-preset').addEventListener('change', syncVideoSizePreset);
+    el('video-quality-preset').addEventListener('change', syncVideoQualityPreset);
+    el('images-size-preset').addEventListener('change', syncImagesSizePreset);
+
+    for (const id of ['image-width', 'image-height']) {
+      el(id).addEventListener('input', () => { chooseCustom('image-size-preset', 'image-advanced'); });
+    }
+    el('image-quality').addEventListener('input', () => {
+      chooseCustom('image-quality-preset', 'image-advanced');
+      el('image-quality-label').textContent = el('image-quality').value;
+    });
+    for (const id of ['video-width', 'video-height']) {
+      el(id).addEventListener('input', () => { chooseCustom('video-size-preset', 'video-advanced'); });
+    }
+    for (const id of ['video-crf', 'video-bitrate']) {
+      el(id).addEventListener('input', () => {
+        chooseCustom('video-quality-preset', 'video-advanced');
+        if (id === 'video-crf' && positiveNumber(id) > 0) el('video-bitrate').value = '';
+        if (id === 'video-bitrate' && positiveNumber(id) > 0) el('video-crf').value = '';
+      });
+    }
+    for (const id of ['images-width', 'images-height']) {
+      el(id).addEventListener('input', () => { chooseCustom('images-size-preset', 'images-advanced'); });
+    }
+
+    el('image-format').addEventListener('change', () => { prefillOutputs(); });
+    el('video-format').addEventListener('change', () => { syncVideoCodecs(); prefillOutputs(); });
+    el('video-codec').addEventListener('change', updateVideoPresetAvailability);
+    el('audio-only').addEventListener('change', toggleAudioOnly);
+    el('audio-format').addEventListener('change', () => { prefillOutputs(); });
+  }
+
+  async function boot() {
+    bindEvents();
+    void registerTauriDragEvents();
+    syncVideoCodecs();
+    syncImageSizePreset();
+    syncImageQualityPreset();
+    syncVideoSizePreset();
+    syncVideoQualityPreset();
+    syncImagesSizePreset();
+    toggleAudioOnly();
+    renderSelection();
+    activateTab('image');
     await loadWorkspace();
-    await loadFiles();
     await loadHistory();
     void loadRuntime();
   }

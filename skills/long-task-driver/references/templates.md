@@ -82,9 +82,24 @@
 | `blockers` | `[{reason, rounds, needs}]` |
 | `no_progress_rounds` | 连续无进展轮数 |
 | `budget` | `{max_rounds, max_minutes}` |
-| `capabilities` | `{file_io, shell, auto_continue, background_job, subagent}` 布尔值 |
+| `capabilities` | 探测结果，见下表 |
+| `native_goal_id` | 原生目标 ID；无原生机制时为 `null` |
+| `native_goal_state` | 原生目标当前状态（`active` / `paused` / `blocked` / `complete` / `budgetLimited`） |
 | `rollback_point` | 最近回滚点（提交号或备份路径） |
 | `confirmed_at` / `updated_at` | 时间戳 |
+
+`capabilities` 字段：
+
+| 键 | 含义 |
+|---|---|
+| `native_goal` | `{kind, create, update, get}`；无则为 `null` |
+| `loop` | `{kind, invoke}`；无则为 `null` |
+| `cli_queue` | `{cmd}`；无则为 `null` |
+| `shell` | 能否执行命令 |
+| `background_job` | 能否提交长时任务 |
+| `subagent` | 能否派生子任务 |
+
+探测顺序与对应档位见 `clients.md`；**`native_goal` 非空就必须用它，不得降级**。
 
 示例：
 
@@ -105,7 +120,16 @@
   "blockers": [],
   "no_progress_rounds": 0,
   "budget": {"max_rounds": 40, "max_minutes": 240},
-  "capabilities": {"file_io": true, "shell": true, "auto_continue": false, "background_job": false, "subagent": false},
+  "capabilities": {
+    "native_goal": {"kind": "goal-tool", "create": "create_goal", "update": "update_goal", "get": "get_goal"},
+    "loop": null,
+    "cli_queue": null,
+    "shell": true,
+    "background_job": false,
+    "subagent": false
+  },
+  "native_goal_id": "goal_01J8ZK3Q",
+  "native_goal_state": "active",
   "rollback_point": "git:9f2c1ab",
   "confirmed_at": "2026-10-20T10:40:00+08:00",
   "updated_at": "2026-10-20T11:12:00+08:00"
@@ -142,10 +166,13 @@
 续跑：说「继续长任务 <task-id>」
 ```
 
-## 7. 续跑块（L2/L3 轮次结束输出）
+## 7. 续跑块（仅 L2/L3 使用）
+
+有原生目标时不要用它——那是 L0 该走的路径。
 
 ```markdown
 [长任务] <task-id> · 第 N 轮 · <phase>
+本客户端无自动续跑，需要你发指令接续。
 进度：<x/y> 验收项 · 本轮证据：<一行>
 下一步：<next_action>
 继续请说：「继续长任务 <task-id>」

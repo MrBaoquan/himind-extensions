@@ -3,14 +3,19 @@
 package ffmpeg
 
 import (
+	"fmt"
 	"os/exec"
+	"strconv"
 	"syscall"
+	"time"
 )
 
-// configureHiddenProcess 让子进程不要弹出控制台窗口。
+const windowsCreateNewProcessGroup = 0x00000200
+
+// configureHiddenProcess 让子进程不要弹出控制台窗口，并确保取消时能杀掉整棵进程树。
 //
-// 插件是以无窗口进程被 Agent 拉起的，任何未隐藏的控制台窗口都会在用户桌面上闪一下，
-// 批量处理时尤其明显。CREATE_NO_WINDOW 是唯一可靠的做法（HideWindow 只对新建窗口生效）。
+// Windows 上常见的 ffmpeg 是 shim：CommandContext 默认只终止 shim，真正的 ffmpeg
+// 子进程会继续运行并占满 CPU。因此这里覆盖 Cancel，用 taskkill /T /F 清理进程树。
 func configureHiddenProcess(command *exec.Cmd) {
 	if command == nil {
 		return
@@ -20,5 +25,17 @@ func configureHiddenProcess(command *exec.Cmd) {
 		command.SysProcAttr = &syscall.SysProcAttr{}
 	}
 	command.SysProcAttr.HideWindow = true
-	command.SysProcAttr.CreationFlags |= createNoWindow
+	command.SysProcAttr.CreationFlags |= createNoWindow | windowsCreateNewProcessGroup
+	command.WaitDelay = 5 * time.Second
+	command.Cancel = func() error {
+		if command.Process == nil {
+			return nil
+		}
+		kill := exec.Command("taskkill", "/PID", strconv.Itoa(command.Process.Pid), "/T", "/F")
+		kill.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNoWindow}
+		if err := kill.Run(); err != nil {
+			return fmt.Errorf("终止 ffmpeg 进程树失败: %w", err)
+		}
+		return nil
+	}
 }

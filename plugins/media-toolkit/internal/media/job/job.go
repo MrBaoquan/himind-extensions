@@ -10,10 +10,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,24 +25,32 @@ import (
 
 // 作业状态。
 const (
-	StatusQueued    = "queued"
-	StatusRunning   = "running"
-	StatusCompleted = "completed"
-	StatusFailed    = "failed"
-	StatusCancelled = "cancelled"
+	StatusQueued      = "queued"
+	StatusRunning     = "running"
+	StatusCompleted   = "completed"
+	StatusFailed      = "failed"
+	StatusCancelled   = "cancelled"
+	StatusInterrupted = "interrupted"
 )
+
+// InlineWorkerEnv 仅供测试使用；生产作业必须由独立 worker 进程执行。
+const InlineWorkerEnv = "HIMIND_MEDIA_TOOLKIT_INLINE_JOBS"
 
 // Record 一条作业记录。字段刻意扁平，便于直接作为能力返回值。
 type Record struct {
-	ID       string  `json:"id"`
-	Kind     string  `json:"kind"`
-	Status   string  `json:"status"`
-	Progress float64 `json:"progress"`
-	Input    string  `json:"input,omitempty"`
-	Output   string  `json:"output,omitempty"`
+	ID         string  `json:"id"`
+	Kind       string  `json:"kind"`
+	Status     string  `json:"status"`
+	Progress   float64 `json:"progress"`
+	Input      string  `json:"input,omitempty"`
+	Output     string  `json:"output,omitempty"`
+	TempOutput string  `json:"temp_output,omitempty"`
+	WorkerPID  int     `json:"worker_pid,omitempty"`
+	Heartbeat  string  `json:"heartbeat_at,omitempty"`
 	// Recipe 摘要（人类可读），用于回看"这条是怎么编出来的"。
 	Recipe    string   `json:"recipe,omitempty"`
 	Args      []string `json:"args,omitempty"`
+	RunArgs   []string `json:"-"`
 	TotalMs   int64    `json:"total_ms,omitempty"`
 	OutTimeMs int64    `json:"out_time_ms,omitempty"`
 	Speed     string   `json:"speed,omitempty"`
@@ -58,6 +68,7 @@ type Store struct {
 	root    string
 	jobs    map[string]*Record
 	cancels map[string]context.CancelFunc
+	inline  bool
 }
 
 // NewStore 创建作业存储。
@@ -71,6 +82,7 @@ func NewStore(tools ffmpeg.Tools) (*Store, error) {
 		root:    root,
 		jobs:    make(map[string]*Record),
 		cancels: make(map[string]context.CancelFunc),
+		inline:  strings.TrimSpace(os.Getenv(InlineWorkerEnv)) == "1",
 	}
 	store.loadExisting()
 	return store, nil
@@ -92,21 +104,36 @@ func (s *Store) Submit(kind, input, output, description string, args []string, t
 	if err != nil {
 		return nil, err
 	}
+	tempOutput, err := createTempOutput(output)
+	if err != nil {
+		return nil, err
+	}
+	runArgs := append([]string(nil), args...)
+	if len(runArgs) == 0 {
+		_ = os.Remove(tempOutput)
+		return nil, fmt.Errorf("ffmpeg 参数为空")
+	}
+	// recipe 编译结果始终以输出路径结尾；先写同目录临时文件，成功后再原子替换，
+	// 避免失败/取消留下半截产物，或把上一版可用产物提前删掉。
+	runArgs[len(runArgs)-1] = tempOutput
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	record := &Record{
-		ID:        id,
-		Kind:      kind,
-		Status:    StatusQueued,
-		Progress:  0,
-		Input:     input,
-		Output:    output,
-		Recipe:    description,
-		Args:      args,
-		TotalMs:   totalMs,
-		LogPath:   logPath,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:         id,
+		Kind:       kind,
+		Status:     StatusQueued,
+		Progress:   0,
+		Input:      input,
+		Output:     output,
+		TempOutput: tempOutput,
+		Recipe:     description,
+		Args:       append([]string(nil), args...),
+		RunArgs:    runArgs,
+		TotalMs:    totalMs,
+		LogPath:    logPath,
+		Heartbeat:  now,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 
 	s.mu.Lock()
@@ -114,12 +141,30 @@ func (s *Store) Submit(kind, input, output, description string, args []string, t
 	s.mu.Unlock()
 	s.persist(record)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	s.mu.Lock()
-	s.cancels[id] = cancel
-	s.mu.Unlock()
+	if s.inline {
+		ctx, cancel := context.WithCancel(context.Background())
+		s.mu.Lock()
+		s.cancels[id] = cancel
+		s.mu.Unlock()
+		go s.run(ctx, record)
+		return record, nil
+	}
 
-	go s.run(ctx, record)
+	workerPID, err := spawnWorker(filepath.Join(s.root, id))
+	if err != nil {
+		s.update(id, func(item *Record) {
+			item.Status = StatusFailed
+			item.Error = "启动后台 worker 失败: " + err.Error()
+			item.TempOutput = ""
+			item.Heartbeat = ""
+		})
+		_ = os.Remove(tempOutput)
+		return nil, err
+	}
+	s.mu.Lock()
+	record.WorkerPID = workerPID
+	s.mu.Unlock()
+	s.persist(record)
 	return record, nil
 }
 
@@ -127,7 +172,11 @@ func (s *Store) run(ctx context.Context, record *Record) {
 	started := time.Now()
 	s.update(record.ID, func(item *Record) {
 		item.Status = StatusRunning
+		item.WorkerPID = os.Getpid()
+		item.Heartbeat = time.Now().UTC().Format(time.RFC3339)
 	})
+	runCtx, stopWatch := s.watchJob(ctx, record.ID)
+	defer stopWatch()
 
 	logFile, logErr := os.Create(record.LogPath)
 	var logWriter *os.File
@@ -136,8 +185,15 @@ func (s *Store) run(ctx context.Context, record *Record) {
 		defer logFile.Close()
 	}
 
-	_, err := s.tools.Run(ctx, ffmpeg.RunOptions{
-		Args:      record.Args,
+	runArgs := record.RunArgs
+	if len(runArgs) == 0 {
+		runArgs = append([]string(nil), record.Args...)
+		if record.TempOutput != "" && len(runArgs) > 0 {
+			runArgs[len(runArgs)-1] = record.TempOutput
+		}
+	}
+	_, err := s.tools.Run(runCtx, ffmpeg.RunOptions{
+		Args:      runArgs,
 		LogWriter: logWriter,
 		OnProgress: func(progress ffmpeg.Progress) {
 			s.update(record.ID, func(item *Record) {
@@ -154,20 +210,32 @@ func (s *Store) run(ctx context.Context, record *Record) {
 		},
 	})
 
+	var finalizeErr error
+	if err == nil {
+		finalizeErr = finalizeTempOutput(record.TempOutput, record.Output)
+	}
+	if err != nil || finalizeErr != nil {
+		_ = os.Remove(record.TempOutput)
+	}
 	s.update(record.ID, func(item *Record) {
 		item.ElapsedMs = time.Since(started).Milliseconds()
+		item.TempOutput = ""
 		switch {
-		case err == nil:
+		case err == nil && finalizeErr == nil:
 			item.Status = StatusCompleted
 			item.Progress = 100
-		case ctx.Err() != nil:
+		case runCtx.Err() != nil:
 			item.Status = StatusCancelled
 			item.Error = "已被取消"
-		default:
+		case err != nil:
 			item.Status = StatusFailed
 			item.Error = err.Error()
+		default:
+			item.Status = StatusFailed
+			item.Error = "写入最终产物失败: " + finalizeErr.Error()
 		}
 	})
+	_ = os.Remove(cancelPath(s.root, record.ID))
 
 	s.mu.Lock()
 	if cancel, ok := s.cancels[record.ID]; ok {
@@ -200,10 +268,19 @@ func (s *Store) Cancel(id string) error {
 	if !exists {
 		return fmt.Errorf("未找到作业: %s", id)
 	}
-	if !ok {
+	if record.Status != StatusQueued && record.Status != StatusRunning {
 		return fmt.Errorf("作业已结束，无法取消: %s (%s)", id, record.Status)
 	}
-	cancel()
+	marker := cancelPath(s.root, id)
+	if err := os.MkdirAll(filepath.Dir(marker), 0o755); err != nil {
+		return fmt.Errorf("创建取消标记目录失败: %w", err)
+	}
+	if err := os.WriteFile(marker, []byte("cancel\n"), 0o644); err != nil {
+		return fmt.Errorf("写入取消标记失败: %w", err)
+	}
+	if ok {
+		cancel()
+	}
 	return nil
 }
 
@@ -279,11 +356,20 @@ func (s *Store) loadExisting() {
 		if json.Unmarshal(payload, &record) != nil || record.ID == "" {
 			continue
 		}
-		// 进程重启后，运行中的作业实际已经死了：标成失败而不是永远停在 running，
-		// 否则调用方会一直等一个永远不会完成的进度。
+		// 独立 worker 会持续写心跳。父插件进程退出不再等于作业中断；
+		// 只有心跳超过宽限期仍未更新，才把作业标记为 interrupted。
 		if record.Status == StatusRunning || record.Status == StatusQueued {
-			record.Status = StatusFailed
-			record.Error = "插件进程重启，作业中断"
+			if heartbeatFresh(record.Heartbeat, 20*time.Second) {
+				s.jobs[record.ID] = &record
+				continue
+			}
+			record.Status = StatusInterrupted
+			record.Error = "后台 worker 已停止，作业中断"
+			_ = os.Remove(record.TempOutput)
+			_ = os.Remove(cancelPath(s.root, record.ID))
+			record.TempOutput = ""
+			record.Heartbeat = ""
+			s.persist(&record)
 		}
 		s.jobs[record.ID] = &record
 	}
@@ -318,6 +404,114 @@ func safeID(value string) bool {
 		}
 	}
 	return true
+}
+
+func createTempOutput(output string) (string, error) {
+	if strings.TrimSpace(output) == "" {
+		return "", fmt.Errorf("输出路径为空")
+	}
+	dir := filepath.Dir(output)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("创建输出目录失败: %w", err)
+	}
+	file, err := os.CreateTemp(dir, "."+filepath.Base(output)+".part-*"+filepath.Ext(output))
+	if err != nil {
+		return "", fmt.Errorf("创建临时输出失败: %w", err)
+	}
+	path := file.Name()
+	if closeErr := file.Close(); closeErr != nil {
+		_ = os.Remove(path)
+		return "", closeErr
+	}
+	if err := os.Remove(path); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func finalizeTempOutput(temp, output string) error {
+	info, err := os.Stat(temp)
+	if err != nil || info.Size() == 0 {
+		return fmt.Errorf("临时产物缺失或为空")
+	}
+	if err := os.Remove(output); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return os.Rename(temp, output)
+}
+
+// RunWorker 由独立进程执行一条已落盘作业。
+func RunWorker(jobDir string) error {
+	jobDir = filepath.Clean(strings.TrimSpace(jobDir))
+	payload, err := os.ReadFile(filepath.Join(jobDir, "job.json"))
+	if err != nil {
+		return fmt.Errorf("读取作业失败: %w", err)
+	}
+	var record Record
+	if err := json.Unmarshal(payload, &record); err != nil {
+		return fmt.Errorf("解析作业失败: %w", err)
+	}
+	if record.Status == StatusCompleted || record.Status == StatusFailed || record.Status == StatusCancelled || record.Status == StatusInterrupted {
+		return nil
+	}
+	tools, err := ffmpeg.Locate()
+	if err != nil {
+		return err
+	}
+	root := filepath.Dir(jobDir)
+	store := &Store{
+		tools: tools, root: root,
+		jobs:    map[string]*Record{record.ID: &record},
+		cancels: make(map[string]context.CancelFunc),
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	store.cancels[record.ID] = cancel
+	store.run(ctx, &record)
+	return nil
+}
+
+func (s *Store) watchJob(parent context.Context, id string) (context.Context, func()) {
+	ctx, cancel := context.WithCancel(parent)
+	done := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+		for {
+			s.update(id, func(item *Record) {
+				item.WorkerPID = os.Getpid()
+				item.Heartbeat = time.Now().UTC().Format(time.RFC3339)
+			})
+			if _, err := os.Stat(cancelPath(s.root, id)); err == nil {
+				cancel()
+				return
+			}
+			select {
+			case <-parent.Done():
+				cancel()
+				return
+			case <-done:
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
+	return ctx, func() {
+		cancel()
+		close(done)
+	}
+}
+
+func cancelPath(root, id string) string {
+	return filepath.Join(root, id, "cancel.requested")
+}
+
+func heartbeatFresh(value string, limit time.Duration) bool {
+	heartbeat, err := time.Parse(time.RFC3339, strings.TrimSpace(value))
+	if err != nil {
+		return false
+	}
+	age := time.Since(heartbeat)
+	return age >= -5*time.Second && age <= limit
 }
 
 // NormalizeLimit 把 limit 收敛到合理范围。
