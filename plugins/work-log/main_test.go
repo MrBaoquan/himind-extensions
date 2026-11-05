@@ -638,7 +638,8 @@ func TestReportReadFallsBackToArchiveFromOtherFiscalRule(t *testing.T) {
 	}
 }
 
-func TestUpsertRejectsBadDate(t *testing.T) {	withDataRoot(t)
+func TestUpsertRejectsBadDate(t *testing.T) {
+	withDataRoot(t)
 	root := t.TempDir()
 	_, rpcError := handle(jsonrpc.Request{
 		Method: "work-log.entry.upsert",

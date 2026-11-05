@@ -36,8 +36,9 @@ func boardProject(t *testing.T, board map[string]any, name string) map[string]an
 func TestProjectBoardAndWorkUpdate(t *testing.T) {
 	withDataRoot(t)
 	root := t.TempDir()
-	// 用当天日期：工作台默认只看最近 14 天，写死日期会让测试随时间变成 dormant。
+	// 用相对今天的日期：工作台按最近活动窗口派生状态，写死日期会随时间推移被判为搁置。
 	today := time.Now().Format("2006-01-02")
+	targetDate := time.Now().AddDate(0, 0, 10).Format("2006-01-02")
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":`+quote(today)+`,"entries":[{"project":"当前工作台","category":"开发","title":"调研项目状态","minutes":60,"next":["实现看板"]}]}`)
 
 	board := call(t, "work-log.project.board", `{"log_root":`+quote(root)+`}`)
@@ -49,7 +50,7 @@ func TestProjectBoardAndWorkUpdate(t *testing.T) {
 		t.Fatalf("默认优先级应为 P2，实际 %v", project["priority"])
 	}
 
-	updated := call(t, "work-log.project.work.update", `{"log_root":`+quote(root)+`,"project_name":"当前工作台","patch":{"state":"blocked","priority":"P0","goal":"完成第一版","target_date":"2026-11-15","blockers":["等待设计确认"],"next_steps":[{"text":"设计数据结构"},{"text":"实现接口"}]}}`)
+	updated := call(t, "work-log.project.work.update", `{"log_root":`+quote(root)+`,"project_name":"当前工作台","patch":{"state":"blocked","priority":"P0","goal":"完成第一版","target_date":`+quote(targetDate)+`,"blockers":["等待设计确认"],"next_steps":[{"text":"设计数据结构"},{"text":"实现接口"}]}}`)
 	work := updated["work"].(map[string]any)
 	if work["state"] != workStateBlocked || work["priority"] != priorityP0 {
 		t.Fatalf("工作状态未更新: %+v", work)
@@ -186,8 +187,7 @@ func TestLegacyProjectsWithoutWork(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "projects.json"), []byte(legacy), 0o644); err != nil {
 		t.Fatalf("写入旧登记表失败: %v", err)
 	}
-	recentDate := time.Now().Format("2006-01-02")
-	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":`+quote(recentDate)+`,"entries":[{"project":"旧项目","category":"开发","title":"旧日志","minutes":30}]}`)
+	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":`+quote(time.Now().Format("2006-01-02"))+`,"entries":[{"project":"旧项目","category":"开发","title":"旧日志","minutes":30}]}`)
 	board := call(t, "work-log.project.board", `{"log_root":`+quote(root)+`}`)
 	project := boardProject(t, board, "旧项目")
 	if project["state"] != workStateInProgress {
