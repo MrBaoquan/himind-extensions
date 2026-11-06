@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-d9c8af94b60c146a",
+  "generation": "sync-0e68500bb3d46795",
   "plugins": [
     {
       "allow_disable": true,
@@ -1299,6 +1299,53 @@
     {
       "allow_disable": true,
       "allow_uninstall": true,
+      "artifact_id": "github:skill/com.himind.skill.ui-accessibility@1.0.0:com.himind.skill.ui-accessibility-1.0.0.hmskill",
+      "artifact_sha256": "d5f340b97cca5a9f8a3d54c539889e840bda51dd0762b61b9fe4968468b0fe95",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [],
+      "categories": [
+        "visual-design",
+        "software-engineering"
+      ],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "把无障碍要求落成可运行的界面实现，覆盖语义角色、键盘路径、焦点管理、读屏标签与平台映射；当要实现或排查无障碍、准备无障碍验收时使用。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.himind.skill.ui-accessibility@1.0.0/com.himind.skill.ui-accessibility-1.0.0.hmskill",
+      "file_name": "com.himind.skill.ui-accessibility-1.0.0.hmskill",
+      "file_size": 31852,
+      "icon": {
+        "sha256": "a95b28f8f711850fd18673fad90615bb4301a9b3502d779e547a26e0b9f04c34",
+        "source": "author",
+        "url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.himind.skill.ui-accessibility@1.0.0/com.himind.skill.ui-accessibility-1.0.0-icon.png"
+      },
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.47",
+      "name": "界面无障碍",
+      "organization_reason": "",
+      "plugin_dependencies": [],
+      "published_at": "2026-11-06T13:14:24Z",
+      "release_notes": "首个版本：语义与键盘实现配方、桌面与移动映射、七步审计流程与带条款的报告格式。",
+      "release_tag": "skill/com.himind.skill.ui-accessibility@1.0.0",
+      "risk_summary": "只读分析与建议；不联网、不执行脚本、不修改工作区外文件。",
+      "sha256": "d5f340b97cca5a9f8a3d54c539889e840bda51dd0762b61b9fe4968468b0fe95",
+      "signature": "Me1j1aXh2ZSPwPPKMRFG2HiWK5tUMlHRCiI/Iulqta9J0ohn5uGAKdmeiYg4JuXqgMJLy/vviCksNVVbOOiot+/77dIwyiWAWr+63dkK5O42U2Bf4SUOHoZJydajeAFioNDroWgWo+4q7hAYebyl49kgyobNcSde9dU21i4Asuv8WQbOpgtgYmLKu1ZrBFnQ1BXwYFO4glMXH/geyzoZbUvd+6daoSSZeoyN5pdqPIJJux/sppK0+e0I+DH5cRRNkqUfdsdOlcZTaMQOPraVl8D3/L03HczqWa3/dHXcA37PL2PJlxFDeCqO7iB0QUSq7j5TNtZPYK43BfVX37Xlg16/5+FcUba8EDUr5jQwvHrCztK1qr+uISK4BZDfJN57x39RCmp7X/iDv3OI2ragofa8dwr+5S07hnHHg0Q8fFFaoIuSwYV/eDPs/+pNlQhcvwOsuuBUO30i0RtrindMGykE/2qRGM9njXxs9SYtL31MCljba9Fc0md+izwN6Ens",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "skill_id": "com.himind.skill.ui-accessibility",
+      "source": "github",
+      "source_commit": "6b0022ba09928d1d60e9720714d46478cec1f985",
+      "source_tree": "46c445930b1a48e6ad0d0f464beb6787f4f9d075",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "version": "1.0.0"
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
       "artifact_id": "github:skill/com.mrbaoquan.skill.unihper-unity-development@1.2.0:com.mrbaoquan.skill.unihper-unity-development-1.2.0.hmskill",
       "artifact_sha256": "c0bca8f37690269634139699a5e1e14f0c1220b6e6dbee80d0305b8c85eef6ce",
       "assignment": "optional",
@@ -1500,36 +1547,36 @@
       "channel": "stable",
       "dependencies": [
         {
-          "kind": "plugin",
           "id": "com.himind.work-log",
-          "required": true,
+          "kind": "plugin",
           "min_version": "",
-          "version": "0.15.0",
+          "pinned": true,
+          "required": true,
           "sha256": "98a42a822c4b6ed5fe3f500280b87ef0d1f607f11a74b36b32dea17d1ca73580",
           "source": {
-            "kind": "github",
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.work-log@0.15.0/com.himind.work-log-0.15.0.hmpkg",
             "id": "github:MrBaoquan/himind-extensions",
-            "repository": "MrBaoquan/himind-extensions",
+            "kind": "github",
             "reference": "plugin/com.himind.work-log@0.15.0",
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.work-log@0.15.0/com.himind.work-log-0.15.0.hmpkg"
+            "repository": "MrBaoquan/himind-extensions"
           },
-          "pinned": true
+          "version": "0.15.0"
         },
         {
-          "kind": "plugin",
           "id": "com.himind.work-log-collector",
-          "required": true,
+          "kind": "plugin",
           "min_version": "",
-          "version": "0.7.2",
+          "pinned": true,
+          "required": true,
           "sha256": "a068fd3d60eec597ee665c76104920e74d87337e20b19b1f7443955658ed9ccd",
           "source": {
-            "kind": "github",
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.work-log-collector@0.7.2/com.himind.work-log-collector-0.7.2.hmpkg",
             "id": "github:MrBaoquan/himind-extensions",
-            "repository": "MrBaoquan/himind-extensions",
+            "kind": "github",
             "reference": "plugin/com.himind.work-log-collector@0.7.2",
-            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.work-log-collector@0.7.2/com.himind.work-log-collector-0.7.2.hmpkg"
+            "repository": "MrBaoquan/himind-extensions"
           },
-          "pinned": true
+          "version": "0.7.2"
         }
       ],
       "description": "采集本机 AI 会话素材，按仓库路径/项目/展项稳定归类并用内置 AI 总结成清晰的工作日志条目（按项目→功能聚合），写入全局工作日志，生成日报归档，并跨期补算周报/月报（自然周期去重）。",
