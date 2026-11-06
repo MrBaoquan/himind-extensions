@@ -4,23 +4,23 @@
   "name": "界面设计助手",
   "author": "马宝全",
   "categories": ["visual-design", "software-engineering"],
-  "version": "0.3.0",
+  "version": "0.3.1",
   "scope": "organization",
-  "distribution_targets": ["workbench"],
+  "distribution_targets": ["workbench", "github"],
   "description": "根据产品、平台与用户目标生成设计系统方向，读取项目设计约束、受控维护设计系统文件、校验令牌并指导界面落地；当用户新建或改版界面、选择风格配色字体、生成设计系统或统一组件规则时使用。",
-  "release_notes": "0.3.0：实现阶段补六种内容状态要求，并与界面无障碍、界面工艺细节、软件界面规范约定交接顺序。",
+  "release_notes": "0.3.1：开放公开分发，依赖插件升到 0.3.0。",
   "min_agent_version": "0.3.47",
   "supported_clients": ["agent-skills"],
   "capabilities": [
-    {"id": "ui-ux.project.inspect", "required": true, "min_version": "0.2.0", "provider": "com.himind.ui-ux-design-tools"},
-    {"id": "ui-ux.design-system.generate", "required": true, "min_version": "0.2.0", "provider": "com.himind.ui-ux-design-tools"},
-    {"id": "ui-ux.design-system.persist", "required": true, "min_version": "0.2.0", "provider": "com.himind.ui-ux-design-tools"},
-    {"id": "ui-ux.token.validate", "required": true, "min_version": "0.2.0", "provider": "com.himind.ui-ux-design-tools"},
-    {"id": "ui-ux.guideline.search", "required": true, "min_version": "0.2.0", "provider": "com.himind.ui-ux-design-tools"},
-    {"id": "ui-ux.catalog.describe", "required": false, "min_version": "0.2.0", "provider": "com.himind.ui-ux-design-tools"}
+    {"id": "ui-ux.project.inspect", "required": true, "min_version": "0.3.0", "provider": "com.himind.ui-ux-design-tools"},
+    {"id": "ui-ux.design-system.generate", "required": true, "min_version": "0.3.0", "provider": "com.himind.ui-ux-design-tools"},
+    {"id": "ui-ux.design-system.persist", "required": true, "min_version": "0.3.0", "provider": "com.himind.ui-ux-design-tools"},
+    {"id": "ui-ux.token.validate", "required": true, "min_version": "0.3.0", "provider": "com.himind.ui-ux-design-tools"},
+    {"id": "ui-ux.guideline.search", "required": true, "min_version": "0.3.0", "provider": "com.himind.ui-ux-design-tools"},
+    {"id": "ui-ux.catalog.describe", "required": false, "min_version": "0.3.0", "provider": "com.himind.ui-ux-design-tools"}
   ],
   "plugin_dependencies": [
-    {"plugin_id": "com.himind.ui-ux-design-tools", "required": true, "min_version": "0.2.0"}
+    {"plugin_id": "com.himind.ui-ux-design-tools", "required": true, "min_version": "0.3.0"}
   ],
   "risk_summary": "只读项目检查与设计建议；设计系统写入仅限工作区约定路径，覆盖已有文件需用户确认；不联网、不执行脚本。",
   "contents": [
