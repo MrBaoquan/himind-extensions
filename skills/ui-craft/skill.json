@@ -1,0 +1,31 @@
+{
+  "id": "com.himind.skill.ui-craft",
+  "icon": "assets/icon.png",
+  "name": "界面工艺细节",
+  "author": "马宝全",
+  "categories": [
+    "visual-design",
+    "software-engineering"
+  ],
+  "version": "1.0.0",
+  "scope": "organization",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
+  "description": "打磨界面的工艺细节，覆盖同心圆角、光学对齐、阴影分层、数字对齐、命中区、过渡范围与动效手感；当界面能用但观感粗糙、扁平或跳动时使用。",
+  "release_notes": "首个版本：圆角与描边、光学对齐、间距节奏、文字细节、命中区、过渡与动效时长的取值规则与审查输出格式。",
+  "min_agent_version": "0.3.47",
+  "supported_clients": [
+    "agent-skills"
+  ],
+  "capabilities": [],
+  "plugin_dependencies": [],
+  "risk_summary": "只读分析与建议；改动范围限于当前任务涉及的样式与组件。",
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml",
+    "assets/icon.png"
+  ]
+}

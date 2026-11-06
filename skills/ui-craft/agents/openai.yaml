@@ -1,0 +1,4 @@
+interface:
+  display_name: "界面工艺细节"
+  short_description: "用具体取值打磨圆角、对齐、阴影与动效"
+  default_prompt: "使用 $ui-craft 打磨当前界面：先看结构与间距，再逐项修圆角、光学对齐、数值对齐、命中区与过渡范围，输出改前改后的具体数值。"

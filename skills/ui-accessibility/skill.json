@@ -1,0 +1,31 @@
+{
+  "id": "com.himind.skill.ui-accessibility",
+  "icon": "assets/icon.png",
+  "name": "界面无障碍",
+  "author": "马宝全",
+  "categories": [
+    "visual-design",
+    "software-engineering"
+  ],
+  "version": "1.0.0",
+  "scope": "organization",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
+  "description": "把无障碍要求落成可运行的界面实现，覆盖语义角色、键盘路径、焦点管理、读屏标签与平台映射；当要实现或排查无障碍、准备无障碍验收时使用。",
+  "release_notes": "首个版本：语义与键盘实现配方、桌面与移动映射、七步审计流程与带条款的报告格式。",
+  "min_agent_version": "0.3.47",
+  "supported_clients": [
+    "agent-skills"
+  ],
+  "capabilities": [],
+  "plugin_dependencies": [],
+  "risk_summary": "只读分析与建议；不联网、不执行脚本、不修改工作区外文件。",
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml",
+    "assets/icon.png"
+  ]
+}

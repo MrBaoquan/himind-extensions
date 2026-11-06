@@ -199,6 +199,16 @@
       "type": "workflow",
       "id": "com.himind.workflow.video-to-motion",
       "path": "workflows/video-to-motion"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.ui-accessibility",
+      "path": "skills/ui-accessibility"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.ui-craft",
+      "path": "skills/ui-craft"
     }
   ],
   "feature_packs": [
