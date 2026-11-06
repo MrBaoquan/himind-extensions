@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-0e68500bb3d46795",
+  "generation": "sync-1d8ddd2301d2d6b3",
   "plugins": [
     {
       "allow_disable": true,
@@ -1338,6 +1338,53 @@
       "source": "github",
       "source_commit": "6b0022ba09928d1d60e9720714d46478cec1f985",
       "source_tree": "46c445930b1a48e6ad0d0f464beb6787f4f9d075",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "version": "1.0.0"
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:skill/com.himind.skill.ui-craft@1.0.0:com.himind.skill.ui-craft-1.0.0.hmskill",
+      "artifact_sha256": "09783fa254ff9987f6d80d335ac11c4eb1536a5cc1cad80691175418e1167d03",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [],
+      "categories": [
+        "visual-design",
+        "software-engineering"
+      ],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "打磨界面的工艺细节，覆盖同心圆角、光学对齐、阴影分层、数字对齐、命中区、过渡范围与动效手感；当界面能用但观感粗糙、扁平或跳动时使用。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.himind.skill.ui-craft@1.0.0/com.himind.skill.ui-craft-1.0.0.hmskill",
+      "file_name": "com.himind.skill.ui-craft-1.0.0.hmskill",
+      "file_size": 24761,
+      "icon": {
+        "sha256": "6092fe4a5f2fc0357d174405ee9e6bde20f9f678c86da9feff517ecff7356185",
+        "source": "author",
+        "url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.himind.skill.ui-craft@1.0.0/com.himind.skill.ui-craft-1.0.0-icon.png"
+      },
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.47",
+      "name": "界面工艺细节",
+      "organization_reason": "",
+      "plugin_dependencies": [],
+      "published_at": "2026-11-06T13:16:37Z",
+      "release_notes": "首个版本：圆角与描边、光学对齐、间距节奏、文字细节、命中区、过渡与动效时长的取值规则与审查输出格式。",
+      "release_tag": "skill/com.himind.skill.ui-craft@1.0.0",
+      "risk_summary": "只读分析与建议；改动范围限于当前任务涉及的样式与组件。",
+      "sha256": "09783fa254ff9987f6d80d335ac11c4eb1536a5cc1cad80691175418e1167d03",
+      "signature": "dzwIkzalJ97vDQ/6RvCmQsiaTWVLHbMlLbveuXd302IJrH7KagAojKtZyJA3jYHY6YveD6yydQ+SzXUyhxrvN4Y2ASCw3f5bZLGcV21WdF6c9Ihjao1H+s0CKoRZpAEPOSipBNCYUmJ22+UVaEcf1nxwCZ541HS8bUCCiSzF5uQ7PknnObEoLWii8BuBdXADw+Tj3emuKJAKxlJfpMS0cJ4qRwvQ/2XGsDMRQEoprLwzmOIBfZgdc/oTqWZ94O7t65+/i69a41Q+rhGUSbb/2tFRzkxyZOq+WH90Uz3bPUwy3rDEwFoAxtWVN4yqsdIdCeyK8O50Ys8CizWJrUJP+JFKTspafunB9nPs2NtT5soJps4GA+AfcMoj313aFOs5XyL4gruMGFO0P1Go3/1dfa619ubdC0KsAvanzTDDIBMjMebmVql79sJSq1evhteV1yz4LZRuo27mNeFCvUPci8gzf531FuVyrPxFPgfJgK1LtDcp+BgcTpR7WeY8qCsw",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "skill_id": "com.himind.skill.ui-craft",
+      "source": "github",
+      "source_commit": "c925496661651f5584fc08e26e14632e7853c780",
+      "source_tree": "2ae37c0dd53f5b10f1dd9732c3e03e69ba95f4e6",
       "supported_clients": [
         "agent-skills"
       ],
