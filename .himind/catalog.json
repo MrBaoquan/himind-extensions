@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-2eab34fe799ba058",
+  "generation": "sync-6b3408d58e75a4bf",
   "plugins": [
     {
       "allow_disable": true,
@@ -1489,6 +1489,83 @@
         "agent-skills"
       ],
       "version": "1.0.0"
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:skill/com.himind.skill.ui-ux-design-assistant@0.3.1:com.himind.skill.ui-ux-design-assistant-0.3.1.hmskill",
+      "artifact_sha256": "a20fa50682ba2fbac06480debcecf1c6cc452b577dba58cde528a757ec6cf9eb",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [
+        "ui-ux.project.inspect",
+        "ui-ux.design-system.generate",
+        "ui-ux.design-system.persist",
+        "ui-ux.token.validate",
+        "ui-ux.guideline.search",
+        "ui-ux.catalog.describe"
+      ],
+      "categories": [
+        "visual-design",
+        "software-engineering"
+      ],
+      "channel": "stable",
+      "dependencies": [
+        {
+          "kind": "plugin",
+          "id": "com.himind.ui-ux-design-tools",
+          "required": true,
+          "min_version": "0.3.0",
+          "version": "0.3.0",
+          "sha256": "c3c4b738fab52daee825f20e184245046edf1bd415ff00809967da9162955c06",
+          "source": {
+            "kind": "github",
+            "id": "github:MrBaoquan/himind-extensions",
+            "repository": "MrBaoquan/himind-extensions",
+            "reference": "plugin/com.himind.ui-ux-design-tools@0.3.0",
+            "artifact_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.ui-ux-design-tools@0.3.0/com.himind.ui-ux-design-tools-0.3.0.hmpkg"
+          },
+          "pinned": true
+        }
+      ],
+      "description": "根据产品、平台与用户目标生成设计系统方向，读取项目设计约束、受控维护设计系统文件、校验令牌并指导界面落地；当用户新建或改版界面、选择风格配色字体、生成设计系统或统一组件规则时使用。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.himind.skill.ui-ux-design-assistant@0.3.1/com.himind.skill.ui-ux-design-assistant-0.3.1.hmskill",
+      "file_name": "com.himind.skill.ui-ux-design-assistant-0.3.1.hmskill",
+      "file_size": 68303,
+      "icon": {
+        "sha256": "a2ce8fcf028fe6a352c69b6848f2750ed2f582a238a49a5065212bceb3f5b2a0",
+        "source": "author",
+        "url": "https://github.com/MrBaoquan/himind-extensions/releases/download/skill%2Fcom.himind.skill.ui-ux-design-assistant@0.3.1/com.himind.skill.ui-ux-design-assistant-0.3.1-icon.png"
+      },
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.47",
+      "name": "界面设计助手",
+      "organization_reason": "",
+      "plugin_dependencies": [
+        {
+          "min_version": "0.3.0",
+          "plugin_id": "com.himind.ui-ux-design-tools",
+          "required": true
+        }
+      ],
+      "published_at": "2026-11-06T13:51:01Z",
+      "release_notes": "0.3.1：开放公开分发，依赖插件升到 0.3.0。",
+      "release_tag": "skill/com.himind.skill.ui-ux-design-assistant@0.3.1",
+      "risk_summary": "只读项目检查与设计建议；设计系统写入仅限工作区约定路径，覆盖已有文件需用户确认；不联网、不执行脚本。",
+      "sha256": "a20fa50682ba2fbac06480debcecf1c6cc452b577dba58cde528a757ec6cf9eb",
+      "signature": "fjbOn2AqIeaiGHJlB/Z7YehcY6CBp0p6RECpotPqurhaSnkttGoyCbbDvLakqCyohyIiveLMC2vvxK0uS9LP5ncQ/z2YnlElpzeV+7eeeq6c4Ebnan1wE+Tm/yFDOJB2GYnGJOMELyg7YsL9xjbViPaDj/gSW8HRvfTsgIfIpypUeVU4QChUO3QP1vI2O5S7zTCItKP4B06I9TfWEUyjvIau4DpWPBXwE9Le+ku15pAv0DphHz1SECx2xDnl9g3E7vvm05nz7d5VFVtmQluqw+tI2POffZf4PxyYaylQDHyANJpKn1mRABqBxmvcnK3uD2U+h0u6GWGpYw0u2gVq6ubU9/TNx1Z890iVLRpta3avTnBmqL8/YgBEdQkL39giMfu9WaSBz8MsN80/HdMVJRe6xNtWJL1nU8gllWHTX/sJ6JY5/4CVAcjktX2DWKnrjVqhFTAdMGWk8/vOyA7Du2T5j4iaBRDbdAtTGSWpasyqSnCpMcxYr1jVfwwjZi+P",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "skill_id": "com.himind.skill.ui-ux-design-assistant",
+      "source": "github",
+      "source_commit": "8c580a5c2ec7eada67714bb8306cacd4eef56cd5",
+      "source_tree": "c73a150d1427e213ec195be6cc34f85a5f3661c1",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "version": "0.3.1"
     },
     {
       "allow_disable": true,
