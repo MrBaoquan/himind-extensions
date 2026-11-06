@@ -4,7 +4,7 @@
   "distribution_id": "mrbaoquan/himind-extensions",
   "channel": "stable",
   "catalog_id": "public",
-  "generation": "sync-885872c7810af141",
+  "generation": "sync-2eab34fe799ba058",
   "plugins": [
     {
       "allow_disable": true,
@@ -108,6 +108,59 @@
       "source_commit": "48f1b27424466348ae7f55587987e3cefa81dab2",
       "source_tree": "84861c6e35c384d8e031c9cb4e7cfa3adada11b1",
       "version": "0.4.2",
+      "view_count": 0
+    },
+    {
+      "allow_disable": true,
+      "allow_uninstall": true,
+      "artifact_id": "github:plugin/com.himind.ui-ux-design-tools@0.3.0:com.himind.ui-ux-design-tools-0.3.0.hmpkg",
+      "artifact_sha256": "c3c4b738fab52daee825f20e184245046edf1bd415ff00809967da9162955c06",
+      "assignment": "optional",
+      "author_name": "马宝全",
+      "capability_ids": [
+        "ui-ux.guideline.search",
+        "ui-ux.design-system.generate",
+        "ui-ux.catalog.describe",
+        "ui-ux.project.inspect",
+        "ui-ux.design-system.persist",
+        "ui-ux.token.validate"
+      ],
+      "categories": [
+        "visual-design"
+      ],
+      "channel": "stable",
+      "dependencies": [],
+      "description": "检索 UI/UX 风格、配色、字体、图表与技术栈指南，并生成结构化设计系统建议。",
+      "download_url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.ui-ux-design-tools@0.3.0/com.himind.ui-ux-design-tools-0.3.0.hmpkg",
+      "file_name": "com.himind.ui-ux-design-tools-0.3.0.hmpkg",
+      "file_size": 6541607,
+      "governance": "optional",
+      "icon": {
+        "sha256": "3f00d73d9bb96e83d3f3b7daf6dca267203731d057d60d2a521cefce6bdd65a3",
+        "source": "author",
+        "url": "https://github.com/MrBaoquan/himind-extensions/releases/download/plugin%2Fcom.himind.ui-ux-design-tools@0.3.0/com.himind.ui-ux-design-tools-0.3.0-icon.png"
+      },
+      "install_mode": "prompt",
+      "managed": false,
+      "management": "user_managed",
+      "min_agent_version": "0.3.47",
+      "name": "界面设计工具",
+      "organization_reason": "",
+      "permissions": [],
+      "plugin_dependencies": [],
+      "plugin_id": "com.himind.ui-ux-design-tools",
+      "published_at": "2026-11-06T13:49:25Z",
+      "release_notes": "0.3.0：开放公开分发，随界面设计助手一起可被外部安装。",
+      "release_tag": "plugin/com.himind.ui-ux-design-tools@0.3.0",
+      "review_status": "published",
+      "sha256": "c3c4b738fab52daee825f20e184245046edf1bd415ff00809967da9162955c06",
+      "signature": "NLxx5QidDvWHhhrZwzbnw4zEv1H0dzluWiebp0abnRQDVyRD5cukcEyyZqURaRMFXyFlcP7z8xbqtDfyaJE55wJiJ9zXg16iQyjcXutl/U0IK2x6boqUITKTG3xb96UvNLMta/UTqowLW4403eqRyrH/YXuQ85rpOHfCMSJp+gBUYKif2NXgibeAMTY/bCn1WNe9BxaYczJZUzzyLHwqU1xtqhQgshLqCrSJ2CnQ5f+myEChqdPSOnDk9bM951AEH8jAhCMaCxgrjgQJ9g4R6rXAtpc5y//p3tW/mkSgcAeRd9AkqRh4s+WcOodP3OGFLnoMyhzwkhq2qpM5f+VrzqL19T7Www+nzilVxrSxoQaret2kSvrZ5dgGCr4qxbso7aEpJrgQY2K585baHZuSrRgqVkuOsq9GJtmZQl7BM7XH8CP9Lf6uOuV9bfhWqoL6jNySPpb7Ys6o4DW2k9+T9yoUwSCiDMoF+52384pwWQHYewV6TrwYY9naXvCUFDrt",
+      "signature_algorithm": "rsa-pss-sha256",
+      "signature_key_id": "himind-production-2026",
+      "source": "github",
+      "source_commit": "66be4f9d10e19de00b7da500a76f5f9aec2f956c",
+      "source_tree": "cb3b2c39a2a9084a0df876fdb3cd322122b0634a",
+      "version": "0.3.0",
       "view_count": 0
     },
     {
