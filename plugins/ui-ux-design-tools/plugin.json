@@ -7,8 +7,8 @@
     "visual-design"
   ],
   "description": "检索 UI/UX 风格、配色、字体、图表与技术栈指南，并生成结构化设计系统建议。",
-  "release_notes": "0.2.1：增强 Avalonia/XAML 项目识别与令牌校验，并补充工业桌面中文检索意图。",
-  "version": "0.2.1",
+  "release_notes": "0.3.0：开放公开分发，随界面设计助手一起可被外部安装。",
+  "version": "0.3.0",
   "entry": "bin/ui-ux-design-tools.exe",
   "runtime": "process-jsonrpc-stdio",
   "platforms": [
@@ -18,7 +18,8 @@
   "governance": "optional",
   "capability_namespace": "ui-ux",
   "distribution_targets": [
-    "workbench"
+    "workbench",
+    "github"
   ],
   "capabilities": [
     {
