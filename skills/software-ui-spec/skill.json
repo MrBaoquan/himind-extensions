@@ -7,11 +7,11 @@
     "visual-design",
     "software-engineering"
   ],
-  "version": "1.1.0",
+  "version": "1.2.0",
   "distribution_targets": ["workbench", "github"],
   "scope": "organization",
-  "description": "定义软件开发 UI/UX 规范并据此审查界面，给出问题清单与验收标准。",
-  "release_notes": "1.1.0：补六种内容状态的完备性要求与渲染验收门，并写明与界面无障碍、界面工艺细节的分工。",
+  "description": "定义软件开发 UI/UX 规范并据此审查界面，含桌面客户端与 WebView 混合应用要求，给出问题清单与验收标准。",
+  "release_notes": "1.2.0：补桌面客户端规范与 WebView 混合应用外壳接管要求，含快捷键、窗口语义、滚动模型与系统集成核对。",
   "min_agent_version": "0.3.40",
   "supported_clients": [
     "agent-skills"
