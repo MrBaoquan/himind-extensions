@@ -1,0 +1,54 @@
+{
+  "id": "com.himind.skill.workspace-context",
+  "icon": "assets/icon.png",
+  "name": "工作区上下文",
+  "author": "马宝全",
+  "categories": ["software-engineering", "docs-knowledge"],
+  "version": "0.1.0",
+  "distribution_targets": ["workbench", "github"],
+  "scope": "organization",
+  "description": "解析当前目录属于哪个项目，按需登记新路径，并给出上级、同级与工程上下文索引。",
+  "release_notes": "0.1.0：首个版本，提供路径解析、候选与登记的分档规则。",
+  "min_agent_version": "0.3.90",
+  "supported_clients": ["agent-skills"],
+  "capabilities": [
+    {
+      "id": "workspace.registry.resolve",
+      "required": true,
+      "min_version": "0.1.0",
+      "provider": "com.himind.workspace-registry"
+    },
+    {
+      "id": "workspace.registry.context.get",
+      "required": true,
+      "min_version": "0.1.0",
+      "provider": "com.himind.workspace-registry"
+    },
+    {
+      "id": "workspace.registry.path.bind",
+      "required": false,
+      "min_version": "0.1.0",
+      "provider": "com.himind.workspace-registry"
+    },
+    {
+      "id": "workspace.registry.project.upsert",
+      "required": false,
+      "min_version": "0.1.0",
+      "provider": "com.himind.workspace-registry"
+    }
+  ],
+  "plugin_dependencies": [
+    {
+      "plugin_id": "com.himind.workspace-registry",
+      "required": true,
+      "min_version": "0.1.0"
+    }
+  ],
+  "risk_summary": "read_only_by_default; registration_requires_user_confirmation",
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml",
+    "assets/icon.png"
+  ]
+}

@@ -209,6 +209,11 @@
       "type": "skill",
       "id": "com.himind.skill.ui-craft",
       "path": "skills/ui-craft"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.workspace-context",
+      "path": "skills/workspace-context"
     }
   ],
   "feature_packs": [
