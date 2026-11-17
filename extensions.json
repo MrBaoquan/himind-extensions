@@ -214,21 +214,7 @@
       "type": "skill",
       "id": "com.himind.skill.workspace-context",
       "path": "skills/workspace-context"
-    },
-    {
-      "type": "plugin",
-      "id": "com.himind.video-cover",
-      "path": "plugins/video-cover"
-    },
-    {
-      "type": "skill",
-      "id": "com.himind.cover-title-assistant",
-      "path": "skills/cover-title-assistant"
-    },
-    {
-      "type": "workflow",
-      "id": "com.himind.video-cover-delivery",
-      "path": "workflows/video-cover-delivery"    }
+    }
   ],
   "feature_packs": [
     {
