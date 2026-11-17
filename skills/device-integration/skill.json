@@ -1,0 +1,31 @@
+{
+  "id": "com.himind.skill.device-integration",
+  "icon": "assets/icon.png",
+  "name": "设备协议与恢复",
+  "author": "马宝全",
+  "categories": [
+    "system-device",
+    "testing-quality"
+  ],
+  "version": "1.0.0",
+  "scope": "organization",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
+  "description": "定义设备协议、故障状态与恢复证据，联调输入输出设备或现场验收时使用。",
+  "release_notes": "首个版本：协议状态、模拟与实机分层、独占联调及恢复判据。",
+  "min_agent_version": "0.3.47",
+  "supported_clients": [
+    "agent-skills"
+  ],
+  "capabilities": [],
+  "plugin_dependencies": [],
+  "risk_summary": "仅在当前任务授权范围内分析、实施与验证；外部副作用遵循宿主及现场操作约束。",
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml",
+    "assets/icon.png"
+  ]
+}

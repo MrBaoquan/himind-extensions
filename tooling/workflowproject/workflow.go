@@ -116,24 +116,28 @@ type Endpoint struct {
 }
 
 type Runtime struct {
-	Provider      string `json:"provider"`
-	Prompt        string `json:"prompt"`
-	WorkspacePath string `json:"workspace_path,omitempty"`
-	ResultSchema  string `json:"result_schema,omitempty"`
-	AllowNetwork  bool   `json:"allow_network,omitempty"`
-	// ToolPolicy is "default" (provider default) or "none" (mount no model-facing tools).
-	ToolPolicy string `json:"tool_policy,omitempty"`
+	Provider       string `json:"provider"`
+	Prompt         string `json:"prompt"`
+	PermissionMode string `json:"permission_mode,omitempty"`
+	WorkspacePath  string `json:"workspace_path,omitempty"`
+	ResultSchema   string `json:"result_schema,omitempty"`
+	AllowNetwork   *bool  `json:"allow_network,omitempty"`
+	// ToolPolicy is default, none (no model-facing tools), or files_only.
+	ToolPolicy     string   `json:"tool_policy,omitempty"`
+	Model          string   `json:"model,omitempty"`
+	ModelFallbacks []string `json:"model_fallbacks,omitempty"`
 	// InputArtifacts lists upstream artifacts delivered to the step as local file paths.
 	InputArtifacts []string `json:"input_artifacts,omitempty"`
 	TimeoutSeconds uint64   `json:"timeout_seconds,omitempty"`
 }
 
 type Loop struct {
-	MaxIterations uint32         `json:"max_iterations"`
-	PauseFeedback bool           `json:"pause_for_feedback,omitempty"`
-	ContinueWhen  map[string]any `json:"continue_when,omitempty"`
-	ExitWhen      map[string]any `json:"exit_when,omitempty"`
-	Steps         []Step         `json:"steps"`
+	MaxIterations      uint32         `json:"max_iterations"`
+	MaxIterationsLimit uint32         `json:"max_iterations_limit,omitempty"`
+	PauseFeedback      bool           `json:"pause_for_feedback,omitempty"`
+	ContinueWhen       map[string]any `json:"continue_when,omitempty"`
+	ExitWhen           map[string]any `json:"exit_when,omitempty"`
+	Steps              []Step         `json:"steps"`
 }
 
 type Step struct {
@@ -143,6 +147,8 @@ type Step struct {
 	CapabilityID     string         `json:"capability_id,omitempty"`
 	Runtime          *Runtime       `json:"runtime,omitempty"`
 	Loop             *Loop          `json:"loop,omitempty"`
+	Delegate         *Delegate      `json:"delegate,omitempty"`
+	RoleID           string         `json:"role_id,omitempty"`
 	When             map[string]any `json:"when,omitempty"`
 	FailWhen         map[string]any `json:"fail_when,omitempty"`
 	CandidateAction  string         `json:"candidate_action,omitempty"`
@@ -173,16 +179,19 @@ type UI struct {
 }
 
 type Manifest struct {
-	SchemaVersion     string         `json:"schema_version"`
-	ID                string         `json:"id"`
-	Version           string         `json:"version"`
-	Name              string         `json:"name"`
-	Description       string         `json:"description,omitempty"`
-	ReleaseNotes      string         `json:"release_notes,omitempty"`
-	MinAgentVersion   string         `json:"min_agent_version"`
-	LocalRequirements map[string]any `json:"local_requirements,omitempty"`
-	OptionalProviders []string       `json:"optional_providers,omitempty"`
-	Capabilities      []string       `json:"capabilities,omitempty"`
+	SchemaVersion          string              `json:"schema_version"`
+	ID                     string              `json:"id"`
+	Version                string              `json:"version"`
+	Name                   string              `json:"name"`
+	Description            string              `json:"description,omitempty"`
+	Icon                   string              `json:"icon,omitempty"`
+	ReleaseNotes           string              `json:"release_notes,omitempty"`
+	MinAgentVersion        string              `json:"min_agent_version"`
+	LocalRequirements      map[string]any      `json:"local_requirements,omitempty"`
+	OptionalProviders      []string            `json:"optional_providers,omitempty"`
+	Capabilities           []string            `json:"capabilities,omitempty"`
+	Roles                  map[string]Role     `json:"roles,omitempty"`
+	CapabilityAlternatives map[string][]string `json:"capability_alternatives,omitempty"`
 	// 分发目标是硬约束（规范 §六），仓库检查要求每个扩展显式声明。
 	DistributionTargets []string     `json:"distribution_targets"`
 	Dependencies        Dependencies `json:"dependencies"`
@@ -346,6 +355,10 @@ func Validate(root string) error {
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		return fmt.Errorf("workflow.json: %w", err)
 	}
+	return validateWorkflowFiles(manifest, files)
+}
+
+func validateWorkflowFiles(manifest Manifest, files map[string][]byte) error {
 	exists := func(relative string) bool {
 		_, ok := files[filepath.ToSlash(relative)]
 		return ok
@@ -375,6 +388,9 @@ func workflowDocuments(files map[string][]byte) map[string][]byte {
 func Package(root, output string) error {
 	files, manifest, err := readDirectory(root)
 	if err != nil {
+		return err
+	}
+	if err := validateWorkflowFiles(manifest, files); err != nil {
 		return err
 	}
 	filesWithoutChecksums := make(map[string][]byte, len(files))
@@ -435,19 +451,7 @@ func readManifestFromDirectory(root string) (Manifest, error) {
 	if err != nil {
 		return Manifest{}, err
 	}
-	exists := func(relative string) bool {
-		_, ok := files[filepath.ToSlash(relative)]
-		return ok
-	}
-	if err := validateManifest(manifest, exists); err != nil {
-		return Manifest{}, err
-	}
-	// 目录形态也要查：Validate(dir) 走这条路径，只在归档分支加会让
-	// 「工程目录通过、打包后才报错」。
-	if err := validateCapabilityShape(manifest); err != nil {
-		return Manifest{}, err
-	}
-	if err := validateCapabilityReferences(manifest, workflowDocuments(files)); err != nil {
+	if err := validateWorkflowFiles(manifest, files); err != nil {
 		return Manifest{}, err
 	}
 	return manifest, nil
@@ -607,11 +611,17 @@ func validateManifest(manifest Manifest, fileExists func(string) bool) error {
 	if err := validateDependencyRefs("plugin", manifest.Dependencies.Plugins); err != nil {
 		return err
 	}
+	if err := validateRoles(manifest); err != nil {
+		return err
+	}
 	stepIDs := map[string]bool{}
 	if err := collectStepIDs(manifest.Steps, stepIDs); err != nil {
 		return err
 	}
 	if err := validateSteps(manifest.Steps, stepIDs, manifest); err != nil {
+		return err
+	}
+	if err := validateTeamScopes(manifest.Steps, manifest, 0, fileExists); err != nil {
 		return err
 	}
 	if err := validateCandidate(manifest); err != nil {
@@ -722,7 +732,7 @@ func validateSteps(steps []Step, stepIDs map[string]bool, manifest Manifest) err
 		if step.OnFailure != "" && !matches(step.OnFailure, "fail", "continue") {
 			return fmt.Errorf("workflow step %s on_failure must be fail or continue", step.ID)
 		}
-		if step.Kind != "" && !matches(step.Kind, "capability", "runtime", "manual", "loop", "provider_defined") {
+		if step.Kind != "" && !matches(step.Kind, "capability", "runtime", "manual", "loop", "delegate", "provider_defined") {
 			return fmt.Errorf("workflow step %s kind is invalid", step.ID)
 		}
 		for _, dependency := range step.DependsOn {
@@ -745,8 +755,8 @@ func validateSteps(steps []Step, stepIDs map[string]bool, manifest Manifest) err
 			if step.Runtime.TimeoutSeconds > 86400 {
 				return fmt.Errorf("workflow runtime step %s timeout_seconds is out of range", step.ID)
 			}
-			if step.Runtime.ToolPolicy != "" && !matches(step.Runtime.ToolPolicy, "default", "none") {
-				return fmt.Errorf("workflow runtime step %s tool_policy must be default or none", step.ID)
+			if step.Runtime.ToolPolicy != "" && !matches(step.Runtime.ToolPolicy, "default", "none", "files_only") {
+				return fmt.Errorf("workflow runtime step %s tool_policy must be default, none or files_only", step.ID)
 			}
 			// input_artifacts 与 tool_policy=none 是合法组合，不要禁止：none 表示不挂载
 			// 模型可见工具，此时平台把声明的 Artifact 作为**只读内容注入提示上下文**
@@ -770,6 +780,9 @@ func validateSteps(steps []Step, stepIDs map[string]bool, manifest Manifest) err
 			}
 			if step.Loop.MaxIterations < 1 || step.Loop.MaxIterations > 20 {
 				return fmt.Errorf("workflow loop step %s max_iterations is out of range", step.ID)
+			}
+			if step.Loop.MaxIterationsLimit != 0 && (step.Loop.MaxIterationsLimit < step.Loop.MaxIterations || step.Loop.MaxIterationsLimit > 20) {
+				return fmt.Errorf("workflow loop step %s max_iterations_limit must be between max_iterations and 20", step.ID)
 			}
 			if step.Loop.ContinueWhen == nil && step.Loop.ExitWhen == nil {
 				return fmt.Errorf("workflow loop step %s requires continue_when or exit_when", step.ID)

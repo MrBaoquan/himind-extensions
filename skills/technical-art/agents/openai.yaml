@@ -1,0 +1,4 @@
+interface:
+  display_name: "实时资源与渲染"
+  short_description: "让资源规格与渲染预算可核对"
+  default_prompt: "使用 $technical-art：读取目标硬件与渲染管线，制定资源规格和预算，在固定视角和构建中比较视觉结果及 CPU/GPU/内存成本。"

@@ -1,0 +1,4 @@
+interface:
+  display_name: "有界工程交付"
+  short_description: "交付有边界且可复现的工程改动"
+  default_prompt: "使用 $engineering-delivery：先确认任务范围、基线和文件所有权，复现问题后实施最小完整改动，执行必要检查并交付候选身份、证据和恢复步骤。"

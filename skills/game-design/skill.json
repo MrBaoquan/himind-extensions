@@ -1,0 +1,31 @@
+{
+  "id": "com.himind.skill.game-design",
+  "icon": "assets/icon.png",
+  "name": "玩法规则与验证",
+  "author": "马宝全",
+  "categories": [
+    "content-production",
+    "testing-quality"
+  ],
+  "version": "1.0.0",
+  "scope": "organization",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
+  "description": "把玩法目标转成可执行规则并通过可玩样本检验，设计循环、数值或关卡时使用。",
+  "release_notes": "首个版本：规则规格、数值推演、试玩观察与迭代判据。",
+  "min_agent_version": "0.3.47",
+  "supported_clients": [
+    "agent-skills"
+  ],
+  "capabilities": [],
+  "plugin_dependencies": [],
+  "risk_summary": "仅在当前任务授权范围内分析、实施与验证；外部副作用遵循宿主及现场操作约束。",
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml",
+    "assets/icon.png"
+  ]
+}

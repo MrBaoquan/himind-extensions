@@ -1,0 +1,2510 @@
+{
+  "schema_version": "himind.source-audit-inventory.v1",
+  "captured_at": "2026-11-17T14:52:10.994287+08:00",
+  "kind": "live_source_snapshot_not_installed_state",
+  "repositories": {
+    "extensions": {
+      "root": "F:\\WebProjects\\himind-extensions",
+      "head": {
+        "exit_code": 0,
+        "output": "34bfe2a032a9f40bb5725e644704650f64a9c2f2",
+        "error": ""
+      },
+      "branch": {
+        "exit_code": 0,
+        "output": "main",
+        "error": ""
+      },
+      "working_tree": {
+        "exit_code": 0,
+        "output": "M extensions.json\n M plugins/media-library/README.md\n M plugins/media-library/plugin.json\n M plugins/media-library/ui/app.css\n M plugins/media-library/ui/app.js\n M plugins/media-library/ui/index.html\n M plugins/media-library/ui_contract_test.go\n?? docs/expert-library-and-workflow-audit-20261117.md\n?? docs/work-log-agent-side-migration-plan.md\n?? plugins/media-studio/\n?? skills/media-creation-assistant/\n?? workflows/media-kit-production/",
+        "error": ""
+      },
+      "files": [
+        {
+          "path": "experts/project-architect/EXPERT.md",
+          "sha256": "1942d20559514e57150d9f6c3c0d3ce365b6f8641584b5d711c6973982fd6659"
+        },
+        {
+          "path": "experts/project-architect/expert.json",
+          "sha256": "5d8e6f19ba8bd93e423cfab55de5a17f4b10e4958c09692276625489c892ae6d"
+        },
+        {
+          "path": "experts/senior-system-architect/EXPERT.md",
+          "sha256": "40df35ce3fdae419dcadaf22255d4472db77c83c01b582008021feba28c46543"
+        },
+        {
+          "path": "experts/senior-system-architect/expert.json",
+          "sha256": "3739c91ea2953728630fdc20c31f250694870a6487766f0f03a0250b79d15e1f"
+        },
+        {
+          "path": "experts/senior-test-engineer/EXPERT.md",
+          "sha256": "149f905ae2a4bfbdc47edceaf13559e1e65ba567a7467996bd6b61b914830874"
+        },
+        {
+          "path": "experts/senior-test-engineer/expert.json",
+          "sha256": "cdd8a737182233ccffdf5973513893b1ad1261aebabed7908870425328dcc9d0"
+        },
+        {
+          "path": "experts/senior-ui-designer/EXPERT.md",
+          "sha256": "79acee1c8db98b24b4237d983f3bb01269a529ee2201209cdc894ae0f235c5f0"
+        },
+        {
+          "path": "experts/senior-ui-designer/expert.json",
+          "sha256": "98b780ae305ebeb52cf115bbac98d3ab968519ceb632c7494237a8f98095d07e"
+        },
+        {
+          "path": "experts/software-engineer/EXPERT.md",
+          "sha256": "8c7f4fc4da76a43e01062c16064404f0bfc2d59a0e09b24ef71c72034ed0fea4"
+        },
+        {
+          "path": "experts/software-engineer/expert.json",
+          "sha256": "b45536cd76f2fe3065582e285d592362b2aad284c14e9baafc2fe2d0d84d0419"
+        },
+        {
+          "path": "extensions.json",
+          "sha256": "74e925bd83bcb8a7f39609e6ecc11a9f69f8cc1c27cb54da67d308b68c42ec4c"
+        },
+        {
+          "path": "plugins/media-studio/main.go",
+          "sha256": "ad49c01fe4fb9e60968365290ab187660c5f0d5beaed8deca5a717558e56d012"
+        },
+        {
+          "path": "skills/dev-workflow-orchestrator/SKILL.md",
+          "sha256": "963ccbf0e135673a1921a066d3bc67c0e7bb5ce7ee2418d7070df24192c9bf62"
+        },
+        {
+          "path": "skills/dev-workflow-orchestrator/skill.json",
+          "sha256": "470dff6ab564bc27a9cddf91c1142b81a24d49692acffa610967a271a501e1a0"
+        },
+        {
+          "path": "skills/develop-himind-conventions/SKILL.md",
+          "sha256": "8fe2112560d6614058faff39ad86927defe6b95bfb4749ac4d2cd0ad76b5c5f4"
+        },
+        {
+          "path": "skills/develop-himind-conventions/skill.json",
+          "sha256": "246361fc6f1286f635c39d8f0c9fff5b04d10b2f9b56e464a189997b8b154b37"
+        },
+        {
+          "path": "skills/develop-himind-plugins/SKILL.md",
+          "sha256": "6ae0a0597e65607c4f2e9a319d9514a2491885a950b901cdecb44a3806e2825b"
+        },
+        {
+          "path": "skills/develop-himind-plugins/skill.json",
+          "sha256": "1a271d040c9bbdb94dc936c6302d5c843c6fd2bbb6fd613d1b571c85368146be"
+        },
+        {
+          "path": "skills/develop-himind-skills/SKILL.md",
+          "sha256": "4d66dae16ceb66aaa9c6e37c4d3b913f704cc81890d8778586c9fba236281a6a"
+        },
+        {
+          "path": "skills/develop-himind-skills/skill.json",
+          "sha256": "09558407ff9563e8dbcea2b19fb91e251fa1b694609654a514cea7536a4c0beb"
+        },
+        {
+          "path": "skills/develop-himind-workflows/SKILL.md",
+          "sha256": "a39155a82975b643537cbb98f2a80eac605a76aa0554c5bccf72888871418b9a"
+        },
+        {
+          "path": "skills/develop-himind-workflows/skill.json",
+          "sha256": "d31e03559f2200fc74bf130991622e0d1bb2c901a8d37b15811146e9bcd6e745"
+        },
+        {
+          "path": "skills/git-svn-commit-summary/SKILL.md",
+          "sha256": "a31defe3075c2883309962446a4ecb775063e3d2c4488778985a95b02e4a3a47"
+        },
+        {
+          "path": "skills/git-svn-commit-summary/skill.json",
+          "sha256": "d03b6162a9f05be590445c9e6242e007e138c29876ae8908b4e68a9ba19a969c"
+        },
+        {
+          "path": "skills/iostudio-debug-assistant/SKILL.md",
+          "sha256": "163eb8da939a9965fed1225725270cd7015cebfcbb7c1b885aef81822701ffdb"
+        },
+        {
+          "path": "skills/iostudio-debug-assistant/skill.json",
+          "sha256": "12c24179ba4f82ea5716a24e059c979d5f53b49be606c78b91548324988aa265"
+        },
+        {
+          "path": "skills/long-task-driver/SKILL.md",
+          "sha256": "d84f4a66c82e8ec88604c69d7dd5d57131086c1af945a52f4f5522f58ec8cd8b"
+        },
+        {
+          "path": "skills/long-task-driver/skill.json",
+          "sha256": "88c35e747ea242c1e70477aaaa6d925f82fc642d873497e2f61e48b158b7423f"
+        },
+        {
+          "path": "skills/mcp-experience-feedback/SKILL.md",
+          "sha256": "95df46b788e118b238c434db57dde3aa2e088d1808d2d4fe3fe9208e4f145cc9"
+        },
+        {
+          "path": "skills/mcp-experience-feedback/skill.json",
+          "sha256": "cd39a52bb8f0c6efaeded40cdf05049dfa039cc96479e0c9c4fbdb23b738c074"
+        },
+        {
+          "path": "skills/media-creation-assistant/SKILL.md",
+          "sha256": "8c4bb9be8aefb167a3782e0080438d228b4120bb6da8e3de909ac806d27b44cb"
+        },
+        {
+          "path": "skills/media-creation-assistant/skill.json",
+          "sha256": "171b7a5a0c9aaf28073a89e23156d5ab59c127e042d54ac747fa97243bbcf7f3"
+        },
+        {
+          "path": "skills/media-downloader-assistant/SKILL.md",
+          "sha256": "18bce6aeabbbbc1745ad9039104b5cbe09a2c3964fc8b13a278a5201e48613c4"
+        },
+        {
+          "path": "skills/media-downloader-assistant/skill.json",
+          "sha256": "92a456c2f58d2e8ea294f0705974a3b6f765fabccb9fdad331c9eb41de6b79c9"
+        },
+        {
+          "path": "skills/software-distribution/SKILL.md",
+          "sha256": "7d17c2d80541cd0ed90354c68d6c2de850e8827b5dd46e6da922b9a6056480d5"
+        },
+        {
+          "path": "skills/software-distribution/skill.json",
+          "sha256": "264f81fce495baacc4ba2a7eeaadd4f5a14ae26bb3cf2ac9e8596ba9ef00977e"
+        },
+        {
+          "path": "skills/software-ui-spec/SKILL.md",
+          "sha256": "4369fde600d9f2b930fb9f214eecd86e6e245b6b1cbef6e7678e60d8eab787ac"
+        },
+        {
+          "path": "skills/software-ui-spec/skill.json",
+          "sha256": "dd8286111cf44ca2a190347adf13f5e9bcb9b84d48f869a99e2079bb99529147"
+        },
+        {
+          "path": "skills/ui-accessibility/SKILL.md",
+          "sha256": "99c7fbc225a05c6ef13dd1899cdfb8c520d43dd8da2874bae4bfe7f34c610ecd"
+        },
+        {
+          "path": "skills/ui-accessibility/skill.json",
+          "sha256": "31ff50e6ce3f468afe0d79f8718d3fe5f94fe16a515289d83a571bd767ebc93e"
+        },
+        {
+          "path": "skills/ui-craft/SKILL.md",
+          "sha256": "7bc1b320b03f0cf827b1534d19fad88c10c17d27b409beaa8a8eb87295e5fcdb"
+        },
+        {
+          "path": "skills/ui-craft/skill.json",
+          "sha256": "290373a5789b23c4865b08bee185448af3708c802f3eb0b184d37c14c7df4d16"
+        },
+        {
+          "path": "skills/ui-ux-design-assistant/SKILL.md",
+          "sha256": "f5fa7ff4b39969dd5e2df4b2bc017cd45f60cfac3f9c09f7f56300dc6fd07626"
+        },
+        {
+          "path": "skills/ui-ux-design-assistant/skill.json",
+          "sha256": "0b98db2a40bcc11c457b19c5b325c82c1a0918cdb5387e045a18aaa36ebec1da"
+        },
+        {
+          "path": "skills/unihper-unity-development/SKILL.md",
+          "sha256": "da7d6df6be8d996465919c05f9f193cd196f270638d95e4ccef28b9bf80fc222"
+        },
+        {
+          "path": "skills/unihper-unity-development/skill.json",
+          "sha256": "50866696b073c11e99a92fe778aded22fdd53dbfed3c7547ae427a5654905b6a"
+        },
+        {
+          "path": "skills/video-motion-authoring/SKILL.md",
+          "sha256": "b57a1fcf32e6a8e111ab095465a66afb6dd1593a531a74021d10b2754724cf68"
+        },
+        {
+          "path": "skills/video-motion-authoring/skill.json",
+          "sha256": "aa20d93eab7bc7c06bf43e69df88f62ec1f4a39b82c36369e3a15a3a1f4f5dab"
+        },
+        {
+          "path": "skills/wechat-miniprogram-assistant/SKILL.md",
+          "sha256": "372e41c4ebdcc10c63d0b56da6d9d8d93e23d9b0031bfde3aac5214191deb56b"
+        },
+        {
+          "path": "skills/wechat-miniprogram-assistant/skill.json",
+          "sha256": "a7d8c9c3d328f4c86f1624dbe408df8d43210f4b79e6fc76718c35886af693a1"
+        },
+        {
+          "path": "skills/work-log/SKILL.md",
+          "sha256": "ac843c5d1355e9915c3f0fe86f1c3a7d771a41b32e3447e791fc2b406c6fe4a6"
+        },
+        {
+          "path": "skills/work-log/skill.json",
+          "sha256": "b51e9da780986f09f2376090e1fc931414fc7549b236b5b7a9616685aff87fef"
+        },
+        {
+          "path": "skills/workspace-context/SKILL.md",
+          "sha256": "ae54adfbedaf0b343c855b024c3f9e6bf0d62ee4cc4f94e2af955ea552ab06e4"
+        },
+        {
+          "path": "skills/workspace-context/skill.json",
+          "sha256": "74994f0533582420b357f9fa4b824d05ea9048a79696efa61cd772c755742413"
+        },
+        {
+          "path": "tooling/expertproject/validate.go",
+          "sha256": "aec9be238b3ac02f27d9bf78b80e04a8b03fded604b0b3be00b509d765e4f9ea"
+        },
+        {
+          "path": "tooling/workflowproject/workflow.go",
+          "sha256": "f286813b40adc9ef5aa284c6dc0d4b29064db256a3ad03aedf2a52d807f18942"
+        },
+        {
+          "path": "workflows/daily-work-log/workflow.json",
+          "sha256": "cd78d339ea93ef42df089c670093d2b0808cce6cd99dc1e8aa730db6dc995b61"
+        },
+        {
+          "path": "workflows/media-kit-production/workflow.json",
+          "sha256": "80cb78583297d164bb23c609b4659bd54b7bdc3e5edbdb7c8a3e50d4625d1a8b"
+        },
+        {
+          "path": "workflows/software-release/workflow.json",
+          "sha256": "30ac1f3fb55cb0c009532bca770f6c421c940a809c4e887d66b5020e8c035283"
+        },
+        {
+          "path": "workflows/tech-radar/workflow.json",
+          "sha256": "d4b53944714ca08af1aef189b0995124ec7b6bbeb51ef58d08db24cc8da4c756"
+        },
+        {
+          "path": "workflows/video-to-motion/workflow.json",
+          "sha256": "77e4885ade756ca9482484f70363ac401586d3faef3a61a37054b0ea43e8dd43"
+        },
+        {
+          "path": "workflows/wechat-miniprogram-ci-delivery/workflow.json",
+          "sha256": "4d110025259ea9dad63f135ed3df0f740b77d32e0818b00ebd3623a620b05537"
+        }
+      ],
+      "registered_counts": {
+        "plugin": 12,
+        "skill": 21,
+        "workflow": 6,
+        "expert": 5
+      }
+    },
+    "agent": {
+      "root": "F:\\WebProjects\\项目看板\\himind-agent",
+      "head": {
+        "exit_code": 0,
+        "output": "4e9e6e51475f8cc6bbfcb2eee4a75726b356b3d5",
+        "error": ""
+      },
+      "branch": {
+        "exit_code": 0,
+        "output": "main",
+        "error": ""
+      },
+      "working_tree": {
+        "exit_code": 0,
+        "output": "",
+        "error": ""
+      },
+      "files": [
+        {
+          "path": "contracts/agent-core/v1/workflow-package.schema.json",
+          "sha256": "87c995081f4734bad51bbf4d259ada8274709c2e38e359338ca544d0bbb3254e"
+        },
+        {
+          "path": "docs/expert-library-review-20261116.md",
+          "sha256": "d2aa9eda2432eb4b53d2192a383b3304e7bb82593a7299037116734ca6614c76"
+        },
+        {
+          "path": "src/app/mission_dispatch.rs",
+          "sha256": "9ff1dd9d0b252c688ce0f5e3879c74f8001b91bc73e837b057356f09bbabf5fa"
+        },
+        {
+          "path": "src/expert.rs",
+          "sha256": "32b7049fe7736d31fdf5c25233ac2b83d79a96aaca36b0b070f66c2ac7dc8dc4"
+        },
+        {
+          "path": "src/mission/assignment.rs",
+          "sha256": "33c3d48174c6bfd9b7c1e514b60b0af4a2f9e87c7924cd3d4cfec857c26e7337"
+        },
+        {
+          "path": "src/mission/entry.rs",
+          "sha256": "ccea06773a1c584931c64030c8365435d3f145435b82b93eedead2681ec4a792"
+        },
+        {
+          "path": "src/mission/export.rs",
+          "sha256": "e0b1e46f043487643bd92c2be7dc4624bf0bd7535761525b1fcd05a29c40bc51"
+        },
+        {
+          "path": "src/mission/isolation.rs",
+          "sha256": "3ae04902d40e35534110df290a78ad0e2a9a5fd9782ddcd2034ebf7003dc4780"
+        },
+        {
+          "path": "src/mission/mod.rs",
+          "sha256": "8a7a7f0368920cbadfcf452e9eb986742b14c4f2087a9d15bd4af449cc4a2bea"
+        },
+        {
+          "path": "src/mission/store.rs",
+          "sha256": "b889d0778bcd4cebc81c91d77f1327dcd053c059096fa8efa4bdeb88b04e42ca"
+        },
+        {
+          "path": "src/mission/team.rs",
+          "sha256": "67b53e63fee5598c4b5ac625fba7650eaa8548efbb8c5c0c27a8d2518339ab39"
+        },
+        {
+          "path": "src/runtime/deepseek_harness.rs",
+          "sha256": "fcc8745d15641b7e4dd2eca516eaf3785ff042925c27ba715b1fd77c5095480b"
+        },
+        {
+          "path": "src/workflow/executor.rs",
+          "sha256": "2f67890365bf4e87c15a4d596d5c39437185820f56c6567854e25bd7cdf11b30"
+        },
+        {
+          "path": "src/workflow/mod.rs",
+          "sha256": "0489050e62c1ffe45dbb53b84894f2bc1147883e1cf6cdf55cef2c0023ad42c5"
+        },
+        {
+          "path": "src/workflow/runner.rs",
+          "sha256": "e0a78a9d63d28a52be9c0df0c1d024acf17b493127015e7aa7b108ad2159add9"
+        },
+        {
+          "path": "src/workflow/runtime.rs",
+          "sha256": "ca4e8820730f2f94d314b71d036a1f62d367c3601d8697aa840112d953925042"
+        },
+        {
+          "path": "src/workflow/store.rs",
+          "sha256": "b3d4fe05eb0aa5a7cafbd76023b515079be794da3868c652183608219e129ecb"
+        },
+        {
+          "path": "workflows/engine-build/workflow.json",
+          "sha256": "aef42332b91e102bed736f1ab6efe40c936d182a1e76852ccb5eb332684d7d60"
+        },
+        {
+          "path": "workflows/software-delivery/workflow.json",
+          "sha256": "68272336dd37fe8f3df6c3d4dd5a6d54ab573c924d3207bcc99837d2e29b2c3e"
+        },
+        {
+          "path": "workflows/ui-craft-team/workflow.json",
+          "sha256": "6ef7a62a915d41b9f42e042d91d1ccdfd7c771ec9f55f4301e0145838953e9b9"
+        },
+        {
+          "path": "workflows/wechat-experience-upload/workflow.json",
+          "sha256": "7abad1089691f7b2923fe7cf4d0b28935cd5cf1047acfe09c5abe818d5b02b2c"
+        },
+        {
+          "path": "workflows/wechat-miniprogram-delivery/workflow.json",
+          "sha256": "907178d6a7edb90adf3ed9f677055f0175d237c3d8e6996e4a10f0df103ad5ce"
+        }
+      ]
+    },
+    "project_extensions": {
+      "root": "F:\\WebProjects\\himind-ext-projects",
+      "head": {
+        "exit_code": 0,
+        "output": "14a07ba9acfca385bcb2a6c4984e2c91df95e92b",
+        "error": ""
+      },
+      "branch": {
+        "exit_code": 0,
+        "output": "main",
+        "error": ""
+      },
+      "working_tree": {
+        "exit_code": 0,
+        "output": "M README.md\n M extensions.json\n M skills/exhibit-experience-direction/SKILL.md\n M skills/exhibit-experience-direction/agents/openai.yaml\n M skills/exhibit-experience-direction/references/copy-system.md\n M skills/exhibit-experience-direction/references/experience-acceptance.md\n M skills/exhibit-experience-direction/skill.json\n?? .himind/media-toolkit/\n?? plugins/andx-custom-page-tools/\n?? skills/andx-custom-page-development/\n?? skills/exhibit-experience-direction/references/aesthetic-review.md\n?? skills/exhibit-experience-direction/references/aesthetic-scorecard.md\n?? workflows/andx-custom-page-delivery/",
+        "error": ""
+      },
+      "files": [
+        {
+          "path": "extensions.json",
+          "sha256": "b517de754dc7a0e584ef39cde38c09f7498e8a78de49a2196bc157d8e352e2eb"
+        },
+        {
+          "path": "skills/andx-custom-page-development/skill.json",
+          "sha256": "948607df5a122862fef27c10445a599631bb600b40dcdf2d4158a81006a2bc49"
+        },
+        {
+          "path": "skills/andx-custom-page-development/SKILL.md",
+          "sha256": "32d282a7fe900fd7218b9065d988604a7f77ef4ad0d2ed6a89d8bad9d9439099"
+        },
+        {
+          "path": "skills/exhibit-development/skill.json",
+          "sha256": "a42c4ec489f7e910d66f6fe7043647b70db07c453270341cafb72fb014778a16"
+        },
+        {
+          "path": "skills/exhibit-development/SKILL.md",
+          "sha256": "b854a6119ced59308ba57e948c0f01a8ddaa83a56c31a47f3425318db37bf310"
+        },
+        {
+          "path": "skills/exhibit-experience-direction/skill.json",
+          "sha256": "39d2743127fb67f9c9f8c1d62fe70f8d1344defff0b514cb32e6cc3e2259ed38"
+        },
+        {
+          "path": "skills/exhibit-experience-direction/SKILL.md",
+          "sha256": "9ad135c43c26ef47739fa933aed3fc64a6c7324481fd30fbc5d9f23d4f1ec1c5"
+        },
+        {
+          "path": "skills/exhibit-web-development/skill.json",
+          "sha256": "20b59eab664f2e2607811b2b69223c8bc57f1fdd81fe261dc5097b685209ba48"
+        },
+        {
+          "path": "skills/exhibit-web-development/SKILL.md",
+          "sha256": "a518215ce6476002e96e1814c10c72755466ff9ee208d116805b6fb8e9c3d324"
+        },
+        {
+          "path": "skills/krpano-tour-assistant/skill.json",
+          "sha256": "73ab7311bf919c98dffe494a9358a42fc88b166e63f7130b17510c3583842767"
+        },
+        {
+          "path": "skills/krpano-tour-assistant/SKILL.md",
+          "sha256": "0a2b02ed63a11e6956c509130bb64bd829150797bcc77174504ad5c7073dcb49"
+        },
+        {
+          "path": "skills/upm-package-development/skill.json",
+          "sha256": "039fe32f02a8dd378996027c171e6550904f102efcebfdab121049e9db79810f"
+        },
+        {
+          "path": "skills/upm-package-development/SKILL.md",
+          "sha256": "d42f79a1c9247c6b4aeb13196aab55bc881185e36f50b1b9c7cdaf424c48c7f3"
+        },
+        {
+          "path": "workflows/andx-custom-page-delivery/workflow.json",
+          "sha256": "dade50e5d57484f12e02aa2afcb5e28a64550912dba629c4008342897572a5af"
+        },
+        {
+          "path": "workflows/exhibit-development/workflow.json",
+          "sha256": "7425530dedd47d2b011bd9981382512679d207cdad4eff55c7dea115b9f0ebf9"
+        },
+        {
+          "path": "workflows/exhibit-web-development/workflow.json",
+          "sha256": "f93a1a69d086e657ad25896959bf66b83beee6ccc7abffea8946a079f752f657"
+        },
+        {
+          "path": "workflows/wx-venue-upload/workflow.json",
+          "sha256": "2a64180644a897676bdfccb0d717e6ca114defade55f846155e3e797ee703aa5"
+        }
+      ],
+      "registered_counts": {
+        "workflow": 4,
+        "skill": 6,
+        "plugin": 2
+      }
+    }
+  },
+  "experts": [
+    {
+      "id": "com.himind.expert.project-architect",
+      "name": "项目架构师",
+      "version": "1.0.0",
+      "skill_refs": [],
+      "workflow_refs": [],
+      "capability_refs": [],
+      "output_contract": {
+        "required_sections": [
+          "结论",
+          "下一步"
+        ]
+      },
+      "harness": {
+        "behavior_phases": [
+          "plan",
+          "execute",
+          "verify",
+          "deliver"
+        ],
+        "required_evidence": [
+          "summary",
+          "next_steps"
+        ],
+        "recovery_guidance": [
+          "遇到不确定性时先说明并请求补充信息"
+        ]
+      },
+      "repository": "extensions",
+      "path": "experts/project-architect/expert.json",
+      "sha256": "5d8e6f19ba8bd93e423cfab55de5a17f4b10e4958c09692276625489c892ae6d",
+      "instructions_bytes": 70,
+      "body_equals_instructions": true
+    },
+    {
+      "id": "com.himind.expert.senior-system-architect",
+      "name": "高级系统架构师",
+      "version": "1.0.0",
+      "skill_refs": [],
+      "workflow_refs": [],
+      "capability_refs": [],
+      "output_contract": {
+        "required_sections": [
+          "结论",
+          "下一步"
+        ]
+      },
+      "harness": {
+        "behavior_phases": [
+          "plan",
+          "execute",
+          "verify",
+          "deliver"
+        ],
+        "required_evidence": [
+          "summary",
+          "next_steps"
+        ],
+        "recovery_guidance": [
+          "遇到不确定性时先说明并请求补充信息"
+        ]
+      },
+      "repository": "extensions",
+      "path": "experts/senior-system-architect/expert.json",
+      "sha256": "3739c91ea2953728630fdc20c31f250694870a6487766f0f03a0250b79d15e1f",
+      "instructions_bytes": 199,
+      "body_equals_instructions": true
+    },
+    {
+      "id": "com.himind.expert.senior-test-engineer",
+      "name": "高级测试工程师",
+      "version": "1.0.0",
+      "skill_refs": [],
+      "workflow_refs": [],
+      "capability_refs": [],
+      "output_contract": {
+        "required_sections": [
+          "结论",
+          "下一步"
+        ]
+      },
+      "harness": {
+        "behavior_phases": [
+          "plan",
+          "execute",
+          "verify",
+          "deliver"
+        ],
+        "required_evidence": [
+          "summary",
+          "next_steps"
+        ],
+        "recovery_guidance": [
+          "遇到不确定性时先说明并请求补充信息"
+        ]
+      },
+      "repository": "extensions",
+      "path": "experts/senior-test-engineer/expert.json",
+      "sha256": "cdd8a737182233ccffdf5973513893b1ad1261aebabed7908870425328dcc9d0",
+      "instructions_bytes": 214,
+      "body_equals_instructions": true
+    },
+    {
+      "id": "com.himind.expert.senior-ui-designer",
+      "name": "高级 UI 设计师",
+      "version": "1.1.0",
+      "skill_refs": [
+        "com.himind.skill.ui-ux-design-assistant",
+        "com.himind.skill.software-ui-spec",
+        "com.himind.skill.ui-accessibility",
+        "com.himind.skill.ui-craft"
+      ],
+      "workflow_refs": [],
+      "capability_refs": [],
+      "output_contract": {
+        "required_sections": [
+          "设计结论",
+          "结构与状态",
+          "取值与依据",
+          "验证",
+          "假设与风险"
+        ]
+      },
+      "harness": {
+        "behavior_phases": [
+          "clarify",
+          "direction",
+          "structure",
+          "spec",
+          "render_check",
+          "deliver"
+        ],
+        "required_evidence": [
+          "direction",
+          "state_coverage",
+          "token_values",
+          "render_evidence",
+          "unverified"
+        ],
+        "recovery_guidance": [
+          "拿不到用户场景或约束时按最保守假设推进，并把假设写进结论",
+          "没有运行环境时标注未验证项，不声称已通过渲染验收"
+        ]
+      },
+      "repository": "extensions",
+      "path": "experts/senior-ui-designer/expert.json",
+      "sha256": "98b780ae305ebeb52cf115bbac98d3ab968519ceb632c7494237a8f98095d07e",
+      "instructions_bytes": 5296,
+      "body_equals_instructions": true
+    },
+    {
+      "id": "com.himind.expert.software-engineer",
+      "name": "软件工程师",
+      "version": "1.0.0",
+      "skill_refs": [],
+      "workflow_refs": [],
+      "capability_refs": [],
+      "output_contract": {
+        "required_sections": [
+          "结论",
+          "下一步"
+        ]
+      },
+      "harness": {
+        "behavior_phases": [
+          "plan",
+          "execute",
+          "verify",
+          "deliver"
+        ],
+        "required_evidence": [
+          "summary",
+          "next_steps"
+        ],
+        "recovery_guidance": [
+          "遇到不确定性时先说明并请求补充信息"
+        ]
+      },
+      "repository": "extensions",
+      "path": "experts/software-engineer/expert.json",
+      "sha256": "b45536cd76f2fe3065582e285d592362b2aad284c14e9baafc2fe2d0d84d0419",
+      "instructions_bytes": 64,
+      "body_equals_instructions": true
+    }
+  ],
+  "skills": [
+    {
+      "id": "com.himind.skill.dev-workflow-orchestrator",
+      "name": "工程工作流助手",
+      "version": "1.0.3",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [],
+      "repository": "extensions",
+      "path": "skills/dev-workflow-orchestrator/skill.json",
+      "sha256": "470dff6ab564bc27a9cddf91c1142b81a24d49692acffa610967a271a501e1a0"
+    },
+    {
+      "id": "com.himind.skill.develop-himind-conventions",
+      "name": "扩展开发规范",
+      "version": "1.1.2",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [],
+      "repository": "extensions",
+      "path": "skills/develop-himind-conventions/skill.json",
+      "sha256": "246361fc6f1286f635c39d8f0c9fff5b04d10b2f9b56e464a189997b8b154b37"
+    },
+    {
+      "id": "com.himind.skill.develop-himind-plugins",
+      "name": "插件开发助手",
+      "version": "1.7.5",
+      "supported_clients": [
+        "himind-ai",
+        "codex",
+        "github-copilot",
+        "workbuddy"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [],
+      "repository": "extensions",
+      "path": "skills/develop-himind-plugins/skill.json",
+      "sha256": "1a271d040c9bbdb94dc936c6302d5c843c6fd2bbb6fd613d1b571c85368146be"
+    },
+    {
+      "id": "com.himind.skill.develop-himind-skills",
+      "name": "技能开发助手",
+      "version": "1.8.4",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [],
+      "repository": "extensions",
+      "path": "skills/develop-himind-skills/skill.json",
+      "sha256": "09558407ff9563e8dbcea2b19fb91e251fa1b694609654a514cea7536a4c0beb"
+    },
+    {
+      "id": "com.himind.skill.develop-himind-workflows",
+      "name": "工作流开发助手",
+      "version": "1.0.3",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [],
+      "repository": "extensions",
+      "path": "skills/develop-himind-workflows/skill.json",
+      "sha256": "d31e03559f2200fc74bf130991622e0d1bb2c901a8d37b15811146e9bcd6e745"
+    },
+    {
+      "id": "com.himind.skill.git-svn-commit-summary",
+      "name": "Git/SVN 提交摘要",
+      "version": "1.1.1",
+      "supported_clients": [
+        "codex",
+        "github-copilot",
+        "workbuddy"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [],
+      "repository": "extensions",
+      "path": "skills/git-svn-commit-summary/skill.json",
+      "sha256": "d03b6162a9f05be590445c9e6242e007e138c29876ae8908b4e68a9ba19a969c"
+    },
+    {
+      "id": "com.himind.skill.iostudio-debug-assistant",
+      "name": "IOStudio 调试助手",
+      "version": "0.1.0",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [
+        {
+          "plugin_id": "com.himind.iostudio",
+          "required": true,
+          "min_version": "1.0.0"
+        }
+      ],
+      "repository": "extensions",
+      "path": "skills/iostudio-debug-assistant/skill.json",
+      "sha256": "12c24179ba4f82ea5716a24e059c979d5f53b49be606c78b91548324988aa265"
+    },
+    {
+      "id": "com.himind.skill.long-task-driver",
+      "name": "长任务推进助手",
+      "version": "0.1.1",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [],
+      "repository": "extensions",
+      "path": "skills/long-task-driver/skill.json",
+      "sha256": "88c35e747ea242c1e70477aaaa6d925f82fc642d873497e2f61e48b158b7423f"
+    },
+    {
+      "id": "com.himind.skill.mcp-experience-feedback",
+      "name": "MCP 体验反馈",
+      "version": "1.0.1",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [],
+      "repository": "extensions",
+      "path": "skills/mcp-experience-feedback/skill.json",
+      "sha256": "cd39a52bb8f0c6efaeded40cdf05049dfa039cc96479e0c9c4fbdb23b738c074"
+    },
+    {
+      "id": "com.himind.skill.media-creation-assistant",
+      "name": "媒体创作助手",
+      "version": "0.1.0",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [
+        {
+          "plugin_id": "com.himind.media-studio",
+          "required": true,
+          "min_version": "0.1.0"
+        }
+      ],
+      "repository": "extensions",
+      "path": "skills/media-creation-assistant/skill.json",
+      "sha256": "171b7a5a0c9aaf28073a89e23156d5ab59c127e042d54ac747fa97243bbcf7f3"
+    },
+    {
+      "id": "com.himind.media-downloader-assistant",
+      "name": "媒体下载助手",
+      "version": "0.1.1",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [
+        {
+          "plugin_id": "com.himind.media-downloader",
+          "required": true,
+          "min_version": "0.1.0"
+        }
+      ],
+      "repository": "extensions",
+      "path": "skills/media-downloader-assistant/skill.json",
+      "sha256": "92a456c2f58d2e8ea294f0705974a3b6f765fabccb9fdad331c9eb41de6b79c9"
+    },
+    {
+      "id": "com.himind.skill.software-distribution",
+      "name": "软件分发助手",
+      "version": "1.4.1",
+      "supported_clients": [
+        "himind-ai",
+        "codex",
+        "github-copilot",
+        "workbuddy"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": null,
+      "repository": "extensions",
+      "path": "skills/software-distribution/skill.json",
+      "sha256": "264f81fce495baacc4ba2a7eeaadd4f5a14ae26bb3cf2ac9e8596ba9ef00977e"
+    },
+    {
+      "id": "com.himind.skill.software-ui-spec",
+      "name": "软件界面规范",
+      "version": "1.3.0",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [],
+      "repository": "extensions",
+      "path": "skills/software-ui-spec/skill.json",
+      "sha256": "dd8286111cf44ca2a190347adf13f5e9bcb9b84d48f869a99e2079bb99529147"
+    },
+    {
+      "id": "com.himind.skill.ui-accessibility",
+      "name": "界面无障碍",
+      "version": "1.0.0",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [],
+      "repository": "extensions",
+      "path": "skills/ui-accessibility/skill.json",
+      "sha256": "31ff50e6ce3f468afe0d79f8718d3fe5f94fe16a515289d83a571bd767ebc93e"
+    },
+    {
+      "id": "com.himind.skill.ui-craft",
+      "name": "界面工艺细节",
+      "version": "1.0.0",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [],
+      "repository": "extensions",
+      "path": "skills/ui-craft/skill.json",
+      "sha256": "290373a5789b23c4865b08bee185448af3708c802f3eb0b184d37c14c7df4d16"
+    },
+    {
+      "id": "com.himind.skill.ui-ux-design-assistant",
+      "name": "界面设计助手",
+      "version": "0.3.1",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [
+        {
+          "plugin_id": "com.himind.ui-ux-design-tools",
+          "required": true,
+          "min_version": "0.3.0"
+        }
+      ],
+      "repository": "extensions",
+      "path": "skills/ui-ux-design-assistant/skill.json",
+      "sha256": "0b98db2a40bcc11c457b19c5b325c82c1a0918cdb5387e045a18aaa36ebec1da"
+    },
+    {
+      "id": "com.mrbaoquan.skill.unihper-unity-development",
+      "name": "UNIHper 开发助手",
+      "version": "1.3.0",
+      "supported_clients": [
+        "codex",
+        "github-copilot",
+        "workbuddy"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [],
+      "repository": "extensions",
+      "path": "skills/unihper-unity-development/skill.json",
+      "sha256": "50866696b073c11e99a92fe778aded22fdd53dbfed3c7547ae427a5654905b6a"
+    },
+    {
+      "id": "com.himind.skill.video-motion-authoring",
+      "name": "视频动作编排助手",
+      "version": "1.8.0",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [
+        {
+          "plugin_id": "com.himind.media-toolkit",
+          "required": true,
+          "min_version": "1.0.0"
+        },
+        {
+          "plugin_id": "com.himind.iostudio",
+          "required": true,
+          "min_version": "1.0.0"
+        },
+        {
+          "plugin_id": "com.himind.media-ai",
+          "required": false,
+          "min_version": "1.0.0"
+        },
+        {
+          "plugin_id": "com.himind.motion-composer",
+          "required": true,
+          "min_version": "1.1.0"
+        }
+      ],
+      "repository": "extensions",
+      "path": "skills/video-motion-authoring/skill.json",
+      "sha256": "aa20d93eab7bc7c06bf43e69df88f62ec1f4a39b82c36369e3a15a3a1f4f5dab"
+    },
+    {
+      "id": "com.mrbaoquan.skill.wechat-miniprogram-assistant",
+      "name": "微信小程序开发助手",
+      "version": "0.1.2",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [
+        {
+          "plugin_id": "com.himind.wechat-miniprogram-tools",
+          "required": true,
+          "min_version": "0.4.1"
+        }
+      ],
+      "repository": "extensions",
+      "path": "skills/wechat-miniprogram-assistant/skill.json",
+      "sha256": "a7d8c9c3d328f4c86f1624dbe408df8d43210f4b79e6fc76718c35886af693a1"
+    },
+    {
+      "id": "com.himind.skill.work-log",
+      "name": "工作日志助手",
+      "version": "0.6.2",
+      "supported_clients": [
+        "himind-ai",
+        "codex",
+        "github-copilot",
+        "workbuddy"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [
+        {
+          "plugin_id": "com.himind.work-log",
+          "required": true,
+          "min_version": "0.16.0"
+        }
+      ],
+      "repository": "extensions",
+      "path": "skills/work-log/skill.json",
+      "sha256": "b51e9da780986f09f2376090e1fc931414fc7549b236b5b7a9616685aff87fef"
+    },
+    {
+      "id": "com.himind.skill.workspace-context",
+      "name": "工作区上下文",
+      "version": "0.1.0",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [
+        {
+          "plugin_id": "com.himind.workspace-registry",
+          "required": true,
+          "min_version": "0.1.0"
+        }
+      ],
+      "repository": "extensions",
+      "path": "skills/workspace-context/skill.json",
+      "sha256": "74994f0533582420b357f9fa4b824d05ea9048a79696efa61cd772c755742413"
+    },
+    {
+      "id": "com.himind.skill.andx-custom-page-development",
+      "name": "AndX 定制页开发助手",
+      "version": "0.1.1",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": null,
+      "plugin_dependencies": [
+        {
+          "plugin_id": "com.himind.andx-custom-page-tools",
+          "required": false,
+          "min_version": "0.1.0"
+        },
+        {
+          "plugin_id": "com.himind.exhibit-development-tools",
+          "required": false,
+          "min_version": "0.6.0"
+        }
+      ],
+      "repository": "project_extensions",
+      "path": "skills/andx-custom-page-development/skill.json",
+      "sha256": "948607df5a122862fef27c10445a599631bb600b40dcdf2d4158a81006a2bc49"
+    },
+    {
+      "id": "com.himind.skill.exhibit-development",
+      "name": "展项开发助手",
+      "version": "0.2.0",
+      "supported_clients": [
+        "codex",
+        "github-copilot",
+        "workbuddy"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [
+        {
+          "plugin_id": "com.himind.exhibit-development-tools",
+          "required": true,
+          "min_version": "0.1.0"
+        }
+      ],
+      "repository": "project_extensions",
+      "path": "skills/exhibit-development/skill.json",
+      "sha256": "a42c4ec489f7e910d66f6fe7043647b70db07c453270341cafb72fb014778a16"
+    },
+    {
+      "id": "com.himind.skill.exhibit-experience-direction",
+      "name": "展项体验方向",
+      "version": "0.2.0",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [],
+      "repository": "project_extensions",
+      "path": "skills/exhibit-experience-direction/skill.json",
+      "sha256": "39d2743127fb67f9c9f8c1d62fe70f8d1344defff0b514cb32e6cc3e2259ed38"
+    },
+    {
+      "id": "com.himind.skill.exhibit-web-development",
+      "name": "展项 Web 开发助手",
+      "version": "0.4.2",
+      "supported_clients": [
+        "codex",
+        "github-copilot",
+        "workbuddy"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [
+        {
+          "plugin_id": "com.himind.exhibit-development-tools",
+          "required": true,
+          "min_version": "0.5.2"
+        }
+      ],
+      "repository": "project_extensions",
+      "path": "skills/exhibit-web-development/skill.json",
+      "sha256": "20b59eab664f2e2607811b2b69223c8bc57f1fdd81fe261dc5097b685209ba48"
+    },
+    {
+      "id": "com.himind.skill.krpano-tour-assistant",
+      "name": "krpano 全景项目助手",
+      "version": "0.1.0",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [],
+      "repository": "project_extensions",
+      "path": "skills/krpano-tour-assistant/skill.json",
+      "sha256": "73ab7311bf919c98dffe494a9358a42fc88b166e63f7130b17510c3583842767"
+    },
+    {
+      "id": "com.himind.skill.upm-package-development",
+      "name": "UPM 包开发规范",
+      "version": "1.9.0",
+      "supported_clients": [
+        "agent-skills"
+      ],
+      "distribution_targets": [
+        "workbench",
+        "github"
+      ],
+      "plugin_dependencies": [],
+      "repository": "project_extensions",
+      "path": "skills/upm-package-development/skill.json",
+      "sha256": "039fe32f02a8dd378996027c171e6550904f102efcebfdab121049e9db79810f"
+    }
+  ],
+  "workflows": [
+    {
+      "id": "com.himind.workflow.daily-work-log",
+      "name": "每日工作日志",
+      "version": "0.7.8",
+      "execution_policy": "segmented",
+      "supported_runtimes": [
+        "himind.builtin"
+      ],
+      "dependencies": {
+        "skills": [],
+        "plugins": [
+          "com.himind.work-log",
+          "com.himind.work-log-collector"
+        ],
+        "connectors": [],
+        "runtimes": [
+          "himind.builtin"
+        ]
+      },
+      "repository": "extensions",
+      "path": "workflows/daily-work-log/workflow.json",
+      "sha256": "cd78d339ea93ef42df089c670093d2b0808cce6cd99dc1e8aa730db6dc995b61",
+      "roles": [],
+      "steps": [
+        {
+          "id": "WL-PROJECTS",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": []
+        },
+        {
+          "id": "WL-EXHIBITS",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "WL-PROJECTS"
+          ]
+        },
+        {
+          "id": "WL-COLLECT",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "WL-PROJECTS"
+          ]
+        },
+        {
+          "id": "WL-SUMMARIZE",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "WL-COLLECT"
+          ]
+        },
+        {
+          "id": "WL-WRITE",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "WL-SUMMARIZE",
+            "WL-EXHIBITS"
+          ]
+        },
+        {
+          "id": "WL-AGGREGATE",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "WL-WRITE"
+          ]
+        },
+        {
+          "id": "WL-REPORT",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "WL-AGGREGATE"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "com.himind.workflow.media-kit-production",
+      "name": "素材套图生产",
+      "version": "0.1.0",
+      "execution_policy": "segmented",
+      "supported_runtimes": [
+        "himind.builtin"
+      ],
+      "dependencies": {
+        "skills": [],
+        "plugins": [
+          "com.himind.media-studio"
+        ],
+        "connectors": [],
+        "runtimes": [
+          "himind.builtin"
+        ]
+      },
+      "repository": "extensions",
+      "path": "workflows/media-kit-production/workflow.json",
+      "sha256": "80cb78583297d164bb23c609b4659bd54b7bdc3e5edbdb7c8a3e50d4625d1a8b",
+      "roles": [],
+      "steps": [
+        {
+          "id": "MK-CHECK",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": []
+        },
+        {
+          "id": "MK-PRODUCE",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "MK-CHECK"
+          ]
+        },
+        {
+          "id": "MK-REVIEW",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "MK-PRODUCE"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "com.himind.workflow.software-release",
+      "name": "软件发布",
+      "version": "1.1.1",
+      "execution_policy": "segmented",
+      "supported_runtimes": [],
+      "dependencies": {
+        "skills": [],
+        "plugins": [],
+        "connectors": [],
+        "runtimes": []
+      },
+      "repository": "extensions",
+      "path": "workflows/software-release/workflow.json",
+      "sha256": "30ac1f3fb55cb0c009532bca770f6c421c940a809c4e887d66b5020e8c035283",
+      "roles": [],
+      "steps": [
+        {
+          "id": "SD-PROJECT",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": []
+        },
+        {
+          "id": "SD-ARTIFACT",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "SD-PROJECT"
+          ]
+        },
+        {
+          "id": "SD-PUBLISH",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "SD-ARTIFACT"
+          ]
+        },
+        {
+          "id": "SD-RESOLVE",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "SD-PUBLISH"
+          ]
+        },
+        {
+          "id": "SD-ACCEPT",
+          "kind": "manual",
+          "role_id": "",
+          "depends_on": [
+            "SD-RESOLVE"
+          ]
+        },
+        {
+          "id": "SD-CHANNEL",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": []
+        }
+      ]
+    },
+    {
+      "id": "com.himind.workflow.tech-radar",
+      "name": "科技雷达日报",
+      "version": "0.4.9",
+      "execution_policy": "segmented",
+      "supported_runtimes": [
+        "himind.builtin"
+      ],
+      "dependencies": {
+        "skills": [],
+        "plugins": [],
+        "connectors": [],
+        "runtimes": [
+          "himind.builtin"
+        ]
+      },
+      "repository": "extensions",
+      "path": "workflows/tech-radar/workflow.json",
+      "sha256": "d4b53944714ca08af1aef189b0995124ec7b6bbeb51ef58d08db24cc8da4c756",
+      "roles": [],
+      "steps": [
+        {
+          "id": "TR-COLLECT",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": []
+        },
+        {
+          "id": "TR-INSIGHT",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "TR-COLLECT"
+          ]
+        },
+        {
+          "id": "TR-REPORT",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "TR-INSIGHT"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "com.himind.workflow.video-to-motion",
+      "name": "视频转动作",
+      "version": "0.1.0",
+      "execution_policy": "segmented",
+      "supported_runtimes": [
+        "himind.builtin"
+      ],
+      "dependencies": {
+        "skills": [
+          {
+            "id": "com.himind.skill.video-motion-authoring",
+            "required": true,
+            "min_version": "1.8.0"
+          }
+        ],
+        "plugins": [
+          {
+            "id": "com.himind.media-toolkit",
+            "required": true,
+            "min_version": "1.4.0"
+          },
+          {
+            "id": "com.himind.iostudio",
+            "required": true,
+            "min_version": "1.1.1"
+          },
+          {
+            "id": "com.himind.motion-composer",
+            "required": true,
+            "min_version": "1.2.0"
+          },
+          {
+            "id": "com.himind.media-ai",
+            "required": false,
+            "min_version": "1.0.0"
+          }
+        ],
+        "connectors": [],
+        "runtimes": [
+          "himind.builtin"
+        ]
+      },
+      "repository": "extensions",
+      "path": "workflows/video-to-motion/workflow.json",
+      "sha256": "77e4885ade756ca9482484f70363ac401586d3faef3a61a37054b0ea43e8dd43",
+      "roles": [],
+      "steps": [
+        {
+          "id": "V2M-MEDIA-READY",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": []
+        },
+        {
+          "id": "V2M-IO-READY",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": []
+        },
+        {
+          "id": "V2M-QA-READY",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": []
+        },
+        {
+          "id": "V2M-DEVICE",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "V2M-IO-READY"
+          ]
+        },
+        {
+          "id": "V2M-PLATFORM",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "V2M-MEDIA-READY",
+            "V2M-QA-READY",
+            "V2M-IO-READY"
+          ]
+        },
+        {
+          "id": "V2M-EVIDENCE",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "V2M-MEDIA-READY",
+            "V2M-PLATFORM"
+          ]
+        },
+        {
+          "id": "V2M-BEHAVIOR",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "V2M-EVIDENCE"
+          ]
+        },
+        {
+          "id": "V2M-INTENT",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "V2M-BEHAVIOR",
+            "V2M-DEVICE",
+            "V2M-PLATFORM"
+          ]
+        },
+        {
+          "id": "V2M-BINDING",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "V2M-INTENT"
+          ]
+        },
+        {
+          "id": "V2M-REVIEW",
+          "kind": "manual",
+          "role_id": "",
+          "depends_on": [
+            "V2M-BINDING"
+          ]
+        },
+        {
+          "id": "V2M-SPECS",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "V2M-REVIEW"
+          ]
+        },
+        {
+          "id": "V2M-QA-LOOP",
+          "kind": "loop",
+          "role_id": "",
+          "depends_on": [
+            "V2M-SPECS"
+          ]
+        },
+        {
+          "id": "V2M-BUILD",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "V2M-QA-LOOP"
+          ]
+        },
+        {
+          "id": "V2M-DELIVERY",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "V2M-BUILD"
+          ]
+        },
+        {
+          "id": "V2M-ACCEPT",
+          "kind": "manual",
+          "role_id": "",
+          "depends_on": [
+            "V2M-DELIVERY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "com.himind.workflow.wechat-miniprogram-ci-delivery",
+      "name": "微信小程序 CI 交付",
+      "version": "1.0.0",
+      "execution_policy": "segmented",
+      "supported_runtimes": [],
+      "dependencies": {
+        "skills": [],
+        "plugins": [
+          {
+            "id": "com.himind.wechat-miniprogram-tools",
+            "required": true,
+            "min_version": "0.4.0"
+          }
+        ],
+        "connectors": [
+          "wechat-miniprogram"
+        ],
+        "runtimes": []
+      },
+      "repository": "extensions",
+      "path": "workflows/wechat-miniprogram-ci-delivery/workflow.json",
+      "sha256": "4d110025259ea9dad63f135ed3df0f740b77d32e0818b00ebd3623a620b05537",
+      "roles": [],
+      "steps": [
+        {
+          "id": "WX-BUILD",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": []
+        },
+        {
+          "id": "WX-CANDIDATE",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "WX-BUILD"
+          ]
+        },
+        {
+          "id": "WX-READINESS",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "WX-CANDIDATE"
+          ]
+        },
+        {
+          "id": "WX-UPLOAD",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "WX-READINESS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "com.himind.workflow.engine-build",
+      "name": "引擎工程构建",
+      "version": "1.0.0",
+      "execution_policy": "segmented",
+      "supported_runtimes": [],
+      "dependencies": {
+        "skills": [],
+        "plugins": [],
+        "connectors": [],
+        "runtimes": []
+      },
+      "repository": "agent",
+      "path": "workflows/engine-build/workflow.json",
+      "sha256": "aef42332b91e102bed736f1ab6efe40c936d182a1e76852ccb5eb332684d7d60",
+      "roles": [],
+      "steps": [
+        {
+          "id": "ENGINE-BUILD",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": []
+        }
+      ]
+    },
+    {
+      "id": "com.himind.workflow.software-delivery",
+      "name": "软件交付（多角色）",
+      "version": "1.1.1",
+      "execution_policy": "segmented",
+      "supported_runtimes": [
+        "himind.builtin",
+        "personal.codex",
+        "personal.github-copilot"
+      ],
+      "dependencies": {
+        "skills": [],
+        "plugins": [],
+        "connectors": [],
+        "runtimes": []
+      },
+      "repository": "agent",
+      "path": "workflows/software-delivery/workflow.json",
+      "sha256": "68272336dd37fe8f3df6c3d4dd5a6d54ab573c924d3207bcc99837d2e29b2c3e",
+      "roles": [
+        "software.analyst",
+        "software.implementer",
+        "software.verifier",
+        "software.reviewer",
+        "software.delivery"
+      ],
+      "steps": [
+        {
+          "id": "ANALYZE",
+          "kind": "runtime",
+          "role_id": "software.analyst",
+          "depends_on": []
+        },
+        {
+          "id": "CONFIRM",
+          "kind": "manual",
+          "role_id": "software.analyst",
+          "depends_on": [
+            "ANALYZE"
+          ]
+        },
+        {
+          "id": "IMPLEMENT",
+          "kind": "runtime",
+          "role_id": "software.implementer",
+          "depends_on": [
+            "CONFIRM"
+          ]
+        },
+        {
+          "id": "QUALITY-GATE",
+          "kind": "delegate",
+          "role_id": "",
+          "depends_on": [
+            "IMPLEMENT"
+          ]
+        },
+        {
+          "id": "PREPARE-PR",
+          "kind": "runtime",
+          "role_id": "software.delivery",
+          "depends_on": [
+            "QUALITY-GATE"
+          ]
+        },
+        {
+          "id": "CREATE-PR",
+          "kind": "manual",
+          "role_id": "software.delivery",
+          "depends_on": [
+            "PREPARE-PR"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "com.himind.workflow.ui-craft-team",
+      "name": "UI 专业打磨团队",
+      "version": "1.2.0",
+      "execution_policy": "segmented",
+      "supported_runtimes": [
+        "himind.builtin",
+        "personal.codex",
+        "personal.github-copilot"
+      ],
+      "dependencies": {
+        "skills": [],
+        "plugins": [],
+        "connectors": [],
+        "runtimes": []
+      },
+      "repository": "agent",
+      "path": "workflows/ui-craft-team/workflow.json",
+      "sha256": "6ef7a62a915d41b9f42e042d91d1ccdfd7c771ec9f55f4301e0145838953e9b9",
+      "roles": [
+        "ui.auditor",
+        "ui.craft",
+        "ui.a11y",
+        "ui.polisher",
+        "ui.planner",
+        "ui.implementer.ia",
+        "ui.implementer.craft",
+        "ui.implementer.a11y",
+        "ui.implementer.shared",
+        "ui.verifier",
+        "ui.guard"
+      ],
+      "steps": [
+        {
+          "id": "SCOPE",
+          "kind": "runtime",
+          "role_id": "ui.auditor",
+          "depends_on": []
+        },
+        {
+          "id": "CONFIRM-SCOPE",
+          "kind": "manual",
+          "role_id": "",
+          "depends_on": [
+            "SCOPE"
+          ]
+        },
+        {
+          "id": "AUDIT",
+          "kind": "delegate",
+          "role_id": "",
+          "depends_on": [
+            "CONFIRM-SCOPE"
+          ]
+        },
+        {
+          "id": "PLAN",
+          "kind": "runtime",
+          "role_id": "ui.planner",
+          "depends_on": [
+            "AUDIT"
+          ]
+        },
+        {
+          "id": "CONFIRM-FIXES",
+          "kind": "manual",
+          "role_id": "",
+          "depends_on": [
+            "PLAN"
+          ]
+        },
+        {
+          "id": "POLISH-LOOP",
+          "kind": "loop",
+          "role_id": "",
+          "depends_on": [
+            "CONFIRM-FIXES"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "com.himind.workflow.wechat-experience-upload",
+      "name": "微信小程序体验版上传",
+      "version": "1.4.3",
+      "execution_policy": "segmented",
+      "supported_runtimes": [],
+      "dependencies": {
+        "skills": [],
+        "plugins": [
+          {
+            "id": "com.himind.wechat-miniprogram-tools",
+            "required": true,
+            "min_version": "0.3.19"
+          }
+        ],
+        "connectors": [
+          "wechat-miniprogram"
+        ],
+        "runtimes": []
+      },
+      "repository": "agent",
+      "path": "workflows/wechat-experience-upload/workflow.json",
+      "sha256": "7abad1089691f7b2923fe7cf4d0b28935cd5cf1047acfe09c5abe818d5b02b2c",
+      "roles": [],
+      "steps": [
+        {
+          "id": "WX-BUILD",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": []
+        },
+        {
+          "id": "WX-CANDIDATE",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "WX-BUILD"
+          ]
+        },
+        {
+          "id": "WX-READINESS",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "WX-CANDIDATE"
+          ]
+        },
+        {
+          "id": "WX-UPLOAD",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "WX-READINESS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "com.himind.workflow.wechat-miniprogram-delivery",
+      "name": "微信小程序体验版交付",
+      "version": "1.0.0",
+      "execution_policy": "segmented",
+      "supported_runtimes": [],
+      "dependencies": {
+        "skills": [],
+        "plugins": [
+          {
+            "id": "com.himind.wechat-miniprogram-tools",
+            "required": true,
+            "min_version": "0.4.0"
+          }
+        ],
+        "connectors": [
+          "wechat-miniprogram"
+        ],
+        "runtimes": []
+      },
+      "repository": "agent",
+      "path": "workflows/wechat-miniprogram-delivery/workflow.json",
+      "sha256": "907178d6a7edb90adf3ed9f677055f0175d237c3d8e6996e4a10f0df103ad5ce",
+      "roles": [],
+      "steps": [
+        {
+          "id": "WX-BUILD",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": []
+        },
+        {
+          "id": "WX-CANDIDATE",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "WX-BUILD"
+          ]
+        },
+        {
+          "id": "WX-READINESS",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "WX-CANDIDATE"
+          ]
+        },
+        {
+          "id": "WX-UPLOAD",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "WX-READINESS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "com.himind.workflow.andx-custom-page-delivery",
+      "name": "AndX 定制页交付",
+      "version": "0.1.0",
+      "execution_policy": "segmented",
+      "supported_runtimes": [
+        "codex",
+        "himind.builtin"
+      ],
+      "dependencies": {
+        "skills": [
+          {
+            "id": "com.himind.skill.andx-custom-page-development",
+            "required": true,
+            "min_version": "0.1.0"
+          }
+        ],
+        "plugins": [
+          {
+            "id": "com.himind.andx-custom-page-tools",
+            "required": true,
+            "min_version": "0.1.0"
+          },
+          {
+            "id": "com.himind.exhibit-development-tools",
+            "required": false,
+            "min_version": "0.6.0"
+          }
+        ],
+        "connectors": [],
+        "runtimes": [
+          "codex",
+          "himind.builtin"
+        ]
+      },
+      "repository": "project_extensions",
+      "path": "workflows/andx-custom-page-delivery/workflow.json",
+      "sha256": "dade50e5d57484f12e02aa2afcb5e28a64550912dba629c4008342897572a5af",
+      "roles": [],
+      "steps": [
+        {
+          "id": "ACP-SPEC",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": []
+        },
+        {
+          "id": "ACP-MYRIADBOX-BUILD",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "ACP-SPEC"
+          ]
+        },
+        {
+          "id": "ACP-PROJECT-INSPECT",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "ACP-SPEC"
+          ]
+        },
+        {
+          "id": "ACP-DEVELOP",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "ACP-PROJECT-INSPECT"
+          ]
+        },
+        {
+          "id": "ACP-EXPERIENCE",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "ACP-DEVELOP"
+          ]
+        },
+        {
+          "id": "ACP-CONTRACT",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "ACP-DEVELOP"
+          ]
+        },
+        {
+          "id": "ACP-BRIDGE-TEST",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "ACP-CONTRACT"
+          ]
+        },
+        {
+          "id": "ACP-PACKAGE",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "ACP-BRIDGE-TEST"
+          ]
+        },
+        {
+          "id": "ACP-PREVIEW",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "ACP-PACKAGE"
+          ]
+        },
+        {
+          "id": "ACP-LIVE-VERIFY",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "ACP-PREVIEW"
+          ]
+        },
+        {
+          "id": "ACP-PROD-APPROVAL",
+          "kind": "manual",
+          "role_id": "",
+          "depends_on": [
+            "ACP-LIVE-VERIFY"
+          ]
+        },
+        {
+          "id": "ACP-ACTIVATE",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "ACP-PROD-APPROVAL"
+          ]
+        },
+        {
+          "id": "ACP-QR",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "ACP-ACTIVATE"
+          ]
+        },
+        {
+          "id": "ACP-EVIDENCE-PACK",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "ACP-QR"
+          ]
+        },
+        {
+          "id": "ACP-WECHAT-REVIEW",
+          "kind": "manual",
+          "role_id": "",
+          "depends_on": [
+            "ACP-EVIDENCE-PACK"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "com.himind.workflow.exhibit-development",
+      "name": "展项开发",
+      "version": "0.3.0",
+      "execution_policy": "segmented",
+      "supported_runtimes": [
+        "codex",
+        "himind.builtin"
+      ],
+      "dependencies": {
+        "skills": [
+          {
+            "id": "com.himind.skill.exhibit-development",
+            "required": true,
+            "min_version": "0.2.0"
+          },
+          {
+            "id": "com.mrbaoquan.skill.unihper-unity-development",
+            "required": true,
+            "min_version": "1.3.0"
+          }
+        ],
+        "plugins": [
+          {
+            "id": "com.himind.exhibit-development-tools",
+            "required": true,
+            "min_version": "0.6.0"
+          }
+        ],
+        "connectors": [],
+        "runtimes": [
+          "codex",
+          "himind.builtin"
+        ]
+      },
+      "repository": "project_extensions",
+      "path": "workflows/exhibit-development/workflow.json",
+      "sha256": "7425530dedd47d2b011bd9981382512679d207cdad4eff55c7dea115b9f0ebf9",
+      "roles": [],
+      "steps": [
+        {
+          "id": "EX-SCRIPT-PARSE",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": []
+        },
+        {
+          "id": "EX-INTRO-DRAFT",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "EX-SCRIPT-PARSE"
+          ]
+        },
+        {
+          "id": "EX-INTRO-PUBLISH",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "EX-INTRO-DRAFT"
+          ]
+        },
+        {
+          "id": "EX-SPEC-DRAFT",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "EX-INTRO-PUBLISH"
+          ]
+        },
+        {
+          "id": "EX-SPEC-CONFIRM",
+          "kind": "manual",
+          "role_id": "",
+          "depends_on": [
+            "EX-SPEC-DRAFT"
+          ]
+        },
+        {
+          "id": "EX-SPEC-PUBLISH",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "EX-SPEC-CONFIRM"
+          ]
+        },
+        {
+          "id": "EX-PROJECT-INSPECT",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "EX-SPEC-PUBLISH"
+          ]
+        },
+        {
+          "id": "EX-DEVELOP",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "EX-PROJECT-INSPECT"
+          ]
+        },
+        {
+          "id": "EX-EVIDENCE-PACK",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "EX-DEVELOP"
+          ]
+        },
+        {
+          "id": "EX-EVIDENCE-UPLOAD",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "EX-EVIDENCE-PACK"
+          ]
+        },
+        {
+          "id": "EX-REVIEW",
+          "kind": "manual",
+          "role_id": "",
+          "depends_on": [
+            "EX-DEVELOP"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "com.himind.workflow.exhibit-web-development",
+      "name": "展项 Web 开发",
+      "version": "0.4.2",
+      "execution_policy": "segmented",
+      "supported_runtimes": [
+        "codex",
+        "himind.builtin"
+      ],
+      "dependencies": {
+        "skills": [
+          {
+            "id": "com.himind.skill.exhibit-web-development",
+            "required": true,
+            "min_version": "0.4.2"
+          },
+          {
+            "id": "com.himind.skill.exhibit-experience-direction",
+            "required": true,
+            "min_version": "0.1.0"
+          }
+        ],
+        "plugins": [
+          {
+            "id": "com.himind.exhibit-development-tools",
+            "required": true,
+            "min_version": "0.5.2"
+          }
+        ],
+        "connectors": [],
+        "runtimes": [
+          "codex",
+          "himind.builtin"
+        ]
+      },
+      "repository": "project_extensions",
+      "path": "workflows/exhibit-web-development/workflow.json",
+      "sha256": "f93a1a69d086e657ad25896959bf66b83beee6ccc7abffea8946a079f752f657",
+      "roles": [],
+      "steps": [
+        {
+          "id": "EXW-SCRIPT-PARSE",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": []
+        },
+        {
+          "id": "EXW-INTRO-DRAFT",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "EXW-SCRIPT-PARSE"
+          ]
+        },
+        {
+          "id": "EXW-INTRO-PUBLISH",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "EXW-INTRO-DRAFT"
+          ]
+        },
+        {
+          "id": "EXW-SPEC-DRAFT",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "EXW-INTRO-PUBLISH"
+          ]
+        },
+        {
+          "id": "EXW-SPEC-VALIDATE",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "EXW-SPEC-DRAFT"
+          ]
+        },
+        {
+          "id": "EXW-SPEC-PUBLISH",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "EXW-SPEC-VALIDATE"
+          ]
+        },
+        {
+          "id": "EXW-PROJECT-INSPECT",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "EXW-SPEC-PUBLISH"
+          ]
+        },
+        {
+          "id": "EXW-DEVELOP",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "EXW-PROJECT-INSPECT"
+          ]
+        },
+        {
+          "id": "EXW-EXPERIENCE-INSPECT",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "EXW-DEVELOP"
+          ]
+        },
+        {
+          "id": "EXW-BUILD",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "EXW-EXPERIENCE-INSPECT"
+          ]
+        },
+        {
+          "id": "EXW-DIST-VERIFY",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "EXW-BUILD"
+          ]
+        },
+        {
+          "id": "EXW-PACKAGE",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "EXW-BUILD"
+          ]
+        },
+        {
+          "id": "EXW-CANDIDATE",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "EXW-PACKAGE"
+          ]
+        },
+        {
+          "id": "EXW-SMOKE",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "EXW-CANDIDATE"
+          ]
+        },
+        {
+          "id": "EXW-EVIDENCE-PACK",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "EXW-SMOKE"
+          ]
+        },
+        {
+          "id": "EXW-EVIDENCE-UPLOAD",
+          "kind": "runtime",
+          "role_id": "",
+          "depends_on": [
+            "EXW-EVIDENCE-PACK"
+          ]
+        },
+        {
+          "id": "EXW-REVIEW",
+          "kind": "manual",
+          "role_id": "",
+          "depends_on": [
+            "EXW-SMOKE",
+            "EXW-EVIDENCE-UPLOAD",
+            "EXW-DIST-VERIFY",
+            "EXW-EXPERIENCE-INSPECT"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "com.himind.workflow.wx-venue-upload",
+      "name": "展馆预约小程序上传",
+      "version": "1.4.4",
+      "execution_policy": "segmented",
+      "supported_runtimes": [],
+      "dependencies": {
+        "skills": [],
+        "plugins": [
+          {
+            "id": "com.himind.wechat-miniprogram-tools",
+            "required": true,
+            "min_version": "0.3.19"
+          }
+        ],
+        "connectors": [
+          "wechat-miniprogram"
+        ],
+        "runtimes": []
+      },
+      "repository": "project_extensions",
+      "path": "workflows/wx-venue-upload/workflow.json",
+      "sha256": "2a64180644a897676bdfccb0d717e6ca114defade55f846155e3e797ee703aa5",
+      "roles": [],
+      "steps": [
+        {
+          "id": "WX-BUILD",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": []
+        },
+        {
+          "id": "WX-CANDIDATE",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "WX-BUILD"
+          ]
+        },
+        {
+          "id": "WX-READINESS",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "WX-CANDIDATE"
+          ]
+        },
+        {
+          "id": "WX-UPLOAD",
+          "kind": "capability",
+          "role_id": "",
+          "depends_on": [
+            "WX-READINESS"
+          ]
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "repository_check": {
+      "command": "go run ./tools/cmd/himind-repo-check",
+      "cwd": "F:\\WebProjects\\himind-extensions",
+      "exit_code": 0,
+      "validated_extensions": 44,
+      "scope": "existing_repository_rules_only",
+      "expert_catalog_notice": "GitHub catalog absence does not establish workbench publication status"
+    },
+    "runtime_execution_performed": false,
+    "expert_packages_deleted": false,
+    "wechat_workflow_comparison": {
+      "left": "extensions/workflows/wechat-miniprogram-ci-delivery/workflow.json",
+      "right": "agent/workflows/wechat-miniprogram-delivery/workflow.json",
+      "different_top_level_fields": [
+        "icon",
+        "id",
+        "name",
+        "release_notes"
+      ],
+      "execution_fields_equal": true
+    },
+    "final_hash_check_at": "2026-11-17T14:57:05.886583+08:00",
+    "source_hash_mismatches": []
+  }
+}

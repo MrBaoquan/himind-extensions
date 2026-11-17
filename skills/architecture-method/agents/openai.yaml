@@ -1,0 +1,4 @@
+interface:
+  display_name: "架构决策方法"
+  short_description: "用质量属性和失败模式约束架构"
+  default_prompt: "使用 $architecture-method：先从现有代码和运行证据建立边界，以质量属性场景比较方案，给出契约、决策记录、验证实验及分阶段恢复路径。"

@@ -1,0 +1,31 @@
+{
+  "id": "com.himind.skill.exhibit-experience",
+  "icon": "assets/icon.png",
+  "name": "展项体验方法",
+  "author": "马宝全",
+  "categories": [
+    "content-production",
+    "visual-design"
+  ],
+  "version": "1.0.0",
+  "scope": "organization",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
+  "description": "把展陈脚本转成可复位的观众体验并验证现场路径，设计或验收互动展项时使用。",
+  "release_notes": "首个版本：观众路径、体验状态、复位与现场证据规则。",
+  "min_agent_version": "0.3.47",
+  "supported_clients": [
+    "agent-skills"
+  ],
+  "capabilities": [],
+  "plugin_dependencies": [],
+  "risk_summary": "仅在当前任务授权范围内分析、实施与验证；外部副作用遵循宿主及现场操作约束。",
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml",
+    "assets/icon.png"
+  ]
+}

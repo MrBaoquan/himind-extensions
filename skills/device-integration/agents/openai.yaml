@@ -1,0 +1,4 @@
+interface:
+  display_name: "设备协议与恢复"
+  short_description: "区分协议就绪与实机恢复证据"
+  default_prompt: "使用 $device-integration：核对设备身份、协议及单位，先做无副作用解析和模拟，再在既有授权及现场条件内联调，记录断连、停止、重连及实际反馈证据。"

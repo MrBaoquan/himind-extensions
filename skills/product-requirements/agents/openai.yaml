@@ -1,0 +1,4 @@
+interface:
+  display_name: "需求与验收规格"
+  short_description: "把诉求转成可观察的验收条件"
+  default_prompt: "使用 $product-requirements：依据现有资料形成目标、范围和需求编号，为每条交付需求写出前提、动作、可观察结果与证据，并标明假设和不做项。"

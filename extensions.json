@@ -122,6 +122,16 @@
     },
     {
       "type": "workflow",
+      "id": "com.himind.workflow.software-delivery",
+      "path": "workflows/software-delivery"
+    },
+    {
+      "type": "workflow",
+      "id": "com.himind.workflow.ui-craft-team",
+      "path": "workflows/ui-craft-team"
+    },
+    {
+      "type": "workflow",
       "id": "com.himind.workflow.tech-radar",
       "path": "workflows/tech-radar"
     },
@@ -137,23 +147,93 @@
     },
     {
       "type": "expert",
-      "id": "com.himind.expert.project-architect",
-      "path": "experts/project-architect"
+      "id": "com.himind.expert.product-designer",
+      "path": "experts/product-designer"
     },
     {
       "type": "expert",
-      "id": "com.himind.expert.senior-system-architect",
-      "path": "experts/senior-system-architect"
+      "id": "com.himind.expert.technical-architect",
+      "path": "experts/technical-architect"
     },
     {
       "type": "expert",
-      "id": "com.himind.expert.senior-ui-designer",
-      "path": "experts/senior-ui-designer"
+      "id": "com.himind.expert.interaction-designer",
+      "path": "experts/interaction-designer"
     },
     {
       "type": "expert",
-      "id": "com.himind.expert.senior-test-engineer",
-      "path": "experts/senior-test-engineer"
+      "id": "com.himind.expert.quality-engineer",
+      "path": "experts/quality-engineer"
+    },
+    {
+      "type": "expert",
+      "id": "com.himind.expert.game-designer",
+      "path": "experts/game-designer"
+    },
+    {
+      "type": "expert",
+      "id": "com.himind.expert.realtime-engineer",
+      "path": "experts/realtime-engineer"
+    },
+    {
+      "type": "expert",
+      "id": "com.himind.expert.technical-artist",
+      "path": "experts/technical-artist"
+    },
+    {
+      "type": "expert",
+      "id": "com.himind.expert.exhibit-experience-designer",
+      "path": "experts/exhibit-experience-designer"
+    },
+    {
+      "type": "expert",
+      "id": "com.himind.expert.device-integration-engineer",
+      "path": "experts/device-integration-engineer"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.product-requirements",
+      "path": "skills/product-requirements"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.architecture-method",
+      "path": "skills/architecture-method"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.engineering-delivery",
+      "path": "skills/engineering-delivery"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.quality-verification",
+      "path": "skills/quality-verification"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.game-design",
+      "path": "skills/game-design"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.realtime-development",
+      "path": "skills/realtime-development"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.technical-art",
+      "path": "skills/technical-art"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.exhibit-experience",
+      "path": "skills/exhibit-experience"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.device-integration",
+      "path": "skills/device-integration"
     },
     {
       "type": "skill",

@@ -1,0 +1,30 @@
+{
+  "id": "com.himind.skill.quality-verification",
+  "icon": "assets/icon.png",
+  "name": "候选质量验证",
+  "author": "马宝全",
+  "categories": [
+    "testing-quality"
+  ],
+  "version": "1.0.0",
+  "scope": "organization",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
+  "description": "按风险验证固定候选并给出有证据的质量结论，功能验收、回归或交付复核时使用。",
+  "release_notes": "首个版本：候选冻结、风险矩阵、证据判定与缺陷复测规则。",
+  "min_agent_version": "0.3.47",
+  "supported_clients": [
+    "agent-skills"
+  ],
+  "capabilities": [],
+  "plugin_dependencies": [],
+  "risk_summary": "仅在当前任务授权范围内分析、实施与验证；外部副作用遵循宿主及现场操作约束。",
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml",
+    "assets/icon.png"
+  ]
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "展项体验方法"
+  short_description: "把展陈脚本转成可复位的观众体验"
+  default_prompt: "使用 $exhibit-experience：梳理观众与展陈目标，把脚本映射到待机、吸引、互动、结束和复位状态，交付媒体/设备契约及目标现场验证清单。"

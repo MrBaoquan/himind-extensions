@@ -1,0 +1,4 @@
+interface:
+  display_name: "候选质量验证"
+  short_description: "让验收结论绑定候选与真实证据"
+  default_prompt: "使用 $quality-verification：固定候选及环境，把验收条件映射到风险测试，执行关键正常和失败恢复路径，输出可复现缺陷、未覆盖范围与候选结论。"

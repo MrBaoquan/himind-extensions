@@ -1,0 +1,4 @@
+interface:
+  display_name: "实时交互开发"
+  short_description: "验证引擎生命周期与目标构建"
+  default_prompt: "使用 $realtime-development：识别工程实际引擎与依赖，按状态和资源所有权实现实时交互，用场景循环、性能采样和目标构建证明结果。"
