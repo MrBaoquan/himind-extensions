@@ -12,6 +12,20 @@ extension-lock.json
 checksums.sha256
 
 # Local state
+# Agent 在工作区生成的媒体、下载任务和临时状态，不属于扩展源码。
+/.himind-data/
+/.himind-downloads/
+/.himind-media/
+/.himind-temp/
+/.himind/media-toolkit/
+/.himind/video-cover/
+/.himind/ui-diagnostics/
+/.himind/workbench-cover-e2e-out/
+/.himind/workbench-cover-e2e-ui-out/
+# 工作流从 style-packs 模板生成的本机执行工程；可复用模板仍保留在源码仓。
+/code-projects/
+# 插件辅助工具的本机编译缓存。
+/plugins/*/tools/.cache/
 # 本机 Agent 的媒体产物（生图/生视频落盘），属于运行期本地状态，不进扩展仓。
 .himind/media/
 # 工作流会话素材（采集器在扩展私有目录不可写时改写到 <工作区>/.himind/material），运行期本地状态。
