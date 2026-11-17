@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>科技雷达 · 历史归档</title>
+    <title>开源热榜 · 历史归档</title>
     <link rel="stylesheet" href="app.css" />
   </head>
   <body>
@@ -11,35 +11,16 @@
       <div class="brand">
         <span class="logo" aria-hidden="true">📡</span>
         <div class="brand-text">
-          <strong>科技雷达</strong>
-          <small>历史归档与网页报告</small>
+          <strong>开源热榜</strong>
+          <small>按日期归档，期内按采集组阅读</small>
         </div>
       </div>
       <div class="toolbar">
-        <label class="field">
-          <span>主题</span>
-          <input id="topics" type="text" value="ai-agent, llm" spellcheck="false" />
-        </label>
-        <label class="field narrow">
-          <span>窗口</span>
-          <select id="window">
-            <option value="7">7 天</option>
-            <option value="14" selected>14 天</option>
-            <option value="30">30 天</option>
-          </select>
-        </label>
-        <label class="field narrow">
-          <span>条数</span>
-          <select id="topn">
-            <option value="10">10</option>
-            <option value="12" selected>12</option>
-            <option value="20">20</option>
-          </select>
-        </label>
-        <button id="collect" class="btn primary" type="button">采集一期</button>
         <button id="refresh" class="btn" type="button">刷新</button>
       </div>
     </header>
+
+
 
     <p class="notice" id="notice" hidden></p>
 
@@ -63,6 +44,7 @@
             <span id="detail-badges" class="badges"></span>
           </div>
         </div>
+        <div class="period-groups" id="group-switcher" role="tablist" aria-label="本期采集组" hidden></div>
         <div class="tabs" role="tablist">
           <button class="tab active" data-tab="ranking" role="tab" type="button">榜单</button>
           <button class="tab" data-tab="summary" role="tab" type="button">摘要</button>
@@ -75,6 +57,7 @@
         </div>
       </section>
     </main>
+
 
     <script src="app.js"></script>
   </body>

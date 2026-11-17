@@ -1,0 +1,269 @@
+{
+  "schema_version": "workflow_package.v1",
+  "id": "com.himind.video-cover-delivery",
+  "icon": "assets/icon.png",
+  "version": "0.1.4",
+  "distribution_targets": [
+    "workbench"
+  ],
+  "name": "视频封面交付",
+  "description": "把素材整理为标题候选，确认后选帧生成并交付统一封面。",
+  "release_notes": "0.1.4：锁定封面插件 0.1.6，并按实际运行方式声明网络访问能力。",
+  "min_agent_version": "0.3.93",
+  "local_requirements": {
+    "platform": "windows",
+    "workspace": "directory",
+    "required_tools": [],
+    "recommended_tools": [
+      "ffmpeg"
+    ]
+  },
+  "candidate": {
+    "required": true,
+    "artifact_id": "candidate",
+    "source": "git",
+    "allow_dirty": true
+  },
+  "execution_policy": "segmented",
+  "entrypoints": [
+    {
+      "id": "from_brief",
+      "at_step": "VC-TITLE",
+      "label": "从素材生成标题",
+      "requires": [
+        "workspace_root",
+        "source_text"
+      ]
+    },
+    {
+      "id": "from_copy",
+      "at_step": "VC-RENDER",
+      "label": "从已确认文案渲染",
+      "requires": [
+        "workspace_root",
+        "video_path",
+        "cover_copy_path"
+      ]
+    }
+  ],
+  "default_entrypoint": "from_brief",
+  "exits": [
+    {
+      "id": "titles_ready",
+      "at_step": "VC-TITLE",
+      "label": "标题候选已生成",
+      "produces": [
+        "title-candidates"
+      ]
+    },
+    {
+      "id": "copy_ready",
+      "at_step": "VC-CONFIRM",
+      "label": "封面文案已确认",
+      "produces": [
+        "cover-copy"
+      ]
+    },
+    {
+      "id": "cover_ready",
+      "at_step": "VC-RENDER",
+      "label": "封面已渲染",
+      "produces": [
+        "cover-delivery"
+      ]
+    },
+    {
+      "id": "accepted",
+      "at_step": "VC-ACCEPT",
+      "label": "封面效果已确认",
+      "produces": [
+        "cover-delivery"
+      ]
+    },
+    {
+      "id": "frozen",
+      "at_step": "VC-FREEZE",
+      "label": "交付候选已冻结",
+      "produces": [
+        "candidate"
+      ]
+    }
+  ],
+  "default_exitpoint": "frozen",
+  "capabilities": [
+    "media.ai.transcribe",
+    "media.toolkit.files.pick",
+    "media.toolkit.probe",
+    "media.toolkit.frames.contact-sheet",
+    "media.toolkit.frames.extract",
+    "media.toolkit.preview.image",
+    "media.cover.template.list",
+    "media.cover.layout.render",
+    "workflow.candidate.freeze"
+  ],
+  "dependencies": {
+    "skills": [
+      {
+        "id": "com.himind.cover-title-assistant",
+        "required": true,
+        "min_version": "0.1.0"
+      }
+    ],
+    "plugins": [
+      {
+        "id": "com.himind.media-toolkit",
+        "required": true,
+        "min_version": "1.4.0"
+      },
+      {
+        "id": "com.himind.video-cover",
+        "required": true,
+        "min_version": "0.1.6"
+      },
+      {
+        "id": "com.himind.media-ai",
+        "required": false,
+        "min_version": "1.2.0"
+      }
+    ],
+    "connectors": [],
+    "runtimes": [
+      "himind.builtin"
+    ]
+  },
+  "steps": [
+    {
+      "id": "VC-TITLE",
+      "title": "生成标题候选",
+      "kind": "runtime",
+      "execution_mode": "sync",
+      "risk_level": "read_only",
+      "runtime": {
+        "provider": "himind.builtin",
+        "workspace_path": "input.workspace_root",
+        "result_schema": "artifacts/title-candidates.schema.json",
+        "tool_policy": "default",
+        "allow_network": true,
+        "timeout_seconds": 300,
+        "prompt": "使用技能「封面标题助手」处理 input.source_text。若同时提供视频且没有文字，可调用 media.ai.transcribe；否则只依据已给文字。提炼可核对事实，生成恰好 6 组主副标题候选：事实/数据 2、反差/悬念 2、利益/提醒 1、人物/情绪 1。每组包含建议断行、传播理由与风险。不要自动选择，不要渲染封面。按 result_schema 输出 title-candidates。"
+      }
+    },
+    {
+      "id": "VC-CONFIRM",
+      "title": "确认封面文案",
+      "kind": "runtime",
+      "execution_mode": "sync",
+      "risk_level": "local_write",
+      "approval_required": true,
+      "depends_on": [
+        "VC-TITLE"
+      ],
+      "runtime": {
+        "provider": "himind.builtin",
+        "workspace_path": "input.workspace_root",
+        "input_artifacts": [
+          "title-candidates"
+        ],
+        "result_schema": "artifacts/cover-copy.schema.json",
+        "tool_policy": "none",
+        "allow_network": true,
+        "timeout_seconds": 300,
+        "prompt": "展示 title-candidates 的六组候选、推荐理由和风险，等待用户明确选择或提出修改。只有收到明确的“选 A-F / 保留某组并修改 / 重新生成”指令后，才输出 cover-copy。不得自行选择，不得进入渲染。若用户要求重写，只修改被指出的问题并重新给出候选，仍然等待确认。"
+      }
+    },
+    {
+      "id": "VC-RENDER",
+      "title": "选帧并渲染",
+      "kind": "runtime",
+      "execution_mode": "sync",
+      "risk_level": "local_write",
+      "depends_on": [
+        "VC-CONFIRM"
+      ],
+      "runtime": {
+        "provider": "himind.builtin",
+        "workspace_path": "input.workspace_root",
+        "input_artifacts": [
+          "cover-copy"
+        ],
+        "result_schema": "artifacts/cover-delivery.schema.json",
+        "tool_policy": "default",
+        "allow_network": true,
+        "timeout_seconds": 1800,
+        "prompt": "使用 input.video_path 调用 media.toolkit.probe 获取时长，生成 9-12 个候选时刻并调用 media.toolkit.frames.contact-sheet 或 media.toolkit.frames.extract。优先选择左上标题区干净、主体位于中下部、没有字幕与人物脸部冲突的纯净画面。选定后抽取高分辨率帧，调用 media.cover.template.list 与 media.cover.layout.render，使用 wanmei-d-v1 和 input.cover_copy 的主副标题，输出 1080x1440 与 1728x2304 封面。保存 preview_path、输出哈希和质检结果到 cover-delivery。不得把 AI 重绘图作为底图。"
+      }
+    },
+    {
+      "id": "VC-ACCEPT",
+      "title": "确认封面效果",
+      "kind": "manual",
+      "execution_mode": "sync",
+      "risk_level": "R2",
+      "approval_required": true,
+      "depends_on": [
+        "VC-RENDER"
+      ]
+    },
+    {
+      "id": "VC-FREEZE",
+      "title": "冻结交付候选",
+      "kind": "capability",
+      "capability_id": "workflow.candidate.freeze",
+      "candidate_action": "freeze",
+      "execution_mode": "sync",
+      "risk_level": "local_write",
+      "depends_on": [
+        "VC-ACCEPT"
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "title-candidates",
+      "artifact_type": "cover_title_candidates",
+      "name": "封面标题候选",
+      "schema": "artifacts/title-candidates.schema.json",
+      "required": true,
+      "validation": "strict",
+      "max_bytes": 1048576
+    },
+    {
+      "id": "cover-copy",
+      "artifact_type": "cover_copy",
+      "name": "已确认封面文案",
+      "schema": "artifacts/cover-copy.schema.json",
+      "required": true,
+      "validation": "strict",
+      "max_bytes": 1048576
+    },
+    {
+      "id": "cover-delivery",
+      "artifact_type": "cover_delivery",
+      "name": "视频封面交付",
+      "schema": "artifacts/cover-delivery.schema.json",
+      "required": true,
+      "validation": "strict",
+      "max_bytes": 4194304
+    },
+    {
+      "id": "candidate",
+      "artifact_type": "candidate",
+      "name": "不可变封面候选",
+      "schema": "artifacts/candidate.schema.json",
+      "required": true,
+      "validation": "strict",
+      "max_bytes": 1048576
+    }
+  ],
+  "ui": {
+    "mode": "declarative",
+    "surfaces": [
+      "agent"
+    ],
+    "entry": "ui/workflow-view.json"
+  },
+  "supported_runtimes": [
+    "himind.builtin"
+  ],
+  "created_at": "2026-11-10T19:20:00+08:00"
+}

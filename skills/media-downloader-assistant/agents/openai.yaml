@@ -1,4 +1,4 @@
 interface:
-  display_name: "媒体下载助手"
-  short_description: "解析链接、选择格式并跟踪受控下载任务"
-  default_prompt: "使用 $media-downloader-assistant 处理用户的网页媒体下载请求；先检查运行时和解析链接，再在用户确认后创建下载任务并跟踪结果。"
+  display_name: "媒体采集助手"
+  short_description: "搜索收藏在线作品，采集入库并核对来源"
+  default_prompt: "使用 $media-downloader-assistant 通过媒体资源库完成平台搜索、收藏及采集，沿用用户已授权的目标和范围，核对文件与入库终态；播放列表及旧任务保留旧工具路径。"

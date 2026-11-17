@@ -124,6 +124,10 @@ func seedSearchBenchmark(t *testing.T, rows int) {
 		if err != nil {
 			t.Fatalf("prepare FTS v2: %v", err)
 		}
+		cjkStmt, err := tx.Prepare(`INSERT INTO search_cjk(entry_type,entry_id,kind,updated_at,cjk) VALUES(?,?,?,?,?)`)
+		if err != nil {
+			t.Fatalf("prepare CJK FTS: %v", err)
+		}
 		for i := start; i < end; i++ {
 			kind := []string{"image", "video", "audio"}[i%3]
 			updated := time.Unix(int64(1761600000+i), 0).UTC().Format(time.RFC3339)
@@ -149,6 +153,9 @@ func seedSearchBenchmark(t *testing.T, rows int) {
 				if _, err := ftsV2Stmt.Exec("library", id, "bench-lib", kind, updated, title, filename, relative, "benchmark 热点", collection, "CC BY 4.0", "Benchmark"); err != nil {
 					t.Fatalf("insert library FTS v2 %d: %v", i, err)
 				}
+				if _, err := cjkStmt.Exec("library", id, kind, updated, spaceCJK(strings.Join([]string{title, relative, "benchmark 热点", collection}, " "))); err != nil {
+					t.Fatalf("insert library CJK FTS %d: %v", i, err)
+				}
 			} else {
 				id := fmt.Sprintf("bench-candidate-%06d", i)
 				name := fmt.Sprintf("city-clip-%06d.%s", i, map[string]string{"image": "png", "video": "mp4", "audio": "mp3"}[kind])
@@ -167,12 +174,16 @@ func seedSearchBenchmark(t *testing.T, rows int) {
 				if _, err := ftsV2Stmt.Exec("candidate", id, "", kind, updated, name, name, relative, "", "", "", ""); err != nil {
 					t.Fatalf("insert candidate FTS v2 %d: %v", i, err)
 				}
+				if _, err := cjkStmt.Exec("candidate", id, kind, updated, spaceCJK(strings.Join([]string{name, relative, "benchmark"}, " "))); err != nil {
+					t.Fatalf("insert candidate CJK FTS %d: %v", i, err)
+				}
 			}
 		}
 		candidateStmt.Close()
 		libraryStmt.Close()
 		ftsStmt.Close()
 		ftsV2Stmt.Close()
+		cjkStmt.Close()
 		if err := tx.Commit(); err != nil {
 			t.Fatalf("commit seed batch: %v", err)
 		}

@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -22,7 +23,7 @@ import (
 	"github.com/MrBaoquan/himind-extensions/sdk/jsonrpc"
 )
 
-const ruleVersion = "tech-radar-rules.v1"
+const ruleVersion = "tech-radar-rules.v4"
 
 // extensionDataNamespace 是扩展私有数据目录的命名空间；
 // Agent 注入 HIMIND_PLUGIN_DATA_ROOT 时优先使用，否则落到本机用户目录。
@@ -34,8 +35,11 @@ var githubSearchBase = "https://api.github.com/search/repositories"
 var httpClient = &http.Client{Timeout: 30 * time.Second}
 
 type input struct {
-	// Domains 是领域预设：cv / llm / ar-vr / general。
-	Domains []string `json:"domains"`
+	// InterestGroups 是计划内部的采集组；组名只用于报告分节，不是全局分类。
+	InterestGroups []interestGroup `json:"interest_groups"`
+	// CategoryIDs 是旧计划的分类 ID；Domains 是更早版本的兼容别名。
+	CategoryIDs []string `json:"category_ids"`
+	Domains     []string `json:"domains"`
 	// Topics 是自定义领域（OR 组，任一标签命中即可）；与 Domains 可同时使用。
 	Topics []string `json:"topics"`
 	// ExtraTopics 追加到每个领域的 OR 词，用来临时扩面。
@@ -57,6 +61,7 @@ type input struct {
 	TopN            int            `json:"top_n"`
 	ReportRoot      string         `json:"report_root"`
 	ReportDate      string         `json:"report_date"`
+	CollectionID    string         `json:"collection_id"`
 	Snapshot        map[string]any `json:"snapshot"`
 	Insight         map[string]any `json:"insight"`
 	Summary         string         `json:"summary"`
@@ -66,6 +71,12 @@ type input struct {
 	WorkflowContext map[string]any `json:"workflow_context"`
 	SnapshotStep    string         `json:"snapshot_step"`
 	InsightStep     string         `json:"insight_step"`
+}
+
+type themePreset struct {
+	ID     string   `json:"id"`
+	Label  string   `json:"label"`
+	Topics []string `json:"topics"`
 }
 
 type repoEntry struct {
@@ -81,29 +92,37 @@ type repoEntry struct {
 	RankDelta   int      `json:"rank_delta"`
 	IsNew       bool     `json:"is_new"`
 	// 下面这些字段用于判断“是不是值得看”，也让报告能自证来源与新鲜度。
-	Forks      int      `json:"forks"`
-	OpenIssues int      `json:"open_issues"`
-	PushedAt   string   `json:"pushed_at"`
-	License    string   `json:"license"`
-	Homepage   string   `json:"homepage"`
-	Archived   bool     `json:"archived"`
-	Domains    []string `json:"domains"`
-	Lanes      []string `json:"lanes"`
+	Forks          int      `json:"forks"`
+	OpenIssues     int      `json:"open_issues"`
+	PushedAt       string   `json:"pushed_at"`
+	License        string   `json:"license"`
+	Homepage       string   `json:"homepage"`
+	Archived       bool     `json:"archived"`
+	Domains        []string `json:"domains"`
+	InterestGroups []string `json:"interest_groups"`
+	Lanes          []string `json:"lanes"`
 }
 
 type snapshot struct {
-	GeneratedAt string         `json:"generated_at"`
-	RuleVersion string         `json:"rule_version"`
-	WindowDays  int            `json:"window_days"`
-	Topics      []string       `json:"topics"`
-	Domains     []string       `json:"domains"`
-	Lanes       []string       `json:"lanes"`
-	MinStars    int            `json:"min_stars"`
-	NewMinStars int            `json:"new_min_stars"`
-	QueryCount  int            `json:"query_count"`
-	TrendBasis  string         `json:"trend_basis"`
-	Entries     []repoEntry    `json:"entries"`
-	RateLimit   map[string]any `json:"rate_limit"`
+	GeneratedAt     string                  `json:"generated_at"`
+	RuleVersion     string                  `json:"rule_version"`
+	CatalogRevision int                     `json:"catalog_revision"`
+	WindowDays      int                     `json:"window_days"`
+	Topics          []string                `json:"topics"`
+	CustomTopics    []string                `json:"custom_topics"`
+	ResolvedTopics  []string                `json:"resolved_topics"`
+	InterestGroups  []snapshotInterestGroup `json:"interest_groups"`
+	Domains         []string                `json:"domains"`
+	GroupLabels     map[string]string       `json:"group_labels"`
+	CategoryLabels  map[string]string       `json:"category_labels"`
+	ThemeLabels     []string                `json:"theme_labels"`
+	Lanes           []string                `json:"lanes"`
+	MinStars        int                     `json:"min_stars"`
+	NewMinStars     int                     `json:"new_min_stars"`
+	QueryCount      int                     `json:"query_count"`
+	TrendBasis      string                  `json:"trend_basis"`
+	Entries         []repoEntry             `json:"entries"`
+	RateLimit       map[string]any          `json:"rate_limit"`
 }
 
 type historyRecord struct {
@@ -113,7 +132,7 @@ type historyRecord struct {
 
 func main() {
 	if err := jsonrpc.Serve(os.Stdin, os.Stdout, handle); err != nil {
-		fmt.Fprintln(os.Stderr, "科技雷达插件已停止:", err)
+		fmt.Fprintln(os.Stderr, "开源热榜插件已停止:", err)
 	}
 }
 
@@ -123,6 +142,23 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 		return nil, rpcError
 	}
 	switch request.Method {
+	case "tech-radar.themes", "tech-radar.catalog":
+		result, err := catalogPayload()
+		return rpcResult(result, err)
+	case "tech-radar.categories.save":
+		var categoryInput saveCategoryInput
+		if rpcError := jsonrpc.DecodeParams(request, &categoryInput); rpcError != nil {
+			return nil, rpcError
+		}
+		result, err := saveCategory(categoryInput)
+		return rpcResult(result, err)
+	case "tech-radar.categories.delete":
+		var deleteInput deleteCategoryInput
+		if rpcError := jsonrpc.DecodeParams(request, &deleteInput); rpcError != nil {
+			return nil, rpcError
+		}
+		result, err := deleteCategory(deleteInput)
+		return rpcResult(result, err)
 	case "tech-radar.collect":
 		result, err := collect(in)
 		return rpcResult(result, err)
@@ -139,7 +175,7 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 		result, err := openLink(in)
 		return rpcResult(result, err)
 	default:
-		return nil, &jsonrpc.Error{Code: -32602, Message: "不支持的科技雷达能力"}
+		return nil, &jsonrpc.Error{Code: -32602, Message: "不支持的开源热榜能力"}
 	}
 }
 
@@ -155,7 +191,11 @@ func collect(in input) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	groups, domainNames, err := queryGroups(in)
+	catalog, err := loadResolvedCatalog()
+	if err != nil {
+		return nil, err
+	}
+	collection, err := resolveCollection(in, catalog)
 	if err != nil {
 		return nil, err
 	}
@@ -207,12 +247,16 @@ func collect(in input) (any, error) {
 	rateLimit := map[string]any{}
 	queryCount := 0
 	queryBudget := maxQueries(in)
+	requiredQueries := len(collection.Topics) * len(lanes)
+	if requiredQueries > queryBudget {
+		return nil, fmt.Errorf("当前采集组需要 %d 次查询，超过上限 %d；请减少组内标签或额外 topic", requiredQueries, queryBudget)
+	}
 	authenticated := strings.TrimSpace(os.Getenv("HIMIND_TECH_RADAR_GITHUB_TOKEN")) != ""
 	interval := queryInterval(in, authenticated)
 	truncated := false
 	merged := map[string]*repoEntry{}
-	order := make([]string, 0, len(groups)*len(lanes)*topN)
-	for _, group := range groups {
+	order := make([]string, 0, len(collection.Topics)*len(lanes)*topN)
+	for _, group := range collection.Topics {
 		for _, lane := range lanes {
 			if queryCount >= queryBudget {
 				truncated = true
@@ -222,7 +266,7 @@ func collect(in input) (any, error) {
 				// 未鉴权时限流是 10 次/分钟，放慢节奏比被 403 掉更划算。
 				time.Sleep(interval)
 			}
-			query := fmt.Sprintf("topic:%s %s stars:>%d fork:false archived:false", group.topic, pushedOrCreated(lane.created, since), lane.minStars)
+			query := fmt.Sprintf("topic:%s %s stars:>%d fork:false archived:false", group.Topic, pushedOrCreated(lane.created, since), lane.minStars)
 			collected, limit, searchErr := searchRepositories(query, in.Languages, topN*4)
 			queryCount++
 			if searchErr != nil {
@@ -242,7 +286,8 @@ func collect(in input) (any, error) {
 				existing, ok := merged[key]
 				if !ok {
 					copy := entry
-					copy.Domains = []string{group.name}
+					copy.Domains = append([]string{}, group.GroupIDs...)
+					copy.InterestGroups = append([]string{}, group.GroupIDs...)
 					copy.Lanes = []string{lane.id}
 					merged[key] = &copy
 					order = append(order, key)
@@ -258,7 +303,10 @@ func collect(in input) (any, error) {
 					existing.License = entry.License
 					existing.Homepage = entry.Homepage
 				}
-				existing.Domains = appendUnique(existing.Domains, group.name)
+				for _, groupID := range group.GroupIDs {
+					existing.Domains = appendUnique(existing.Domains, groupID)
+					existing.InterestGroups = appendUnique(existing.InterestGroups, groupID)
+				}
 				existing.Lanes = appendUnique(existing.Lanes, lane.id)
 			}
 		}
@@ -307,20 +355,38 @@ func collect(in input) (any, error) {
 		return filtered[left].FullName < filtered[right].FullName
 	})
 
+	resolvedTopics := make([]string, 0, len(collection.Topics))
+	for _, group := range collection.Topics {
+		resolvedTopics = appendUnique(resolvedTopics, group.Topic)
+	}
+	groupLabels := collection.GroupLabels
+	groupIDs := collection.GroupIDs()
+	themeLabels := make([]string, 0, len(groupIDs))
+	for _, id := range groupIDs {
+		themeLabels = append(themeLabels, groupLabels[id])
+	}
+	customTopics := collection.CustomTopics
 	snap := snapshot{
-		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
-		RuleVersion: ruleVersion,
-		WindowDays:  window,
+		GeneratedAt:     time.Now().UTC().Format(time.RFC3339),
+		RuleVersion:     ruleVersion,
+		CatalogRevision: catalog.Revision,
+		WindowDays:      window,
 		// 严格 schema 校验下 null ≠ 空数组：一律归一成 []，避免“没有主题”时报告被拒。
-		Topics:      nonNilStrings(in.Topics),
-		Domains:     nonNilStrings(domainNames),
-		Lanes:       []string{"active", "rising"},
-		MinStars:    minStars,
-		NewMinStars: newMinStars,
-		QueryCount:  queryCount,
-		TrendBasis:  trendBasis(ledger, date),
-		Entries:     filtered,
-		RateLimit:   rateLimit,
+		Topics:         nonNilStrings(customTopics),
+		CustomTopics:   nonNilStrings(customTopics),
+		ResolvedTopics: nonNilStrings(resolvedTopics),
+		InterestGroups: collection.SnapshotGroups(),
+		Domains:        nonNilStrings(groupIDs),
+		GroupLabels:    groupLabels,
+		CategoryLabels: groupLabels,
+		ThemeLabels:    nonNilStrings(themeLabels),
+		Lanes:          []string{"active", "rising"},
+		MinStars:       minStars,
+		NewMinStars:    newMinStars,
+		QueryCount:     queryCount,
+		TrendBasis:     trendBasis(ledger, date),
+		Entries:        filtered,
+		RateLimit:      rateLimit,
 	}
 	if truncated {
 		snap.RateLimit["truncated"] = true
@@ -498,12 +564,18 @@ func truncateRunes(value string, limit int) string {
 //
 // GitHub 搜索的 `topic:` 限定符**不支持 OR**（带括号返回 0 条，不带括号直接 422），
 // 所以这里不做 OR 拼装，而是「一个标签一次查询」，再在本地按仓库去重合并。
-var domainPresets = map[string][]string{
-	"cv":      {"computer-vision"},
-	"llm":     {"llm"},
-	"ar-vr":   {"virtual-reality", "augmented-reality"},
-	"general": {"machine-learning"},
+var themePresets = []themePreset{
+	{ID: "ai-short-drama", Label: "AI 短剧", Topics: []string{"ai-short-drama", "short-drama"}},
+	{ID: "ai-video", Label: "AI 视频生成", Topics: []string{"text-to-video", "video-generation"}},
+	{ID: "code-animation", Label: "代码动画视频", Topics: []string{"remotion", "programmatic-video"}},
+	{ID: "creator-tools", Label: "自媒体创作工具", Topics: []string{"content-creation", "content-automation"}},
+	{ID: "cv", Label: "计算机视觉", Topics: []string{"computer-vision"}},
+	{ID: "llm", Label: "大模型 / LLM", Topics: []string{"llm"}},
+	{ID: "ar-vr", Label: "AR / VR", Topics: []string{"virtual-reality", "augmented-reality"}},
+	{ID: "general", Label: "综合 AI", Topics: []string{"machine-learning"}},
 }
+
+var customTopicPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,49}$`)
 
 const (
 	defaultMinStars    = 800
@@ -511,11 +583,11 @@ const (
 	// 未鉴权时 GitHub 搜索限流为 10 次/分钟，默认放慢查询节奏；有 token 时不必等待。
 	unauthenticatedQueryIntervalMs = 7000
 	// 单次运行最多打多少个查询，避免把额度打光。
-	defaultMaxQueries = 16
-	// 快照规模：既保证报告有料，也要让提示词留在命令行长度限制内。
-	defaultMaxEntries          = 48
-	defaultDescriptionMaxChars = 260
-	defaultTopicsMax           = 8
+	defaultMaxQueries = 24
+	// 快照规模：既保证报告有料，也要让无工具 Runtime 的内联上下文留在 16K 字符预算内。
+	defaultMaxEntries          = 32
+	defaultDescriptionMaxChars = 160
+	defaultTopicsMax           = 6
 )
 
 // defaultDomains 让「什么都不填」也是一次有意义的采集。
@@ -527,42 +599,72 @@ type queryGroup struct {
 	topic string
 }
 
-// queryGroups 把领域预设与自定义主题展开成「一个标签一次查询」的清单。
+// queryGroups 把选中分类与额外 topic 展开成「一个标签一次查询」的清单。
+// 分类 ID 只是稳定引用，真正的查询单位始终是去重后的 GitHub topic。
 func queryGroups(in input) ([]queryGroup, []string, error) {
-	domains := in.Domains
-	if len(domains) == 0 && len(in.Topics) == 0 && len(in.ExtraTopics) == 0 {
-		domains = defaultDomains
+	catalog, err := loadResolvedCatalog()
+	if err != nil {
+		return nil, nil, err
 	}
-	groups := make([]queryGroup, 0, len(domains)+1)
-	names := make([]string, 0, len(domains))
-	for _, raw := range domains {
+	return queryGroupsWithCatalog(in, catalog)
+}
+
+func queryGroupsWithCatalog(in input, catalog resolvedCatalog) ([]queryGroup, []string, error) {
+	categoryIDs := in.CategoryIDs
+	if len(categoryIDs) == 0 {
+		categoryIDs = in.Domains
+	}
+	if len(categoryIDs) == 0 && len(in.Topics) == 0 && len(in.ExtraTopics) == 0 {
+		categoryIDs = defaultDomains
+	}
+	groups := make([]queryGroup, 0, len(categoryIDs)+1)
+	names := make([]string, 0, len(categoryIDs))
+	seenNames := make(map[string]struct{}, len(categoryIDs))
+	seenTopics := make(map[string]struct{}, len(categoryIDs)*2)
+	for _, raw := range categoryIDs {
 		key := strings.ToLower(strings.TrimSpace(raw))
 		if key == "" {
 			continue
 		}
-		topics, ok := domainPresets[key]
+		category, ok := catalog.category(key)
 		if !ok {
-			return nil, nil, fmt.Errorf("未知领域预设：%s（可选：cv / llm / ar-vr / general）", raw)
+			return nil, nil, fmt.Errorf("未知主题分类：%s；请刷新分类目录后重试", raw)
 		}
-		for _, topic := range topics {
-			groups = append(groups, queryGroup{name: key, topic: topic})
+		if _, exists := seenNames[category.ID]; !exists {
+			seenNames[category.ID] = struct{}{}
+			names = append(names, category.ID)
 		}
-		names = append(names, key)
+		for _, topic := range category.Topics {
+			if _, exists := seenTopics[topic]; exists {
+				continue
+			}
+			seenTopics[topic] = struct{}{}
+			groups = append(groups, queryGroup{name: category.ID, topic: topic})
+		}
 	}
 	custom := make([]string, 0)
+	customAdded := false
 	for _, topic := range append(append([]string{}, in.Topics...), in.ExtraTopics...) {
-		trimmed := strings.TrimSpace(topic)
+		trimmed := strings.ToLower(strings.TrimSpace(topic))
 		if trimmed == "" {
 			continue
 		}
+		if !customTopicPattern.MatchString(trimmed) {
+			return nil, nil, fmt.Errorf("额外 topic「%s」格式不合法：只允许小写字母、数字和连字符，长度 1-50", topic)
+		}
+		custom = appendUnique(custom, trimmed)
+		if _, exists := seenTopics[trimmed]; exists {
+			continue
+		}
+		seenTopics[trimmed] = struct{}{}
+		customAdded = true
 		groups = append(groups, queryGroup{name: "custom", topic: trimmed})
-		custom = append(custom, trimmed)
 	}
-	if len(custom) > 0 {
+	if customAdded {
 		names = append(names, "custom")
 	}
 	if len(groups) == 0 {
-		return nil, nil, errors.New("domains 或 topics 至少需要一个")
+		return nil, nil, errors.New("category_ids 或 extra_topics 至少需要一个")
 	}
 	return groups, names, nil
 }
@@ -766,7 +868,7 @@ func render(in input) (any, error) {
 		"new_entry_count":   newCount,
 		"snapshot_sha256":   digestOf(snap),
 		"rule_version":      snap.RuleVersion,
-		"prompt_version":    "tech-radar-insight.v1",
+		"prompt_version":    "tech-radar-insight.v2",
 		"insight_model":     insightString(insight, "model"),
 		"insight_service":   insightString(insight, "service_source"),
 		"insight_provider":  insightString(insight, "provider"),
@@ -782,17 +884,18 @@ func render(in input) (any, error) {
 		return nil, errors.New("报告摘要计算失败")
 	}
 	if err := appendArchive(root, archiveRecord{
-		ReportDate:     date,
-		GeneratedAt:    snap.GeneratedAt,
-		EntryCount:     len(snap.Entries),
-		NewEntryCount:  newCount,
-		Summary:        summary,
-		HTMLPath:       htmlPath,
-		JSONPath:       jsonPath,
-		SnapshotSHA256: digestOf(snap),
-		RuleVersion:    snap.RuleVersion,
-		PromptVersion:  "tech-radar-insight.v1",
-		Degraded:       len(insight) == 0,
+		CollectionLabel: snapshotGroupLabel(snap),
+		ReportDate:      date,
+		GeneratedAt:     snap.GeneratedAt,
+		EntryCount:      len(snap.Entries),
+		NewEntryCount:   newCount,
+		Summary:         summary,
+		HTMLPath:        htmlPath,
+		JSONPath:        jsonPath,
+		SnapshotSHA256:  digestOf(snap),
+		RuleVersion:     snap.RuleVersion,
+		PromptVersion:   "tech-radar-insight.v2",
+		Degraded:        len(insight) == 0,
 	}); err != nil {
 		return nil, err
 	}
@@ -801,7 +904,7 @@ func render(in input) (any, error) {
 		"artifacts": []map[string]any{{
 			"artifact_id":   "tech-radar-report",
 			"artifact_type": "tech_radar_report",
-			"name":          "科技雷达报告 " + date,
+			"name":          "开源热榜报告 " + date,
 			// Artifact 内容按声明 schema 校验，因此指向结构化报告而不是网页；
 			// 网页路径在报告 JSON 里作为事实字段保留。
 			"uri":    "file:///" + strings.ReplaceAll(jsonPath, "\\", "/"),
@@ -880,7 +983,7 @@ func reportSections(snap snapshot, perSection int) []reportSection {
 		if !hasValue(entry.Lanes, "active") {
 			continue
 		}
-		for _, domain := range entry.Domains {
+		for _, domain := range entryGroupIDs(entry) {
 			if _, ok := activeByDomain[domain]; !ok {
 				activeOrder = append(activeOrder, domain)
 			}
@@ -923,7 +1026,7 @@ func reportSections(snap snapshot, perSection int) []reportSection {
 	for _, domain := range activeOrder {
 		markCovered(activeByDomain[domain])
 		sections = append(sections, reportSection{
-			title:   "活跃基础盘 · " + domainLabel(domain),
+			title:   "活跃基础盘 · " + snap.categoryLabel(domain),
 			note:    fmt.Sprintf("近 %d 天有推送、星数 ≥ %d 的长期项目，按总星数排序。", snap.WindowDays, snap.MinStars),
 			entries: capEntries(activeByDomain[domain], perSection),
 		})
@@ -972,16 +1075,43 @@ func hasValue(values []string, want string) bool {
 }
 
 func domainLabel(domain string) string {
-	return map[string]string{
-		"cv":      "计算机视觉",
-		"llm":     "大模型 / LLM",
-		"ar-vr":   "AR / VR",
-		"general": "综合 AI",
-		"custom":  "自定义主题",
-	}[domain]
+	for _, preset := range themePresets {
+		if preset.ID == domain {
+			return preset.Label
+		}
+	}
+	if domain == "custom" {
+		return "额外 topic"
+	}
+	return domain
 }
 
-func entryBadges(entry repoEntry) string {
+func (snap snapshot) categoryLabel(domain string) string {
+	if label := strings.TrimSpace(snap.GroupLabels[domain]); label != "" {
+		return label
+	}
+	if label := strings.TrimSpace(snap.CategoryLabels[domain]); label != "" {
+		return label
+	}
+	return domainLabel(domain)
+}
+
+func entryGroupIDs(entry repoEntry) []string {
+	if len(entry.InterestGroups) > 0 {
+		return entry.InterestGroups
+	}
+	return entry.Domains
+}
+
+func (snap snapshot) categoryLabelList() []string {
+	labels := make([]string, 0, len(snap.Domains))
+	for _, domain := range snap.Domains {
+		labels = append(labels, snap.categoryLabel(domain))
+	}
+	return labels
+}
+
+func entryBadges(entry repoEntry, categoryLabels map[string]string) string {
 	badges := make([]string, 0, 4)
 	if entry.StarsGained > 0 {
 		badges = append(badges, fmt.Sprintf("近 %s 天 +%d 星", entry.FirstSeen, entry.StarsGained))
@@ -989,25 +1119,30 @@ func entryBadges(entry repoEntry) string {
 	if entry.IsNew {
 		badges = append(badges, "首次收录")
 	}
-	if len(entry.Domains) > 0 {
-		labels := make([]string, 0, len(entry.Domains))
-		for _, domain := range entry.Domains {
-			labels = append(labels, domainLabel(domain))
+	if len(entryGroupIDs(entry)) > 0 {
+		groupIDs := entryGroupIDs(entry)
+		names := make([]string, 0, len(groupIDs))
+		for _, domain := range groupIDs {
+			label := strings.TrimSpace(categoryLabels[domain])
+			if label == "" {
+				label = domainLabel(domain)
+			}
+			names = append(names, label)
 		}
-		badges = append(badges, strings.Join(labels, "/"))
+		badges = append(badges, strings.Join(names, "/"))
 	}
 	return strings.Join(badges, " · ")
 }
 
 func renderMarkdown(date string, snap snapshot, insight map[string]any, summary string) string {
 	var builder strings.Builder
-	builder.WriteString("### 科技雷达 · " + date + "\n\n")
+	builder.WriteString("### 开源热榜 · " + date + "\n\n")
 	if strings.TrimSpace(summary) != "" {
 		builder.WriteString(summary + "\n\n")
 	}
 	builder.WriteString(fmt.Sprintf(
-		"来源：公开 GitHub 搜索接口 · 领域 %s · 窗口 %d 天 · 星数下限 %d/%d · 共 %d 次查询\n\n",
-		strings.Join(snap.Domains, "、"), snap.WindowDays, snap.MinStars, snap.NewMinStars, snap.QueryCount,
+		"来源：公开 GitHub 搜索接口 · 分类 %s · 窗口 %d 天 · 星数下限 %d/%d · 共 %d 次查询\n\n",
+		strings.Join(snap.categoryLabelList(), "、"), snap.WindowDays, snap.MinStars, snap.NewMinStars, snap.QueryCount,
 	))
 	if model := insightString(insight, "model"); model != "" {
 		builder.WriteString("解读模型：" + model + "\n\n")
@@ -1079,7 +1214,7 @@ func renderHTML(date string, snap snapshot, insight map[string]any, summary stri
 				html.EscapeString(fallback(entry.Language, "未标注语言")),
 				html.EscapeString(fallback(entry.License, "未标注许可")),
 				html.EscapeString(shortDate(entry.PushedAt)),
-				html.EscapeString(entryBadges(entry)),
+				html.EscapeString(entryBadges(entry, snap.CategoryLabels)),
 			))
 		}
 		sections.WriteString(
@@ -1091,7 +1226,7 @@ func renderHTML(date string, snap snapshot, insight map[string]any, summary stri
 	if strings.TrimSpace(summary) != "" {
 		summaryHTML = `<p class="summary">` + html.EscapeString(summary) + `</p>`
 	}
-	return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>科技雷达 ` + html.EscapeString(date) + `</title>
+	return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>开源热榜 ` + html.EscapeString(date) + `</title>
 <style>
 body{margin:0;padding:32px;background:#f7f8fa;color:#111827;font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
 main{max-width:860px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:28px}
@@ -1112,8 +1247,8 @@ a{color:#1d4ed8;text-decoration:none;font-weight:600}
 .meta{margin:4px 0 0;color:#6b7280;font-size:12px}
 footer{margin-top:18px;color:#94a3b8;font-size:11px}
 </style></head><body><main>
-<h1>科技雷达 · ` + html.EscapeString(date) + `</h1>
-<p class="sub">来源：公开 GitHub 搜索接口 · 领域 ` + html.EscapeString(strings.Join(snap.Domains, "、")) +
+<h1>开源热榜 · ` + html.EscapeString(date) + `</h1>
+<p class="sub">来源：公开 GitHub 搜索接口 · 分类 ` + html.EscapeString(strings.Join(snap.categoryLabelList(), "、")) +
 		` · 窗口 ` + fmt.Sprintf("%d", snap.WindowDays) + ` 天 · 星数下限 ` +
 		fmt.Sprintf("%d", snap.MinStars) + `/` + fmt.Sprintf("%d", snap.NewMinStars) +
 		` · 共 ` + fmt.Sprintf("%d", snap.QueryCount) + ` 次查询 · 生成于 ` + html.EscapeString(snap.GeneratedAt) + `</p>
@@ -1261,17 +1396,51 @@ func defaultDataRoot() string {
 }
 
 type archiveRecord struct {
-	ReportDate     string `json:"report_date"`
-	GeneratedAt    string `json:"generated_at"`
-	EntryCount     int    `json:"entry_count"`
-	NewEntryCount  int    `json:"new_entry_count"`
-	Summary        string `json:"summary"`
-	HTMLPath       string `json:"html_path"`
-	JSONPath       string `json:"json_path"`
-	SnapshotSHA256 string `json:"snapshot_sha256"`
-	RuleVersion    string `json:"rule_version"`
-	PromptVersion  string `json:"prompt_version"`
-	Degraded       bool   `json:"degraded"`
+	CollectionID    string `json:"collection_id,omitempty"`
+	CollectionLabel string `json:"collection_label,omitempty"`
+	ReportDate      string `json:"report_date"`
+	GeneratedAt     string `json:"generated_at"`
+	EntryCount      int    `json:"entry_count"`
+	NewEntryCount   int    `json:"new_entry_count"`
+	Summary         string `json:"summary"`
+	HTMLPath        string `json:"html_path"`
+	JSONPath        string `json:"json_path"`
+	SnapshotSHA256  string `json:"snapshot_sha256"`
+	RuleVersion     string `json:"rule_version"`
+	PromptVersion   string `json:"prompt_version"`
+	Degraded        bool   `json:"degraded"`
+}
+
+func snapshotGroupLabel(snap snapshot) string {
+	labels := make([]string, 0, len(snap.InterestGroups))
+	seen := map[string]struct{}{}
+	for _, group := range snap.InterestGroups {
+		label := strings.TrimSpace(group.Name)
+		if label == "" {
+			label = strings.TrimSpace(group.ID)
+		}
+		if label == "" {
+			continue
+		}
+		if _, ok := seen[label]; ok {
+			continue
+		}
+		seen[label] = struct{}{}
+		labels = append(labels, label)
+	}
+	return strings.Join(labels, " / ")
+}
+
+func snapshotGroupLabelFromArchive(root string, record archiveRecord) string {
+	raw, err := os.ReadFile(filepath.Join(root, record.ReportDate, "snapshot.json"))
+	if err != nil {
+		return ""
+	}
+	var snap snapshot
+	if json.Unmarshal(raw, &snap) != nil {
+		return ""
+	}
+	return snapshotGroupLabel(snap)
 }
 
 // appendArchive 维护扩展自己的归档索引，视图按日期读取即可，无需扫描目录。
@@ -1373,19 +1542,59 @@ func upstreamInsight(in input) map[string]any {
 }
 
 // listArchive 是扩展视图的数据入口：视图只消费能力结果，不直接读文件系统。
+func archiveRoots(in input) ([]string, error) {
+	if strings.TrimSpace(in.ReportRoot) != "" {
+		root, err := reportRoot(in.ReportRoot)
+		if err != nil {
+			return nil, err
+		}
+		return []string{root}, nil
+	}
+	base := defaultDataRoot()
+	roots := []string{base}
+	collections := filepath.Join(base, "collections")
+	if entries, err := os.ReadDir(collections); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				roots = append(roots, filepath.Join(collections, entry.Name()))
+			}
+		}
+	}
+	return roots, nil
+}
+
 func listArchive(in input) (any, error) {
-	root, err := reportRoot(in.ReportRoot)
+	roots, err := archiveRoots(in)
 	if err != nil {
 		return nil, err
 	}
-	records, err := readArchive(filepath.Join(root, "index.json"))
-	if err != nil {
-		return nil, err
+	records := make([]archiveRecord, 0)
+	for _, root := range roots {
+		items, readErr := readArchive(filepath.Join(root, "index.json"))
+		if readErr != nil {
+			return nil, readErr
+		}
+		collectionID := ""
+		if filepath.Base(filepath.Dir(root)) == "collections" {
+			collectionID = filepath.Base(root)
+		}
+		for _, record := range items {
+			record.CollectionID = collectionID
+			if record.CollectionLabel == "" && collectionID != "" {
+				record.CollectionLabel = snapshotGroupLabelFromArchive(root, record)
+			}
+			if record.CollectionLabel == "" {
+				record.CollectionLabel = collectionID
+			}
+			records = append(records, record)
+		}
 	}
-	limit := in.TopN
-	if limit <= 0 || limit > len(records) {
-		limit = len(records)
-	}
+	sort.SliceStable(records, func(left, right int) bool {
+		if records[left].ReportDate != records[right].ReportDate {
+			return records[left].ReportDate > records[right].ReportDate
+		}
+		return records[left].CollectionID < records[right].CollectionID
+	})
 	if strings.TrimSpace(in.ReportDate) != "" {
 		filtered := make([]archiveRecord, 0, len(records))
 		for _, record := range records {
@@ -1395,8 +1604,12 @@ func listArchive(in input) (any, error) {
 		}
 		records = filtered
 	}
+	limit := in.TopN
+	if limit <= 0 || limit > len(records) {
+		limit = len(records)
+	}
 	return map[string]any{
-		"data_root": root,
+		"data_root": defaultDataRoot(),
 		"total":     len(records),
 		"records":   records[:minInt(limit, len(records))],
 	}, nil
@@ -1405,11 +1618,31 @@ func listArchive(in input) (any, error) {
 // readArchivedReport 是扩展视图的第二条数据通路：视图只拿能力结果，
 // 不直接读文件系统，报告 HTML、快照和解读都由扩展进程自己取回。
 func readArchivedReport(in input) (any, error) {
-	root, err := reportRoot(in.ReportRoot)
+	roots, err := archiveRoots(in)
 	if err != nil {
 		return nil, err
 	}
+	if strings.TrimSpace(in.ReportRoot) == "" && strings.TrimSpace(in.CollectionID) != "" {
+		roots = []string{filepath.Join(defaultDataRoot(), "collections", filepath.Base(strings.TrimSpace(in.CollectionID)))}
+	}
+	root := roots[0]
 	date := strings.TrimSpace(in.ReportDate)
+	if !isReportDate(date) || strings.TrimSpace(in.CollectionID) != "" {
+		for _, candidate := range roots {
+			items, readErr := readArchive(filepath.Join(candidate, "index.json"))
+			if readErr != nil {
+				continue
+			}
+			for _, item := range items {
+				if date == "" || item.ReportDate == date {
+					root = candidate
+					date = item.ReportDate
+					goto rootResolved
+				}
+			}
+		}
+	}
+rootResolved:
 	if date == "" {
 		records, listErr := readArchive(filepath.Join(root, "index.json"))
 		if listErr != nil {
@@ -1443,14 +1676,19 @@ func readArchivedReport(in input) (any, error) {
 	if raw, readErr := os.ReadFile(filepath.Join(directory, "insight.json")); readErr == nil {
 		_ = json.Unmarshal(raw, &insight)
 	}
+	collectionID := ""
+	if filepath.Base(filepath.Dir(root)) == "collections" {
+		collectionID = filepath.Base(root)
+	}
 	return map[string]any{
-		"report_date": date,
-		"report":      report,
-		"snapshot":    snapshotBody,
-		"insight":     insight,
-		"html":        string(htmlBody),
-		"markdown":    report["dingtalk_markdown"],
-		"html_path":   filepath.Join(directory, "index.html"),
+		"report_date":   date,
+		"collection_id": collectionID,
+		"report":        report,
+		"snapshot":      snapshotBody,
+		"insight":       insight,
+		"html":          string(htmlBody),
+		"markdown":      report["dingtalk_markdown"],
+		"html_path":     filepath.Join(directory, "index.html"),
 	}, nil
 }
 

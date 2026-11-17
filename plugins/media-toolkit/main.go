@@ -260,17 +260,21 @@ type probeInput struct {
 }
 
 type imageConvertInput struct {
-	WorkspaceRoot string   `json:"workspace_root"`
-	Paths         []string `json:"paths"`
-	OutputDir     string   `json:"output_dir"`
-	Format        string   `json:"format"`
-	Width         int      `json:"width,omitempty"`
-	Height        int      `json:"height,omitempty"`
-	Quality       int      `json:"quality,omitempty"`
-	Background    string   `json:"background,omitempty"`
-	Suffix        string   `json:"suffix,omitempty"`
-	NameTemplate  string   `json:"name_template,omitempty"`
-	Overwrite     bool     `json:"overwrite,omitempty"`
+	Crop          *image.Crop `json:"crop,omitempty"`
+	Rotate        int         `json:"rotate,omitempty"`
+	FlipH         bool        `json:"flip_h,omitempty"`
+	FlipV         bool        `json:"flip_v,omitempty"`
+	WorkspaceRoot string      `json:"workspace_root"`
+	Paths         []string    `json:"paths"`
+	OutputDir     string      `json:"output_dir"`
+	Format        string      `json:"format"`
+	Width         int         `json:"width,omitempty"`
+	Height        int         `json:"height,omitempty"`
+	Quality       int         `json:"quality,omitempty"`
+	Background    string      `json:"background,omitempty"`
+	Suffix        string      `json:"suffix,omitempty"`
+	NameTemplate  string      `json:"name_template,omitempty"`
+	Overwrite     bool        `json:"overwrite,omitempty"`
 }
 
 type videoConvertInput struct {
@@ -313,6 +317,7 @@ type projectInput struct {
 }
 
 type runInput struct {
+	ReceiptPath   string        `json:"receipt_path,omitempty"`
 	WorkspaceRoot string        `json:"workspace_root"`
 	Recipe        recipe.Recipe `json:"recipe"`
 	// Kind 作业类型标签，仅用于展示与统计。
@@ -446,6 +451,7 @@ func (s *service) imageConvert(input imageConvertInput) (any, *himindjsonrpc.Err
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 	result, convertErr := image.ConvertBatch(ctx, tools, paths, outputDir, image.Options{
+		Crop: input.Crop, Rotate: input.Rotate, FlipH: input.FlipH, FlipV: input.FlipV,
 		Format: input.Format, Width: input.Width, Height: input.Height,
 		Quality: input.Quality, Background: input.Background,
 		Suffix: input.Suffix, NameTemplate: input.NameTemplate, Overwrite: input.Overwrite,
@@ -698,6 +704,31 @@ func (s *service) recipeRun(input runInput) (any, *himindjsonrpc.Error) {
 	if rpcError != nil {
 		return nil, rpcError
 	}
+	receipt := ""
+	if input.ReceiptPath != "" {
+		root, err := workspace.Open(input.WorkspaceRoot)
+		if err != nil {
+			return nil, &himindjsonrpc.Error{Code: -32602, Message: err.Error()}
+		}
+		receipt, err = root.Resolve(input.ReceiptPath)
+		if err != nil {
+			return nil, &himindjsonrpc.Error{Code: -32602, Message: err.Error()}
+		}
+		if filepath.Ext(receipt) != ".json" || receipt == resolved.Output.Path {
+			return nil, &himindjsonrpc.Error{Code: -32602, Message: "回执必须使用独立的 JSON 文件"}
+		}
+		for _, source := range resolved.Inputs {
+			if strings.EqualFold(source.Path, receipt) {
+				return nil, &himindjsonrpc.Error{Code: -32602, Message: "回执不能覆盖输入文件"}
+			}
+		}
+		if _, err = os.Lstat(receipt); !os.IsNotExist(err) {
+			return nil, &himindjsonrpc.Error{Code: -32602, Message: "回执文件已存在，请使用新的任务目录"}
+		}
+		if err = workspace.EnsureParentDir(receipt); err != nil {
+			return nil, &himindjsonrpc.Error{Code: -32602, Message: err.Error()}
+		}
+	}
 	args, err := recipe.Compile(resolved)
 	if err != nil {
 		return nil, &himindjsonrpc.Error{Code: -32602, Message: err.Error()}
@@ -712,6 +743,29 @@ func (s *service) recipeRun(input runInput) (any, *himindjsonrpc.Error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		if info, probeErr := probe.Read(ctx, tools, resolved.Inputs[0].Path); probeErr == nil {
 			totalMs = info.DurationMs
+			if input.Kind == "library-audio" {
+				if !info.HasAudio || totalMs <= 0 || resolved.Video == nil || !resolved.Video.Disable || resolved.Audio == nil || resolved.Audio.Disable {
+					cancel()
+					return nil, &himindjsonrpc.Error{Code: -32602, Message: "所选素材没有可提取的音轨"}
+				}
+				if trim := resolved.Audio.Trim; trim != nil {
+					start, end := int64(0), totalMs
+					if trim.StartMs != nil {
+						start = *trim.StartMs
+					}
+					if trim.EndMs != nil {
+						end = *trim.EndMs
+					}
+					if start < 0 || start >= totalMs || end <= start || end > totalMs+50 {
+						cancel()
+						return nil, &himindjsonrpc.Error{Code: -32602, Message: "片段范围超出素材时长，请调整开始和结束时间"}
+					}
+					totalMs = end - start
+				}
+			}
+		} else if input.Kind == "library-audio" {
+			cancel()
+			return nil, &himindjsonrpc.Error{Code: -32602, Message: "无法读取源素材音轨，请选择其他素材"}
 		}
 		cancel()
 	}
@@ -720,8 +774,8 @@ func (s *service) recipeRun(input runInput) (any, *himindjsonrpc.Error) {
 	if kind == "" {
 		kind = "recipe"
 	}
-	record, err := s.store.Submit(
-		kind, resolved.Inputs[0].Path, resolved.Output.Path, resolved.Describe(), args, totalMs)
+	record, err := s.store.SubmitWithReceipt(
+		kind, resolved.Inputs[0].Path, resolved.Output.Path, resolved.Describe(), args, totalMs, receipt)
 	if err != nil {
 		return nil, &himindjsonrpc.Error{Code: -32000, Message: "提交作业失败: " + err.Error()}
 	}

@@ -102,13 +102,223 @@ type fetchInput struct {
 }
 
 func main() {
+	if len(os.Args) == 3 && os.Args[1] == "--acquisition-worker" {
+		if err := runAcquisitionWorker(os.Args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, "采集任务已停止，请查看任务状态")
+			os.Exit(1)
+		}
+		return
+	}
 	if err := jsonrpc.Serve(os.Stdin, os.Stdout, handle); err != nil {
 		fmt.Fprintln(os.Stderr, "媒体资源库插件已停止:", err)
 	}
 }
 
+// legacyCapabilityIDs 是 ADR 0119 改名对照表；旧 ID 只在本进程内转发，不再写进清单。
+var legacyCapabilityIDs = map[string]string{
+	"media-library.asset.ai_cache.get":   "media-library.asset.ai-cache.get",
+	"media-library.asset.ai_cache.set":   "media-library.asset.ai-cache.set",
+	"media-library.asset.user_state":     "media-library.asset.user-state",
+	"media-library.library.items":        "media-library.holdings.items",
+	"media-library.library.item.remove":  "media-library.holdings.item.remove",
+	"media-library.library.item.restore": "media-library.holdings.item.restore",
+	"media-library.library.trash.list":   "media-library.holdings.trash.list",
+	"media-library.library.rescan":       "media-library.holdings.rescan",
+	"media-library.library.sync":         "media-library.holdings.sync",
+}
+
+func legacyCapabilityID(id string) string {
+	if mapped, ok := legacyCapabilityIDs[id]; ok {
+		return mapped
+	}
+	return id
+}
+
 func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
+	// ADR 0119 改名前的旧 ID 仍接受，避免已打开的旧界面或既有工作流直接报未知能力。
+	request.Method = legacyCapabilityID(request.Method)
 	switch request.Method {
+	case "media-library.image.open", "media-library.image.get", "media-library.image.apply", "media-library.image.preview", "media-library.image.adopt", "media-library.image.generate":
+		var in imageEditInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		switch request.Method {
+		case "media-library.image.open":
+			return rpcResult(openImageEditor(in))
+		case "media-library.image.get":
+			return rpcResult(getImageEditor(in))
+		case "media-library.image.apply":
+			return rpcResult(applyImageEditor(in))
+		case "media-library.image.preview":
+			return rpcResult(previewImageEditor(in))
+		case "media-library.image.adopt":
+			return rpcResult(adoptImageEditor(in))
+		default:
+			return rpcResult(generateImageEditor(in))
+		}
+	case "media-library.generation.catalog":
+		return rpcResult(generationCatalog())
+	case "media-library.generation.list":
+		return rpcResult(generationList())
+	case "media-library.generation.voices":
+		return rpcResult(generationVoices())
+	case "media-library.generation.prepare", "media-library.generation.submit", "media-library.generation.get", "media-library.generation.cancel", "media-library.generation.adopt", "media-library.generation.preview", "media-library.generation.reference", "media-library.asset.lineage":
+		var in generationInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		switch request.Method {
+		case "media-library.generation.prepare":
+			return rpcResult(prepareGeneration(in))
+		case "media-library.generation.submit":
+			return rpcResult(submitGeneration(in))
+		case "media-library.generation.get":
+			return rpcResult(getGeneration(in))
+		case "media-library.generation.cancel":
+			return rpcResult(cancelGeneration(in))
+		case "media-library.generation.adopt":
+			return rpcResult(adoptGeneration(in))
+		case "media-library.generation.preview":
+			return rpcResult(generationPreview(in))
+		case "media-library.generation.reference":
+			return rpcResult(generationReferencePreview(in))
+		default:
+			return rpcResult(generationLineage(in))
+		}
+	case "media-library.remote.preview":
+		var in remotePreviewInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(remotePreview(in))
+	case "media-library.remote.preview.cancel":
+		var in struct {
+			RequestID string `json:"request_id"`
+		}
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(cancelRemotePreview(in.RequestID))
+	case "media-library.audio.start":
+		var in audioStartInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(startAudio(in))
+	case "media-library.music.discover":
+		var in discoveryInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(discoverMusic(in))
+	case "media-library.discovery.providers":
+		return discoveryProviders(), nil
+	case "media-library.comments.list", "media-library.comments.snapshot.get", "media-library.comments.snapshot.save":
+		var in commentInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		if request.Method == "media-library.comments.list" {
+			return rpcResult(listComments(in))
+		}
+		return rpcResult(commentSnapshot(in, request.Method == "media-library.comments.snapshot.save"))
+	case "media-library.legacy.import":
+		var in struct {
+			Items []legacyDownload `json:"items"`
+		}
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(importLegacyDownloads(in.Items))
+	case "media-library.legacy.list":
+		return rpcResult(listLegacyDownloads())
+	case "media-library.discovery.search":
+		var in discoveryInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(searchDiscovery(in))
+	case "media-library.discovery.cancel":
+		var in struct {
+			RequestID string `json:"request_id"`
+		}
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(cancelDiscovery(in.RequestID))
+	case "media-library.ui.geometry.record", "media-library.ui.geometry.get":
+		return rpcResult(uiGeometry(request.Params, request.Method == "media-library.ui.geometry.record"))
+	case "media-library.holdings.provenance":
+		var in struct {
+			ItemID string `json:"item_id"`
+		}
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(acquisitionProvenance(in.ItemID))
+	case "media-library.catalog.inspect":
+		var in struct {
+			LibraryID string `json:"library_id"`
+			Limit     int    `json:"limit"`
+		}
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(inspectLibraryCatalog(in.LibraryID, in.Limit))
+	case "media-library.acquisition.start":
+		var in acquisitionStartInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(startAcquisition(in))
+	case "media-library.acquisition.status", "media-library.acquisition.list", "media-library.acquisition.cancel", "media-library.acquisition.retry", "media-library.acquisition.remove", "media-library.acquisition.log":
+		var in struct {
+			JobID             string `json:"job_id"`
+			Limit             int    `json:"limit"`
+			UseCurrentAccount bool   `json:"use_current_account"`
+		}
+		if len(request.Params) > 0 {
+			if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+				return nil, rpcError
+			}
+		}
+		return rpcResult(acquisitionOperation(strings.TrimPrefix(request.Method, "media-library.acquisition."), in.JobID, in.Limit, in.UseCurrentAccount))
+	case "media-library.bookmark.save":
+		var in remoteResource
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal(request.Params, &fields); err != nil {
+			return nil, jsonrpc.InvalidParams("收藏参数无效")
+		}
+		_, noteProvided := fields["note"]
+		_, tagsProvided := fields["tags"]
+		return rpcResult(saveBookmarkFields(in, noteProvided, tagsProvided))
+	case "media-library.bookmark.list":
+		var in struct {
+			Query string `json:"query"`
+		}
+		if len(request.Params) > 0 {
+			if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+				return nil, rpcError
+			}
+		}
+		return rpcResult(listBookmarks(in.Query))
+	case "media-library.bookmark.remove":
+		var in struct {
+			RemoteID string `json:"remote_id"`
+		}
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(removeBookmark(in.RemoteID))
+	case "media-library.download.status", "media-library.download.install", "media-library.remote.resolve", "media-library.account.status", "media-library.account.connect", "media-library.account.disconnect":
+		if len(request.Params) == 0 {
+			request.Params = json.RawMessage(`{}`)
+		}
+		return rpcResult(downloadCapability(request))
 	case "media-library.provider.list":
 		// 无参数调用也要能用：模型或视图可能不带 params 直接问有哪些来源。
 		if len(request.Params) > 0 {
@@ -157,6 +367,72 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 		return rpcResult(createLibrary(in))
 	case "media-library.repository.list":
 		return rpcResult(listLibraries())
+	case "media-library.holdings.items":
+		var in libraryItemsInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(listLibraryItems(in))
+	case "media-library.holdings.item.remove":
+		var in libraryItemIDsInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(removeLibraryItems(in))
+	case "media-library.holdings.item.restore":
+		var in libraryItemIDsInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(restoreLibraryItems(in))
+	case "media-library.holdings.trash.list":
+		var in libraryTrashInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(listLibraryTrash(in))
+	case "media-library.holdings.rescan":
+		var in libraryRescanInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(rescanLibrary(in))
+	case "media-library.holdings.sync":
+		var in librarySyncInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(librarySync(in))
+	case "media-library.organize.plan":
+		var in organizePlanInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(planOrganize(in))
+	case "media-library.organize.apply":
+		var in organizeApplyInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(applyOrganize(in))
+	case "media-library.organize.review.list":
+		var in organizeReviewListInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(listOrganizeReview(in))
+	case "media-library.organize.review.decide":
+		var in organizeReviewDecideInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(decideOrganizeReview(in))
+	case "media-library.organize.runs.list":
+		var in organizeRunsInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(listOrganizeRuns(in))
 	case "media-library.repository.update":
 		var in updateLibraryInput
 		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
@@ -171,13 +447,14 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 		return rpcResult(removeLibrary(in))
 	case "media-library.source.add":
 		var in struct {
-			Path        string `json:"path"`
-			DisplayName string `json:"display_name"`
+			Path         string `json:"path"`
+			DisplayName  string `json:"display_name"`
+			MetadataMode string `json:"metadata_mode"`
 		}
 		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
 			return nil, rpcError
 		}
-		return rpcResult(addSourceRoot(in.Path, in.DisplayName))
+		return rpcResult(addSourceRoot(in.Path, in.DisplayName, in.MetadataMode))
 	case "media-library.source.update":
 		var in updateSourceInput
 		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
@@ -202,6 +479,152 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 			return nil, rpcError
 		}
 		return rpcResult(searchResources(in))
+	case "media-library.runtime.status":
+		return rpcResult(runtimeStatus())
+	case "media-library.asset.enrich":
+		var in enrichInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(enrichAssets(in))
+	case "media-library.asset.detail":
+		var in assetDetailInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(assetDetail(in))
+	case "media-library.asset.thumbnail":
+		var in assetThumbnailInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(assetThumbnails(in))
+	case "media-library.asset.facets":
+		var in assetFacetInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(assetFacets(in))
+	case "media-library.asset.user-state":
+		var in userStateInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(getAssetUserState(in))
+	case "media-library.audio.waveform":
+		var in userStateInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(audioWaveform(in))
+	case "media-library.asset.tags.set":
+		var in tagsInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(setAssetTags(in))
+	case "media-library.asset.rating.set":
+		var in ratingInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(setAssetRating(in))
+	case "media-library.asset.note.set":
+		var in noteInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(setAssetNote(in))
+	case "media-library.asset.ai-cache.get":
+		var in aiCacheGetInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(getAITagCache(in))
+	case "media-library.asset.ai-cache.set":
+		var in aiCacheSetInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(setAITagCache(in))
+	case "media-library.ai.budget":
+		var in aiBudgetInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(aiBudgetSummary(in))
+	case "media-library.ai.job.get":
+		var in struct {
+			SelectionID string `json:"selection_id"`
+		}
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(getAIJobRef(in))
+	case "media-library.ai.job.set":
+		var in aiJobRefInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(setAIJobRef(in))
+	case "media-library.ai.job.clear":
+		var in struct {
+			SelectionID string `json:"selection_id"`
+		}
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(clearAIJobRef(in))
+	case "media-library.ai.job.list":
+		return rpcResult(listAIJobRefs())
+	case "media-library.selection.create":
+		var in selectionCreateInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(createSelection(in))
+	case "media-library.selection.list":
+		return rpcResult(listSelections())
+	case "media-library.selection.summary":
+		return rpcResult(listCuratedSelections())
+	case "media-library.asset.reveal":
+		var in revealInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(revealPath(in))
+	case "media-library.selection.detail":
+		var in struct {
+			SelectionID string `json:"selection_id"`
+		}
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(getSelectionDetail(in.SelectionID))
+	case "media-library.selection.auto":
+		var in selectionAutoInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(autoSelect(in))
+	case "media-library.selection.decide":
+		var in selectionDecisionInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(decideSelection(in))
+	case "media-library.selection.decide.batch":
+		var in selectionDecideBatchInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(decideSelectionBatch(in))
+	case "media-library.selection.promote":
+		var in selectionPromoteInput
+		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
+			return nil, rpcError
+		}
+		return rpcResult(promoteSelection(in))
 	case "media-library.asset.adopt":
 		var in adoptInput
 		if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {

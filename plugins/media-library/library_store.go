@@ -113,16 +113,18 @@ CREATE VIRTUAL TABLE IF NOT EXISTS search_fts_v2 USING fts5(
 `
 
 type libraryRecord struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	BackendType   string `json:"backend_type"`
-	RootURI       string `json:"root_uri"`
-	CredentialRef string `json:"credential_ref,omitempty"`
-	AccessMode    string `json:"access_mode"`
-	CreatedAt     string `json:"created_at"`
-	UpdatedAt     string `json:"updated_at"`
-	AssetCount    int    `json:"asset_count"`
-	State         string `json:"state"`
+	ID                string `json:"id"`
+	Name              string `json:"name"`
+	BackendType       string `json:"backend_type"`
+	RootURI           string `json:"root_uri"`
+	CredentialRef     string `json:"credential_ref,omitempty"`
+	AccessMode        string `json:"access_mode"`
+	Kind              string `json:"kind"`
+	OriginSelectionID string `json:"origin_selection_id,omitempty"`
+	CreatedAt         string `json:"created_at"`
+	UpdatedAt         string `json:"updated_at"`
+	AssetCount        int    `json:"asset_count"`
+	State             string `json:"state"`
 }
 
 type libraryManifest struct {
@@ -160,15 +162,17 @@ type createLibraryInput struct {
 	RootPath      string `json:"root_path"`
 	CredentialRef string `json:"credential_ref"`
 	AccessMode    string `json:"access_mode"`
+	Kind          string `json:"kind"`
 }
 
 type sourceRoot struct {
-	ID          string `json:"id"`
-	Path        string `json:"path"`
-	DisplayName string `json:"display_name"`
-	ScanStatus  string `json:"scan_status"`
-	LastScanAt  string `json:"last_scan_at"`
-	CreatedAt   string `json:"created_at"`
+	ID           string `json:"id"`
+	Path         string `json:"path"`
+	DisplayName  string `json:"display_name"`
+	ScanStatus   string `json:"scan_status"`
+	LastScanAt   string `json:"last_scan_at"`
+	MetadataMode string `json:"metadata_mode"`
+	CreatedAt    string `json:"created_at"`
 }
 
 type sourceScanInput struct {
@@ -222,6 +226,42 @@ func openLibraryDB() (*sql.DB, error) {
 	if err := ensureSearchIndexV2(db); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("初始化新版检索索引失败: %w", err)
+	}
+	if err := ensureV3Schema(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("初始化资产索引失败: %w", err)
+	}
+	if err := ensureUserStateSchema(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("初始化用户标记失败: %w", err)
+	}
+	if err := ensureCJKIndex(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("初始化中文索引失败: %w", err)
+	}
+	if err := ensureAITagCache(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("初始化 AI 缓存失败: %w", err)
+	}
+	if err := ensureLibraryKind(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("初始化库类型失败: %w", err)
+	}
+	if err := ensureLibraryManageSchema(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("初始化库管理表失败: %w", err)
+	}
+	if err := ensureOrganizeSchema(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("初始化自动整理表失败: %w", err)
+	}
+	if err := ensureAcquisitionSchema(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("初始化媒体采集记录失败: %w", err)
+	}
+	if err := ensureMusicSchema(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("初始化音乐与音频记录失败: %w", err)
 	}
 	return db, nil
 }
@@ -301,12 +341,14 @@ func createLibrary(in createLibraryInput) (any, error) {
 	} else if err != sql.ErrNoRows {
 		return nil, err
 	}
-	_, err = db.Exec(`INSERT INTO libraries(id,name,backend_type,root_uri,credential_ref,access_mode,created_at,updated_at)
-		VALUES(?,?,?,?,?,?,?,?)
+	_, err = db.Exec(`INSERT INTO libraries(id,name,backend_type,root_uri,credential_ref,access_mode,created_at,updated_at,kind,origin_selection_id)
+		VALUES(?,?,?,?,?,?,?,?,?,?)
 		ON CONFLICT(backend_type,root_uri) DO UPDATE SET
 		  name=excluded.name, credential_ref=excluded.credential_ref,
-		  access_mode=excluded.access_mode, updated_at=excluded.updated_at`,
-		manifest.LibraryID, name, backend, root, strings.TrimSpace(in.CredentialRef), manifest.AccessMode, now, now)
+		  access_mode=excluded.access_mode, updated_at=excluded.updated_at,
+		  kind=CASE WHEN libraries.kind='curated' THEN 'curated' ELSE excluded.kind END`,
+		manifest.LibraryID, name, backend, root, strings.TrimSpace(in.CredentialRef), manifest.AccessMode, now, now,
+		firstNonEmpty(normalizeLibraryKind(in.Kind), libraryKindMaterial), "")
 	if err != nil {
 		return nil, err
 	}
@@ -324,10 +366,14 @@ func getLibrary(id string) (*libraryRecord, error) {
 
 func getLibraryWithDB(db *sql.DB, id string) (*libraryRecord, error) {
 	var item libraryRecord
-	err := db.QueryRow(`SELECT l.id,l.name,l.backend_type,l.root_uri,l.credential_ref,l.access_mode,l.created_at,l.updated_at,
-		(SELECT COUNT(*) FROM library_items i WHERE i.library_id=l.id)
+	err := db.QueryRow(`SELECT l.id,l.name,l.backend_type,l.root_uri,l.credential_ref,l.access_mode,
+		COALESCE(l.kind,'material'),
+		COALESCE(NULLIF(l.origin_selection_id,''),(SELECT s.id FROM selections s WHERE s.library_id=l.id ORDER BY s.created_at DESC LIMIT 1),''),
+		l.created_at,l.updated_at,
+		(SELECT COUNT(*) FROM library_items i WHERE i.library_id=l.id AND i.deleted_at='')
 		FROM libraries l WHERE l.id=?`, id).Scan(
-		&item.ID, &item.Name, &item.BackendType, &item.RootURI, &item.CredentialRef, &item.AccessMode, &item.CreatedAt, &item.UpdatedAt, &item.AssetCount)
+		&item.ID, &item.Name, &item.BackendType, &item.RootURI, &item.CredentialRef, &item.AccessMode,
+		&item.Kind, &item.OriginSelectionID, &item.CreatedAt, &item.UpdatedAt, &item.AssetCount)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("资源库不存在: %s", id)
 	}
@@ -347,9 +393,12 @@ func listLibraries() (any, error) {
 		return nil, err
 	}
 	defer db.Close()
-	rows, err := db.Query(`SELECT l.id,l.name,l.backend_type,l.root_uri,l.credential_ref,l.access_mode,l.created_at,l.updated_at,
-		(SELECT COUNT(*) FROM library_items i WHERE i.library_id=l.id)
-		FROM libraries l ORDER BY l.name,l.id`)
+	rows, err := db.Query(`SELECT l.id,l.name,l.backend_type,l.root_uri,l.credential_ref,l.access_mode,
+		COALESCE(l.kind,'material'),
+		COALESCE(NULLIF(l.origin_selection_id,''),(SELECT s.id FROM selections s WHERE s.library_id=l.id ORDER BY s.created_at DESC LIMIT 1),''),
+		l.created_at,l.updated_at,
+		(SELECT COUNT(*) FROM library_items i WHERE i.library_id=l.id AND i.deleted_at='')
+		FROM libraries l ORDER BY l.kind DESC, l.name, l.id`)
 	if err != nil {
 		return nil, err
 	}
@@ -357,7 +406,8 @@ func listLibraries() (any, error) {
 	items := []libraryRecord{}
 	for rows.Next() {
 		var item libraryRecord
-		if err := rows.Scan(&item.ID, &item.Name, &item.BackendType, &item.RootURI, &item.CredentialRef, &item.AccessMode, &item.CreatedAt, &item.UpdatedAt, &item.AssetCount); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.BackendType, &item.RootURI, &item.CredentialRef,
+			&item.AccessMode, &item.Kind, &item.OriginSelectionID, &item.CreatedAt, &item.UpdatedAt, &item.AssetCount); err != nil {
 			return nil, err
 		}
 		item.State = "offline"
@@ -442,19 +492,36 @@ func removeLibrary(in removeLibraryInput) (any, error) {
 		return nil, err
 	}
 	removedItems, _ := result.RowsAffected()
+	// 精选引用必须一起断开，否则精选会指向一个不存在的库。
+	if _, err := tx.Exec(`UPDATE selections SET library_id='', status=CASE WHEN status='done' THEN 'reviewing' ELSE status END, updated_at=? WHERE library_id=?`, nowRFC3339(), id); err != nil {
+		return nil, err
+	}
+	// 这个库目录下的沉淀记录一并作废，避免“精选显示已加入、库里没有”。
+	rootPrefix := strings.TrimRight(library.RootURI, "\\/") + string(filepath.Separator)
+	if _, err := tx.Exec(`DELETE FROM curated_entries WHERE location_path LIKE ?`, rootPrefix+"%"); err != nil {
+		return nil, err
+	}
 	if _, err := tx.Exec(`DELETE FROM libraries WHERE id=?`, id); err != nil {
 		return nil, err
 	}
+	logLibraryEvent(tx, id, "", "library.remove", map[string]any{"name": library.Name, "items": removedItems})
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return map[string]any{"id": id, "name": library.Name, "removed_items": removedItems, "disk_files_preserved": true}, nil
 }
 
-func addSourceRoot(path string, displayName string) (any, error) {
+func addSourceRoot(path string, displayName string, metadataMode string) (any, error) {
 	value := strings.TrimSpace(path)
 	if value == "" {
 		return nil, fmt.Errorf("请选择要索引的本地文件夹")
+	}
+	mode := strings.ToLower(strings.TrimSpace(metadataMode))
+	if mode == "" {
+		mode = "db"
+	}
+	if mode != "db" && mode != "jsonl" && mode != "both" {
+		return nil, fmt.Errorf("metadata_mode 必须是 db、jsonl 或 both")
 	}
 	absolute, err := filepath.Abs(value)
 	if err != nil {
@@ -470,9 +537,12 @@ func addSourceRoot(path string, displayName string) (any, error) {
 	}
 	defer db.Close()
 	var existing sourceRoot
-	err = db.QueryRow(`SELECT id,path,display_name,scan_status,last_scan_at,created_at FROM source_roots WHERE path=?`, absolute).Scan(
-		&existing.ID, &existing.Path, &existing.DisplayName, &existing.ScanStatus, &existing.LastScanAt, &existing.CreatedAt)
+	err = db.QueryRow(`SELECT id,path,display_name,scan_status,last_scan_at,COALESCE(metadata_mode,'db'),created_at FROM source_roots WHERE path=?`, absolute).Scan(
+		&existing.ID, &existing.Path, &existing.DisplayName, &existing.ScanStatus, &existing.LastScanAt, &existing.MetadataMode, &existing.CreatedAt)
 	if err == nil {
+		if mode != "db" {
+			_, _ = db.Exec(`UPDATE source_roots SET metadata_mode=? WHERE id=?`, mode, existing.ID)
+		}
 		return existing, nil
 	}
 	if err != sql.ErrNoRows {
@@ -482,9 +552,9 @@ func addSourceRoot(path string, displayName string) (any, error) {
 	if name == "" {
 		name = filepath.Base(absolute)
 	}
-	item := sourceRoot{ID: randomID("src"), Path: absolute, DisplayName: name, ScanStatus: "pending", CreatedAt: nowRFC3339()}
-	_, err = db.Exec(`INSERT INTO source_roots(id,path,display_name,scan_status,created_at) VALUES(?,?,?,?,?)`,
-		item.ID, item.Path, item.DisplayName, item.ScanStatus, item.CreatedAt)
+	item := sourceRoot{ID: randomID("src"), Path: absolute, DisplayName: name, ScanStatus: "pending", MetadataMode: mode, CreatedAt: nowRFC3339()}
+	_, err = db.Exec(`INSERT INTO source_roots(id,path,display_name,scan_status,metadata_mode,created_at) VALUES(?,?,?,?,?,?)`,
+		item.ID, item.Path, item.DisplayName, item.ScanStatus, mode, item.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -646,22 +716,47 @@ func scanSourceBatch(in sourceScanInput) (any, error) {
 				if infoErr != nil {
 					continue
 				}
+				modifiedAt := info.ModTime().UTC().Format(time.RFC3339)
+				// 增量扫描：大小与修改时间都没变时只刷新 seen_generation，跳过
+				// 身份系统调用、UPSERT 和 FTS 重写。10 万级重扫的主要成本在这里。
+				var existingBytes int64
+				var existingModified string
+				if scanErr := tx.QueryRow(`SELECT bytes,modified_at FROM candidates WHERE path=?`, path).Scan(&existingBytes, &existingModified); scanErr == nil &&
+					existingBytes == info.Size() && existingModified == modifiedAt {
+					if _, err := tx.Exec(`UPDATE candidates SET seen_generation=?,missing=0 WHERE path=?`, generation, path); err != nil {
+						return nil, err
+					}
+					processed++
+					continue
+				}
 				relative, _ := filepath.Rel(root, path)
+				relativeSlash := filepath.ToSlash(relative)
+				folder := ""
+				if index := strings.LastIndex(relativeSlash, "/"); index > 0 {
+					folder = relativeSlash[:index]
+				}
+				identity := identifyFile(path)
 				id := stableID("candidate", path)
 				now := nowRFC3339()
-				_, err := tx.Exec(`INSERT INTO candidates(id,source_id,path,relative_path,name,kind,extension,bytes,modified_at,seen_generation,created_at,updated_at)
-					VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+				_, err := tx.Exec(`INSERT INTO candidates(id,source_id,path,relative_path,name,kind,extension,bytes,modified_at,seen_generation,volume_id,file_id,folder,created_at,updated_at)
+					VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 					ON CONFLICT(path) DO UPDATE SET source_id=excluded.source_id, relative_path=excluded.relative_path,
 					name=excluded.name, kind=excluded.kind, extension=excluded.extension, bytes=excluded.bytes,
-					modified_at=excluded.modified_at, seen_generation=excluded.seen_generation, missing=0, updated_at=excluded.updated_at`,
-					id, sourceID, path, filepath.ToSlash(relative), entry.Name(), kind, strings.ToLower(filepath.Ext(path)),
-					info.Size(), info.ModTime().UTC().Format(time.RFC3339), generation, now, now)
+					modified_at=excluded.modified_at, seen_generation=excluded.seen_generation, missing=0,
+					volume_id=excluded.volume_id, file_id=excluded.file_id, folder=excluded.folder,
+					probe_state=CASE WHEN candidates.bytes<>excluded.bytes OR candidates.modified_at<>excluded.modified_at THEN 'pending' ELSE candidates.probe_state END,
+					thumb_state=CASE WHEN candidates.bytes<>excluded.bytes OR candidates.modified_at<>excluded.modified_at THEN 'pending' ELSE candidates.thumb_state END,
+					meta_json=CASE WHEN candidates.bytes<>excluded.bytes OR candidates.modified_at<>excluded.modified_at THEN '{}' ELSE candidates.meta_json END,
+					updated_at=excluded.updated_at`,
+					id, sourceID, path, relativeSlash, entry.Name(), kind, strings.ToLower(filepath.Ext(path)),
+					info.Size(), modifiedAt, generation,
+					identity.VolumeID, identity.FileID, folder, now, now)
 				if err != nil {
 					return nil, err
 				}
 				if err := replaceSearchDocument(tx, searchDocument{
 					EntryType: "candidate", EntryID: id, Kind: kind, UpdatedAt: now,
-					Title: entry.Name(), Filename: entry.Name(), Path: filepath.ToSlash(relative),
+					Title: entry.Name(), Filename: entry.Name(), Path: relativeSlash,
 				}); err != nil {
 					return nil, err
 				}
@@ -725,9 +820,19 @@ func replaceSearchDocument(tx *sql.Tx, doc searchDocument) error {
 	if _, err := tx.Exec(`DELETE FROM search_fts_v2 WHERE entry_type=? AND entry_id=?`, doc.EntryType, doc.EntryID); err != nil {
 		return err
 	}
-	_, err := tx.Exec(`INSERT INTO search_fts_v2(entry_type,entry_id,library_id,kind,updated_at,title,filename,path,tags,collection,license,author) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
-		doc.EntryType, doc.EntryID, doc.LibraryID, doc.Kind, doc.UpdatedAt, doc.Title, doc.Filename, doc.Path, doc.Tags, doc.Collection, doc.License, doc.Author)
-	return err
+	if _, err := tx.Exec(`INSERT INTO search_fts_v2(entry_type,entry_id,library_id,kind,updated_at,title,filename,path,tags,collection,license,author) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
+		doc.EntryType, doc.EntryID, doc.LibraryID, doc.Kind, doc.UpdatedAt, doc.Title, doc.Filename, doc.Path, doc.Tags, doc.Collection, doc.License, doc.Author); err != nil {
+		return err
+	}
+	cjk := spaceCJK(strings.Join([]string{doc.Title, doc.Filename, doc.Path, doc.Tags, doc.Collection}, " "))
+	if _, err := tx.Exec(`DELETE FROM search_cjk WHERE entry_type=? AND entry_id=?`, doc.EntryType, doc.EntryID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`INSERT INTO search_cjk(entry_type,entry_id,kind,updated_at,cjk) VALUES(?,?,?,?,?)`,
+		doc.EntryType, doc.EntryID, doc.Kind, doc.UpdatedAt, cjk); err != nil {
+		return err
+	}
+	return nil
 }
 
 func ensureSearchIndexV2(db *sql.DB) error {
@@ -783,7 +888,7 @@ func listSourceRoots() (any, error) {
 		return nil, err
 	}
 	defer db.Close()
-	rows, err := db.Query(`SELECT id,path,display_name,scan_status,last_scan_at,created_at FROM source_roots ORDER BY created_at DESC`)
+	rows, err := db.Query(`SELECT id,path,display_name,scan_status,last_scan_at,COALESCE(metadata_mode,'db'),created_at FROM source_roots ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -791,7 +896,7 @@ func listSourceRoots() (any, error) {
 	items := []sourceRoot{}
 	for rows.Next() {
 		var item sourceRoot
-		if err := rows.Scan(&item.ID, &item.Path, &item.DisplayName, &item.ScanStatus, &item.LastScanAt, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Path, &item.DisplayName, &item.ScanStatus, &item.LastScanAt, &item.MetadataMode, &item.CreatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, item)

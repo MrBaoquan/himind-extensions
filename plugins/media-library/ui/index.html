@@ -5,8 +5,44 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>媒体库</title>
   <link rel="stylesheet" href="app.css" />
+  <link rel="stylesheet" href="intake.css" />
+  <link rel="stylesheet" href="audio.css" />
+  <link rel="stylesheet" href="preview.css" />
+  <link rel="stylesheet" href="generation.css" />
+  <link rel="stylesheet" href="image-editor.css" />
 </head>
 <body>
+  <svg class="icon-sprite" aria-hidden="true" focusable="false" width="0" height="0">
+    <defs>
+      <symbol id="icon-grid" viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></symbol>
+      <symbol id="icon-library" viewBox="0 0 24 24"><path d="M4 5h4v14H4zM10 5h4v14h-4z"/><path d="m16 6 4 1-3 13-4-1z"/></symbol>
+      <symbol id="icon-monitor" viewBox="0 0 24 24"><path d="M3 5h18v11H3z"/><path d="M9 20h6M12 16v4"/></symbol>
+      <symbol id="icon-cloud" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 0-8 5 5 0 0 0-9.6-1.5A3.5 3.5 0 0 0 7 18z"/></symbol>
+      <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="icon-wand" viewBox="0 0 24 24"><path d="m4 20 9-9M14 3v4M18 7h4M17 14l3 3M13 10l2-2 3 3-2 2z"/></symbol>
+      <symbol id="icon-tag" viewBox="0 0 24 24"><path d="M4 12V5a1 1 0 0 1 1-1h7l8 8-8 8z"/><path d="M8 8h.01"/></symbol>
+      <symbol id="icon-more" viewBox="0 0 24 24"><path d="M6 12h.01M12 12h.01M18 12h.01"/></symbol>
+      <symbol id="icon-sort" viewBox="0 0 24 24"><path d="M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3"/></symbol>
+      <symbol id="icon-layers" viewBox="0 0 24 24"><path d="m12 4 8 4-8 4-8-4z"/><path d="m4 13 8 4 8-4"/></symbol>
+      <symbol id="icon-folder" viewBox="0 0 24 24"><path d="M4 7h6l2 2h8v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 7V5a1 1 0 0 1 1-1h4l2 2"/></symbol>
+      <symbol id="icon-inbox" viewBox="0 0 24 24"><path d="M4 13 6 5h12l2 8v6H4z"/><path d="M4 13h5l1 2h4l1-2h5"/></symbol>
+      <symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12 4 4 10-10"/></symbol>
+      <symbol id="icon-bookmark" viewBox="0 0 24 24"><path d="M7 4h10v16l-5-3-5 3z"/></symbol>
+      <symbol id="icon-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="m7 17 10-10"/></symbol>
+      <symbol id="icon-link" viewBox="0 0 24 24"><path d="M10 13a4 4 0 0 0 6 .5l2-2a4 4 0 0 0-6-6l-1 1"/><path d="M14 11a4 4 0 0 0-6-.5l-2 2a4 4 0 0 0 6 6l1-1"/></symbol>
+      <symbol id="icon-alert" viewBox="0 0 24 24"><path d="M12 4 3 20h18z"/><path d="M12 10v4M12 17h.01"/></symbol>
+      <symbol id="icon-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V4h11"/></symbol>
+      <symbol id="icon-list" viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/></symbol>
+      <symbol id="icon-chevron-down" viewBox="0 0 24 24"><path d="m7 9 5 5 5-5"/></symbol>
+      <symbol id="icon-open" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></symbol>
+      <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2"/><path d="m7 7 1 13h8l1-13"/></symbol>
+      <symbol id="icon-sync" viewBox="0 0 24 24"><path d="M4 11a7 7 0 0 1 12-4l3 3"/><path d="M20 5v5h-5"/><path d="M20 13a7 7 0 0 1-12 4l-3-3"/><path d="M4 19v-5h5"/></symbol>
+      <symbol id="icon-undo" viewBox="0 0 24 24"><path d="M9 7 4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 6 6v1"/></symbol>
+      <symbol id="icon-table" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="1"/><path d="M4 10h16M10 10v9"/></symbol>
+      <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></symbol>
+    </defs>
+  </svg>
+
   <div class="app-shell">
     <header class="app-bar">
       <div class="brand">
@@ -16,7 +52,17 @@
           <p>图片、视频与音频</p>
         </div>
       </div>
+      <nav class="view-tabs" role="tablist" aria-label="视图">
+        <button type="button" id="view-tab-assets" class="view-tab active" role="tab" aria-selected="true" aria-controls="view-assets" data-view="assets"><svg class="icon" aria-hidden="true"><use href="#icon-grid"/></svg>素材</button>
+        <button type="button" id="view-tab-discovery" class="view-tab" role="tab" aria-selected="false" aria-controls="view-discovery" data-view="discovery"><svg class="icon" aria-hidden="true"><use href="#icon-cloud"/></svg>在线发现</button>
+        <button type="button" id="view-tab-bookmarks" class="view-tab" role="tab" aria-selected="false" aria-controls="view-bookmarks" data-view="bookmarks"><svg class="icon" aria-hidden="true"><use href="#icon-bookmark"/></svg>收藏</button>
+        <button type="button" id="view-tab-selection" class="view-tab" role="tab" aria-selected="false" aria-controls="view-selection" data-view="selection"><svg class="icon" aria-hidden="true"><use href="#icon-library"/></svg>精选</button>
+        <button type="button" id="view-tab-library" class="view-tab" role="tab" aria-selected="false" aria-controls="view-library" data-view="library"><svg class="icon" aria-hidden="true"><use href="#icon-folder"/></svg>库</button>
+      </nav>
+      <button type="button" id="open-generation" class="ghost">AI 生成</button>
       <div class="app-actions">
+        <button type="button" id="open-intake" class="primary"><svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg>添加链接</button>
+        <button type="button" id="open-acquisitions" class="ghost" aria-haspopup="dialog">后台任务<span id="acquisition-count" class="acquisition-count" hidden></span></button>
         <button type="button" id="open-settings" class="icon-button" aria-label="媒体库设置" title="媒体库设置">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"/></svg>
         </button>
@@ -24,6 +70,60 @@
     </header>
 
     <main class="workspace">
+      <section id="view-generation" class="view-panel generation-workspace" hidden>
+        <header class="generation-head"><h2>AI 生成</h2><div class="generation-actions"><button type="button" id="generation-new" class="ghost">新建生成</button><button type="button" id="generation-records" class="ghost">生成记录</button><button type="button" id="generation-collapse" class="ghost" aria-expanded="true">收起参数</button><button type="button" id="generation-refresh" class="ghost">重新检查</button><button type="button" id="generation-back" class="ghost">返回素材</button></div></header>
+        <div class="generation-layout">
+          <form id="generation-form" class="generation-form">
+            <div class="generation-form-fields">
+            <h3>新生成</h3>
+            <label>生成类型<select id="generation-type"><option value="image.generate">生成图片</option><option value="image.edit">修改图片</option><option value="video.generate">生成视频</option><option value="audio.speech">合成语音</option></select></label>
+            <p id="generation-route" class="meta">正在读取 Agent 能力…</p>
+            <label id="generation-prompt-label">画面描述<textarea id="generation-prompt" maxlength="8000" rows="6" required placeholder="描述主体、场景、风格和构图"></textarea></label>
+            <section id="generation-references" hidden><div class="generation-actions"><strong>参考图片</strong><button type="button" id="generation-pick-reference" class="ghost">从素材库选择</button></div><div id="generation-reference-list"></div></section>
+            <div class="generation-fields">
+              <label id="generation-n-field">数量<select id="generation-n"><option value="1">1 张</option><option value="2">2 张</option><option value="3">3 张</option><option value="4">4 张</option></select></label>
+              <label id="generation-size-field">尺寸<select id="generation-size"><option value="">跟随模型</option><option value="1024x1024">1024 × 1024</option><option value="1536x1024">1536 × 1024</option><option value="1024x1536">1024 × 1536</option></select></label>
+              <label id="generation-duration-field" hidden>时长（秒）<input id="generation-duration" type="number" min="1" max="60" placeholder="跟随模型" /></label>
+              <label id="generation-ratio-field" hidden>比例<select id="generation-ratio"><option value="">跟随模型</option><option>16:9</option><option>9:16</option><option>1:1</option></select></label>
+              <label id="generation-voice-field" hidden>音色<input id="generation-voice" type="text" maxlength="120" placeholder="默认音色" list="generation-voices" /><datalist id="generation-voices"></datalist><button type="button" id="generation-browse-voices" class="ghost">选择音色</button></label>
+              <label id="generation-speed-field" hidden>语速<select id="generation-speed"><option value="1">1 倍</option><option value="0.75">0.75 倍</option><option value="1.25">1.25 倍</option><option value="1.5">1.5 倍</option></select></label>
+            </div><p id="generation-parameter-note" class="meta">参数范围以 Agent 当前能力为准。</p>
+            </div>
+            <div class="generation-form-footer"><p id="generation-spec" class="meta"></p><div id="generation-availability" class="inline-feedback" hidden></div><button type="button" id="generation-help" class="ghost" hidden>查看处理方法</button><button type="submit" id="generation-submit" class="primary">生成图片</button><p class="meta">新请求可能收费；价格与用量以 Agent 为准。</p><button type="button" id="generation-undo" class="ghost" hidden>恢复上份草稿</button></div>
+          </form>
+          <section id="generation-results" class="generation-results">
+            <div class="generation-result-head"><h3>本次生成</h3><span id="generation-record-date" class="meta"></span></div>
+            <div id="generation-feedback" class="inline-feedback" hidden></div>
+            <div class="generation-result-body"><div id="generation-run-state" class="generation-run-state"></div><details id="generation-snapshot" hidden><summary>查看本次参数</summary><div id="generation-snapshot-body"></div></details>
+            <div class="generation-actions"><button type="button" id="generation-reuse" class="ghost" hidden>复用参数</button><button type="button" id="generation-verify" class="ghost" hidden>核对原任务</button><button type="button" id="generation-resubmit" class="ghost" hidden>提交这份记录</button><button type="button" id="generation-cancel" class="ghost" hidden>取消生成</button></div>
+            <div id="generation-output-list" class="generation-output-list"><p class="meta">填写内容并生成，结果会保存在这里。</p></div></div>
+            <div id="generation-savebar" class="generation-savebar" hidden><div class="generation-actions"><span id="generation-selected" class="meta"></span><button type="button" id="generation-select-all" class="ghost">全选</button><button type="button" id="generation-clear-selection" class="ghost">清空选择</button><button type="button" id="generation-compare" class="ghost" hidden>比较所选图片</button></div><label>保存到<select id="generation-library"><option value="">选择资源库</option></select></label><div class="generation-actions"><button type="button" id="generation-adopt" class="primary">添加到资源库</button><button type="button" id="generation-open-library" class="ghost" hidden>在库中查看</button></div></div>
+          </section>
+        </div>
+      </section>
+      <section id="view-discovery" class="view-panel remote-shell" role="tabpanel" aria-labelledby="view-tab-discovery" hidden>
+        <header class="remote-head"><div><h2>在线发现</h2><p class="meta">按平台查找作品，收藏作品或下载到资源库</p></div><div id="discovery-modes" class="segmented" hidden><button type="button" id="discovery-video" class="segment active" aria-pressed="true">视频</button><button type="button" id="discovery-music" class="segment" aria-pressed="false">音乐 / BGM</button></div></header>
+        <div class="remote-body">
+          <form id="discovery-form" class="discovery-form">
+            <label>平台<select id="discovery-platform"><option value="stock">素材站</option><option value="douyin">抖音</option><option value="bilibili">哔哩哔哩</option><option value="youtube">YouTube</option></select></label>
+            <label class="discovery-query">关键词<input id="discovery-query" type="search" required maxlength="100" placeholder="搜索视频、图片或音频" /></label>
+            <div class="discovery-actions"><button type="submit" id="discovery-submit" class="primary">搜索</button><button type="button" id="discovery-cancel" class="ghost" hidden>取消</button></div>
+          </form>
+          <p id="discovery-support" class="meta"></p>
+          <div id="discovery-feedback" class="inline-feedback" role="status" hidden></div>
+          <div id="discovery-results" class="remote-results"><div class="remote-empty"><strong>输入关键词查找素材</strong><span class="meta">已有作品链接时，点击右上角“添加链接”。</span></div></div>
+          <button type="button" id="discovery-more" class="ghost" hidden>加载更多</button>
+        </div>
+      </section>
+      <section id="view-bookmarks" class="view-panel remote-shell" role="tabpanel" aria-labelledby="view-tab-bookmarks" hidden>
+        <header class="remote-head"><div><h2>收藏</h2><p class="meta">保存作品链接，下载后在素材和资源库中使用</p></div></header>
+        <div class="remote-body">
+          <form id="bookmark-form" class="bookmark-search"><label for="bookmark-query">查找收藏</label><input id="bookmark-query" type="search" maxlength="200" placeholder="标题、备注或标签" /><button type="submit" class="ghost">查找</button></form>
+          <div id="bookmark-feedback" class="inline-feedback" role="status" hidden></div>
+          <div id="bookmark-results" class="remote-results"></div>
+        </div>
+      </section>
+      <div id="view-assets" class="view-panel" role="tabpanel" aria-labelledby="view-tab-assets">
       <section class="search-section" aria-label="搜索">
         <form id="search-form" class="search-form">
           <label class="search-field" for="query">
@@ -35,6 +135,7 @@
         </form>
 
         <div class="search-options">
+          <button type="button" id="browse-bgm" class="ghost" aria-pressed="false">我的 BGM</button>
           <div id="scope-group" class="segmented" role="group" aria-label="搜索范围">
             <button type="button" class="segment active" data-scope="all" aria-pressed="true">全部</button>
             <button type="button" class="segment" data-scope="online" aria-pressed="false">在线</button>
@@ -55,7 +156,7 @@
         </div>
 
         <div id="filter-popover" class="filter-panel" hidden>
-          <fieldset class="filter-group">
+          <fieldset id="provider-filter-group" class="filter-group">
             <legend>在线来源</legend>
             <div id="provider-filters" class="filter-options"></div>
           </fieldset>
@@ -73,6 +174,29 @@
             </label>
             <label>最小时长
               <input id="filter-min-duration" type="number" min="0" max="3600" step="1" placeholder="秒" />
+            </label>
+            <label>文件夹
+              <select id="filter-folder">
+                <option value="">全部</option>
+              </select>
+            </label>
+            <label>分辨率
+              <select id="filter-resolution">
+                <option value="">不限</option>
+                <option value="3800">4K</option>
+                <option value="2500">2K</option>
+                <option value="1900">1080p</option>
+                <option value="1200">720p</option>
+              </select>
+            </label>
+            <label>时长
+              <select id="filter-duration">
+                <option value="">不限</option>
+                <option value="short">5 秒内</option>
+                <option value="medium">5–30 秒</option>
+                <option value="long">30–120 秒</option>
+                <option value="longer">2 分钟以上</option>
+              </select>
             </label>
           </div>
           <div class="filter-footer">
@@ -101,6 +225,162 @@
         <div id="results" class="results" aria-busy="false"></div>
         <div class="results-footer"><button type="button" id="load-more" class="ghost" hidden>加载更多</button></div>
       </section>
+      </div>
+
+      <section id="view-selection" class="view-panel selection-view" role="tabpanel" aria-labelledby="view-tab-selection" hidden>
+        <div class="selection-layout">
+          <aside class="selection-sidebar" aria-label="精选列表">
+            <div class="selection-sidebar-head">
+              <div>
+                <h2>精选 <span id="selection-count" class="selection-count"></span></h2>
+                <p class="meta">从素材里挑出要留下的</p>
+              </div>
+              <button type="button" id="selection-new" class="ghost"><svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg>新建</button>
+            </div>
+            <div id="selection-list" class="selection-list" role="list"></div>
+          </aside>
+
+          <section class="selection-main" aria-labelledby="selection-title">
+            <header class="selection-main-head">
+              <div class="selection-main-title">
+                <div class="selection-title-row">
+                  <h2 id="selection-title">精选</h2>
+                  <span id="selection-status" class="status-badge" hidden></span>
+                </div>
+                <p id="selection-subtitle" class="meta">从当前结果挑出素材，再加入精选库。</p>
+              </div>
+              <div class="selection-main-actions">
+                <button type="button" id="toggle-selection-list" class="icon-button compact selection-list-toggle" aria-label="精选列表" title="精选列表" aria-expanded="true"><svg class="icon" aria-hidden="true"><use href="#icon-list"/></svg></button>
+                <span id="selection-progress" class="meta"></span>
+              </div>
+            </header>
+
+            <div id="selection-pipeline" class="selection-pipeline" hidden></div>
+
+            <form id="selection-create-form" class="selection-create" hidden>
+              <label>名称<input id="selection-name" type="text" maxlength="120" value="精选" /></label>
+              <label>目标条数<input id="selection-target" type="number" min="1" max="500" value="10" /></label>
+              <label>目标精选库<select id="selection-library" aria-label="目标精选库"></select></label>
+              <label>加入方式
+                <select id="selection-mode">
+                  <option value="hardlink">同卷硬链接（不占空间）</option>
+                  <option value="copy">复制文件</option>
+                  <option value="reference">只登记（不落文件）</option>
+                </select>
+              </label>
+              <button type="button" id="selection-new-library" class="ghost"><svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg>新建精选库</button>
+              <button type="button" id="selection-create" class="primary"><svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg>从当前结果创建</button>
+              <div id="selection-library-new-row" class="selection-library-new" hidden>
+                <label>精选库目录<input id="selection-library-root" type="text" maxlength="2000" placeholder="例如 E:\\精选" /></label>
+                <button type="button" id="selection-library-create" class="ghost"><svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg>创建精选库</button>
+              </div>
+            </form>
+
+            <div class="selection-toolbar">
+              <button type="button" id="selection-auto" class="ghost" disabled><svg class="icon" aria-hidden="true"><use href="#icon-wand"/></svg>自动预选</button>
+              <button type="button" id="selection-ai-tag" class="ghost" disabled><svg class="icon" aria-hidden="true"><use href="#icon-tag"/></svg>AI 打标</button>
+              <button type="button" id="selection-ai-cancel" class="ghost" hidden><svg class="icon" aria-hidden="true"><use href="#icon-ban"/></svg>取消 AI 作业</button>
+              <details class="selection-more">
+                <summary><svg class="icon" aria-hidden="true"><use href="#icon-more"/></svg>更多</summary>
+                <div class="selection-more-body">
+                  <label>AI 模式
+                    <select id="selection-ai-profile" aria-label="AI 打标模式" title="AI 打标模式">
+                      <option value="fast">快速 · 仅标签</option>
+                      <option value="full">完整 · 标签+描述（更贵）</option>
+                      <option value="ocr">OCR · 画面文字</option>
+                    </select>
+                  </label>
+                  <span class="meta" id="selection-ai-service-note" title="服务与模型由 Agent 统一配置">AI 服务由 Agent 决定</span>
+                </div>
+              </details>
+              <span class="selection-toolbar-spacer"></span>
+              <label class="selection-group-toggle">
+                <button type="button" id="selection-group-similar" class="filter-chip" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#icon-layers"/></svg>按相似组折叠</button>
+              </label>
+              <label>排序
+                <select id="selection-sort">
+                  <option value="rank">按组与排名</option>
+                  <option value="quality">按质量分</option>
+                  <option value="state">按决策状态</option>
+                </select>
+              </label>
+            </div>
+
+            <div id="selection-feedback" class="inline-feedback" role="status" hidden></div>
+            <div id="selection-result" class="selection-result" hidden></div>
+            <div id="selection-items" class="selection-items" role="list"></div>
+
+            <footer class="selection-footer">
+              <div class="selection-destination">
+                <span id="selection-destination-label" class="meta">还没有目标精选库</span>
+                <button type="button" id="selection-open-library" class="ghost" hidden><svg class="icon" aria-hidden="true"><use href="#icon-folder"/></svg>打开精选库</button>
+              </div>
+              <button type="button" id="selection-promote" class="primary" disabled><svg class="icon" aria-hidden="true"><use href="#icon-inbox"/></svg>加入精选库</button>
+            </footer>
+          </section>
+        </div>
+      </section>
+      <section id="view-library" class="view-panel library-view" role="tabpanel" aria-labelledby="view-tab-library" hidden>
+        <div class="library-layout">
+          <aside class="library-sidebar" aria-label="库列表">
+            <div class="library-sidebar-head">
+              <div>
+                <h2>库 <span id="library-list-count" class="selection-count"></span></h2>
+                <p class="meta">素材库与精选库</p>
+              </div>
+            </div>
+            <div id="library-list" class="library-list"></div>
+          </aside>
+
+          <section class="library-main" aria-labelledby="library-name">
+            <header class="library-main-head">
+              <div class="library-main-title">
+                <div class="selection-title-row">
+                  <h2 id="library-view-name">库</h2>
+                  <span id="library-kind" class="status-badge" hidden></span>
+                </div>
+                <p id="library-meta" class="meta">选择一个库查看内容</p>
+              </div>
+              <div class="library-main-actions">
+                <button type="button" id="library-organize" class="ghost" disabled><svg class="icon" aria-hidden="true"><use href="#icon-wand"/></svg>自动整理</button>
+                <button type="button" id="library-rescan" class="ghost" disabled><svg class="icon" aria-hidden="true"><use href="#icon-refresh"/></svg>重新扫描</button>
+                <button type="button" id="library-sync" class="ghost" disabled><svg class="icon" aria-hidden="true"><use href="#icon-sync"/></svg>同步精选</button>
+                <button type="button" id="library-trash-toggle" class="ghost" aria-pressed="false" disabled><svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg>回收站</button>
+                <button type="button" id="library-view-toggle" class="icon-button" aria-label="切换表格或网格" title="切换表格或网格"><svg class="icon" aria-hidden="true"><use href="#icon-table"/></svg></button>
+              </div>
+            </header>
+
+            <div class="library-toolbar">
+              <label class="checkbox-line"><input type="checkbox" id="library-select-all" /> 全选</label>
+              <span id="library-selected" class="meta">未选择</span>
+              <button type="button" id="library-remove" class="ghost danger-text" disabled><svg class="icon" aria-hidden="true"><use href="#icon-ban"/></svg>移出</button>
+              <button type="button" id="library-restore" class="ghost" hidden disabled><svg class="icon" aria-hidden="true"><use href="#icon-undo"/></svg>恢复</button>
+              <span id="library-feedback" class="meta"></span>
+            </div>
+
+            <div id="library-report" class="library-report" hidden></div>
+            <section id="organize-panel" class="library-report organize-panel" aria-live="polite" hidden>
+              <div class="organize-head">
+                <strong id="organize-title">自动整理</strong>
+                <span id="organize-status" class="meta"></span>
+                <span class="organize-actions">
+                  <button type="button" id="organize-review" class="ghost" hidden><svg class="icon" aria-hidden="true"><use href="#icon-inbox"/></svg>待复核</button>
+                  <button type="button" id="organize-back" class="ghost" hidden><svg class="icon" aria-hidden="true"><use href="#icon-undo"/></svg>返回库</button>
+                  <button type="button" id="organize-accept-all" class="ghost" hidden>全部通过</button>
+                  <button type="button" id="organize-reject-all" class="ghost danger-text" hidden>全部排除</button>
+                  <button type="button" id="organize-close" class="icon-button compact" aria-label="关闭自动整理面板" title="关闭"><svg class="icon" aria-hidden="true"><use href="#icon-ban"/></svg></button>
+                </span>
+              </div>
+              <div id="organize-body" class="organize-body"></div>
+            </section>
+            <div id="library-content" class="library-content" role="list"></div>
+            <footer class="library-footer">
+              <span id="library-content-count" class="meta"></span>
+              <button type="button" id="library-content-more" class="ghost" hidden>加载更多</button>
+            </footer>
+          </section>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -116,6 +396,11 @@
       </div>
       <div class="detail-toolbar">
         <span id="preview-position" class="detail-position"></span>
+        <button type="button" id="preview-toggle-info" class="ghost" aria-expanded="true">收起信息</button>
+        <button type="button" id="preview-fullscreen" class="ghost">全屏</button>
+        <button type="button" id="reveal-asset" class="icon-button compact" aria-label="在文件管理器中显示" title="在文件管理器中显示">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h6l2 2h8v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 7V5a1 1 0 0 1 1-1h4l2 2"/></svg>
+        </button>
         <button type="button" id="previous-preview" class="icon-button compact" aria-label="查看上一项" title="上一项">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>
         </button>
@@ -128,17 +413,109 @@
       </div>
     </header>
     <div class="detail-content">
-      <div id="preview-media" class="detail-media"></div>
-      <section class="detail-info" aria-labelledby="detail-info-title">
+      <section class="preview-stage" aria-label="媒体预览">
+        <div id="preview-media" class="detail-media" tabindex="0"></div>
+        <div id="preview-tools" class="preview-tools" hidden>
+          <div id="preview-play-tools" class="preview-tool-group"><button type="button" id="preview-back" class="ghost">后退 10秒</button><button type="button" id="preview-play" class="primary">播放</button><button type="button" id="preview-forward" class="ghost">前进 10秒</button><span id="preview-time" class="meta">0:00 / 0:00</span><label>倍速<select id="preview-speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label><button type="button" id="preview-loop" class="ghost" aria-pressed="false">循环</button></div>
+          <div id="preview-image-tools" class="preview-tool-group" hidden><button type="button" id="preview-fit" class="ghost">适应窗口</button><button type="button" id="preview-actual" class="ghost">原始尺寸</button><button type="button" id="preview-zoom-out" class="ghost" aria-label="缩小图片">−</button><span id="preview-zoom" class="meta">100%</span><button type="button" id="preview-zoom-in" class="ghost" aria-label="放大图片">＋</button></div>
+        </div>
+        <section id="preview-filmstrip" class="preview-filmstrip" aria-label="当前结果" hidden></section>
+      </section>
+      <aside id="preview-inspector" class="preview-inspector">
+        <div class="preview-inspector-tabs" role="tablist" aria-label="资源详情"><button type="button" class="active" data-preview-tab="info" role="tab" aria-selected="true">信息</button><button type="button" data-preview-tab="organize" role="tab" aria-selected="false">整理</button><button type="button" data-preview-tab="source" role="tab" aria-selected="false">来源</button><button type="button" id="preview-comments-tab" data-preview-tab="comments" role="tab" aria-selected="false">评论</button></div>
+        <div class="preview-inspector-scroll">
+      <section class="detail-info" data-preview-panel="info" aria-labelledby="detail-info-title">
         <div class="detail-info-head">
           <h3 id="detail-info-title">素材信息</h3>
           <span id="preview-kind-label" class="meta"></span>
         </div>
         <dl id="preview-meta" class="detail-meta"></dl>
+        <div id="preview-engagement"></div>
       </section>
-      <div id="preview-feedback" class="inline-feedback" role="status" hidden></div>
+      <section class="preview-panel" data-preview-panel="organize" hidden>
+        <h3>整理素材</h3>
+        <p id="preview-organize-empty" class="meta">此资源暂不支持编辑标记，可先下载或添加到资源库。</p>
+        <details id="audio-editor" class="audio-editor" hidden>
+          <summary id="audio-editor-summary">提取音频</summary>
+          <form id="audio-extract-form" class="audio-extract-form">
+            <p class="field-hint">从当前素材提取音轨或片段，作为 BGM 入库。可能包含口播与环境声。</p>
+            <label>素材名称<input id="audio-title" type="text" required maxlength="300" /></label>
+            <div class="audio-range">
+              <label>开始（秒）<input id="audio-start" type="number" required min="0" max="86400" step="0.01" value="0" /></label>
+              <label>结束（秒）<input id="audio-end" type="number" min="0.1" max="86400" step="0.01" placeholder="留空提取完整音轨" /></label>
+            </div>
+            <div id="audio-waveform" class="audio-waveform" hidden><canvas id="audio-wave-canvas" height="96"></canvas><div id="audio-wave-selection" class="audio-wave-selection"></div><input id="audio-wave-start" type="range" min="0" max="1000" value="0" aria-label="片段开始位置" /><input id="audio-wave-end" type="range" min="0" max="1000" value="1000" aria-label="片段结束位置" /></div>
+            <p id="audio-wave-status" class="meta"></p>
+            <div class="audio-range-actions"><span id="audio-selection-duration" class="meta">完整音轨</span><label class="checkbox-line"><input id="audio-loop-selection" type="checkbox" />循环试听</label></div>
+            <div class="audio-range-actions"><button type="button" id="audio-mark-start" class="ghost">当前时间设为开始</button><button type="button" id="audio-mark-end" class="ghost">当前时间设为结束</button><button type="button" id="audio-audition" class="ghost">试听片段</button></div>
+            <div class="audio-range"><label>格式<select id="audio-format"><option value="wav">WAV · 无损编码</option><option value="m4a">M4A · 体积较小</option><option value="mp3">MP3 · 通用格式</option></select></label><label>目标资源库<select id="audio-library" required></select></label></div>
+            <p class="field-hint">保留源文件和加工记录。格式转换不会提高原始音质。</p>
+            <div id="audio-feedback" class="inline-feedback" role="status" hidden></div>
+            <button type="submit" id="audio-submit" class="primary">提取并入库</button>
+          </form>
+        </details>
+        <section id="user-state" class="user-state" hidden aria-labelledby="user-state-title">
+          <div class="detail-info-head">
+            <h3 id="user-state-title">我的标记</h3>
+            <span id="user-state-mode" class="meta"></span>
+          </div>
+          <label>标签
+            <input id="asset-tags" type="text" maxlength="500" autocomplete="off" placeholder="城市, 夜景, 精选" />
+          </label>
+          <div id="asset-tag-chips" class="asset-tag-chips"></div>
+          <label>评分
+            <select id="asset-rating">
+              <option value="0">未评分</option>
+              <option value="1">1 星</option>
+              <option value="2">2 星</option>
+              <option value="3">3 星</option>
+              <option value="4">4 星</option>
+              <option value="5">5 星</option>
+            </select>
+          </label>
+          <div id="asset-stars" class="asset-stars" aria-label="素材评分"></div>
+          <label>备注<textarea id="asset-note" rows="4" maxlength="10000" placeholder="记录用途、适用场景或画面文字"></textarea></label>
+          <span id="asset-ai-service-note" class="meta" title="服务与模型由 Agent 统一配置">AI 服务由 Agent 决定</span>
+          <label>AI 模式
+            <select id="asset-ai-profile">
+              <option value="full">标签+描述</option>
+              <option value="fast">仅标签（快）</option>
+              <option value="ocr">OCR 文字</option>
+            </select>
+          </label>
+          <button type="button" id="ai-tag-asset" class="ghost">AI 打标</button>
+          <button type="button" id="save-user-state" class="ghost">保存标记</button>
+          <span id="user-state-feedback" class="meta"></span>
+          <p id="user-note" class="meta" hidden></p>
+        </section>
+      </section>
+      <section id="preview-source-panel" class="preview-panel" data-preview-panel="source" hidden><h3>来源与许可</h3><dl id="preview-source-meta" class="detail-meta"></dl><section id="asset-provenance" class="asset-provenance" hidden></section></section>
+      <section id="preview-comments-panel" class="preview-panel" data-preview-panel="comments" hidden>
+        <header class="comments-head"><h3>评论 <span id="comments-count" class="meta"></span></h3><label class="comment-sort-label">排序<select id="comments-sort"><option value="official">官网顺序</option><option value="likes">点赞优先（已加载）</option></select></label></header>
+        <div class="comments-actions"><button type="button" id="comments-refresh" class="ghost">读取官网评论</button><button type="button" id="comments-cancel" class="ghost" hidden>取消读取</button><button type="button" id="comments-snapshot" class="ghost" disabled>查看已存快照</button><button type="button" id="comments-save" class="ghost" title="保存本次官网采样中按点赞排序的最多 20 条评论，不代表完整热评排行" disabled>保存热门快照</button></div>
+        <p id="comments-status" class="comment-status" role="status"></p>
+        <p id="comments-context" class="meta"></p>
+        <div id="comments-body"><div id="comments-list" class="comments-list"></div><button type="button" id="comments-more" class="ghost" hidden>加载更多评论</button></div>
+      </section>
+      <section class="preview-panel" id="preview-adoption-panel" hidden>
+        <h3>添加到资源库</h3>
+        <div id="preview-adopt-slot"></div>
+      </section>
+        </div>
+      </aside>
+      <div id="preview-operation-slot" class="preview-operation-slot" hidden></div>
     </div>
     <footer class="detail-footer">
+      <div class="preview-footer-status"><div id="preview-feedback" class="inline-feedback" role="status" hidden></div><button type="button" id="preview-show-jobs" class="ghost" hidden>查看任务</button><button type="button" id="preview-job-library" class="ghost" hidden>在库中查看</button></div>
+      <div class="preview-footer-actions">
+        <div id="preview-generation-actions" class="generation-actions" hidden></div>
+        <button type="button" id="preview-edit-image" class="ghost" hidden>编辑图片</button>
+        <button type="button" id="preview-image-video" class="ghost" hidden>生成视频</button>
+        <button type="button" id="preview-audio-action" class="ghost" hidden>提取音频</button>
+        <div id="remote-preview-actions" class="remote-preview-actions" hidden><button type="button" id="remote-preview-bookmark" class="ghost">收藏作品</button><button type="button" id="remote-preview-audio" class="ghost">提取音频</button><button type="button" id="remote-preview-collect" class="primary">下载视频</button></div>
+        <button type="button" id="preview-adopt-action" class="primary" hidden>添加到库</button>
+        <a id="remote-preview-source" target="_blank" rel="noopener noreferrer" hidden>打开原作品</a>
+      </div>
       <div id="adopt-form" class="adopt-form">
         <div class="adopt-form-head">
           <strong>入库信息</strong>
@@ -171,7 +548,7 @@
       <header class="settings-head">
         <div>
           <h2 id="settings-title">媒体库设置</h2>
-          <p class="meta">资源库、本机来源和在线来源</p>
+          <p class="meta">资源库、本机文件夹、在线来源与索引状态</p>
         </div>
         <button type="button" id="close-settings" class="icon-button" aria-label="关闭媒体库设置" title="关闭">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
@@ -183,9 +560,18 @@
           <button type="button" id="settings-tab-libraries" class="settings-tab active" role="tab" aria-selected="true" aria-controls="settings-panel-libraries" data-settings-tab="libraries">资源库</button>
           <button type="button" id="settings-tab-local" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-panel-local" data-settings-tab="local">本机文件夹</button>
           <button type="button" id="settings-tab-online" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-panel-online" data-settings-tab="online">在线来源</button>
+          <button type="button" id="settings-tab-acquisition" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-panel-acquisition" data-settings-tab="acquisition">平台与下载</button>
           <button type="button" id="settings-tab-index" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-panel-index" data-settings-tab="index">索引状态</button>
         </nav>
         <div class="settings-panels">
+          <section id="settings-panel-acquisition" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-acquisition" data-settings-panel="acquisition" hidden>
+            <div class="section-head"><div><h3>平台与下载</h3><p class="meta">账号仅保存在本机，连接后自动复用</p></div></div>
+            <div id="acquisition-settings-feedback" class="inline-feedback" role="status" hidden></div>
+            <div class="config-row"><div class="config-row-main"><strong>下载组件</strong><small id="download-runtime-state">正在检查…</small></div><div class="config-actions"><button type="button" id="install-download-runtime" class="ghost" disabled>安装组件</button></div></div>
+            <div class="config-row"><div class="config-row-main"><strong>抖音</strong><small id="douyin-account-state">正在检查…</small></div><div class="config-actions"><button type="button" id="connect-douyin-account" class="ghost" disabled>连接抖音</button><button type="button" id="disconnect-douyin-account" class="ghost danger-text" hidden>断开</button></div></div>
+            <p class="field-hint">媒体库首次使用需连接一次。旧下载工具的会话保留在原入口。</p>
+            <p class="field-hint">作品许可由来源平台或作者决定，下载不代表获得使用或再分发授权。</p>
+          </section>
           <section id="settings-panel-libraries" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-libraries" data-settings-panel="libraries">
             <div class="section-head">
               <div><h3>资源库</h3><p class="meta">本地目录或 SMB 共享目录</p></div>
@@ -213,6 +599,11 @@
             </div>
             <div class="inline-form">
               <input id="source-path" type="text" placeholder="选择要建立索引的文件夹" />
+              <select id="source-metadata-mode" aria-label="标签与评分存储方式" title="标签、评分存储方式">
+                <option value="db">标记存本机</option>
+                <option value="jsonl">标记写来源</option>
+                <option value="both">两者都写</option>
+              </select>
               <button type="button" id="pick-folder" class="ghost">选择</button>
               <button type="button" id="add-source" class="primary">添加并扫描</button>
             </div>
@@ -248,6 +639,7 @@
     </section>
   </div>
 
+
   <div id="confirm-modal" class="modal-layer confirm-layer" aria-hidden="true" hidden>
     <div class="modal-backdrop" data-cancel-confirm></div>
     <section class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
@@ -262,6 +654,100 @@
     </section>
   </div>
 
+  <div id="intake-modal" class="modal-layer intake-layer" hidden>
+    <div class="modal-backdrop" data-close-intake></div>
+    <section class="intake-dialog" role="dialog" aria-modal="true" aria-labelledby="intake-title">
+      <header class="remote-head"><div><h2 id="intake-title">下载作品</h2><p class="meta">选择格式与保存位置，确认后开始下载</p></div><button type="button" id="close-intake" class="icon-button" aria-label="关闭下载窗口"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+      <div class="remote-body intake-body">
+        <form id="intake-resolve-form" class="intake-link-form"><label for="intake-url">作品链接</label><div class="intake-url-row"><input id="intake-url" type="url" required maxlength="2000" placeholder="粘贴视频或音频网页链接" /><button type="submit" id="resolve-intake" class="ghost">继续</button></div></form>
+        <div id="intake-feedback" class="inline-feedback" role="status" hidden></div>
+        <button type="button" id="intake-open-settings" class="inline-link" hidden>打开平台与下载设置</button>
+        <section id="intake-details" hidden>
+          <h3 id="intake-media-title"></h3><p id="intake-media-meta" class="meta"></p>
+          <div class="intake-options">
+            <label>保存方式<select id="intake-mode"><option value="import">下载并入库</option><option value="save">仅保存文件</option></select></label>
+            <label id="intake-library-field">目标资源库<select id="intake-library"></select></label>
+            <label id="intake-destination-field" hidden>保存目录<div class="intake-url-row"><input id="intake-destination" type="text" maxlength="2000" placeholder="留空保存到系统下载文件夹" /><button type="button" id="pick-intake-destination" class="ghost">选择</button></div></label>
+            <label>画质或格式<select id="intake-format"><option value="best">最佳画质</option><option value="1080p">最高 1080p</option><option value="720p">最高 720p</option><option value="480p">最高 480p</option><option value="audio">仅音频 · MP3</option></select></label>
+            <label id="intake-bgm-field" class="checkbox-line" hidden><input id="intake-bgm" type="checkbox" /> 作为 BGM 保存</label>
+            <label id="intake-subtitles-field" hidden>字幕<select id="intake-subtitles"><option value="">不下载字幕</option></select></label>
+          </div>
+          <p id="intake-target-hint" class="field-hint"></p>
+          <p id="intake-music-meta" class="meta" hidden></p>
+          <p id="intake-audio-hint" class="field-hint" hidden>提取视频音轨，可能含口播和环境声。入库后可试听并裁剪片段。</p>
+          <p class="field-hint">任务在后台继续，关闭此窗口不影响任务。</p>
+        </section>
+      </div>
+      <footer class="remote-footer"><button type="button" id="bookmark-intake" class="ghost" disabled>收藏作品</button><button type="button" id="start-intake" class="primary" disabled>下载并入库</button></footer>
+    </section>
+  </div>
+
+  <div id="acquisitions-modal" class="modal-layer acquisition-layer" hidden>
+    <div class="modal-backdrop" data-close-acquisitions></div>
+    <section class="acquisition-dialog" role="dialog" aria-modal="true" aria-labelledby="acquisitions-title">
+      <header class="remote-head"><div><h2 id="acquisitions-title">后台任务</h2><p id="acquisitions-summary" class="meta">关闭面板后任务仍会继续</p></div><div class="generation-actions"><button type="button" id="open-generation-tasks" class="ghost">生成任务</button><button type="button" id="close-acquisitions" class="icon-button" aria-label="关闭后台任务"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div></header>
+      <div class="remote-body">
+        <div id="acquisitions-feedback" class="inline-feedback" role="status" hidden></div>
+        <button type="button" id="reload-acquisitions" class="ghost" hidden>重试加载</button>
+        <div id="acquisition-jobs" class="acquisition-jobs"></div>
+        <details id="legacy-downloads" class="legacy-downloads">
+          <summary>旧下载记录</summary>
+          <p class="meta">只读显示最近 200 条已结束记录，文件保留原位置。在途任务和播放列表继续使用媒体下载工具。</p>
+          <button type="button" id="import-legacy-downloads" class="ghost">导入旧下载记录</button>
+          <div id="legacy-feedback" class="inline-feedback" role="status" hidden></div>
+          <div id="legacy-download-list" class="acquisition-jobs"></div>
+        </details>
+      </div>
+    </section>
+  </div>
+  <div id="image-editor-modal" class="image-editor-modal" hidden>
+    <section id="image-editor" role="dialog" aria-modal="true" aria-labelledby="image-editor-heading">
+      <header class="image-editor-head"><div class="image-editor-heading"><h2 id="image-editor-heading">编辑图片</h2><p id="image-editor-source" class="meta"></p></div><div class="image-editor-actions"><button type="button" id="image-editor-compare" class="ghost" aria-pressed="false">查看原图</button><button type="button" id="image-editor-close" class="ghost">完成编辑</button></div></header>
+      <div class="image-editor-body">
+        <nav class="image-editor-tools" aria-label="图片工具">
+          <button type="button" class="ghost" data-image-tool="basic" aria-pressed="true">基础编辑</button>
+          <button type="button" class="ghost" data-image-tool="crop" aria-pressed="false">裁剪</button>
+          <button type="button" class="ghost" data-image-tool="describe" aria-pressed="false">描述改图</button>
+          <button type="button" class="ghost" data-image-tool="local" aria-pressed="false">局部修改</button>
+          <button type="button" class="ghost" data-image-tool="erase" aria-pressed="false">消除</button>
+        </nav>
+        <div class="image-editor-workarea"><div id="image-editor-stage"><canvas id="image-editor-canvas" tabindex="0" aria-label="图片编辑画布"></canvas><div id="image-editor-empty" class="empty-state"><strong>正在读取图片…</strong></div></div><div class="image-editor-canvasbar"><span id="image-editor-dimensions" class="meta"></span><span id="image-editor-hint" class="meta">适应画布</span></div></div>
+        <aside class="image-editor-settings">
+          <div id="image-editor-basic">
+            <h3>变换与输出</h3>
+            <label>旋转<select id="image-editor-rotate"><option value="0">不旋转</option><option value="90">顺时针 90°</option><option value="180">旋转 180°</option><option value="270">逆时针 90°</option></select></label>
+            <div class="image-editor-pair"><label class="image-editor-check"><input type="checkbox" id="image-editor-flip-h">水平翻转</label><label class="image-editor-check"><input type="checkbox" id="image-editor-flip-v">垂直翻转</label></div>
+            <details id="image-editor-crop-fields"><summary>裁剪范围（像素）</summary><div class="image-editor-pair"><label>X<input id="image-editor-crop-x" type="number" min="0" value="0"></label><label>Y<input id="image-editor-crop-y" type="number" min="0" value="0"></label><label>宽<input id="image-editor-crop-w" type="number" min="1"></label><label>高<input id="image-editor-crop-h" type="number" min="1"></label></div><button type="button" id="image-editor-crop-clear" class="ghost wide">清除裁剪</button></details>
+            <div class="image-editor-pair"><label>输出宽<input id="image-editor-width" type="number" min="1" max="16384" placeholder="自动"></label><label>输出高<input id="image-editor-height" type="number" min="1" max="16384" placeholder="自动"></label></div>
+            <p class="meta">单边留空保持比例；同时填写时等比缩放并补白。</p>
+            <label>格式<select id="image-editor-format"><option value="png">PNG · 无损</option><option value="jpeg">JPEG · 白底</option><option value="webp">WebP</option></select></label>
+            <label id="image-editor-quality-field">质量<input id="image-editor-quality" type="number" min="1" max="100" value="90"></label>
+            <p class="meta">裁剪 → 旋转与翻转 → 尺寸 → 格式</p>
+
+          </div>
+          <div id="image-editor-ai" hidden>
+            <h3 id="image-editor-ai-heading">描述改图</h3>
+            <p id="image-editor-ai-availability" class="meta">正在检查图片编辑服务…</p>
+            <div id="image-editor-brush-controls" hidden><label>画笔大小<input id="image-editor-brush" type="range" min="1" max="20" value="5"></label><div class="image-editor-actions"><button type="button" id="image-editor-stroke-undo" class="ghost">撤销选区</button><button type="button" id="image-editor-stroke-clear" class="ghost">清空选区</button></div><p id="image-editor-selection" class="meta">在画布上涂抹需要修改的区域</p></div>
+            <label>修改要求<textarea id="image-editor-prompt" rows="5" maxlength="8000" placeholder="例如：将天空改为日落，保留建筑与构图"></textarea></label>
+            <p class="meta">以当前版本为参考，确认后交给 Agent 生成。</p>
+            <button type="button" id="image-editor-generate" class="primary wide">生成新版本</button>
+            <div id="image-editor-job" hidden><p id="image-editor-job-status" class="meta"></p><div class="image-editor-actions"><button type="button" id="image-editor-refresh" class="ghost">核对任务</button><button type="button" id="image-editor-cancel" class="ghost">取消生成</button></div></div>
+          </div>
+          <div id="image-editor-basic-actions" class="image-editor-actions"><button type="button" id="image-editor-reset" class="ghost">重置</button><button type="button" id="image-editor-apply" class="primary">应用编辑</button></div>
+        </aside>
+      </div>
+      <div class="image-editor-versionbar"><span class="meta">版本</span><div id="image-editor-versions"></div></div>
+      <footer class="image-editor-footer"><div id="image-editor-feedback" class="inline-feedback" role="status">编辑会生成新版本，原图保留。</div><div class="image-editor-save"><label>名称<input type="text" id="image-editor-title" maxlength="120"></label><label>保存到<select id="image-editor-library"></select></label><button type="button" id="image-editor-save" class="primary">保存为新素材</button><button type="button" id="image-editor-open-library" class="ghost" hidden>查看素材</button></div></footer>
+    </section>
+  </div>
+  <script src="image-editor.js"></script>
+  <script src="intake.js"></script>
+  <script src="audio.js"></script>
+  <script src="comments.js"></script>
+  <script src="preview.js"></script>
+  <script src="generation.js"></script>
+  <script src="geometry.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

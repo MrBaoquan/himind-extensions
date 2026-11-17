@@ -1,0 +1,84 @@
+/* G1: Desktop workspace uses the library's existing semantic tokens. */
+.generation-head,.generation-result-head,.generation-actions{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);flex-wrap:wrap}
+.generation-head{margin-bottom:var(--space-4)}
+.generation-layout{display:grid;grid-template-columns:300px minmax(0,1fr);gap:var(--space-4);align-items:stretch;height:var(--generation-height,560px);min-height:280px}
+.generation-form,.generation-results{min-width:0;padding:var(--space-4);background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md)}
+.generation-form{display:flex;flex-direction:column;padding:0;overflow:hidden;min-height:0}
+.generation-form-fields{display:grid;gap:var(--space-3);overflow:auto;min-height:0;padding:var(--space-4);scrollbar-gutter:stable}
+.generation-form-footer{display:grid;gap:var(--space-2);padding:var(--space-3) var(--space-4);border-top:1px solid var(--color-border);background:var(--color-surface);flex:none;margin-top:auto}
+.generation-form label,.generation-results>label{display:grid;gap:var(--space-1);min-width:0}
+.generation-form textarea{width:100%;height:120px;min-height:80px;resize:vertical;padding:var(--space-2);line-height:1.5}
+.generation-form select,.generation-results>label select{width:100%}
+.generation-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-2);margin-top:var(--space-3)}
+.generation-form summary{cursor:pointer;min-height:32px}
+.generation-form .generation-check{display:flex;align-items:center;gap:var(--space-2)}
+.generation-results{display:flex;flex-direction:column;gap:var(--space-3);overflow:hidden;min-height:0}
+.generation-result-body{min-height:0;overflow:auto;display:grid;align-content:start;gap:var(--space-3);scrollbar-gutter:stable}
+.generation-savebar{display:grid;gap:var(--space-2);border-top:1px solid var(--color-border);padding-top:var(--space-3);margin-top:auto;flex:none}
+.generation-savebar>label{display:grid;gap:var(--space-1)}
+.generation-savebar select{width:100%}
+.generation-prompt-snapshot{white-space:pre-wrap;overflow-wrap:anywhere;max-height:120px;overflow:auto}
+.generation-form-fields>h3{margin:0}
+.generation-form-footer .inline-feedback{margin:0;overflow-wrap:anywhere}
+.generation-run-state{white-space:pre-line;overflow-wrap:anywhere;color:var(--color-muted)}
+.generation-output-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr));gap:var(--space-3)}
+.generation-output{min-width:0;border:1px solid var(--color-border);border-radius:var(--radius-sm);overflow:hidden}
+.generation-output>button{width:100%;height:180px;border:0;background:var(--color-subtle);color:var(--color-text);padding:0;display:grid;place-items:center}
+.generation-output img,.generation-output video{display:block;width:100%;height:100%;object-fit:contain}
+.generation-output label{display:flex;gap:var(--space-2);padding:var(--space-2);align-items:center}
+.generation-output .meta{padding:0 var(--space-2) var(--space-2);overflow-wrap:anywhere}
+#generation-reference-list{display:grid;gap:var(--space-2);margin-top:var(--space-2)}
+.generation-reference{display:flex;gap:var(--space-2);align-items:center;min-width:0}
+.generation-reference span{min-width:0;flex:1;overflow-wrap:anywhere}
+.generation-reference button{flex-shrink:0}
+.generation-reference img,.generation-reference-placeholder{width:48px;height:48px;object-fit:contain;flex:none;border:1px solid var(--color-border);border-radius:var(--radius-sm)}
+.generation-reference-placeholder{display:grid;place-items:center;font-size:12px;color:var(--color-muted)}
+.generation-layout.parameters-collapsed{grid-template-columns:minmax(0,1fr)}
+.generation-layout.parameters-collapsed .generation-form{display:none}
+.generation-dialog{width:min(960px,calc(100vw - 48px));max-height:calc(100vh - 48px);padding:var(--space-4);border:1px solid var(--color-border-strong);border-radius:var(--radius-md);color:var(--color-text);background:var(--color-surface);overflow:auto}
+.generation-dialog::backdrop{background:rgba(15,23,42,.5)}
+.generation-dialog .generation-actions{margin-bottom:var(--space-3)}
+.generation-dialog-media{height:min(60vh,640px);min-height:140px;display:grid;place-items:center;background:var(--color-subtle)}
+.generation-dialog-media img,.generation-dialog-media video{max-width:100%;max-height:100%;width:100%;height:100%;object-fit:contain}
+.generation-dialog-media audio{width:min(500px,100%)}
+.generation-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:var(--space-3);margin-block:var(--space-3);max-height:50vh;overflow:auto}
+.generation-picker button{text-align:left;white-space:normal;overflow-wrap:anywhere}
+.generation-picker-item{display:grid;gap:var(--space-2);padding:var(--space-2);border:1px solid var(--color-border);border-radius:var(--radius-sm);min-width:0;cursor:pointer;position:relative;align-content:start}
+.generation-picker-item input{position:absolute;top:12px;left:12px;width:20px;height:20px;z-index:1}
+.generation-picker-art{height:120px;display:grid;place-items:center;background:var(--color-subtle)}
+.generation-picker-art img{width:100%;height:120px;object-fit:contain}
+.generation-picker-item strong,.generation-picker-item .meta{overflow-wrap:anywhere;min-width:0}
+.generation-picker-item:has(input:checked){border-color:var(--color-primary);background:var(--color-subtle)}
+.generation-dialog>label,.generation-dialog form>label{display:grid;gap:var(--space-1)}
+.generation-dialog form{display:flex;align-items:end;gap:var(--space-2)}
+.generation-dialog form>label{flex:1;min-width:0}
+.generation-dialog>footer{margin-top:var(--space-3)}
+.generation-record-list{display:grid;gap:var(--space-2);max-height:55vh;overflow:auto;margin-top:var(--space-3)}
+.generation-record{display:grid;gap:var(--space-1);text-align:left;white-space:normal;overflow-wrap:anywhere;padding:var(--space-3);background:var(--color-surface);color:var(--color-text);border:1px solid var(--color-border);border-radius:var(--radius-sm)}
+.generation-voice-list{display:grid;gap:var(--space-3);max-height:60vh;overflow:auto}
+.generation-voice-list article{display:grid;gap:var(--space-2);border-bottom:1px solid var(--color-border);padding-bottom:var(--space-3)}
+.generation-voice-list audio{max-width:100%}
+.generation-comparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-3)}
+.generation-comparison figure{margin:0;min-width:0;text-align:center}
+.generation-comparison img{width:100%;height:50vh;object-fit:contain;background:var(--color-subtle)}
+#preview-generation-actions{justify-content:flex-end;min-width:0}
+#preview-generation-actions>label{display:flex;align-items:center;gap:var(--space-1);min-width:0}
+#preview-generation-actions select{max-width:220px}
+.generation-lineage{margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--color-border)}
+.generation-lineage p{white-space:pre-wrap;overflow-wrap:anywhere}
+/* G2: Minimum desktop width keeps controls on their own rows; no mobile layout. */
+@media(max-width:1000px){.generation-layout{grid-template-columns:272px minmax(0,1fr)}.generation-head{align-items:flex-start}.generation-head>.generation-actions{justify-content:flex-end}}
+@media(prefers-reduced-motion:reduce){.generation-workspace *{transition:none}}
+
+/* Keep the scroll track within panel padding and content edges aligned. */
+.generation-result-body{margin-inline-end:calc(-1 * var(--generation-scrollbar,0px))}
+.generation-reference .ghost{padding-inline:8px}
+.generation-record-thumb{width:72px;height:54px;object-fit:contain;grid-row:1 / 4;grid-column:1}
+.generation-record:has(img){grid-template-columns:72px minmax(0,1fr);column-gap:12px}
+.generation-record:has(img)>:not(img){grid-column:2}
+
+.generation-reference-preview{display:block;padding:0;width:48px;height:48px;flex:none;border:0;background:transparent}
+.generation-reference-preview img{display:block}
+
+.generation-dialog-media{display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:0}
+.generation-dialog-media img,.generation-dialog-media video{min-width:0;min-height:0}

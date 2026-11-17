@@ -1,6 +1,6 @@
-# 科技雷达日报
+# 开源热榜日报
 
-每日采集公开科技热点仓库，按领域规则筛选并与历史对比，由内置 AI 结合公司项目上下文给出解读与相关性排序，产出可直接浏览的网页报告。
+每日采集公开科技热点仓库，按用户维护的分类与标签筛选并与历史对比，由内置 AI 结合公司项目上下文给出解读与相关性排序，产出可直接浏览的网页报告。
 
 > 通知渠道（钉钉群）已从本条链路中移除。当前闭环终点是"编排好的网页报告"；需要推送时再接通知能力与对应的自动审批策略。
 
@@ -18,7 +18,7 @@
 
 - `collect` 需要 `workspace`（对应 run 的 `workspace_root`，也满足 `local_requirements.workspace`）；
 - `insight` / `publish` 需要 seed Artifact `tech-radar-snapshot`；
-- 业务参数（`domains`、`topics`、`window_days`、`top_n`、星数下限）作为 run 输入原样传给能力，不参与入口判定，因为平台只能校验“字符串事实”，而 `domains` 必须是数组。
+- 业务参数（`category_ids`、`extra_topics`、`window_days`、`top_n`、星数下限）作为 run 输入原样传给能力，不参与入口判定，因为平台只能校验“字符串事实”，而分类和标签必须是数组。旧计划的 `domains` / `topics` 仍作为兼容别名读取。
 - 这些参数**不写进 step input**：step input 会覆盖 run 输入，一旦写死就等于让启动表单字段失效。默认值集中在扩展侧（见 `defaultDomains` 与 `defaultMinStars`），用户填了才生效。
 
 ## 数据归属与承载页
@@ -27,7 +27,7 @@
 
 - 存储根目录默认由 Agent 注入插件进程的 `HIMIND_PLUGIN_DATA_ROOT`（生产环境为 `%LOCALAPPDATA%\HiMindAgent\plugin-data\<plugin_id>`，升级与回滚都不影响）；`report_root` 作为**可选覆盖**出现在启动表单里，显式填写后会被扩展记住（`state.json`），写入位置与自带归档视图读取位置始终一致，不会出现「报告写到了别处、视图却读默认目录」的分叉；
 - 工作流只负责“什么时候跑、按什么顺序跑”，产出 Run 与 Artifact 事实；
-- 扩展自带的 **“科技雷达 · 历史归档”视图**（`contributes.views`，入口 `ui/index.html`）按期次浏览榜单、智能解读理由、摘要与网页原稿，并可手动补采一期；
+- 扩展自带的 **“开源热榜 · 历史归档”视图**（`contributes.views`，入口 `ui/index.html`）按期次浏览榜单、智能解读理由、摘要与网页原稿，并可手动补采一期；
 - 视图通过 `tech-radar.archive.list` 与 `tech-radar.archive.read` 两条只读能力取数，打开条目链接走扩展自己的 `tech-radar.link.open`（`local_action`）。页面不依赖宿主页面上下文，因此单独打开或嵌入宿主行为一致。
 
 ## 采集信号与报告结构（0.4.0 起，默认值归位见 0.4.1 / workflow 0.4.2）
@@ -37,21 +37,21 @@
 - **活跃基础盘**：`topic:<伞形标签> pushed:>窗口 stars:>下限 fork:false archived:false`，按总星数排序 —— 例如 OpenCV、Ultralytics、Transformers、three.js；
 - **新星**：`created:>窗口 stars:>新星下限`，窗口内新建且已起量的项目。
 
-领域预设（`domains`）：`cv`（computer-vision）、`llm`（llm）、`ar-vr`（virtual-reality + augmented-reality）、`general`（machine-learning）。GitHub 的 `topic:` **不支持 OR**（带括号返回 0 条，不带括号 422），所以实现上是「一个标签一次查询 + 本地去重」；未鉴权时按 7 秒间隔放慢节奏（可用 `query_interval_ms` 或 `HIMIND_TECH_RADAR_QUERY_INTERVAL_MS` 覆盖），单次运行默认最多 16 次查询。
+工作流表单使用计划内“采集组”：每组有名称，并包含多个标签。插件通过 `tech-radar.catalog` 提供丰富的系统标签和 starter groups，Agent 缓存最近一次成功目录。所有组内标签跨组去重后统一查询；GitHub 的 `topic:` **不支持 OR**，所以仍是一个标签一次查询并在本地合并，每个唯一 topic 展开 active/rising 两次查询。未鉴权时按 7 秒间隔放慢节奏，默认最多 24 次查询，超过预算会在保存前和采集前拒绝。
 
 **星数增量（`stars_gained`）由扩展自己的历史快照计算**：GitHub 搜索接口不提供增长速度，所以「升温榜」从第二期开始有值，第一期会在报告里说明原因。
 
-报告分三段呈现：**升温榜**（按 `stars_gained`）、**活跃基础盘**（按领域）、**新星**；每段写明筛选依据，页脚注明来源与查询次数。
+报告分三段呈现：**升温榜**（按 `stars_gained`）、**活跃基础盘**（按分类）、**新星**；每段写明筛选依据，页脚注明来源与查询次数。
 
 解读步骤不再把快照塞进提示词，而是声明 `input_artifacts: ["tech-radar-snapshot"]`：平台把快照的文件路径注入步骤输入，模型读文件后作答（见 ADR 0075）。数据走文件、提示词只说任务，提示词长度因此与报告体量无关。
 
-启动成本：包内声明了 `default_entrypoint: collect` / `default_exitpoint: published`，**默认值一律由扩展自己持有**（默认领域 `cv`+`llm`+`ar-vr`、基础盘星数下限 800、新星下限 150、窗口 7 天、每段 10 条），工作流步骤输入不再写死这些参数——写死的 step input 会覆盖用户输入，等于让表单字段失效。因此 **`workflow run com.himind.workflow.tech-radar '{}'` 就能跑完一期**，表单里每个字段都预填默认值，用户只在想改的时候改；需要固定归档位置时才填 `report_root`（也可以存成启动预设，日常只改其中一两个字段）。
+启动成本：包内声明了 `default_entrypoint: collect` / `default_exitpoint: published`，**默认值一律由扩展自己持有**（表单默认选中四个内容创作分类，基础盘星数下限 800、新星下限 150、窗口 7 天、每段 10 条、最多 24 次查询），工作流步骤输入不再写死这些参数——写死的 step input 会覆盖用户输入，等于让表单字段失效。因此 **`workflow run com.himind.workflow.tech-radar '{}'` 就能跑完一期**，表单里每个字段都预填默认值，用户只在想改的时候改；需要固定归档位置时才填 `report_root`（也可以存成启动预设，日常只改其中一两个字段）。
 
 ## 三个待建能力的契约（实现依据）
 
 ### `tech-radar.collect`
 
-输入：`domains`(list，默认 `cv`/`llm`/`ar-vr`)、`topics`(list，自定义标签)、`languages`(list)、`exclude_owners`(list)、`min_stars`(int, 默认 800)、`new_min_stars`(int, 默认 150)、`window_days`(int, 默认 7)、`top_n`(int, 默认 10)、`report_root`(text, 可选，默认扩展数据目录且会被记住)、`report_date`(可选)、`credential_handles`(可选 GitHub token 句柄)。
+输入：`category_ids`(分类多选，兼容旧 `domains`)、`extra_topics`(额外 GitHub topic，兼容旧 `topics`)、`languages`(list)、`exclude_owners`(list)、`min_stars`(int, 默认 800)、`new_min_stars`(int, 默认 150)、`window_days`(int, 默认 7)、`top_n`(int, 默认 10)、`report_root`(text, 可选，默认扩展数据目录且会被记住)、`report_date`(可选)、`credential_handles`(可选 GitHub token 句柄)。
 
 行为要求：
 
@@ -110,7 +110,7 @@
 `tech-radar.collect`、`tech-radar.report`、归档读取、自带视图与**定时触发**都已实现（见下）。每天自动执行不再依赖外部计划任务，用平台的定时任务即可（Agent 左侧「工作 → 定时任务」，或命令行）：
 
 ```powershell
-himind-agent.exe schedule set '{"id":"daily-tech-radar","kind":"workflow","target_id":"com.himind.workflow.tech-radar","cron":"0 9 * * *","input":{"workspace_root":"F:\\WebProjects\\项目看板","topics":["ai-agent","llm"],"window_days":14,"top_n":12},"execution":{"entrypoint":"collect","exitpoint":"published"}}'
+himind-agent.exe schedule set '{"id":"daily-open-source-hotlist","kind":"workflow","target_id":"com.himind.workflow.tech-radar","cron":"0 9 * * *","input":{"workspace_root":"C:\\Users\\you\\Documents\\HiMindExtensions\\himind-extensions","category_ids":["ai-short-drama","ai-video","code-animation","creator-tools"],"extra_topics":[],"window_days":14,"top_n":10,"min_stars":100,"new_min_stars":20,"max_queries":24},"execution":{"entrypoint":"collect","exitpoint":"published"}}'
 ```
 
 计划保存在 `schedules.json`，桌面 Agent 每 30 秒检查一次，到点后走与手动启动完全相同的 Run 路径（`_origin.source=scheduler`）。定时是平台级能力，工作流只是当前支持的一种目标类型；详见 `项目看板/docs/scheduling.md` 与 ADR 0074。

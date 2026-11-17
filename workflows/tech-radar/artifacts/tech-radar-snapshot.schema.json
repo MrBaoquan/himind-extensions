@@ -2,43 +2,165 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "热点采集快照",
   "type": "object",
-  "required": ["generated_at", "rule_version", "window_days", "entries"],
+  "required": [
+    "generated_at",
+    "rule_version",
+    "window_days",
+    "entries"
+  ],
   "properties": {
-    "generated_at": { "type": "string" },
-    "rule_version": { "type": "string" },
-    "window_days": { "type": "integer", "minimum": 1 },
-    "topics": { "type": "array", "items": { "type": "string" } },
-    "domains": { "type": "array", "items": { "type": "string" } },
-    "lanes": { "type": "array", "items": { "type": "string" } },
-    "min_stars": { "type": "integer" },
-    "new_min_stars": { "type": "integer" },
-    "query_count": { "type": "integer" },
-    "trend_basis": { "type": "string" },
+    "generated_at": {
+      "type": "string"
+    },
+    "rule_version": {
+      "type": "string"
+    },
+    "catalog_revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "window_days": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "topics": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "custom_topics": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "resolved_topics": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "domains": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "category_labels": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "theme_labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "lanes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "min_stars": {
+      "type": "integer"
+    },
+    "new_min_stars": {
+      "type": "integer"
+    },
+    "query_count": {
+      "type": "integer"
+    },
+    "trend_basis": {
+      "type": "string"
+    },
     "entries": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["entry_id", "full_name", "html_url", "stars", "stars_gained"],
+        "required": [
+          "entry_id",
+          "full_name",
+          "html_url",
+          "stars",
+          "stars_gained"
+        ],
         "properties": {
-          "entry_id": { "type": "string" },
-          "full_name": { "type": "string" },
-          "html_url": { "type": "string" },
-          "description": { "type": "string" },
-          "language": { "type": "string" },
-          "stars": { "type": "integer" },
-          "stars_gained": { "type": "integer" },
-          "topics": { "type": "array", "items": { "type": "string" } },
-          "first_seen": { "type": "string" },
-          "rank_delta": { "type": "integer" },
-          "is_new": { "type": "boolean" },
-          "forks": { "type": "integer" },
-          "open_issues": { "type": "integer" },
-          "pushed_at": { "type": "string" },
-          "license": { "type": "string" },
-          "homepage": { "type": "string" },
-          "archived": { "type": "boolean" },
-          "domains": { "type": "array", "items": { "type": "string" } },
-          "lanes": { "type": "array", "items": { "type": "string" } }
+          "entry_id": {
+            "type": "string"
+          },
+          "full_name": {
+            "type": "string"
+          },
+          "html_url": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "stars": {
+            "type": "integer"
+          },
+          "stars_gained": {
+            "type": "integer"
+          },
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "first_seen": {
+            "type": "string"
+          },
+          "rank_delta": {
+            "type": "integer"
+          },
+          "is_new": {
+            "type": "boolean"
+          },
+          "forks": {
+            "type": "integer"
+          },
+          "open_issues": {
+            "type": "integer"
+          },
+          "pushed_at": {
+            "type": "string"
+          },
+          "license": {
+            "type": "string"
+          },
+          "homepage": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lanes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "interest_groups": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         },
         "additionalProperties": true
       }
@@ -46,11 +168,52 @@
     "rate_limit": {
       "type": "object",
       "properties": {
-        "remaining": { "type": "integer" },
-        "resets_at": { "type": "string" },
-        "authenticated": { "type": "boolean" }
+        "remaining": {
+          "type": "integer"
+        },
+        "resets_at": {
+          "type": "string"
+        },
+        "authenticated": {
+          "type": "boolean"
+        }
       },
       "additionalProperties": true
+    },
+    "interest_groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "topics"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "query_count": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "group_labels": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
     }
   },
   "additionalProperties": true

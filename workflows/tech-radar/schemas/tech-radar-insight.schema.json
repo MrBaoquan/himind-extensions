@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "科技雷达解读结果",
+  "title": "开源热榜解读结果",
   "type": "object",
   "required": ["insights", "summary"],
   "properties": {

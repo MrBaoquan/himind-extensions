@@ -2,15 +2,15 @@
   "id": "com.himind.media-downloader",
   "icon": "assets/icon.png",
   "name": "媒体下载工具",
-  "author": "马宝全",
+  "author": "本地开发者",
   "categories": [
     "video-post",
     "audio-sound",
     "data-automation"
   ],
   "description": "把网页中的在线音视频、字幕和播放列表下载到系统下载文件夹或指定目录，并记录来源信息。",
-  "release_notes": "0.2.2：修复搜索框嵌套边框与高度对齐，保持下载管理表格收敛。",
-  "version": "0.2.2",
+  "release_notes": "修复抖音登录后仍无法解析：适配官网详情网关，复用加密会话获取视频格式并下载，无需另装 Python。",
+  "version": "0.2.8",
   "distribution_targets": [
     "workbench",
     "github"
@@ -104,6 +104,7 @@
           },
           "format_id": {
             "type": "string",
+            "description": "单个原始视频格式 ID；与仅音频和清晰度上限互斥，独立视频流需 ffmpeg 合并音轨",
             "maxLength": 200
           },
           "quality": {
@@ -370,6 +371,45 @@
         "additionalProperties": false
       },
       "risk_level": "read_only"
+    },
+    {
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "id": "media.downloader.site.status",
+      "description": "读取抖音站点连接状态，不返回会话内容",
+      "availability": "local",
+      "risk_level": "read_only",
+      "timeout_seconds": 15
+    },
+    {
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "id": "media.downloader.site.connect",
+      "description": "打开抖音官网连接窗口并加密保存会话",
+      "availability": "local",
+      "risk_level": "local_write",
+      "timeout_seconds": 15
+    },
+    {
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "id": "media.downloader.site.disconnect",
+      "description": "断开抖音连接并清除本机保存的会话",
+      "availability": "local",
+      "risk_level": "local_write",
+      "timeout_seconds": 15
     }
   ],
   "permissions": [
@@ -402,7 +442,7 @@
       },
       {
         "id": "media.downloader.runtime.install",
-        "title": "安装下载运行时"
+        "title": "安装下载组件"
       },
       {
         "id": "media.downloader.info.get",

@@ -10,6 +10,7 @@ import (
 )
 
 type previewInput struct {
+	AssetID  string `json:"asset_id"`
 	Path     string `json:"path"`
 	Kind     string `json:"kind"`
 	MaxBytes int64  `json:"max_bytes"`
@@ -17,6 +18,17 @@ type previewInput struct {
 
 func previewAsset(in previewInput) (any, error) {
 	path := strings.TrimSpace(in.Path)
+	if path == "" && strings.TrimSpace(in.AssetID) != "" {
+		db, err := openLibraryDB()
+		if err != nil {
+			return nil, err
+		}
+		defer db.Close()
+		err = db.QueryRow(`SELECT local_path FROM library_items WHERE id=? AND deleted_at='' UNION ALL SELECT path FROM candidates WHERE id=? AND missing=0 LIMIT 1`, in.AssetID, in.AssetID).Scan(&path)
+		if err != nil {
+			return nil, fmt.Errorf("参考素材不存在或已离线，请重新选择")
+		}
+	}
 	if path == "" {
 		return nil, fmt.Errorf("缺少预览路径")
 	}
@@ -40,6 +52,10 @@ func previewAsset(in previewInput) (any, error) {
 		"kind":  kind,
 		"bytes": info.Size(),
 	}
+	streamURL := streamURLFor(absolute, strings.TrimSpace(in.AssetID))
+	if streamURL != "" {
+		result["stream_url"] = streamURL
+	}
 	if kind == "image" {
 		limit := in.MaxBytes
 		if limit <= 0 {
@@ -49,7 +65,10 @@ func previewAsset(in previewInput) (any, error) {
 			limit = 32 << 20
 		}
 		if info.Size() > limit {
-			return nil, fmt.Errorf("图片超过预览上限，请打开所在位置查看")
+			if streamURL == "" {
+				return nil, fmt.Errorf("图片超过预览上限，请打开所在位置查看")
+			}
+			return result, nil
 		}
 		payload, err := os.ReadFile(absolute)
 		if err != nil {
@@ -75,6 +94,10 @@ func previewAsset(in previewInput) (any, error) {
 	}
 	if kind != "video" && kind != "audio" {
 		return nil, fmt.Errorf("该媒体类型暂不支持预览")
+	}
+	// 视频/音频优先走 Range 流：不把整段媒体塞进 data URL，可拖动进度。
+	if streamURL != "" {
+		return result, nil
 	}
 	limit := in.MaxBytes
 	if limit <= 0 {

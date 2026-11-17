@@ -2,14 +2,14 @@
   "id": "com.himind.media-toolkit",
   "icon": "assets/icon.png",
   "name": "媒体处理工具",
-  "author": "马宝全",
+  "author": "本地开发者",
   "categories": [
     "video-post",
     "audio-sound"
   ],
   "description": "对图片、视频与音频做确定性处理与测量：图片批量转换、视频转换、图片转视频、媒体参数分析、抽帧拼图与响度曲线。",
-  "release_notes": "2.3.2：素材区合并为单一拖拽/点击目标；移除独立选择按钮与手动路径；修复原生文件选择器兼容性和拖拽窗口事件绑定。",
-  "version": "2.3.2",
+  "release_notes": "新增像素裁剪、直角旋转和水平垂直翻转，图片处理支持奇数像素尺寸，原图保持不变。",
+  "version": "2.4.0",
   "entry": "bin/media-toolkit.exe",
   "runtime": "process-jsonrpc-stdio",
   "platforms": [
@@ -37,7 +37,7 @@
     },
     {
       "id": "media.toolkit.image.convert",
-      "description": "批量转换图片格式，并可缩放、控制质量和输出命名",
+      "description": "裁剪、旋转、翻转、缩放并转换图片格式",
       "availability": "local",
       "timeout_seconds": 900,
       "risk_level": "local_write",
@@ -101,6 +101,53 @@
             "maxLength": 160
           },
           "overwrite": {
+            "type": "boolean"
+          },
+          "crop": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 16384
+              },
+              "y": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 16384
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16384
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16384
+              }
+            },
+            "required": [
+              "x",
+              "y",
+              "width",
+              "height"
+            ],
+            "additionalProperties": false
+          },
+          "rotate": {
+            "type": "integer",
+            "enum": [
+              0,
+              90,
+              180,
+              270
+            ]
+          },
+          "flip_h": {
+            "type": "boolean"
+          },
+          "flip_v": {
             "type": "boolean"
           }
         },
@@ -427,6 +474,10 @@
           },
           "recipe": {
             "type": "object"
+          },
+          "receipt_path": {
+            "type": "string",
+            "maxLength": 1000
           }
         },
         "required": [

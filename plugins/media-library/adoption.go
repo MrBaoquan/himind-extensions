@@ -42,23 +42,27 @@ type adoptInput struct {
 }
 
 type catalogEvent struct {
-	EventID        string   `json:"event_id"`
-	Type           string   `json:"type"`
-	LibraryID      string   `json:"library_id"`
-	AssetID        string   `json:"asset_id"`
-	RelativePath   string   `json:"relative_path,omitempty"`
-	Title          string   `json:"title,omitempty"`
-	Kind           string   `json:"kind,omitempty"`
-	SHA256         string   `json:"sha256"`
-	LicenseName    string   `json:"license_name,omitempty"`
-	LicenseURL     string   `json:"license_url,omitempty"`
-	SourceProvider string   `json:"source_provider,omitempty"`
-	SourceURL      string   `json:"source_url,omitempty"`
-	Tags           []string `json:"tags,omitempty"`
-	Collection     string   `json:"collection,omitempty"`
-	Actor          string   `json:"actor"`
-	CreatedAt      string   `json:"created_at"`
-	Deduplicated   bool     `json:"deduplicated,omitempty"`
+	EventID            string          `json:"event_id"`
+	Type               string          `json:"type"`
+	LibraryID          string          `json:"library_id"`
+	AssetID            string          `json:"asset_id"`
+	RelativePath       string          `json:"relative_path,omitempty"`
+	Title              string          `json:"title,omitempty"`
+	Kind               string          `json:"kind,omitempty"`
+	SHA256             string          `json:"sha256"`
+	LicenseName        string          `json:"license_name,omitempty"`
+	LicenseURL         string          `json:"license_url,omitempty"`
+	SourceProvider     string          `json:"source_provider,omitempty"`
+	SourceURL          string          `json:"source_url,omitempty"`
+	Tags               []string        `json:"tags,omitempty"`
+	Collection         string          `json:"collection,omitempty"`
+	Actor              string          `json:"actor"`
+	CreatedAt          string          `json:"created_at"`
+	Deduplicated       bool            `json:"deduplicated,omitempty"`
+	ParentAssetID      string          `json:"parent_asset_id,omitempty"`
+	GenerationManifest json.RawMessage `json:"generation_manifest,omitempty"`
+	Role               string          `json:"role,omitempty"`
+	Language           string          `json:"language,omitempty"`
 }
 
 func adoptAssets(in adoptInput) (any, error) {

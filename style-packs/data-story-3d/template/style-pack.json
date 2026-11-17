@@ -1,0 +1,34 @@
+{
+  "schema": "himind.video.style-pack.v1",
+  "id": "data-story-3d",
+  "version": "1.0.0",
+  "name": "3D 数据故事",
+  "description": "three.js 立体柱状数据空间，带透视网格、数值标签与冠军高亮。",
+  "renderer": "browser-code",
+  "entry": "render.mjs",
+  "video_out": "out/video.mp4",
+  "duration_seconds": 10,
+  "preview": {
+    "sheet_out": "out/check/sheet.jpg",
+    "strip_out": "out/check/strip.jpg",
+    "stills_out": "out/stills"
+  },
+  "license": "MIT",
+  "network": {
+    "mode": "none",
+    "allow": []
+  },
+  "delivery": {
+    "web": true,
+    "web_width": 1280,
+    "web_crf": 23,
+    "max_master_mb": 50
+  },
+  "data_contract": {
+    "id": "data-story-items",
+    "version": "1.0.0",
+    "projection": "creative.production.data.data-story-items.v1",
+    "schema_file": "input/data.schema.json"
+  },
+  "attribution": "HiMind original data-story-3d style pack"
+}

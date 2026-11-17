@@ -31,12 +31,13 @@ const (
 
 // Record 一条作业记录。
 type Record struct {
-	ID       string `json:"id"`
-	Kind     string `json:"kind"`
-	Status   string `json:"status"`
-	Input    string `json:"input,omitempty"`
-	Language string `json:"language,omitempty"`
-	Model    string `json:"model,omitempty"`
+	ID         string `json:"id"`
+	Kind       string `json:"kind"`
+	Status     string `json:"status"`
+	Input      string `json:"input,omitempty"`
+	Language   string `json:"language,omitempty"`
+	Model      string `json:"model,omitempty"`
+	Background bool   `json:"background,omitempty"`
 	// Stage 当前阶段（抽音频 / 转写），让长任务的不同阶段可见。
 	Stage string `json:"stage,omitempty"`
 	// Result 完成后的转写结果（段落与文本）。
@@ -174,12 +175,29 @@ func (s *Store) Get(id string) (*Record, error) {
 	if !ok {
 		return nil, fmt.Errorf("未找到作业: %s", id)
 	}
+	if record.Background {
+		fresh, err := s.readRecord(id)
+		if err != nil {
+			return nil, err
+		}
+		record = fresh
+	}
 	copied := *record
 	return &copied, nil
 }
 
 // Cancel 取消一条作业。
 func (s *Store) Cancel(id string) error {
+	current, err := s.Get(id)
+	if err != nil {
+		return err
+	}
+	if current.Background {
+		if current.Status != StatusQueued && current.Status != StatusRunning {
+			return fmt.Errorf("作业已结束，无法取消: %s", id)
+		}
+		return os.WriteFile(filepath.Join(s.root, id, "cancel"), []byte("cancel\n"), 0o600)
+	}
 	s.mu.Lock()
 	cancel, ok := s.cancels[id]
 	record, exists := s.jobs[id]
@@ -211,15 +229,14 @@ func (s *Store) List(limit int) []Record {
 
 func (s *Store) update(id string, mutate func(*Record)) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	record, ok := s.jobs[id]
 	if !ok {
-		s.mu.Unlock()
 		return
 	}
 	mutate(record)
 	record.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	copied := *record
-	s.mu.Unlock()
 	s.persist(&copied)
 }
 
@@ -260,10 +277,7 @@ func (s *Store) loadExisting() {
 		}
 		// 进程重启后，运行中的作业实际已经死了：标成失败而不是永远停在 running，
 		// 否则调用方会一直等一个永远不会完成的进度。
-		if record.Status == StatusRunning || record.Status == StatusQueued {
-			record.Status = StatusFailed
-			record.Error = "插件进程重启，作业中断"
-		}
+		recoverInterrupted(&record)
 		s.jobs[record.ID] = &record
 	}
 }

@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "科技雷达网页报告",
+  "title": "开源热榜网页报告",
   "type": "object",
   "required": ["report_date", "html_path", "entry_count", "snapshot_sha256"],
   "properties": {

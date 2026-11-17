@@ -1,76 +1,55 @@
 ---
 name: media-downloader-assistant
-description: 将用户的网页媒体下载意图整理为受控流程，调用媒体下载工具完成运行时检查、链接解析、格式选择和下载任务跟踪；适用于视频、音频、字幕和播放列表下载。
+description: 使用媒体资源库搜索、收藏并采集在线作品，选择格式、跟踪后台任务与来源；用户要求搜索视频、下载音视频字幕或沉淀素材时使用。
 ---
 
-# 媒体下载助手
+# 媒体采集助手
 
-## 适用场景
+## 入口与范围
 
-当用户要求“下载这个视频”“提取音频”“把播放列表保存到工作区”“下载字幕”或“检查某个媒体链接有哪些清晰度”时使用本技能。目标链接必须是用户明确提供的 `http` 或 `https` 地址；不要自行搜索、猜测或拼接下载地址。
+普通视频、音频、字幕、搜索与入库均使用 `media-library.*`。稳定技能 ID 保持不变。只有用户明确要求播放列表，或跟踪旧工具创建的任务，才使用可选的 `media.downloader.*`。
 
-## 前置检查
+用户已明确授权下载、目标与数量时直接执行，不重复询问。只有目标库、范围或格式缺失且无法合理推断时再澄清；搜索不自动触发批量下载。不得索取或传递 Cookie、Token、密码、签名媒体地址或任意命令，不绕过验证码、付费或 DRM。
 
-1. 调用 `media.downloader.runtime.status` 检查本机运行时。
-2. 如果状态是 `missing` 或 `broken`，向用户说明缺少 yt-dlp 运行时，并询问是否安装。
-3. 用户确认后调用 `media.downloader.runtime.install`；安装完成后再次调用运行时状态能力验证结果。
-4. 如果没有 ffmpeg，明确告知：合并双轨视频、音频提取、字幕转换等能力不可用，单文件格式仍可下载。
-5. 不要在未确认时自动安装运行时，也不要改用任意 Shell、`pip`、`winget` 或手动下载命令。
+## 检查运行条件
 
-## 链接解析
+1. 调用 `media-library.download.status`。缺组件时沿用已有安装授权；无授权时说明用途并确认后调用可选的 `media-library.download.install`，然后重查状态。不要改用 Shell 或自行拼接安装命令。
+2. 音频提取和独立音视频合并需要 ffmpeg；缺失时解释影响，选择含音轨的原始格式或等用户安装。
+3. 抖音需要连接时调用可选的 `media-library.account.status`、`media-library.account.connect`，由用户在官网窗口操作。连接后复用会话，模型不读取秘密；失败时给出设置中的连接入口。
 
-调用 `media.downloader.info.get`：
+## 搜索与收藏
 
-- 普通视频传 `url`。
-- 用户明确要求整个播放列表时传 `playlist=true`，并默认限制 `max_items`；不要未经确认批量处理大型列表。
-- 返回的标题、上传者、时长、格式、字幕和条目数用于下一步选择。
+1. 调用 `media-library.discovery.providers` 读取各平台搜索、预览及采集支持；不能把搜索成功当成下载可用。
+2. 用户指定平台与关键词后调用 `media-library.discovery.search`，传 `provider`（douyin、bilibili、youtube）、`query` 和新的 32 位十六进制 `request_id`。只使用返回的稳定作品地址。
+3. 下一页沿用同一平台和关键词，并传原样 `next_cursor`；过期、换平台、改词或换账号时重新搜索。不要跨账号复用游标。
+4. 用户取消或改词时调用 `media-library.discovery.cancel` 并传原请求编号；忽略迟到结果。不高频重试平台限流或验证失败。
+5. 摘要显示作品标题、平台、作者及真实时长。搜索无预览时明确可打开作品页面，不伪造缩略图或成功状态。
+6. 用户要求收藏时调用 `media-library.bookmark.save`，传 `source_url` 与作品稳定字段；备注和标签仅在用户要求修改时传入，避免覆盖已有整理。调用 `media-library.bookmark.list` 检索已有收藏。收藏只保存作品线索，不表示已下载或已获许可。
 
-向用户展示摘要时，优先给出：
+## 解析与采集
 
-- 标题和来源；
-- 时长或条目数；
-- 可用清晰度和格式；
-- 是否需要 ffmpeg；
-- 预计文件大小（如果解析结果提供）。
+1. 调用 `media-library.remote.resolve`，传用户提供或搜索返回的 `url`、`playlist:false`。根据真实结果选择 `quality`（best、1080p、720p、480p）、单个 `format_id`、`audio_only` 或存在的字幕语言。原始格式与清晰度、仅音频互斥；未知尺寸格式不要承诺符合某个上限。
+2. 入库前调用 `media-library.repository.list`，只选择在线、可写的本机库。用户要入库时传 `mode:import` 和明确的 `library_id`；只保存则传 `mode:save` 与可选 `dest_dir`。未指定保存目录时使用系统下载文件夹，不将插件私有目录当作用户输出。
+3. 调用 `media-library.acquisition.start`，必传 `url` 和新的 `idempotency_key`，再传模式、目标及已选格式。相同意图的网络重试保留同一幂等键；用户改变格式或目标时生成新键。默认单作品、有限大小，不设覆盖。
+4. 记录返回的 `job_id`，通过 `media-library.acquisition.status` 跟踪，或 `media-library.acquisition.list` 查已有任务。5秒或更长间隔轮询；关闭界面仍由后台任务执行，不创建第二套队列。
+5. 用户取消时调用 `media-library.acquisition.cancel` 并核对终态。失败修复后调用 `media-library.acquisition.retry`；待入库任务只继续保存/入库，不重复下载。
+6. `SESSION_CHANGED` 需要用户明确选择当前账号后，重试才传 `use_current_account:true`。不能自动把原账号任务绑定到新账号。
+7. 完成后检查 `files`、SHA256 和 `library_item_id`；入库素材用 `media-library.holdings.provenance`（`item_id`）核对来源。不把任务排队或下载结束等同于入库完成。
 
-## 选择下载参数
+## 错误恢复
 
-1. 用户明确指定 `format_id` 时优先使用该格式，但仍要检查是否与 ffmpeg 能力匹配。
-2. 用户没有指定格式时，优先使用 `quality`：`best`、`1080p`、`720p` 或 `480p`。
-3. 用户只要音频时设置 `audio_only=true`；没有 ffmpeg 时必须解释不可用，不要伪造成功。
-4. 用户要求字幕时，只使用解析结果中真实存在的字幕语言代码。
-5. `dest_dir` 可以是系统下载文件夹或其他本机绝对路径；相对路径仍限制在工作区内。缺省使用系统下载文件夹。
-6. 不传递 Cookie、浏览器凭据、登录态、代理凭据或 DRM 参数。遇到需要登录、购买或 DRM 的内容，停止并说明本技能不支持绕过访问控制。
+- 需要网页登录：给出连接或作品官网入口，等待用户操作；不索取凭据。
+- 平台验证、访问拒绝、限流：说明实际原因，允许稍后重试，不循环抓取或绕过。
+- 格式不可用：重新解析后选择可用格式；文件超限则缩小格式或按用户明确授权调整上限。
+- 目标不可用或待入库：恢复目标后重试同一任务，保留已下载文件。
+- 能力不存在：报告缺失的真实插件版本和能力，不自动编造别名或改走旧工具写入口。
 
-## 创建和跟踪任务
+## 旧工具兼容路径
 
-调用 `media.downloader.job.start`：
+仅在用户明确要求播放列表时检查可选的 `media.downloader.runtime.status`，调用 `media.downloader.info.get`（`playlist:true`、明确 `max_items`），再按授权调用 `media.downloader.job.start`。传已确认的工作区、URL、保存目录与列表上限，不自动采集整张大型列表。缺少旧插件时说明播放列表暂不可用，普通单作品采集不受影响。
 
-- 必传：`workspace_root`、`url`。
-- 可选：`dest_dir`、`quality`、`format_id`、`audio_only`、`subtitles`、`playlist`、`max_items`、`max_bytes`、`overwrite`。
-- 返回后记录 `job_id`，不要把内部插件数据目录当作下载目录。
+旧任务只通过 `media.downloader.job.list`、`media.downloader.job.status` 跟踪，用户要求取消时调用 `media.downloader.job.cancel`。保留原 owner、输出与来源记录；不要将旧 `job_id` 交给新采集能力。旧历史的只读导入在媒体资源库“采集任务→旧下载记录”中操作，不接管在途任务，不移动文件。
 
-调用 `media.downloader.job.status` 跟踪任务：
+## 交付
 
-- 状态为 `queued`、`running`、`canceling` 时继续等待；不要高频轮询。
-- 状态为 `completed` 时，报告 `outputs` 中的工作区文件路径和同名 `.source.json` 来源记录。
-- 状态为 `failed` 时，按错误信息区分运行时缺失、解析失败、网络失败、磁盘空间不足或 ffmpeg 缺失。
-- 用户要求取消时调用 `media.downloader.job.cancel`，然后再次查询状态确认。
-
-## 输出格式
-
-完成下载后，用简短结构回复：
-
-1. 任务 ID；
-2. 媒体标题或来源；
-3. 成功保存的文件路径；
-4. 来源记录路径；
-5. 使用的清晰度/格式与是否使用了 ffmpeg；
-6. 失败或未执行的部分及原因。
-
-## 降级策略
-
-- 运行时缺失：请求用户确认后安装；安装失败时保留原错误并给出可执行的排查方向。
-- 官方二进制下载失败：媒体下载工具会自动尝试固定版本的 PyPI 备用安装；如果两者都失败，报告完整原因，不要改用任意命令。
-- 链接解析失败：建议用户确认链接公开可访问，不要尝试绕过登录或地域限制。
-- 文件过大或播放列表过长：要求用户缩小范围、提高限额或分批处理。
+简短报告标题与平台、最终状态、输出文件路径、入库条目及来源、选用格式和未完成原因。搜索/收藏/文件/正式入库分别按实际状态表达；平台失败与未测试项不写成支持承诺。

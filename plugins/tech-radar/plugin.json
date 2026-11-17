@@ -1,45 +1,185 @@
 {
   "id": "com.himind.tech-radar",
   "icon": "assets/icon.png",
-  "name": "科技雷达",
+  "name": "开源热榜",
   "author": "马宝全",
-  "categories": ["data-automation", "docs-knowledge"],
-  "description": "采集公开科技热点仓库并按领域规则筛选、与历史台账对比，生成可归档的网页报告。",
-  "release_notes": "0.4.4：报告复用当天采集快照，拒绝空快照覆盖有效日报；定时运行遇到短暂数据库锁会自动重试。",
-  "version": "0.4.4",
-  "distribution_targets": ["workbench", "github"],
+  "categories": [
+    "data-automation",
+    "docs-knowledge"
+  ],
+  "description": "按定时计划中的采集组采集公开开源仓库，比较历史热度，生成可归档的网页报告。",
+  "release_notes": "0.6.5：归档期次按日期合并；期次统计排除旧版兼容报告，全部视图去重展示。",
+  "version": "0.6.5",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
   "entry": "bin/tech-radar.exe",
   "runtime": "process-jsonrpc-stdio",
-  "platforms": ["windows-x64"],
-  "min_agent_version": "0.3.47",
+  "platforms": [
+    "windows-x64"
+  ],
+  "min_agent_version": "0.3.80",
   "governance": "optional",
   "capabilities": [
     {
       "id": "tech-radar.collect",
-      "description": "按领域采集公开仓库，用历史快照计算星数增量",
+      "description": "按定时计划内采集组的标签采集公开仓库，用历史快照计算星数增量",
       "availability": "local",
       "timeout_seconds": 300,
       "input_schema": {
         "type": "object",
         "properties": {
-          "domains":{"type":"array","items":{"enum":["cv","llm","ar-vr","general"]}},
-          "topics":{"type":"array","items":{"type":"string"}},
-          "extra_topics":{"type":"array","items":{"type":"string"}},
-          "languages":{"type":"array","items":{"type":"string"}},
-          "exclude_owners":{"type":"array","items":{"type":"string"}},
-          "min_stars":{"type":"integer","minimum":0,"maximum":200000},
-          "new_min_stars":{"type":"integer","minimum":0,"maximum":200000},
-          "query_interval_ms":{"type":"integer","minimum":0,"maximum":60000},
-          "max_queries":{"type":"integer","minimum":1,"maximum":40},
-          "max_entries":{"type":"integer","minimum":1,"maximum":200},
-          "description_max_chars":{"type":"integer","minimum":0,"maximum":2000},
-          "topics_max":{"type":"integer","minimum":0,"maximum":50},
-          "timeout_seconds":{"type":"integer","minimum":30,"maximum":1800},
-          "window_days":{"type":"integer","minimum":1,"maximum":90},
-          "top_n":{"type":"integer","minimum":1,"maximum":100},
-          "report_root":{"type":"string"},
-          "report_date":{"type":"string"}
+          "domains": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "cv",
+                "llm",
+                "ar-vr",
+                "general",
+                "ai-short-drama",
+                "ai-video",
+                "code-animation",
+                "creator-tools"
+              ]
+            }
+          },
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,49}$"
+            }
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "exclude_owners": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "min_stars": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200000
+          },
+          "new_min_stars": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200000
+          },
+          "query_interval_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 60000
+          },
+          "max_queries": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 40,
+            "default": 24
+          },
+          "max_entries": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "description_max_chars": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2000
+          },
+          "topics_max": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 1800
+          },
+          "window_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 90
+          },
+          "top_n": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "report_root": {
+            "type": "string"
+          },
+          "report_date": {
+            "type": "string"
+          },
+          "category_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "extra_topics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,49}$"
+            }
+          },
+          "interest_groups": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "topics": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 12,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,49}$"
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "topics"
+              ],
+              "additionalProperties": true
+            }
+          }
         },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "tech-radar.themes",
+      "description": "读取标签库、starter groups、查询预算与自定义 topic 规则",
+      "availability": "local",
+      "timeout_seconds": 5,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
         "required": [],
         "additionalProperties": false
       },
@@ -52,14 +192,30 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "snapshot":{"type":"object"},
-          "insight":{"type":"object"},
-          "report_root":{"type":"string"},
-          "report_date":{"type":"string"},
-          "summary":{"type":"string"},
-          "workflow_context":{"type":"object"},
-          "snapshot_step":{"type":"string"},
-          "insight_step":{"type":"string"}
+          "snapshot": {
+            "type": "object"
+          },
+          "insight": {
+            "type": "object"
+          },
+          "report_root": {
+            "type": "string"
+          },
+          "report_date": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "workflow_context": {
+            "type": "object"
+          },
+          "snapshot_step": {
+            "type": "string"
+          },
+          "insight_step": {
+            "type": "string"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -73,9 +229,21 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "report_root":{"type":"string"},
-          "report_date":{"type":"string"},
-          "top_n":{"type":"integer","minimum":1,"maximum":365}
+          "report_root": {
+            "type": "string"
+          },
+          "report_date": {
+            "type": "string"
+          },
+          "top_n": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365
+          },
+          "collection_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]+$"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -89,8 +257,16 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "report_root":{"type":"string"},
-          "report_date":{"type":"string"}
+          "report_root": {
+            "type": "string"
+          },
+          "report_date": {
+            "type": "string"
+          },
+          "collection_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]+$"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -104,21 +280,131 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "url":{"type":"string"}
+          "url": {
+            "type": "string"
+          }
         },
-        "required": ["url"],
+        "required": [
+          "url"
+        ],
         "additionalProperties": false
       },
       "risk_level": "local_action"
+    },
+    {
+      "id": "tech-radar.categories.save",
+      "description": "兼容旧版计划：创建或更新用户分类及其标签",
+      "availability": "local",
+      "timeout_seconds": 5,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "topics": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 12,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,49}$"
+            }
+          },
+          "custom_tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9-]{0,49}$"
+                },
+                "label": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "source": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "slug"
+              ]
+            }
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "label",
+          "topics"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "tech-radar.categories.delete",
+      "description": "兼容旧版计划：删除未被计划引用的用户分类；内置分类只读",
+      "availability": "local",
+      "timeout_seconds": 5,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "tech-radar.catalog",
+      "description": "读取丰富标签库、starter groups、查询预算和自定义 topic 规则",
+      "availability": "local",
+      "timeout_seconds": 5,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
     }
   ],
-  "permissions": ["filesystem.workspace.read", "filesystem.workspace.write", "network.github.read"],
+  "permissions": [
+    "filesystem.workspace.read",
+    "filesystem.workspace.write",
+    "network.github.read"
+  ],
   "contributes": {
     "views": [
       {
         "id": "tech-radar.archive",
-        "title": "科技雷达 · 历史归档",
-        "short_title": "科技雷达",
+        "title": "开源热榜 · 历史归档",
+        "short_title": "开源热榜",
         "icon": "radar",
         "quick_access": true,
         "order": 40,
@@ -127,11 +413,26 @@
       }
     ],
     "commands": [
-      {"id":"tech-radar.collect","title":"采集科技雷达热点"},
-      {"id":"tech-radar.report","title":"生成科技雷达报告"},
-      {"id":"tech-radar.archive.list","title":"查看科技雷达归档"},
-      {"id":"tech-radar.archive.read","title":"查看某一期科技雷达报告"},
-      {"id":"tech-radar.link.open","title":"在默认浏览器打开条目链接"}
+      {
+        "id": "tech-radar.collect",
+        "title": "采集开源热榜热点"
+      },
+      {
+        "id": "tech-radar.report",
+        "title": "生成开源热榜报告"
+      },
+      {
+        "id": "tech-radar.archive.list",
+        "title": "查看开源热榜归档"
+      },
+      {
+        "id": "tech-radar.archive.read",
+        "title": "查看某一期开源热榜报告"
+      },
+      {
+        "id": "tech-radar.link.open",
+        "title": "在默认浏览器打开条目链接"
+      }
     ]
   }
 }

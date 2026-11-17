@@ -1,0 +1,4 @@
+interface:
+  display_name: "封面标题助手"
+  short_description: "把选题或新闻稿提炼成可确认的主副标题候选"
+  default_prompt: "使用 $cover-title-assistant 从这份素材生成 6 组封面主副标题候选，并等待我确认。"

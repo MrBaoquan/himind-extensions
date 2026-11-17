@@ -1,0 +1,206 @@
+{
+  "id": "com.himind.video-cover",
+  "capability_namespace": "media.cover",
+  "icon": "assets/icon.png",
+  "name": "视频封面工具",
+  "author": "本地开发者",
+  "categories": [
+    "video-post",
+    "visual-design",
+    "content-production"
+  ],
+  "description": "从视频帧生成封面，提供无品牌标题与品牌模板，支持多比例预览和本地导出。",
+  "release_notes": "新增无品牌标题封面与多比例输出，保留原有品牌模板；修复同进程重复渲染字体失效。",
+  "version": "0.1.7",
+  "entry": "bin/video-cover.exe",
+  "runtime": "process-jsonrpc-stdio",
+  "platforms": [
+    "windows-x64"
+  ],
+  "min_agent_version": "0.3.93",
+  "governance": "optional",
+  "distribution_targets": [
+    "workbench"
+  ],
+  "plugin_dependencies": [
+    {
+      "plugin_id": "com.himind.media-toolkit",
+      "required": true,
+      "min_version": "1.4.0"
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "media.cover.template.list",
+      "description": "列出可用封面模板与安全区",
+      "availability": "local",
+      "execution_mode": "sync",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.cover.layout.render",
+      "description": "从视频帧合成可选模板与比例的封面",
+      "availability": "local",
+      "execution_mode": "sync",
+      "timeout_seconds": 300,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "source_image": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "output_dir": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "filename": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "template_id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "focus_x": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "focus_y": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "outputs": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "properties": {
+                "width": {
+                  "type": "integer",
+                  "minimum": 540,
+                  "maximum": 4320
+                },
+                "height": {
+                  "type": "integer",
+                  "minimum": 720,
+                  "maximum": 5760
+                },
+                "filename": {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                "format": {
+                  "enum": [
+                    "png",
+                    "jpeg",
+                    "jpg"
+                  ]
+                }
+              },
+              "required": [
+                "width",
+                "height"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "inline": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workspace_root",
+          "source_image",
+          "title"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.cover.layout.batch",
+      "description": "按多组视频帧和文案批量渲染封面",
+      "availability": "local",
+      "execution_mode": "sync",
+      "timeout_seconds": 1800,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "workspace_root",
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "permissions": [],
+  "contributes": {
+    "views": [
+      {
+        "id": "media.cover.main",
+        "title": "视频封面工具",
+        "short_title": "视频封面",
+        "icon": "image",
+        "quick_access": true,
+        "order": 64,
+        "location": "plugin_navigation",
+        "entry": "ui/index.html",
+        "external_capabilities": [
+          "media.toolkit.*"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "id": "media.cover.template.list",
+        "title": "查看封面模板"
+      },
+      {
+        "id": "media.cover.layout.render",
+        "title": "渲染封面"
+      },
+      {
+        "id": "media.cover.layout.batch",
+        "title": "批量渲染封面"
+      }
+    ]
+  }
+}

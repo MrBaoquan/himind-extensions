@@ -14,6 +14,7 @@ import (
 
 func withSearchServer(t *testing.T, handler http.HandlerFunc) {
 	t.Helper()
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
 	// 测试不需要遵守 GitHub 的限流节奏。
 	t.Setenv("HIMIND_TECH_RADAR_QUERY_INTERVAL_MS", "0")
 	server := httptest.NewServer(handler)
@@ -189,6 +190,94 @@ func TestUnknownDomainIsRejected(t *testing.T) {
 	}
 }
 
+func TestSnapshotDefaultsStayWithinNoToolsBudget(t *testing.T) {
+	if defaultMaxEntries > 32 {
+		t.Fatalf("defaultMaxEntries=%d exceeds the safe prompt budget", defaultMaxEntries)
+	}
+	if defaultDescriptionMaxChars > 160 {
+		t.Fatalf("defaultDescriptionMaxChars=%d exceeds the safe prompt budget", defaultDescriptionMaxChars)
+	}
+	if defaultTopicsMax > 6 {
+		t.Fatalf("defaultTopicsMax=%d exceeds the safe prompt budget", defaultTopicsMax)
+	}
+}
+
+func TestCreatorVideoDomainPresets(t *testing.T) {
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	groups, names, err := queryGroups(input{Domains: []string{
+		"ai-short-drama", "ai-video", "code-animation", "creator-tools",
+	}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Join(names, ",") != "ai-short-drama,ai-video,code-animation,creator-tools" {
+		t.Fatalf("unexpected domain names: %v", names)
+	}
+	wantTopics := []string{
+		"ai-short-drama", "short-drama",
+		"text-to-video", "video-generation",
+		"remotion", "programmatic-video",
+		"content-creation", "content-automation",
+	}
+	if len(groups) != len(wantTopics) {
+		t.Fatalf("expected %d queries, got %d: %#v", len(wantTopics), len(groups), groups)
+	}
+	for index, want := range wantTopics {
+		if groups[index].topic != want {
+			t.Fatalf("query %d: expected topic %q, got %#v", index, want, groups[index])
+		}
+	}
+}
+
+func TestThemeCatalogIncludesBudgetAndLabels(t *testing.T) {
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	catalog, err := catalogPayload()
+	if err != nil {
+		t.Fatalf("unexpected catalog error: %v", err)
+	}
+	themes, ok := catalog["themes"].([]map[string]any)
+	if !ok || len(themes) != len(themePresets) {
+		t.Fatalf("unexpected theme catalog: %#v", catalog["themes"])
+	}
+	if catalog["max_queries"] != defaultMaxQueries || defaultMaxQueries != 24 {
+		t.Fatalf("unexpected query budget: %#v", catalog["max_queries"])
+	}
+	if themes[0]["label"] != "AI 短剧" || themes[0]["query_count"] != 4 {
+		t.Fatalf("unexpected first theme: %#v", themes[0])
+	}
+}
+
+func TestCustomTopicsAreValidatedAndDeduped(t *testing.T) {
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	groups, names, err := queryGroups(input{
+		Domains: []string{"ai-video"},
+		Topics:  []string{"video-generation", "remotion", "remotion"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Join(names, ",") != "ai-video,custom" {
+		t.Fatalf("unexpected names: %v", names)
+	}
+	if len(groups) != 3 {
+		t.Fatalf("expected 3 deduped query groups, got %#v", groups)
+	}
+	if _, _, err := queryGroups(input{Topics: []string{"AI Agent"}}); err == nil {
+		t.Fatal("expected invalid custom topic to be rejected")
+	}
+}
+
+func TestQueryBudgetRejectsOversizedSelection(t *testing.T) {
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	domains := make([]string, 0, len(themePresets))
+	for _, preset := range themePresets {
+		domains = append(domains, preset.ID)
+	}
+	_, err := collect(input{Domains: domains, MaxQueries: 1, ReportRoot: t.TempDir()})
+	if err == nil || !strings.Contains(err.Error(), "超过上限") {
+		t.Fatalf("expected explicit query budget error, got %v", err)
+	}
+}
 func TestExplicitReportRootIsRemembered(t *testing.T) {
 	dataRoot := t.TempDir()
 	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", dataRoot)
@@ -324,6 +413,70 @@ func TestArchiveReadReturnsLatestReportForView(t *testing.T) {
 	}
 	if _, err := readArchivedReport(input{ReportRoot: root, ReportDate: "../../etc"}); err == nil {
 		t.Fatal("expected an invalid report date to be rejected")
+	}
+}
+
+func TestArchiveCollectionsDisambiguateSameDate(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", base)
+	collections := []struct {
+		id    string
+		label string
+	}{
+		{id: "self-media", label: "自媒体创作"},
+		{id: "professional-dev", label: "专业开发技术"},
+	}
+	for _, collection := range collections {
+		snapshotValue := map[string]any{
+			"generated_at": "2026-09-19T00:00:00Z",
+			"rule_version": ruleVersion,
+			"window_days":  7,
+			"topics":       []string{"ai-agent"},
+			"interest_groups": []map[string]any{{
+				"id": collection.id, "name": collection.label, "topics": []string{"ai-agent"},
+			}},
+			"entries": []map[string]any{{
+				"entry_id": collection.id + "/repo", "full_name": collection.id + "/repo",
+				"html_url": "https://github.com/" + collection.id + "/repo",
+				"language": "Go", "stars": 10, "is_new": true,
+			}},
+		}
+		root := filepath.Join(base, "collections", collection.id)
+		if _, err := render(input{
+			Snapshot: snapshotValue, Insight: map[string]any{"summary": collection.label + "解读"},
+			ReportRoot: root, ReportDate: "2026-09-19", Summary: collection.label + "摘要",
+		}); err != nil {
+			t.Fatalf("render %s failed: %v", collection.id, err)
+		}
+	}
+
+	result, err := listArchive(input{TopN: 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	records := result.(map[string]any)["records"].([]archiveRecord)
+	if len(records) != 2 {
+		t.Fatalf("expected two same-date collection records, got %#v", records)
+	}
+	labels := map[string]string{}
+	for _, record := range records {
+		labels[record.CollectionID] = record.CollectionLabel
+	}
+	if labels["self-media"] != "自媒体创作" || labels["professional-dev"] != "专业开发技术" {
+		t.Fatalf("expected collection labels from snapshots, got %#v", labels)
+	}
+
+	detail, err := readArchivedReport(input{ReportDate: "2026-09-19", CollectionID: "professional-dev"})
+	if err != nil {
+		t.Fatalf("read professional-dev failed: %v", err)
+	}
+	payload := detail.(map[string]any)
+	if payload["collection_id"] != "professional-dev" {
+		t.Fatalf("expected selected collection id, got %#v", payload["collection_id"])
+	}
+	report := payload["report"].(map[string]any)
+	if report["summary"] != "专业开发技术摘要" || report["rule_version"] != ruleVersion {
+		t.Fatalf("expected professional-dev report, got %#v", report)
 	}
 }
 

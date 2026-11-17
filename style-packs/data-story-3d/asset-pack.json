@@ -1,0 +1,95 @@
+{
+  "schema": "himind.asset-pack.v1",
+  "id": "data-story-3d",
+  "version": "1.0.0",
+  "name": "3D 数据故事",
+  "description": "three.js 立体柱状数据空间，带透视网格、数值标签与冠军高亮。",
+  "license": "MIT",
+  "attribution": "HiMind original data-story-3d style pack; three.js (MIT) is an npm dependency.",
+  "resources": [
+    {
+      "id": "template",
+      "type": "template",
+      "path": "template",
+      "role": "render-template",
+      "runtime": "browser-code",
+      "entry": "render.mjs",
+      "format": "directory"
+    },
+    {
+      "id": "preview",
+      "type": "image",
+      "path": "preview/sheet.jpg",
+      "role": "preview",
+      "mime": "image/jpeg"
+    },
+    {
+      "id": "storyboard",
+      "type": "docs",
+      "path": "template/STORYBOARD.md",
+      "role": "storyboard",
+      "mime": "text/markdown"
+    },
+    {
+      "id": "preview_loop",
+      "type": "image",
+      "path": "preview/loop.webp",
+      "role": "preview_loop",
+      "mime": "image/webp"
+    }
+  ],
+  "entrypoints": [
+    {
+      "id": "render",
+      "resource": "template",
+      "runtime": "browser-code",
+      "entry": "render.mjs",
+      "inputs": [
+        "brief.json",
+        "data.json"
+      ],
+      "outputs": [
+        "video.mp4",
+        "video-web.mp4"
+      ]
+    }
+  ],
+  "provenance": {
+    "source": "https://github.com/mrdoob/three.js",
+    "commit": "three@0.160.0",
+    "license": "MIT",
+    "adapted_files": [
+      "three.module.js as npm dependency"
+    ],
+    "changes": [
+      "new three.js composition"
+    ]
+  },
+  "permissions": {
+    "filesystem": "workspace",
+    "process": [
+      "node",
+      "chrome",
+      "ffmpeg"
+    ],
+    "network": {
+      "mode": "none",
+      "allow": []
+    }
+  },
+  "quality": {
+    "smoke": "preview/sheet.jpg",
+    "determinism": true
+  },
+  "consumers": [
+    "com.himind.media-workbench"
+  ],
+  "tags": [
+    "video",
+    "style",
+    "3d",
+    "threejs",
+    "data",
+    "chart"
+  ]
+}

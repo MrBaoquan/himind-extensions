@@ -24,6 +24,7 @@ func TestPayloadFilesIsExclusionBased(t *testing.T) {
 		"checksums.sha256",
 		".gitignore",
 		"ui/node_modules/react/index.js",
+		"dev/__pycache__/verify.cpython-312.pyc",
 		"dist/bundle.js",
 		"target/debug/out",
 		"test-output/report.json",

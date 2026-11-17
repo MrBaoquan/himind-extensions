@@ -21,6 +21,7 @@ import (
 
 	"himind-plugin/media-toolkit/internal/media/ffmpeg"
 	"himind-plugin/media-toolkit/internal/media/plugindata"
+	"himind-plugin/media-toolkit/internal/media/probe"
 )
 
 // 作业状态。
@@ -38,15 +39,17 @@ const InlineWorkerEnv = "HIMIND_MEDIA_TOOLKIT_INLINE_JOBS"
 
 // Record 一条作业记录。字段刻意扁平，便于直接作为能力返回值。
 type Record struct {
-	ID         string  `json:"id"`
-	Kind       string  `json:"kind"`
-	Status     string  `json:"status"`
-	Progress   float64 `json:"progress"`
-	Input      string  `json:"input,omitempty"`
-	Output     string  `json:"output,omitempty"`
-	TempOutput string  `json:"temp_output,omitempty"`
-	WorkerPID  int     `json:"worker_pid,omitempty"`
-	Heartbeat  string  `json:"heartbeat_at,omitempty"`
+	OutputDurationMS int64   `json:"output_duration_ms,omitempty"`
+	ReceiptPath      string  `json:"receipt_path,omitempty"`
+	ID               string  `json:"id"`
+	Kind             string  `json:"kind"`
+	Status           string  `json:"status"`
+	Progress         float64 `json:"progress"`
+	Input            string  `json:"input,omitempty"`
+	Output           string  `json:"output,omitempty"`
+	TempOutput       string  `json:"temp_output,omitempty"`
+	WorkerPID        int     `json:"worker_pid,omitempty"`
+	Heartbeat        string  `json:"heartbeat_at,omitempty"`
 	// Recipe 摘要（人类可读），用于回看"这条是怎么编出来的"。
 	Recipe    string   `json:"recipe,omitempty"`
 	Args      []string `json:"args,omitempty"`
@@ -93,6 +96,12 @@ func NewStore(tools ffmpeg.Tools) (*Store, error) {
 // 先把记录置为 queued 再返回，保证调用方立刻拿得到 ID ——
 // 若等真正跑起来才返回，长任务的提交接口会阻塞在启动阶段。
 func (s *Store) Submit(kind, input, output, description string, args []string, totalMs int64) (*Record, error) {
+	return s.SubmitWithReceipt(kind, input, output, description, args, totalMs, "")
+}
+
+// SubmitWithReceipt publishes a bounded, credential-free progress/result file
+// in the caller's validated staging workspace. No broker survives submission.
+func (s *Store) SubmitWithReceipt(kind, input, output, description string, args []string, totalMs int64, receipt string) (*Record, error) {
 	if s.tools.FFmpeg == "" {
 		return nil, ffmpeg.ErrNotAvailable
 	}
@@ -119,21 +128,22 @@ func (s *Store) Submit(kind, input, output, description string, args []string, t
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	record := &Record{
-		ID:         id,
-		Kind:       kind,
-		Status:     StatusQueued,
-		Progress:   0,
-		Input:      input,
-		Output:     output,
-		TempOutput: tempOutput,
-		Recipe:     description,
-		Args:       append([]string(nil), args...),
-		RunArgs:    runArgs,
-		TotalMs:    totalMs,
-		LogPath:    logPath,
-		Heartbeat:  now,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		ReceiptPath: receipt,
+		ID:          id,
+		Kind:        kind,
+		Status:      StatusQueued,
+		Progress:    0,
+		Input:       input,
+		Output:      output,
+		TempOutput:  tempOutput,
+		Recipe:      description,
+		Args:        append([]string(nil), args...),
+		RunArgs:     runArgs,
+		TotalMs:     totalMs,
+		LogPath:     logPath,
+		Heartbeat:   now,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 
 	s.mu.Lock()
@@ -164,7 +174,11 @@ func (s *Store) Submit(kind, input, output, description string, args []string, t
 	s.mu.Lock()
 	record.WorkerPID = workerPID
 	s.mu.Unlock()
-	s.persist(record)
+	// The worker owns subsequent persistence; a very short job may have already
+	// completed before spawn returns. Never replace its terminal receipt.
+	if receipt == "" {
+		s.persist(record)
+	}
 	return record, nil
 }
 
@@ -211,6 +225,17 @@ func (s *Store) run(ctx context.Context, record *Record) {
 	})
 
 	var finalizeErr error
+	var outputDuration int64
+	if err == nil && record.Kind == "library-audio" {
+		probeCtx, probeCancel := context.WithTimeout(runCtx, 30*time.Second)
+		info, probeErr := probe.Read(probeCtx, s.tools, record.TempOutput)
+		probeCancel()
+		if probeErr != nil || !info.HasAudio || info.DurationMs <= 0 {
+			err = fmt.Errorf("音频产物没有可播放的音轨")
+		} else {
+			outputDuration = info.DurationMs
+		}
+	}
 	if err == nil {
 		finalizeErr = finalizeTempOutput(record.TempOutput, record.Output)
 	}
@@ -222,6 +247,7 @@ func (s *Store) run(ctx context.Context, record *Record) {
 		item.TempOutput = ""
 		switch {
 		case err == nil && finalizeErr == nil:
+			item.OutputDurationMS = outputDuration
 			item.Status = StatusCompleted
 			item.Progress = 100
 		case runCtx.Err() != nil:
@@ -319,6 +345,7 @@ func (s *Store) update(id string, mutate func(*Record)) {
 	copied.Args = append([]string(nil), record.Args...)
 	s.mu.Unlock()
 	s.persist(&copied)
+	writeReceipt(&copied)
 }
 
 func (s *Store) persist(record *Record) {
@@ -370,6 +397,7 @@ func (s *Store) loadExisting() {
 			record.TempOutput = ""
 			record.Heartbeat = ""
 			s.persist(&record)
+			writeReceipt(&record)
 		}
 		s.jobs[record.ID] = &record
 	}
@@ -456,6 +484,9 @@ func RunWorker(jobDir string) error {
 	}
 	tools, err := ffmpeg.Locate()
 	if err != nil {
+		record.Status = StatusFailed
+		record.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+		writeReceipt(&record)
 		return err
 	}
 	root := filepath.Dir(jobDir)
@@ -484,6 +515,19 @@ func (s *Store) watchJob(parent context.Context, id string) (context.Context, fu
 			if _, err := os.Stat(cancelPath(s.root, id)); err == nil {
 				cancel()
 				return
+			}
+			s.mu.Lock()
+			record := s.jobs[id]
+			receipt := ""
+			if record != nil {
+				receipt = record.ReceiptPath
+			}
+			s.mu.Unlock()
+			if receipt != "" {
+				if _, err := os.Stat(receipt + ".cancel"); err == nil {
+					cancel()
+					return
+				}
 			}
 			select {
 			case <-parent.Done():

@@ -1,26 +1,36 @@
 {
   "schema_version": "workflow_view.v1",
-  "title": "科技雷达日报",
+  "title": "开源热榜日报",
   "sections": [
     {
       "id": "scope",
       "title": "关注范围",
       "fields": [
         {
-          "id": "domains",
-          "label": "关注领域",
-          "type": "list",
-          "default": ["cv", "llm", "ar-vr"],
-          "options": ["cv", "llm", "ar-vr", "general"],
-          "placeholder": "每行一个：cv / llm / ar-vr / general",
-          "hint": "留空等于 cv + llm + ar-vr 三个默认领域；每行一个，行内不要用逗号连写。"
-        },
-        {
-          "id": "topics",
-          "label": "自定义主题",
-          "type": "list",
-          "placeholder": "每行一条 GitHub 标签，例如 3d-gaussian-splatting",
-          "hint": "可选；填了就在默认领域之外追加查询。"
+          "id": "interest_groups",
+          "label": "采集内容",
+          "type": "topic-groups",
+          "default": [
+            {
+              "id": "default-group",
+              "name": "综合 AI",
+              "topics": [
+                "machine-learning"
+              ]
+            }
+          ],
+          "option_source": {
+            "kind": "plugin_capability",
+            "capability_id": "tech-radar.catalog",
+            "input": {},
+            "items_path": "tags"
+          },
+          "budget": {
+            "max_queries": 24,
+            "interval_ms": 7000
+          },
+          "hint": "按兴趣创建 1–4 个采集组；每组选择多个标签。跨组重复标签只查询一次，总查询数不超过 24。",
+          "span": "full"
         },
         {
           "id": "languages",

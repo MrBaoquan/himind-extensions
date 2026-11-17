@@ -1,29 +1,178 @@
 {
   "id": "com.himind.media-downloader-assistant",
   "icon": "assets/icon.png",
-  "name": "媒体下载助手",
-  "author": "马宝全",
-  "categories": ["video-post", "audio-sound", "data-automation"],
-  "version": "0.1.1",
-  "distribution_targets": ["workbench", "github"],
+  "name": "媒体采集助手",
+  "author": "本地开发者",
+  "categories": [
+    "video-post",
+    "audio-sound",
+    "data-automation"
+  ],
+  "version": "0.2.0",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
   "scope": "organization",
-  "description": "把用户的媒体下载意图转换为受控的解析、选择和任务跟踪步骤，适合网页音视频、字幕和播放列表下载场景。",
-  "release_notes": "0.1.1：适配默认系统下载文件夹和自定义保存目录。",
+  "description": "搜索、收藏并采集在线作品到媒体资源库，跟踪后台任务与来源；播放列表保留旧工具路径。",
+  "release_notes": "默认使用媒体资源库完成平台搜索、收藏及采集入库；旧播放列表和在途任务保留原工具归属。",
   "min_agent_version": "0.3.47",
-  "supported_clients": ["agent-skills"],
+  "supported_clients": [
+    "agent-skills"
+  ],
   "capabilities": [
-    {"id": "media.downloader.runtime.status", "required": true, "min_version": "0.1.0", "provider": "com.himind.media-downloader"},
-    {"id": "media.downloader.runtime.install", "required": false, "min_version": "0.1.0", "provider": "com.himind.media-downloader"},
-    {"id": "media.downloader.info.get", "required": true, "min_version": "0.1.0", "provider": "com.himind.media-downloader"},
-    {"id": "media.downloader.job.start", "required": true, "min_version": "0.1.0", "provider": "com.himind.media-downloader"},
-    {"id": "media.downloader.job.status", "required": true, "min_version": "0.1.0", "provider": "com.himind.media-downloader"},
-    {"id": "media.downloader.job.cancel", "required": false, "min_version": "0.1.0", "provider": "com.himind.media-downloader"},
-    {"id": "media.downloader.job.list", "required": false, "min_version": "0.1.0", "provider": "com.himind.media-downloader"}
+    {
+      "id": "media-library.download.status",
+      "required": true,
+      "min_version": "2.10.0",
+      "provider": "com.himind.media-library"
+    },
+    {
+      "id": "media-library.remote.resolve",
+      "required": true,
+      "min_version": "2.10.0",
+      "provider": "com.himind.media-library"
+    },
+    {
+      "id": "media-library.discovery.providers",
+      "required": true,
+      "min_version": "2.10.0",
+      "provider": "com.himind.media-library"
+    },
+    {
+      "id": "media-library.discovery.search",
+      "required": true,
+      "min_version": "2.10.0",
+      "provider": "com.himind.media-library"
+    },
+    {
+      "id": "media-library.discovery.cancel",
+      "required": true,
+      "min_version": "2.10.0",
+      "provider": "com.himind.media-library"
+    },
+    {
+      "id": "media-library.bookmark.save",
+      "required": true,
+      "min_version": "2.10.0",
+      "provider": "com.himind.media-library"
+    },
+    {
+      "id": "media-library.bookmark.list",
+      "required": true,
+      "min_version": "2.10.0",
+      "provider": "com.himind.media-library"
+    },
+    {
+      "id": "media-library.repository.list",
+      "required": true,
+      "min_version": "2.10.0",
+      "provider": "com.himind.media-library"
+    },
+    {
+      "id": "media-library.acquisition.start",
+      "required": true,
+      "min_version": "2.10.0",
+      "provider": "com.himind.media-library"
+    },
+    {
+      "id": "media-library.acquisition.status",
+      "required": true,
+      "min_version": "2.10.0",
+      "provider": "com.himind.media-library"
+    },
+    {
+      "id": "media-library.acquisition.list",
+      "required": true,
+      "min_version": "2.10.0",
+      "provider": "com.himind.media-library"
+    },
+    {
+      "id": "media-library.acquisition.cancel",
+      "required": true,
+      "min_version": "2.10.0",
+      "provider": "com.himind.media-library"
+    },
+    {
+      "id": "media-library.acquisition.retry",
+      "required": true,
+      "min_version": "2.10.0",
+      "provider": "com.himind.media-library"
+    },
+    {
+      "id": "media-library.holdings.provenance",
+      "required": true,
+      "min_version": "2.10.0",
+      "provider": "com.himind.media-library"
+    },
+    {
+      "id": "media-library.download.install",
+      "required": false,
+      "min_version": "2.10.0",
+      "provider": "com.himind.media-library"
+    },
+    {
+      "id": "media-library.account.status",
+      "required": false,
+      "min_version": "2.10.0",
+      "provider": "com.himind.media-library"
+    },
+    {
+      "id": "media-library.account.connect",
+      "required": false,
+      "min_version": "2.10.0",
+      "provider": "com.himind.media-library"
+    },
+    {
+      "id": "media.downloader.runtime.status",
+      "required": false,
+      "min_version": "0.2.8",
+      "provider": "com.himind.media-downloader"
+    },
+    {
+      "id": "media.downloader.info.get",
+      "required": false,
+      "min_version": "0.2.8",
+      "provider": "com.himind.media-downloader"
+    },
+    {
+      "id": "media.downloader.job.start",
+      "required": false,
+      "min_version": "0.2.8",
+      "provider": "com.himind.media-downloader"
+    },
+    {
+      "id": "media.downloader.job.status",
+      "required": false,
+      "min_version": "0.2.8",
+      "provider": "com.himind.media-downloader"
+    },
+    {
+      "id": "media.downloader.job.cancel",
+      "required": false,
+      "min_version": "0.2.8",
+      "provider": "com.himind.media-downloader"
+    },
+    {
+      "id": "media.downloader.job.list",
+      "required": false,
+      "min_version": "0.2.8",
+      "provider": "com.himind.media-downloader"
+    }
   ],
   "plugin_dependencies": [
-    {"plugin_id": "com.himind.media-downloader", "required": true, "min_version": "0.1.0"}
+    {
+      "plugin_id": "com.himind.media-library",
+      "required": true,
+      "min_version": "2.10.0"
+    },
+    {
+      "plugin_id": "com.himind.media-downloader",
+      "required": false,
+      "min_version": "0.2.8"
+    }
   ],
-  "risk_summary": "默认只读检查；安装运行时和创建下载任务需要用户确认；不接受任意命令、Cookie、DRM 或私密凭据。",
+  "risk_summary": "网页登录在受控官网窗口完成，不索取凭据；沿用用户已授权的目标和范围，保留旧任务及文件。",
   "contents": [
     "skill.json",
     "SKILL.md",

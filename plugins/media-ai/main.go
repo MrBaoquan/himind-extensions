@@ -7,8 +7,9 @@
 // 稳定的 4-5 秒一句的节律。
 //
 // 两层外部依赖，都按 runtime-lock.json 锁定版本与摘要后获取：
-//   whisper.cpp  语音识别（二进制 + ggml 模型）
-//   ffmpeg       抽音频（实测 whisper 自己读不了 mp4/AAC）
+//
+//	whisper.cpp  语音识别（二进制 + ggml 模型）
+//	ffmpeg       抽音频（实测 whisper 自己读不了 mp4/AAC）
 package main
 
 import (
@@ -39,12 +40,20 @@ const (
 )
 
 type service struct {
-	store *job.Store
+	store    *job.Store
+	workerID string
 }
 
 var defaultService = &service{}
 
 func main() {
+	if len(os.Args) == 3 && os.Args[1] == "--transcription-worker" {
+		if err := runTranscriptionWorker(os.Args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	_ = himindjsonrpc.Serve(os.Stdin, os.Stdout, defaultService.handle)
 }
 
@@ -113,7 +122,7 @@ type transcribeInput struct {
 	// 而实测它对歌曲不可靠（中文歌被判成 en，结果只剩占位文本）。
 	Language string `json:"language"`
 	// Model 模型 id，默认 small。
-	Model string `json:"model"`
+	Model   string `json:"model"`
 	StartMs *int64 `json:"start_ms"`
 	EndMs   *int64 `json:"end_ms"`
 }
@@ -161,6 +170,7 @@ func (s *service) runtimeStatus() (any, *himindjsonrpc.Error) {
 		"ffmpeg_path":        ffmpegPath,
 		"available_models":   modelIDs(lock),
 		"capabilities_ready": []string{"transcribe", "job.status", "job.cancel", "job.list"},
+		"job_mode":           "detached-worker-v1",
 	}
 	ready := status.BinaryInstalled && ffmpegErr == nil && len(status.InstalledModels) > 0
 	payload["ready"] = ready
@@ -201,14 +211,14 @@ func (s *service) runtimeInstall(input installInput) (any, *himindjsonrpc.Error)
 		}, nil
 	}
 	return map[string]any{
-		"ok":                true,
-		"binary_installed":  result.BinaryInstalled,
-		"binary_path":       result.BinaryPath,
-		"installed_models":  result.InstalledModels,
-		"skipped":           result.Skipped,
-		"runtime_root":      paths.Root,
-		"license":           lock.Archive.License,
-		"license_note":      lock.LicenseNote,
+		"ok":               true,
+		"binary_installed": result.BinaryInstalled,
+		"binary_path":      result.BinaryPath,
+		"installed_models": result.InstalledModels,
+		"skipped":          result.Skipped,
+		"runtime_root":     paths.Root,
+		"license":          lock.Archive.License,
+		"license_note":     lock.LicenseNote,
 	}, nil
 }
 
@@ -285,63 +295,99 @@ func (s *service) transcribe(input transcribeInput) (any, *himindjsonrpc.Error) 
 	}
 
 	binaryPath := status.BinaryPath
-	record, err := store.Submit("transcribe", inputPath, language, model.ID,
-		func(ctx context.Context, reporter *job.Reporter) (any, error) {
-			work, err := os.MkdirTemp(workDir, "t-")
-			if err != nil {
-				return nil, err
-			}
-			defer os.RemoveAll(work)
+	run := func(ctx context.Context, reporter *job.Reporter) (any, error) {
+		work, err := os.MkdirTemp(workDir, "t-")
+		if err != nil {
+			return nil, err
+		}
+		defer os.RemoveAll(work)
 
-			reporter.Stage("extracting-audio")
-			reporter.Log("抽取音频: " + inputPath)
-			audioPath, err := audio.Extract(ctx, audio.ExtractOptions{
-				FFmpegPath: ffmpegPath,
-				InputPath:  inputPath,
-				OutputPath: filepath.Join(work, "audio.wav"),
-				StartMs:    input.StartMs,
-				EndMs:      input.EndMs,
-			})
-			if err != nil {
-				return nil, err
-			}
-
-			reporter.Stage("transcribing")
-			reporter.Log("转写: 模型=" + model.ID + " 语言=" + languageOrDefault(language))
-			result, err := whisper.Run(ctx, binaryPath, whisper.Options{
-				AudioPath:  audioPath,
-				ModelPath:  modelPath,
-				Language:   language,
-				OutputDir:  work,
-				Threads:    1, // 必须单线程：多线程在该环境会段错误
-				OnProgress: reporter.Log,
-			})
-			if err != nil {
-				return nil, err
-			}
-
-			// 把结果整理成"可直接用"的形状：区分真实内容与占位标注，
-			// 并算出歌词节律（相邻段起点差），这正是编排动作时要的时点。
-			content := result.ContentSegments()
-			payload := map[string]any{
-				"language":         result.Language,
-				"model":            model.ID,
-				"elapsed_ms":       result.ElapsedMs,
-				"segments":         result.Segments,
-				"content_segments": content,
-				"full_text":        result.FullText,
-				"vocal_ratio":      result.VocalRatio,
-				"placeholder_only": len(content) == 0,
-				"content_count":    len(content),
-			}
-			if len(content) == 0 {
-				payload["note"] = "只识别出音乐/人声标注，没有实际词。" +
-					"若是歌曲，确认 language 是否指定正确（自动检测对歌曲不可靠）。"
-			} else {
-				payload["beats_ms"] = beatStarts(content)
-			}
-			return payload, nil
+		reporter.Stage("extracting-audio")
+		reporter.Log("抽取音频: " + inputPath)
+		audioPath, err := audio.Extract(ctx, audio.ExtractOptions{
+			FFmpegPath: ffmpegPath,
+			InputPath:  inputPath,
+			OutputPath: filepath.Join(work, "audio.wav"),
+			StartMs:    input.StartMs,
+			EndMs:      input.EndMs,
 		})
+		if err != nil {
+			return nil, err
+		}
+
+		silent, err := audio.DigitalSilence(ctx, audioPath)
+		if err != nil {
+			return nil, fmt.Errorf("检查识别音频失败: %w", err)
+		}
+		if silent {
+			reporter.Log("音频为数字静音，跳过模型，不生成字幕")
+			return map[string]any{
+				"language": language, "model": model.ID, "segments": []any{},
+				"content_segments": []any{}, "full_text": "", "content_count": 0,
+				"vocal_ratio": 0, "placeholder_only": true, "silence_only": true,
+				"note": "音频为数字静音，未生成字幕。",
+			}, nil
+		}
+
+		reporter.Stage("transcribing")
+		reporter.Log("转写: 模型=" + model.ID + " 语言=" + languageOrDefault(language))
+		result, err := whisper.Run(ctx, binaryPath, whisper.Options{
+			AudioPath:  audioPath,
+			ModelPath:  modelPath,
+			Language:   language,
+			OutputDir:  work,
+			Threads:    1, // 必须单线程：多线程在该环境会段错误
+			OnProgress: reporter.Log,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		// 把结果整理成"可直接用"的形状：区分真实内容与占位标注，
+		// 并算出歌词节律（相邻段起点差），这正是编排动作时要的时点。
+		content := result.ContentSegments()
+		payload := map[string]any{
+			"language":         result.Language,
+			"model":            model.ID,
+			"elapsed_ms":       result.ElapsedMs,
+			"segments":         result.Segments,
+			"content_segments": content,
+			"full_text":        result.FullText,
+			"vocal_ratio":      result.VocalRatio,
+			"placeholder_only": len(content) == 0,
+			"content_count":    len(content),
+		}
+		if len(content) == 0 {
+			payload["note"] = "只识别出音乐/人声标注，没有实际词。" +
+				"若是歌曲，确认 language 是否指定正确（自动检测对歌曲不可靠）。"
+		} else {
+			payload["beats_ms"] = beatStarts(content)
+		}
+		return payload, nil
+	}
+	var record *job.Record
+	if s.workerID != "" {
+		record, err = store.Get(s.workerID)
+		if err == nil && (record.Kind != "transcribe" || record.Input != inputPath || record.Model != model.ID || record.Language != language) {
+			err = fmt.Errorf("作业输入身份不一致")
+		}
+		if err == nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
+			defer cancel()
+			err = store.RunBackground(ctx, s.workerID, run)
+		}
+	} else {
+		input.Path = inputPath
+		input.Language = language
+		input.Model = model.ID
+		record, err = store.PrepareBackground("transcribe", inputPath, language, model.ID, input)
+		if err == nil {
+			err = startTranscriptionWorker(record.ID)
+			if err != nil {
+				store.FailBackground(record.ID, err)
+			}
+		}
+	}
 	if err != nil {
 		return nil, &himindjsonrpc.Error{Code: -32000, Message: err.Error()}
 	}

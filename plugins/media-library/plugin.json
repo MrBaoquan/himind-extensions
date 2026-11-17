@@ -1,16 +1,17 @@
 {
   "id": "com.himind.media-library",
+  "capability_namespace": "media-library",
   "icon": "assets/icon.png",
   "name": "媒体资源库",
-  "author": "马宝全",
+  "author": "本地开发者",
   "categories": [
     "visual-design",
     "video-post",
     "audio-sound"
   ],
-  "description": "检索免费素材库的图片、视频与音效，把选中的素材落到工作区并记录来源许可，也可为本机媒体目录建立索引。",
-  "release_notes": "2.0.0：统一来源与入库元数据；新增资源库/本机来源编辑移除、原生图标、sticky 搜索、音频试听、连续预览、十万级检索及应用内确认弹窗。",
-  "version": "2.0.0",
+  "description": "检索、收藏和下载在线作品，管理图片、视频与音频的本机及共享资源库，记录来源与许可。",
+  "release_notes": "新增图片编辑工作区：裁剪、旋转、翻转、尺寸与格式，版本比较和另存素材；接入底座描述改图及局部蒙版。",
+  "version": "2.17.4",
   "distribution_targets": [
     "workbench",
     "github"
@@ -23,6 +24,374 @@
   "min_agent_version": "0.3.47",
   "governance": "optional",
   "capabilities": [
+    {
+      "id": "media-library.generation.voices",
+      "description": "读取底座当前音色目录",
+      "timeout_seconds": 90,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "risk_level": "read_only",
+      "availability": "local"
+    },
+    {
+      "id": "media-library.generation.reference",
+      "description": "预览生成记录的可信参考图",
+      "timeout_seconds": 90,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          }
+        },
+        "required": [
+          "session_id",
+          "index"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only",
+      "availability": "local"
+    },
+    {
+      "timeout_seconds": 90,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "id": "media-library.generation.catalog",
+      "description": "读取生成能力和模型状态",
+      "risk_level": "read_only",
+      "availability": "local"
+    },
+    {
+      "timeout_seconds": 90,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "id": "media-library.generation.list",
+      "description": "读取持久生成会话",
+      "risk_level": "read_only",
+      "availability": "local"
+    },
+    {
+      "timeout_seconds": 90,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 1
+          },
+          "auto_adopt": {
+            "type": "boolean"
+          },
+          "parameters": {
+            "type": "object"
+          },
+          "output_references": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "properties": {
+                "session_id": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "index": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                }
+              },
+              "required": [
+                "session_id",
+                "index"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "references": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          "library_id": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "capability": {
+            "enum": [
+              "image.generate",
+              "image.edit",
+              "video.generate",
+              "audio.speech"
+            ],
+            "type": "string"
+          },
+          "reference_order": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "id": "media-library.generation.prepare",
+      "description": "保存生成意图并准备参考素材",
+      "risk_level": "local_write",
+      "availability": "local"
+    },
+    {
+      "timeout_seconds": 90,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "id": "media-library.generation.submit",
+      "description": "幂等提交生成意图到底座",
+      "risk_level": "local_write",
+      "availability": "local"
+    },
+    {
+      "timeout_seconds": 90,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "session_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "id": "media-library.generation.get",
+      "description": "核对生成状态与候选结果",
+      "risk_level": "read_only",
+      "availability": "local"
+    },
+    {
+      "timeout_seconds": 90,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "id": "media-library.generation.cancel",
+      "description": "请求底座取消生成",
+      "risk_level": "local_write",
+      "availability": "local"
+    },
+    {
+      "timeout_seconds": 90,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1
+          },
+          "indexes": {
+            "type": "array",
+            "maxItems": 4,
+            "minItems": 1,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3
+            }
+          },
+          "library_id": {
+            "maxLength": 100,
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "id": "media-library.generation.adopt",
+      "description": "保存可信生成结果与来源",
+      "risk_level": "local_write",
+      "availability": "local"
+    },
+    {
+      "timeout_seconds": 90,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "session_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "id": "media-library.generation.preview",
+      "description": "预览可信生成候选",
+      "risk_level": "read_only",
+      "availability": "local"
+    },
+    {
+      "timeout_seconds": 15,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "maxLength": 100,
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "asset_id"
+        ]
+      },
+      "id": "media-library.asset.lineage",
+      "description": "读取素材的生成来源与衍生关系",
+      "risk_level": "read_only",
+      "availability": "local"
+    },
+    {
+      "id": "media-library.comments.list",
+      "description": "按需读取抖音官网展示的公开评论采样",
+      "availability": "local",
+      "timeout_seconds": 75,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "item_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "request_id": {
+            "type": "string",
+            "maxLength": 32
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.comments.snapshot.get",
+      "description": "读取作品关联的已保存评论快照",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "item_id": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.comments.snapshot.save",
+      "description": "保存已读取评论中按点赞排序的热门采样",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "item_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "sample_id": {
+            "type": "string",
+            "maxLength": 32
+          }
+        },
+        "required": [
+          "sample_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.audio.waveform",
+      "description": "读取已关联本机音视频的有界音频波形",
+      "availability": "local",
+      "timeout_seconds": 20,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "asset_id"
+        ],
+        "additionalProperties": false
+      }
+    },
     {
       "id": "media-library.provider.list",
       "description": "列出已配置的素材来源及其可用状态",
@@ -278,6 +647,13 @@
               "read_only",
               "contribute"
             ]
+          },
+          "kind": {
+            "enum": [
+              "material",
+              "curated"
+            ],
+            "description": "素材库或精选库"
           }
         },
         "required": [
@@ -298,6 +674,160 @@
         "type": "object",
         "properties": {},
         "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.holdings.items",
+      "description": "浏览资源库或精选库的条目（分页）",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "library_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.holdings.item.remove",
+      "description": "从库移出条目（默认只删索引，文件保留）",
+      "availability": "local",
+      "timeout_seconds": 60,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          "delete_files": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.holdings.item.restore",
+      "description": "恢复回收站里的条目",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.holdings.trash.list",
+      "description": "列出库的回收站条目",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          }
+        },
+        "required": [
+          "library_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.holdings.rescan",
+      "description": "比对库索引与磁盘，报告缺失/变化/孤儿（只读）",
+      "availability": "local",
+      "timeout_seconds": 120,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "library_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.holdings.sync",
+      "description": "对比精选与库内容；apply=false 预览，apply=true 移出不在精选中的条目",
+      "availability": "local",
+      "timeout_seconds": 120,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "selection_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "token": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "apply": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "selection_id"
+        ],
         "additionalProperties": false
       }
     },
@@ -369,6 +899,13 @@
           "display_name": {
             "type": "string",
             "maxLength": 200
+          },
+          "metadata_mode": {
+            "enum": [
+              "db",
+              "jsonl",
+              "both"
+            ]
           }
         },
         "required": [
@@ -493,9 +1030,705 @@
           "cursor": {
             "type": "string",
             "maxLength": 1000
+          },
+          "folder": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "min_dimension": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "min_duration_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_duration_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "audio_purpose": {
+            "enum": [
+              "bgm"
+            ]
           }
         },
         "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.runtime.status",
+      "description": "检查 ffmpeg/ffprobe/exiftool 是否就绪",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.asset.enrich",
+      "description": "批量探测元数据并生成缩略图",
+      "availability": "local",
+      "timeout_seconds": 300,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "asset_ids": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "time_budget_ms": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 120000
+          },
+          "thumbnails": {
+            "type": "boolean"
+          },
+          "thumbnail_size": {
+            "enum": [
+              "grid",
+              "preview"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.asset.detail",
+      "description": "读取单个资产的完整元数据",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "asset_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.asset.thumbnail",
+      "description": "批量返回素材缩略图",
+      "availability": "local",
+      "timeout_seconds": 120,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "asset_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 60,
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          "size": {
+            "enum": [
+              "grid",
+              "preview"
+            ]
+          }
+        },
+        "required": [
+          "asset_ids"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.asset.facets",
+      "description": "统计文件夹、类型、分辨率与时长分布",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "kinds": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "enum": [
+                "image",
+                "video",
+                "audio"
+              ]
+            }
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.asset.user-state",
+      "description": "读取素材标签与评分",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "asset_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.asset.tags.set",
+      "description": "保存素材标签",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "tags": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "maxLength": 60
+            }
+          }
+        },
+        "required": [
+          "asset_id",
+          "tags"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.asset.rating.set",
+      "description": "保存素材评分",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "rating": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5
+          }
+        },
+        "required": [
+          "asset_id",
+          "rating"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.asset.note.set",
+      "description": "保存素材文字备注或 OCR 结果",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 10000
+          }
+        },
+        "required": [
+          "asset_id",
+          "note"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.asset.ai-cache.get",
+      "description": "读取 AI 打标缓存",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "profile": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "prompt_version": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "asset_id",
+          "profile",
+          "model",
+          "prompt_version"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.asset.ai-cache.set",
+      "description": "写入 AI 打标缓存",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "profile": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "prompt_version": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "result": {
+            "type": "object"
+          },
+          "tokens": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "asset_id",
+          "profile",
+          "model",
+          "prompt_version",
+          "result"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.ai.budget",
+      "description": "查询 AI 打标预算：今日/本月已用 token、预估花费与下一次作业可用 token 上限",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "planned_calls": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5000
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.ai.job.set",
+      "description": "记录精选集对应的 Agent 后台 AI 作业，关窗或重启后可接着看结果",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "selection_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "job_id": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "profile": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "service": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "selection_id",
+          "job_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.ai.job.get",
+      "description": "读取精选集上一次 AI 打标作业",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "selection_id": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "selection_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.ai.job.clear",
+      "description": "清除精选集的 AI 作业引用",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "selection_id": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "selection_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.selection.create",
+      "description": "从当前结果或文件夹创建精选集",
+      "availability": "local",
+      "timeout_seconds": 60,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "asset_ids": {
+            "type": "array",
+            "maxItems": 1000,
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          "source_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "folder": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "target_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "target_path": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "library_id": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "目标精选库；与 target_path 二选一"
+          },
+          "promote_mode": {
+            "enum": [
+              "hardlink",
+              "copy",
+              "reference"
+            ]
+          },
+          "actor": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.selection.list",
+      "description": "列出精选集与进度",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.selection.detail",
+      "description": "读取精选集与素材决策",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "selection_id": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "selection_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.selection.auto",
+      "description": "按相似组与质量自动预选",
+      "availability": "local",
+      "timeout_seconds": 300,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "selection_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "similarity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
+          },
+          "time_budget_ms": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 600000
+          }
+        },
+        "required": [
+          "selection_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.selection.decide",
+      "description": "修改单条素材的精选状态",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "selection_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "asset_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "state": {
+            "enum": [
+              "included",
+              "excluded",
+              "reserve",
+              "candidate"
+            ]
+          }
+        },
+        "required": [
+          "selection_id",
+          "asset_id",
+          "state"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.selection.decide.batch",
+      "description": "批量调整精选状态（按相似组保留最佳、批量排除等）",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "selection_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "decisions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1000,
+            "items": {
+              "type": "object",
+              "properties": {
+                "asset_id": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "state": {
+                  "enum": [
+                    "included",
+                    "excluded",
+                    "reserve",
+                    "candidate"
+                  ]
+                }
+              },
+              "required": [
+                "asset_id",
+                "state"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "selection_id",
+          "decisions"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.selection.summary",
+      "description": "列出精选及其状态、进度与对应精选库",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.asset.reveal",
+      "description": "在系统文件管理器中定位素材或打开目录",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "local_action",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "asset_id": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.selection.promote",
+      "description": "把入选素材加入精选库",
+      "availability": "local",
+      "timeout_seconds": 1800,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "selection_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "mode": {
+            "enum": [
+              "hardlink",
+              "copy",
+              "reference"
+            ]
+          }
+        },
+        "required": [
+          "selection_id"
+        ],
         "additionalProperties": false
       }
     },
@@ -619,6 +1852,10 @@
       "input_schema": {
         "type": "object",
         "properties": {
+          "asset_id": {
+            "type": "string",
+            "maxLength": 100
+          },
           "path": {
             "type": "string",
             "maxLength": 2000
@@ -636,14 +1873,1316 @@
             "maximum": 33554432
           }
         },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.organize.plan",
+      "description": "按画质、相似聚类与 AI 标签生成自动整理方案（自动入库 / 待复核 / 跳过），不落文件",
+      "availability": "local",
+      "timeout_seconds": 300,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "source_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "policy": {
+            "type": "object",
+            "properties": {
+              "auto_ingest": {
+                "type": "boolean"
+              },
+              "quality_floor": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "similarity": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 64
+              },
+              "per_cluster": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "hardlink",
+                  "copy",
+                  "reference"
+                ]
+              },
+              "cleanup": {
+                "type": "boolean"
+              },
+              "max_items": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2000
+              },
+              "max_review": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000
+              },
+              "max_scan": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2000
+              }
+            },
+            "additionalProperties": false
+          }
+        },
         "required": [
-          "path"
+          "library_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.organize.apply",
+      "description": "执行整理方案：把高置信条目沉淀进库，并按策略清理本次不再保留的自动条目",
+      "availability": "local",
+      "timeout_seconds": 600,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "run_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.organize.review.list",
+      "description": "列出整理方案里需要人工确认的条目",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "run_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.organize.review.decide",
+      "description": "处理复核队列：通过的入库，排除的跳过",
+      "availability": "local",
+      "timeout_seconds": 300,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "items": {
+              "type": "object",
+              "properties": {
+                "asset_id": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "accept": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "asset_id",
+                "accept"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "run_id",
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.organize.runs.list",
+      "description": "列出最近的自动整理运行记录",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.download.status",
+      "description": "检查媒体采集所需下载组件",
+      "availability": "local",
+      "timeout_seconds": 20,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "media-library.download.install",
+      "description": "安装固定版本的媒体下载组件",
+      "availability": "local",
+      "timeout_seconds": 600,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "force": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "media-library.remote.resolve",
+      "description": "解析媒体链接、格式与字幕",
+      "availability": "local",
+      "timeout_seconds": 90,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "playlist": {
+            "type": "boolean"
+          },
+          "max_items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "media-library.bookmark.save",
+      "description": "保存在线作品线索与备注",
+      "availability": "local",
+      "timeout_seconds": 20,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "source_url": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "kind": {
+            "enum": [
+              "image",
+              "video",
+              "audio"
+            ]
+          },
+          "author": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "preview_url": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "license": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "duration_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "tags": {
+            "type": "array",
+            "maxItems": 30,
+            "items": {
+              "type": "string",
+              "maxLength": 80
+            }
+          }
+        },
+        "required": [
+          "source_url"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "media-library.bookmark.list",
+      "description": "查询收藏的在线作品",
+      "availability": "local",
+      "timeout_seconds": 20,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "media-library.bookmark.remove",
+      "description": "移除收藏并保留已有素材",
+      "availability": "local",
+      "timeout_seconds": 20,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "remote_id": {
+            "type": "string",
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "remote_id"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "risk_level": "local_write",
+      "availability": "local",
+      "description": "创建可恢复的媒体采集任务",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "dest_dir": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "format_id": {
+            "type": "string",
+            "description": "单个原始视频格式 ID；与仅音频和清晰度上限互斥，独立视频流需 ffmpeg 合并音轨",
+            "maxLength": 200
+          },
+          "quality": {
+            "enum": [
+              "best",
+              "1080p",
+              "720p",
+              "480p"
+            ]
+          },
+          "audio_only": {
+            "type": "boolean"
+          },
+          "subtitles": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "maxLength": 50
+            }
+          },
+          "playlist": {
+            "type": "boolean"
+          },
+          "max_items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1024,
+            "maximum": 17179869184
+          },
+          "overwrite": {
+            "type": "boolean"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "thumbnail": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "extractor": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "duration_seconds": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "mode": {
+            "enum": [
+              "save",
+              "import"
+            ]
+          },
+          "library_id": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 8
+          },
+          "remote_id": {
+            "maxLength": 80,
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "bgm"
+            ]
+          }
+        },
+        "required": [
+          "url",
+          "idempotency_key"
+        ],
+        "additionalProperties": false
+      },
+      "timeout_seconds": 20,
+      "id": "media-library.acquisition.start"
+    },
+    {
+      "risk_level": "read_only",
+      "availability": "local",
+      "description": "读取采集任务状态",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "job_id": {
+            "pattern": "^acq-[a-f0-9]{32}$",
+            "type": "string"
+          }
+        }
+      },
+      "timeout_seconds": 20,
+      "id": "media-library.acquisition.status"
+    },
+    {
+      "risk_level": "read_only",
+      "availability": "local",
+      "description": "列出最近的媒体采集任务",
+      "input_schema": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "maximum": 100,
+            "minimum": 1
+          }
+        }
+      },
+      "timeout_seconds": 20,
+      "id": "media-library.acquisition.list"
+    },
+    {
+      "risk_level": "local_write",
+      "availability": "local",
+      "description": "取消采集并保留已完成文件",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "job_id": {
+            "pattern": "^acq-[a-f0-9]{32}$",
+            "type": "string"
+          }
+        }
+      },
+      "timeout_seconds": 20,
+      "id": "media-library.acquisition.cancel"
+    },
+    {
+      "risk_level": "local_write",
+      "availability": "local",
+      "description": "继续采集或仅重试入库与目录同步",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "job_id": {
+            "pattern": "^acq-[a-f0-9]{32}$",
+            "type": "string"
+          },
+          "use_current_account": {
+            "type": "boolean"
+          }
+        }
+      },
+      "timeout_seconds": 20,
+      "id": "media-library.acquisition.retry"
+    },
+    {
+      "risk_level": "local_write",
+      "availability": "local",
+      "description": "移除已结束的任务记录并保留文件",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "job_id": {
+            "pattern": "^acq-[a-f0-9]{32}$",
+            "type": "string"
+          }
+        }
+      },
+      "timeout_seconds": 20,
+      "id": "media-library.acquisition.remove"
+    },
+    {
+      "risk_level": "read_only",
+      "availability": "local",
+      "description": "读取脱敏的采集诊断信息",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "job_id": {
+            "pattern": "^acq-[a-f0-9]{32}$",
+            "type": "string"
+          }
+        }
+      },
+      "timeout_seconds": 20,
+      "id": "media-library.acquisition.log"
+    },
+    {
+      "description": "读取抖音平台连接状态",
+      "risk_level": "read_only",
+      "id": "media-library.account.status",
+      "timeout_seconds": 20,
+      "input_schema": {
+        "required": [],
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "availability": "local"
+    },
+    {
+      "description": "在独立官网窗口连接抖音",
+      "risk_level": "local_write",
+      "id": "media-library.account.connect",
+      "timeout_seconds": 20,
+      "input_schema": {
+        "required": [],
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "availability": "local"
+    },
+    {
+      "description": "断开媒体库的抖音连接",
+      "risk_level": "local_write",
+      "id": "media-library.account.disconnect",
+      "timeout_seconds": 20,
+      "input_schema": {
+        "required": [],
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "availability": "local"
+    },
+    {
+      "timeout_seconds": 20,
+      "availability": "local",
+      "description": "读取素材的全部来源和字幕附件",
+      "id": "media-library.holdings.provenance",
+      "risk_level": "read_only",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id"
+        ]
+      }
+    },
+    {
+      "timeout_seconds": 25,
+      "availability": "local",
+      "description": "联合检查资源库目录记录并去重",
+      "id": "media-library.catalog.inspect",
+      "risk_level": "read_only",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "limit": {
+            "maximum": 200,
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "library_id"
+        ]
+      }
+    },
+    {
+      "id": "media-library.discovery.providers",
+      "description": "查看平台搜索、预览和采集支持范围",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "media-library.discovery.search",
+      "description": "在平台官网搜索作品并返回可收藏及采集的稳定线索",
+      "availability": "local",
+      "timeout_seconds": 75,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "enum": [
+              "douyin",
+              "bilibili",
+              "youtube"
+            ]
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "request_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          }
+        },
+        "required": [
+          "provider",
+          "query"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.discovery.cancel",
+      "description": "取消指定的官网搜索，不改变平台连接和收藏",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          }
+        },
+        "required": [
+          "request_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.ui.geometry.get",
+      "description": "读取最近一次真实界面几何报告",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "media-library.ui.geometry.record",
+      "description": "保存不含文本和链接的真实界面几何",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "viewport": {
+            "type": "object"
+          },
+          "groups": {
+            "type": "array",
+            "maxItems": 5
+          },
+          "samples": {
+            "type": "array",
+            "maxItems": 50
+          },
+          "media": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "viewport",
+          "groups"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "local_write"
+    },
+    {
+      "id": "media-library.legacy.import",
+      "description": "幂等导入旧工具已结束记录并保留文件及原任务归属",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "type": "object",
+              "properties": {
+                "job_id": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9-]{1,64}$"
+                },
+                "status": {
+                  "enum": [
+                    "completed",
+                    "failed",
+                    "canceled",
+                    "queued",
+                    "running",
+                    "canceling"
+                  ]
+                },
+                "title": {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                "url": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "outputs": {
+                  "type": "array",
+                  "maxItems": 200,
+                  "items": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "finished_at": {
+                  "type": "string",
+                  "maxLength": 40
+                }
+              },
+              "required": [
+                "job_id",
+                "status",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.legacy.list",
+      "description": "读取已导入的旧下载历史引用",
+      "availability": "local",
+      "timeout_seconds": 15,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.audio.start",
+      "description": "从本地视频或音频提取片段并作为BGM入库",
+      "availability": "local",
+      "risk_level": "local_write",
+      "timeout_seconds": 180,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "library_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "start_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 86400000
+          },
+          "end_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 86400000
+          },
+          "format": {
+            "enum": [
+              "wav",
+              "mp3",
+              "m4a"
+            ]
+          },
+          "idempotency_key": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "asset_id",
+          "library_id",
+          "idempotency_key"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.music.discover",
+      "description": "按抖音视频样本识别音乐并统计用曲次数",
+      "availability": "local",
+      "risk_level": "local_write",
+      "timeout_seconds": 180,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "enum": [
+              "douyin"
+            ]
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "request_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          }
+        },
+        "required": [
+          "provider"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.remote.preview",
+      "description": "按需准备平台视频的临时播放预览",
+      "availability": "local",
+      "timeout_seconds": 100,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "request_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          }
+        },
+        "required": [
+          "url",
+          "request_id"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "media-library.remote.preview.cancel",
+      "description": "停止当前视频预览加载",
+      "availability": "local",
+      "timeout_seconds": 10,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          }
+        },
+        "required": [
+          "request_id"
+        ],
+        "additionalProperties": false
+      },
+      "risk_level": "read_only"
+    },
+    {
+      "id": "media-library.image.open",
+      "description": "从已登记图片打开编辑工作区",
+      "risk_level": "local_write",
+      "availability": "local",
+      "timeout_seconds": 300,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "output_reference": {
+            "type": "object",
+            "properties": {
+              "session_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3
+              }
+            },
+            "required": [
+              "session_id",
+              "index"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.image.get",
+      "description": "恢复图片版本与生成任务",
+      "risk_level": "read_only",
+      "availability": "local",
+      "timeout_seconds": 300,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.image.preview",
+      "description": "预览经过校验的图片编辑版本",
+      "risk_level": "read_only",
+      "availability": "local",
+      "timeout_seconds": 300,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "version_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "session_id",
+          "version_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.image.apply",
+      "description": "应用基础编辑并保留新版本",
+      "risk_level": "local_write",
+      "availability": "local",
+      "timeout_seconds": 300,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "version_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "crop": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 16384
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 16384
+                  },
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16384
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16384
+                  }
+                },
+                "required": [
+                  "x",
+                  "y",
+                  "width",
+                  "height"
+                ],
+                "additionalProperties": false
+              },
+              "rotate": {
+                "type": "integer",
+                "enum": [
+                  0,
+                  90,
+                  180,
+                  270
+                ]
+              },
+              "flip_h": {
+                "type": "boolean"
+              },
+              "flip_v": {
+                "type": "boolean"
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 16384
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 16384
+              },
+              "quality": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "format": {
+                "enum": [
+                  "png",
+                  "jpeg",
+                  "webp"
+                ]
+              }
+            },
+            "required": [
+              "format",
+              "quality"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "session_id",
+          "version_id",
+          "options"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.image.adopt",
+      "description": "另存图片版本并保留衍生来源",
+      "risk_level": "local_write",
+      "availability": "local",
+      "timeout_seconds": 300,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "version_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "library_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "session_id",
+          "version_id",
+          "library_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media-library.image.generate",
+      "description": "准备描述改图或局部蒙版请求",
+      "risk_level": "local_write",
+      "availability": "local",
+      "timeout_seconds": 300,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "version_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "mode": {
+            "enum": [
+              "describe",
+              "local",
+              "erase"
+            ]
+          },
+          "prompt": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "request_key": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 100
+          },
+          "strokes": {
+            "type": "array",
+            "maxItems": 128,
+            "items": {
+              "type": "object",
+              "properties": {
+                "radius": {
+                  "type": "number",
+                  "minimum": 0.001,
+                  "maximum": 0.25
+                },
+                "points": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 2000,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "y": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "radius",
+                "points"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "session_id",
+          "version_id",
+          "mode",
+          "request_key"
         ],
         "additionalProperties": false
       }
     }
   ],
-  "plugin_dependencies": [],
+  "plugin_dependencies": [
+    {
+      "plugin_id": "com.himind.media-toolkit",
+      "min_version": "2.4.0",
+      "required": false
+    }
+  ],
   "permissions": [
     "secret.broker.acquire",
     "filesystem.workspace.read",
@@ -660,7 +3199,11 @@
         "quick_access": true,
         "order": 60,
         "location": "plugin_navigation",
-        "entry": "ui/index.html"
+        "entry": "ui/index.html",
+        "external_capabilities": [
+          "media.ai.*",
+          "media.downloader.job.list"
+        ]
       }
     ],
     "commands": [
@@ -693,6 +3236,10 @@
         "title": "查看资源库"
       },
       {
+        "id": "media-library.holdings.items",
+        "title": "浏览库内容"
+      },
+      {
         "id": "media-library.repository.update",
         "title": "修改资源库"
       },
@@ -721,6 +3268,102 @@
         "title": "检索资源库与候选资源"
       },
       {
+        "id": "media-library.runtime.status",
+        "title": "检查媒体运行时"
+      },
+      {
+        "id": "media-library.asset.enrich",
+        "title": "补全素材信息"
+      },
+      {
+        "id": "media-library.asset.detail",
+        "title": "读取素材详情"
+      },
+      {
+        "id": "media-library.asset.thumbnail",
+        "title": "读取素材缩略图"
+      },
+      {
+        "id": "media-library.asset.facets",
+        "title": "查看素材分布"
+      },
+      {
+        "id": "media-library.asset.user-state",
+        "title": "读取素材标记"
+      },
+      {
+        "id": "media-library.asset.tags.set",
+        "title": "保存素材标签"
+      },
+      {
+        "id": "media-library.asset.rating.set",
+        "title": "保存素材评分"
+      },
+      {
+        "id": "media-library.asset.note.set",
+        "title": "保存素材备注"
+      },
+      {
+        "id": "media-library.asset.ai-cache.get",
+        "title": "读取 AI 缓存"
+      },
+      {
+        "id": "media-library.asset.ai-cache.set",
+        "title": "写入 AI 缓存"
+      },
+      {
+        "id": "media-library.ai.budget",
+        "title": "查询 AI 预算"
+      },
+      {
+        "id": "media-library.ai.job.set",
+        "title": "记录 AI 作业"
+      },
+      {
+        "id": "media-library.ai.job.get",
+        "title": "读取 AI 作业"
+      },
+      {
+        "id": "media-library.ai.job.clear",
+        "title": "清除 AI 作业"
+      },
+      {
+        "id": "media-library.selection.create",
+        "title": "创建精选集"
+      },
+      {
+        "id": "media-library.selection.list",
+        "title": "查看精选集"
+      },
+      {
+        "id": "media-library.selection.detail",
+        "title": "查看精选详情"
+      },
+      {
+        "id": "media-library.selection.auto",
+        "title": "自动预选"
+      },
+      {
+        "id": "media-library.selection.decide",
+        "title": "调整精选状态"
+      },
+      {
+        "id": "media-library.selection.decide.batch",
+        "title": "批量调整精选"
+      },
+      {
+        "id": "media-library.selection.summary",
+        "title": "查看精选与精选库"
+      },
+      {
+        "id": "media-library.asset.reveal",
+        "title": "在文件夹中显示"
+      },
+      {
+        "id": "media-library.selection.promote",
+        "title": "加入精选库"
+      },
+      {
         "id": "media-library.asset.adopt",
         "title": "采纳到资源库"
       },
@@ -731,6 +3374,26 @@
       {
         "id": "media-library.asset.preview",
         "title": "预览媒体素材"
+      },
+      {
+        "id": "media-library.organize.plan",
+        "title": "生成自动整理方案"
+      },
+      {
+        "id": "media-library.organize.apply",
+        "title": "执行自动整理"
+      },
+      {
+        "id": "media-library.organize.review.list",
+        "title": "查看待复核条目"
+      },
+      {
+        "id": "media-library.organize.review.decide",
+        "title": "处理复核队列"
+      },
+      {
+        "id": "media-library.organize.runs.list",
+        "title": "查看整理记录"
       }
     ]
   },
@@ -795,5 +3458,16 @@
         }
       ]
     }
+  ],
+  "capability_dependencies": [
+    "media.toolkit.recipe.run",
+    "media.provider.catalog",
+    "media.job.start",
+    "media.job.get",
+    "media.job.list",
+    "media.job.cancel",
+    "media.asset.import",
+    "media.audio.voice.list",
+    "media.toolkit.image.convert"
   ]
 }

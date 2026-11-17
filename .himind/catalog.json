@@ -1123,7 +1123,7 @@
       "artifact_id": "github:skill/com.himind.skill.mcp-experience-feedback@1.0.1:com.himind.skill.mcp-experience-feedback-1.0.1.hmskill",
       "artifact_sha256": "aa91c8ae793ece56d606f8583064c2463b6078a53bdcaeb29886b38e05d75a18",
       "assignment": "optional",
-      "author_name": "超级管理员",
+      "author_name": "马宝全",
       "capability_ids": [],
       "categories": [
         "software-engineering",
@@ -1360,7 +1360,7 @@
       "artifact_id": "github:skill/com.himind.skill.software-ui-spec@1.0.1:com.himind.skill.software-ui-spec-1.0.1.hmskill",
       "artifact_sha256": "da9a15ae3d5694b49bcc2cccf830e342d806004f666478bf412b988ebc946247",
       "assignment": "optional",
-      "author_name": "超级管理员",
+      "author_name": "马宝全",
       "capability_ids": [],
       "categories": [
         "visual-design",

@@ -8,8 +8,8 @@
     "video-post"
   ],
   "description": "按需下载模型理解媒体内容：先把语音与歌词转写成带时间戳的文本，用于定位动作时点。",
-  "release_notes": "1.2.0：显示名改为「媒体理解工具」（原「媒体智能」用了规范禁用词），并补齐命令，使能力可在命令面板检索。",
-  "version": "1.2.0",
+  "release_notes": "识别前检查数字静音，避免全零音频产生虚构字幕，保留低音量语音与作业恢复。",
+  "version": "1.2.3",
   "entry": "bin/media-ai.exe",
   "runtime": "process-jsonrpc-stdio",
   "platforms": [

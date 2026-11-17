@@ -111,7 +111,8 @@ func TestMediaLibraryUIAcceptanceContract(t *testing.T) {
 		requireContains(t, js, `state.lastFocus`, "A5")
 		requireContains(t, js, `document.body.classList.add('has-overlay')`, "A5")
 		requireContains(t, js, `event.key === 'ArrowRight'`, "A5")
-		escapeHandler := between(t, js, `document.addEventListener('keydown'`, `});`)
+		// Scope the keyboard handlers explicitly; a nested promise callback also ends with });.
+		escapeHandler := between(t, js, `// Capture Escape before`, `async function start()`)
 		settingsAt := strings.Index(escapeHandler, `if (state.settingsOpen) void closeSettings()`)
 		previewAt := strings.Index(escapeHandler, `else if (state.previewOpen) closePreview()`)
 		if settingsAt < 0 || previewAt < 0 || settingsAt > previewAt {
@@ -241,6 +242,47 @@ func TestMediaLibraryUIAcceptanceContract(t *testing.T) {
 		requireContains(t, js, "function showConfirm(options)", "Confirm")
 		requireContains(t, js, "function resolveConfirm(value)", "Confirm")
 		requireAbsent(t, js, "window.confirm", "Confirm")
+	})
+
+	t.Run("Curated library management lives in its own view", func(t *testing.T) {
+		requireContains(t, html, `id="view-tab-library"`, "Library")
+		requireContains(t, html, `id="view-library"`, "Library")
+		for _, id := range []string{"library-list", "library-view-name", "library-rescan", "library-sync", "library-trash-toggle", "library-remove", "library-restore", "library-select-all", "library-view-toggle"} {
+			requireContains(t, html, id, "Library")
+		}
+		requireAbsent(t, html, "id=\"library-dialog-title\"", "Library")
+		for _, fn := range []string{"function openLibraryView(libraryID)", "function removeSelectedLibraryItems()", "function restoreLibraryItemsByIDs(ids)", "function syncCurrentLibrary()", "function rescanCurrentLibrary()"} {
+			requireContains(t, js, fn, "Library")
+		}
+		requireContains(t, js, "media-library.holdings.item.remove", "Library")
+		requireContains(t, js, "media-library.holdings.sync", "Library")
+		requireContains(t, manifest, "media-library.holdings.item.remove", "Library")
+		requireContains(t, manifest, "media-library.holdings.item.restore", "Library")
+		requireContains(t, manifest, "media-library.holdings.trash.list", "Library")
+		requireContains(t, manifest, "media-library.holdings.rescan", "Library")
+		requireContains(t, manifest, "media-library.holdings.sync", "Library")
+		if countOccurrences(html, `id="library-name"`) != 1 {
+			t.Fatal("Library: settings input and view heading must not share an id")
+		}
+	})
+
+	t.Run("Automatic organize keeps humans on the exception path", func(t *testing.T) {
+		for _, id := range []string{"library-organize", "organize-panel", "organize-title", "organize-status", "organize-review", "organize-back", "organize-accept-all", "organize-reject-all"} {
+			requireContains(t, html, id, "Organize")
+		}
+		for _, fn := range []string{"function organizeCurrentLibrary()", "function runOrganizeAI(view, assetIDs)", "function openOrganizeReview()", "function decideOrganizeItems(assetIDs, accept)"} {
+			requireContains(t, js, fn, "Organize")
+		}
+		requireContains(t, js, "media-library.organize.plan", "Organize")
+		requireContains(t, js, "media-library.organize.apply", "Organize")
+		requireContains(t, js, "media-library.organize.review.list", "Organize")
+		requireContains(t, js, "media-library.organize.review.decide", "Organize")
+		requireContains(t, js, "media.ai.tag.batch.start", "Organize")
+		for _, capability := range []string{"media-library.organize.plan", "media-library.organize.apply", "media-library.organize.review.list", "media-library.organize.review.decide", "media-library.organize.runs.list"} {
+			requireContains(t, manifest, capability, "Organize")
+		}
+		requireContains(t, css, ".review-row", "Organize")
+		requireContains(t, css, ".organize-count", "Organize")
 	})
 
 }

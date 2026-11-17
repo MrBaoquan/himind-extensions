@@ -7,6 +7,7 @@ package image
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -19,6 +20,10 @@ import (
 
 // Options 一次图片转换的用户意图。
 type Options struct {
+	Crop         *Crop  `json:"crop,omitempty"`
+	Rotate       int    `json:"rotate,omitempty"`
+	FlipH        bool   `json:"flip_h,omitempty"`
+	FlipV        bool   `json:"flip_v,omitempty"`
 	Format       string `json:"format"`
 	Width        int    `json:"width,omitempty"`
 	Height       int    `json:"height,omitempty"`
@@ -27,6 +32,26 @@ type Options struct {
 	Suffix       string `json:"suffix,omitempty"`
 	NameTemplate string `json:"name_template,omitempty"`
 	Overwrite    bool   `json:"overwrite,omitempty"`
+}
+
+// Crop uses pixels of the decoded input, before rotation, flips and resizing.
+type Crop struct {
+	X      int `json:"x"`
+	Y      int `json:"y"`
+	Width  int `json:"width"`
+	Height int `json:"height"`
+}
+
+func ValidateTransform(o Options, width, height int) error {
+	if o.Rotate != 0 && o.Rotate != 90 && o.Rotate != 180 && o.Rotate != 270 {
+		return errors.New("旋转角度应为 0、90、180 或 270")
+	}
+	if c := o.Crop; c != nil {
+		if c.X < 0 || c.Y < 0 || c.Width < 1 || c.Height < 1 || c.X > width-c.Width || c.Y > height-c.Height {
+			return errors.New("裁剪区域必须在原图像素范围内")
+		}
+	}
+	return nil
 }
 
 // Output 单个产物的结果。
@@ -113,8 +138,29 @@ func ConvertBatch(ctx context.Context, tools ffmpeg.Tools, inputs []string, outp
 	if options.Width > 16384 || options.Height > 16384 {
 		return BatchResult{}, errors.New("宽高上限为 16384")
 	}
-	if options.Width%2 != 0 || options.Height%2 != 0 {
-		return BatchResult{}, errors.New("宽高必须是偶数，避免部分编码器静默取整")
+	// Raster images allow odd pixel dimensions. No video chroma rounding here.
+	if err := ValidateTransform(options, 16384, 16384); err != nil {
+		return BatchResult{}, err
+	}
+	if options.Crop != nil {
+		for _, input := range inputs {
+			raw, err := tools.ProbeJSON(ctx, []string{"-select_streams", "v:0", "-show_entries", "stream=width,height", input})
+			if err != nil {
+				return BatchResult{}, err
+			}
+			var info struct {
+				Streams []struct {
+					Width  int `json:"width"`
+					Height int `json:"height"`
+				} `json:"streams"`
+			}
+			if json.Unmarshal([]byte(raw), &info) != nil || len(info.Streams) != 1 {
+				return BatchResult{}, errors.New("无法读取图片尺寸")
+			}
+			if err := ValidateTransform(options, info.Streams[0].Width, info.Streams[0].Height); err != nil {
+				return BatchResult{}, err
+			}
+		}
 	}
 	background, err := normalizeBackground(options.Background)
 	if err != nil {
@@ -220,7 +266,7 @@ func convertOne(ctx context.Context, tools ffmpeg.Tools, input, output string, s
 	args = append(args, qualityArgs(spec.Name, options.Quality)...)
 	switch spec.Name {
 	case "jpeg":
-		args = append(args, "-pix_fmt", "yuvj420p")
+		args = append(args, "-pix_fmt", "yuvj444p")
 	case "tiff":
 		args = append(args, "-compression_algo", "deflate")
 	case "gif":
@@ -253,15 +299,32 @@ func convertOne(ctx context.Context, tools ffmpeg.Tools, input, output string, s
 
 func filtersFor(options Options, background string) string {
 	filters := make([]string, 0, 2)
+	if c := options.Crop; c != nil {
+		filters = append(filters, fmt.Sprintf("crop=%d:%d:%d:%d:exact=1", c.Width, c.Height, c.X, c.Y))
+	}
+	switch options.Rotate {
+	case 90:
+		filters = append(filters, "transpose=1")
+	case 180:
+		filters = append(filters, "hflip", "vflip")
+	case 270:
+		filters = append(filters, "transpose=2")
+	}
+	if options.FlipH {
+		filters = append(filters, "hflip")
+	}
+	if options.FlipV {
+		filters = append(filters, "vflip")
+	}
 	switch {
 	case options.Width > 0 && options.Height > 0:
 		filters = append(filters,
 			fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=decrease", options.Width, options.Height),
 			fmt.Sprintf("pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=%s", options.Width, options.Height, background))
 	case options.Width > 0:
-		filters = append(filters, fmt.Sprintf("scale=%d:-2", options.Width))
+		filters = append(filters, fmt.Sprintf("scale=%d:-1", options.Width))
 	case options.Height > 0:
-		filters = append(filters, fmt.Sprintf("scale=-2:%d", options.Height))
+		filters = append(filters, fmt.Sprintf("scale=-1:%d", options.Height))
 	}
 	return strings.Join(filters, ",")
 }

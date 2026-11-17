@@ -2,7 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'himind.media-downloader.settings.v1';
-  const VERSION = '0.2.2';
+  const VERSION = '0.2.8';
 
   const DEFAULT_SETTINGS = {
     defaultDest: '',
@@ -28,6 +28,9 @@
     runtime: null,
     media: null,
     mediaInput: '',
+    mediaPlaylist: false,
+    pendingProbe: null,
+    startingJob: false,
     jobs: [],
     activeJobs: [],
     recentJobs: [],
@@ -41,6 +44,8 @@
     currentView: 'overview',
     jobsLoaded: false,
     loadingJobs: false,
+    jobsError: '',
+    installingRuntime: false,
     timer: null,
     probeToken: 0,
     jobsRequestSeq: 0,
@@ -52,6 +57,11 @@
     drawerLogError: '',
     confirmResolve: null,
     focusBeforeDialog: null,
+    site: null,
+    siteTimer: null,
+    siteBusy: false,
+    resumeProbe: null,
+    siteRequestSeq: 0,
     settings: loadSettings(),
   };
 
@@ -75,6 +85,16 @@
   }
 
   function describe(error) {
+    const message = typeof error === 'string' ? error : error && error.message;
+    if (typeof message === 'string') {
+      const rpc = message.match(/^plugin capability [\w.-]+ failed: (\{[\s\S]*\})$/);
+      if (rpc) {
+        try {
+          const detail = JSON.parse(rpc[1]);
+          if (typeof detail.message === 'string') return detail.message;
+        } catch (_) {}
+      }
+    }
     if (error && error.code === 'bridge_unavailable') return error.message;
     if (typeof error === 'string') return error;
     if (error && error.message) return error.message;
@@ -191,7 +211,7 @@
   function syncDestinationDefaults() {
     const resolved = systemDownloadsDir();
     if (el('setting-dest')) {
-      if (document.activeElement !== el('setting-dest')) el('setting-dest').value = state.settings.defaultDest || '';
+      if (document.activeElement !== el('setting-dest') && !(window.MediaDesktop && window.MediaDesktop.hasSettingsDraft())) el('setting-dest').value = state.settings.defaultDest || '';
       el('setting-dest').placeholder = resolved;
     }
     if (el('setting-dest-hint')) {
@@ -281,6 +301,7 @@
       if (isSetting) {
         if (el('setting-dest')) el('setting-dest').value = path;
       }
+      if (el(targetId)) el(targetId).dispatchEvent(new Event('input', { bubbles: true }));
       updateDownloadSummary();
     } catch (error) {
       toast('选择目录失败：' + describe(error), 'error');
@@ -313,8 +334,10 @@
   function saveSettings() {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state.settings));
+      return true;
     } catch (_) {
       // 本地存储不可用时，设置只在当前会话生效。
+      return false;
     }
   }
 
@@ -420,15 +443,22 @@
   }
 
   function openSidebar() {
+    if (el('sidebar')) el('sidebar').inert = false;
     if (el('sidebar')) el('sidebar').classList.add('open');
     if (el('sidebar-scrim')) el('sidebar-scrim').hidden = false;
     if (el('sidebar-toggle')) el('sidebar-toggle').setAttribute('aria-expanded', 'true');
+    const first = qs('.nav-item', el('sidebar'));
+    if (first) first.focus();
   }
 
   function closeSidebar() {
+    const sidebar = el('sidebar');
+    const hadFocus = sidebar && sidebar.contains(document.activeElement);
     if (el('sidebar')) el('sidebar').classList.remove('open');
     if (el('sidebar-scrim')) el('sidebar-scrim').hidden = true;
     if (el('sidebar-toggle')) el('sidebar-toggle').setAttribute('aria-expanded', 'false');
+    if (sidebar && window.matchMedia) sidebar.inert = window.matchMedia('(max-width: 900px)').matches;
+    if (hadFocus && el('sidebar-toggle')) el('sidebar-toggle').focus();
   }
 
   function prepareOverlay() {
@@ -484,7 +514,8 @@
     el('page-title').textContent = meta.title;
     el('page-subtitle').textContent = meta.subtitle;
     closeSidebar();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const content = el('workspace-content');
+    if (content) content.scrollTo({ top: 0, behavior: 'auto' });
     if (view === 'tasks' && (!state.jobsLoaded || (options && options.refresh))) {
       void loadJobs({ silent: false });
     }
@@ -521,6 +552,18 @@
       case 'broken': return '不可用';
       case 'error': return '检查失败';
       default: return runtime.state || '未知';
+    }
+  }
+
+  function runtimeMessage(runtime) {
+    if (!runtime) return '检查下载组件是否可用。';
+    switch (runtime.state) {
+      case 'ready': return runtime.ffmpeg_path ? '下载组件已就绪，可以解析链接并下载。' : '下载组件可用；未检测到 ffmpeg，仅支持自带音轨的视频格式。';
+      case 'outdated': return '下载组件可用，但版本与推荐版本不同。可安装推荐版本，或继续使用当前版本。';
+      case 'missing': return '尚未安装下载组件。点击“安装下载组件”后即可解析链接。';
+      case 'broken': return '下载组件无法启动，请重新安装后重试。';
+      case 'error': return '无法检查下载组件，请重新检查；错误详情可在诊断信息中查看。';
+      default: return '请重新检查下载组件。';
     }
   }
 
@@ -566,28 +609,23 @@
     if (overviewBody) {
       const ytDetail = ytdlpReady
         ? (runtime.version || '已安装') + (runtime.source ? ' · ' + runtime.source : '')
-        : (runtime && runtime.message ? runtime.message : '尚未安装或无法启动');
+        : runtimeMessage(runtime);
       const ffDetail = ffmpegReady
-        ? (runtime.ffmpeg_version || '已安装') + ' · 合并与音频提取可用'
+        ? '合并与音频提取可用'
         : '未检测到，部分格式与仅音频不可用';
       overviewBody.innerHTML =
         '<div class="health-row"><span class="dot ' + (ytdlpReady ? 'ok' : 'error') + '"></span><div><strong>yt-dlp ' + escapeHtml(ytdlpReady ? '可用' : '不可用') + '</strong><span class="truncate" title="' + escapeHtml(ytDetail) + '">' + escapeHtml(ytDetail) + '</span></div></div>' +
         '<div class="health-row"><span class="dot ' + (ffmpegReady ? 'ok' : 'warn') + '"></span><div><strong>ffmpeg ' + escapeHtml(ffmpegReady ? '可用' : '未检测到') + '</strong><span class="truncate" title="' + escapeHtml(ffDetail) + '">' + escapeHtml(ffDetail) + '</span></div></div>';
     }
-    if (el('overview-install')) el('overview-install').hidden = ready;
+    if (el('overview-install')) el('overview-install').hidden = ready && !state.installingRuntime;
 
     const orb = el('runtime-orb');
     if (orb) orb.className = 'runtime-orb ' + (tone === 'ok' ? 'ok' : tone === 'warn' ? 'warn' : tone === 'error' ? 'error' : 'muted');
     if (el('runtime-title')) el('runtime-title').textContent = runtime ? (ready ? '运行时已就绪' : '运行时' + runtimeStateLabel(runtime)) : '尚未检查';
     if (el('runtime-message')) {
-      const message = runtime && runtime.message
-        ? runtime.message
-        : ready
-          ? 'yt-dlp 与 ffmpeg 均已就绪，可以解析链接并执行下载。'
-          : '检查 yt-dlp 与 ffmpeg 是否可用。安装器只下载固定版本并校验 SHA-256。';
-      el('runtime-message').textContent = message;
+      el('runtime-message').textContent = runtimeMessage(runtime);
     }
-    if (el('runtime-install-btn')) el('runtime-install-btn').hidden = ready;
+    if (el('runtime-install-btn')) el('runtime-install-btn').hidden = ready && !state.installingRuntime;
 
     const ytdlpBadge = el('ytdlp-status');
     if (ytdlpBadge) {
@@ -632,23 +670,47 @@
         : '';
     }
     syncDestinationDefaults();
+    if (window.MediaDesktop) window.MediaDesktop.syncControls();
   }
 
-  async function installRuntime(button) {
-    if (button) button.disabled = true;
+  function setInstallBusy(busy) {
+    ['runtime-install-btn', 'overview-install'].forEach((id) => {
+      const button = el(id);
+      button.disabled = busy;
+      button.setAttribute('aria-busy', String(busy));
+      const label = button.querySelector('span');
+      if (label) label.textContent = busy ? '正在安装…' : '安装下载组件';
+      else button.textContent = busy ? '正在安装…' : '安装下载组件';
+    });
+  }
+
+  async function installRuntime() {
+    if (state.installingRuntime) return;
+    state.installingRuntime = true;
+    setInstallBusy(true);
+    const status = el('runtime-install-state');
+    status.hidden = false;
+    status.className = 'inline-state info';
+    status.textContent = '正在下载并校验组件，完成前请保留此窗口。最长约 10 分钟；下载速度取决于网络。';
     try {
-      const result = await bridgeInvoke('media.downloader.runtime.install', {});
-      toast(result && result.message ? result.message : '运行时已安装。', 'success', 6000);
+      await bridgeInvoke('media.downloader.runtime.install', {});
+      status.className = 'inline-state success';
+      status.textContent = '下载组件已安装。';
+      toast('下载组件已安装。', 'success');
       await loadRuntime({ silent: true });
     } catch (error) {
-      toast('安装运行时失败：' + describe(error), 'error', 7000);
+      status.className = 'inline-state error';
+      status.textContent = '安装失败：' + describe(error) + '。请检查网络后重试。';
     } finally {
-      if (button) button.disabled = false;
+      state.installingRuntime = false;
+      setInstallBusy(false);
+      renderRuntime();
     }
   }
 
   function setProbeState(kind, message, busy) {
     const node = el('probe-state');
+    el('url').setAttribute('aria-invalid', kind === 'error' && !state.media ? 'true' : 'false');
     if (!message) {
       node.hidden = true;
       node.textContent = '';
@@ -657,7 +719,19 @@
     }
     node.hidden = false;
     node.className = 'inline-state' + (kind ? ' ' + kind : '');
-    node.innerHTML = (busy ? '<span class="spinner"></span>' : '') + '<span>' + escapeHtml(message) + '</span>';
+    node.innerHTML = (busy ? '<span class="spinner" aria-hidden="true"></span>' : '') + '<span>' + escapeHtml(message) + '</span>';
+  }
+
+  function setProbeBusy(busy) {
+    el('probe-button').disabled = busy;
+    el('probe-button').setAttribute('aria-busy', String(busy));
+    el('probe-button').querySelector('span').textContent = busy ? '正在解析…' : '解析链接';
+    el('cancel-probe').hidden = !busy;
+  }
+
+  function mediaMatchesInput() {
+    return !!state.media && state.mediaInput === el('url').value.trim()
+      && state.mediaPlaylist === el('playlist').checked;
   }
 
   function validateMediaUrl(value) {
@@ -674,8 +748,11 @@
   }
 
   async function probe() {
-    const button = el('probe-button');
     const raw = el('url').value.trim();
+    const playlist = el('playlist').checked;
+    if (state.pendingProbe && state.pendingProbe.raw === raw && state.pendingProbe.playlist === playlist) return;
+    invalidateProbe();
+    state.resumeProbe = null;
     if (!raw) {
       setProbeState('error', '请先输入媒体链接。');
       el('url').focus();
@@ -689,28 +766,40 @@
       return;
     }
     const token = ++state.probeToken;
-    button.disabled = true;
+    state.pendingProbe = { token, raw, playlist };
+    setProbeBusy(true);
     setComposerStep(2);
-    setProbeState('', '正在解析媒体信息，播放列表可能需要更长时间…', true);
+    setProbeState('', '正在解析，通常需要数秒，最长约 75 秒。可停止等待并重新输入。', true);
     try {
       const result = await bridgeInvoke('media.downloader.info.get', {
         url: url,
-        playlist: el('playlist').checked,
+        playlist: playlist,
         max_items: 200,
       });
       if (token !== state.probeToken) return;
+      if (raw !== el('url').value.trim() || playlist !== el('playlist').checked) {
+        invalidateProbe('输入已更改，请重新解析。');
+        return;
+      }
       state.media = result || null;
       state.mediaInput = raw;
+      state.mediaPlaylist = playlist;
       renderMedia(result || {});
       showComposerOptions(true);
       setComposerStep(3);
       setComposerBadge('已解析', 'completed');
       setProbeState('success', '解析完成，确认保存位置后即可开始下载。');
       window.setTimeout(() => {
-        if (el('download-step-options')) el('download-step-options').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (token === state.probeToken && el('download-step-options')) el('download-step-options').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }, 60);
     } catch (error) {
       if (token !== state.probeToken) return;
+      const siteNeeded = /site_connection_(required|expired)/.test(describe(error));
+      if (siteNeeded) {
+        state.resumeProbe = { raw, playlist, token };
+        state.site = { state: /site_connection_expired/.test(describe(error)) ? 'expired' : 'disconnected' };
+        renderSite();
+      }
       state.media = null;
       state.mediaInput = '';
       el('info-card').hidden = true;
@@ -718,12 +807,78 @@
       showComposerOptions(false);
       setComposerStep(1);
       setComposerBadge('解析失败', 'failed');
-      setProbeState('error', '解析失败：' + describe(error));
+      setProbeState('error', siteNeeded ? '请连接抖音，完成后会继续解析当前链接。' : state.runtime && state.runtime.state === 'missing'
+        ? runtimeMessage(state.runtime) : '解析失败：' + describe(error));
       updateDownloadSummary();
       updateStartState();
     } finally {
-      if (token === state.probeToken) button.disabled = false;
+      if (token === state.probeToken) {
+        state.pendingProbe = null;
+        setProbeBusy(false);
+        updateStartState();
+      }
     }
+  }
+
+  function renderSite() {
+    const site = state.site || {};
+    const connecting = state.siteBusy || site.state === 'connecting';
+    const connected = site.state === 'connected';
+    const label = connecting ? '正在连接…' : connected ? '重新连接' : site.state === 'expired' ? '重新连接' : '连接抖音';
+    const text = connecting ? '请在抖音窗口完成连接，返回后会自动继续。' : connected ? '已连接 · 解析和下载自动复用' : site.state === 'expired' ? '连接已过期，请重新连接。' : site.message || '连接一次，后续解析和下载自动复用。';
+    for (const id of ['site-inline-status', 'site-settings-status']) if (el(id)) el(id).textContent = text;
+    for (const id of ['site-connect', 'site-settings-connect']) if (el(id)) { el(id).textContent = label; el(id).disabled = connecting; }
+    if (el('site-disconnect')) { el('site-disconnect').hidden = !connected && !connecting && site.state !== 'expired'; el('site-disconnect').disabled = state.siteBusy; el('site-disconnect').textContent = connecting ? '取消连接' : '断开'; }
+    if (el('site-inline-cancel')) { el('site-inline-cancel').hidden = !connecting; el('site-inline-cancel').disabled = state.siteBusy; }
+    if (el('site-connection')) el('site-connection').hidden = !state.resumeProbe;
+  }
+
+  async function loadSite() {
+    const seq = ++state.siteRequestSeq;
+    try {
+      const site = await bridgeInvoke('media.downloader.site.status', {});
+      if (seq !== state.siteRequestSeq) return;
+      state.site = site;
+      renderSite();
+      if (site.state === 'connecting') scheduleSitePoll();
+      else if (site.state === 'connected' && state.resumeProbe) {
+        const pending = state.resumeProbe;
+        state.resumeProbe = null;
+        renderSite();
+        if (pending.token === state.probeToken && pending.raw === el('url').value.trim() && pending.playlist === el('playlist').checked) await probe();
+      }
+    } catch (_) {
+      if (seq !== state.siteRequestSeq) return;
+      state.site = { state: 'unknown', message: '暂时无法读取连接状态，请稍后重试。' };
+      renderSite();
+    }
+  }
+
+  function scheduleSitePoll() {
+    if (state.siteTimer) window.clearTimeout(state.siteTimer);
+    state.siteTimer = window.setTimeout(() => { state.siteTimer = null; void loadSite(); }, 1800);
+  }
+
+  async function connectSite() {
+    if (state.siteBusy || (state.site && state.site.state === 'connecting')) return;
+    state.siteBusy = true; renderSite();
+    ++state.siteRequestSeq;
+    try {
+      state.site = await bridgeInvoke('media.downloader.site.connect', {});
+      scheduleSitePoll();
+    } catch (error) { toast('打开连接窗口失败：' + describe(error), 'error'); }
+    finally { state.siteBusy = false; renderSite(); }
+  }
+
+  async function disconnectSite() {
+    if (state.siteBusy) return;
+    if (!(await askConfirm('断开抖音连接', '清除本机保存的站点会话，并停止使用该会话的下载。下次解析抖音链接时需要重新连接；已下载文件不受影响。', '断开', 'danger'))) return;
+    state.siteBusy = true; ++state.siteRequestSeq;
+    if (state.siteTimer) window.clearTimeout(state.siteTimer);
+    state.resumeProbe = null; invalidateProbe(); renderSite();
+    try { state.site = await bridgeInvoke('media.downloader.site.disconnect', {}); toast('抖音连接已断开。', 'success'); }
+    catch (error) { toast('断开失败：' + describe(error), 'error'); }
+    finally { state.siteBusy = false; renderSite(); }
   }
 
   function renderMedia(media) {
@@ -765,13 +920,16 @@
     const format = el('format');
     format.innerHTML = '<option value="">自动选择</option>';
     const formats = (media.formats || []).slice().sort((left, right) => (right.height || 0) - (left.height || 0));
-    formats.slice(0, 80).forEach((item) => {
+    formats.filter((item) => item.vcodec && item.vcodec !== 'none'
+      && ((item.acodec && item.acodec !== 'none') || (state.runtime && state.runtime.ffmpeg_path)))
+      .slice(0, 80).forEach((item) => {
       const option = document.createElement('option');
       option.value = item.format_id;
       const resolution = item.resolution || (item.height ? item.height + 'p' : '');
       const codec = item.vcodec && item.vcodec !== 'none' ? item.vcodec : (item.acodec && item.acodec !== 'none' ? item.acodec : '');
       const size = item.filesize || item.filesize_approx;
-      const label = [item.format_id, resolution, item.ext, codec, size ? formatBytes(size) : ''].filter(Boolean).join(' · ');
+      const kind = item.acodec && item.acodec !== 'none' ? '音视频' : '视频 · 自动合并音频';
+      const label = [kind, item.format_id, resolution, item.ext, codec, size ? formatBytes(size) : ''].filter(Boolean).join(' · ');
       option.textContent = label || item.format_id;
       format.appendChild(option);
     });
@@ -815,14 +973,23 @@
 
   function updateDownloadSummary() {
     const media = state.media;
+    const rawFormat = !!el('format').value;
+    const audioOnly = el('audio-only').checked;
+    el('quality').disabled = rawFormat || audioOnly;
+    el('audio-only').disabled = rawFormat;
+    el('format').disabled = audioOnly;
+    el('format-hint').textContent = rawFormat
+      ? '使用所选原始格式，清晰度由该格式决定；独立视频流将自动合并音频。'
+      : audioOnly ? '仅音频模式自动选择音轨，不应用视频清晰度。'
+        : '通常使用自动选择。原始格式仅列出音视频或可自动合并音频的视频流。';
     const qualityValue = el('quality') ? el('quality').value : state.settings.defaultQuality;
     const qualityLabel = el('quality') && el('quality').selectedOptions[0] ? el('quality').selectedOptions[0].textContent : qualityValue;
     const formatSelect = el('format');
     const formatLabel = formatSelect && formatSelect.selectedOptions[0] ? formatSelect.selectedOptions[0].textContent : '自动选择';
     const dest = el('dest-dir') ? el('dest-dir').value.trim() || defaultDestination() : defaultDestination();
     const subs = selectedSubtitles();
-    if (el('summary-quality')) el('summary-quality').textContent = qualityLabel;
-    if (el('summary-format')) el('summary-format').textContent = formatLabel;
+    if (el('summary-quality')) el('summary-quality').textContent = rawFormat ? '由原始格式决定' : audioOnly ? '不适用（仅音频）' : qualityLabel;
+    if (el('summary-format')) el('summary-format').textContent = audioOnly ? '自动选择音轨' : formatLabel;
     if (el('summary-dest')) {
       el('summary-dest').textContent = dest;
       el('summary-dest').title = dest;
@@ -854,7 +1021,7 @@
 
   function updateStartState() {
     const runtimeReady = !!state.runtime && (state.runtime.state === 'ready' || state.runtime.state === 'outdated');
-    const ready = !!state.media && runtimeReady;
+    const ready = mediaMatchesInput() && runtimeReady && !state.pendingProbe && !state.startingJob;
     if (el('start-button')) el('start-button').disabled = !ready;
   }
 
@@ -867,6 +1034,8 @@
         return;
       }
       el('url').value = text.trim();
+      el('url').dispatchEvent(new Event('input', { bubbles: true }));
+      invalidateProbe('已粘贴新链接，请解析。');
       el('url').focus();
       toast('已粘贴链接，点击“解析”继续。', 'success');
     } catch (error) {
@@ -875,7 +1044,8 @@
   }
 
   function resetComposer() {
-    state.probeToken += 1;
+    if (window.MediaDesktop) window.MediaDesktop.clearComposerDraft();
+    invalidateProbe();
     state.media = null;
     state.mediaInput = '';
     el('url').value = '';
@@ -891,7 +1061,7 @@
     el('info-card').hidden = true;
     el('media-entries-wrap').hidden = true;
     el('media-entries').innerHTML = '';
-    el('probe-state').hidden = true;
+    setProbeState('', '');
     showComposerOptions(false);
     setComposerStep(1);
     setComposerBadge('', 'neutral');
@@ -900,12 +1070,13 @@
   }
 
   function collectDownloadInput() {
+    if (!mediaMatchesInput()) throw new Error('链接或播放列表选项已更改，请重新解析。');
     return {
       workspace_root: state.workspaceRoot,
       url: el('url').value.trim(),
       dest_dir: el('dest-dir').value.trim() || defaultDestination(),
       format_id: el('format').value,
-      quality: el('quality').value,
+      quality: el('format').value ? 'best' : el('quality').value,
       audio_only: el('audio-only').checked,
       subtitles: selectedSubtitles(),
       playlist: el('playlist').checked,
@@ -920,11 +1091,13 @@
   }
 
   async function startDownload() {
-    if (!state.media) {
+    if (state.startingJob) return;
+    if (!mediaMatchesInput()) {
       toast('请先解析链接，确认媒体信息。', 'warn');
       return;
     }
     const button = el('start-button');
+    state.startingJob = true;
     button.disabled = true;
     try {
       const input = collectDownloadInput();
@@ -950,6 +1123,7 @@
       setProbeState('error', '创建下载任务失败：' + describe(error));
       toast('创建下载任务失败：' + describe(error), 'error', 7000);
     } finally {
+      state.startingJob = false;
       updateStartState();
     }
   }
@@ -994,6 +1168,8 @@
       const result = await bridgeInvoke('media.downloader.job.list', buildListInput(state.page));
       if (seq !== state.jobsRequestSeq) return;
       const items = Array.isArray(result.items) ? result.items : [];
+      state.jobsError = '';
+      renderJobsFeedback();
       state.jobs = items;
       state.total = Number(result.total || 0);
       state.summary = result.summary || state.summary;
@@ -1017,16 +1193,24 @@
     } catch (error) {
       if (seq !== state.jobsRequestSeq) return;
       if (!silent) toast('读取任务失败：' + describe(error), 'error');
-      if (!state.jobsLoaded) {
-        state.jobsLoaded = true;
-        renderTasks();
-      }
+      state.jobsError = describe(error);
+      renderJobsFeedback();
+      renderTasks();
+      updateOverview();
     } finally {
       if (seq === state.jobsRequestSeq) {
         state.loadingJobs = false;
         if (table) table.setAttribute('aria-busy', 'false');
       }
     }
+  }
+
+  function renderJobsFeedback() {
+    const banner = el('jobs-error');
+    banner.hidden = !state.jobsError;
+    el('jobs-error-message').textContent = state.jobsError
+      ? '读取下载记录失败。' + (state.jobsLoaded ? '当前保留上次读取的记录，可能不符合最新筛选。' : '尚未读取到记录，请重试。') + '原因：' + state.jobsError
+      : '';
   }
 
   async function loadActiveJobs() {
@@ -1062,10 +1246,6 @@
 
   function renderSummary() {
     const summary = state.summary || { total: 0, active: 0, completed: 0, failed: 0, canceled: 0, output_bytes: 0 };
-    if (el('stat-active')) el('stat-active').textContent = String(summary.active || 0);
-    if (el('stat-completed')) el('stat-completed').textContent = String(summary.completed || 0);
-    if (el('stat-failed')) el('stat-failed').textContent = String(summary.failed || 0);
-    if (el('stat-output')) el('stat-output').textContent = formatBytes(summary.output_bytes || 0);
     if (el('count-all')) el('count-all').textContent = String(summary.total || 0);
     if (el('count-active')) el('count-active').textContent = String(summary.active || 0);
     if (el('count-completed')) el('count-completed').textContent = String(summary.completed || 0);
@@ -1143,12 +1323,20 @@
           : '')
       : '';
     if (!state.jobsLoaded) {
+      if (state.jobsError) {
+        body.innerHTML = '';
+        el('tasks-empty').hidden = true;
+        return;
+      }
       renderTaskSkeleton();
       return;
     }
     if (!state.jobs.length) {
       body.innerHTML = '';
       if (el('tasks-empty')) el('tasks-empty').hidden = false;
+      const filtered = state.filters.status !== 'all' || state.filters.query || state.filters.range !== 'all';
+      el('tasks-empty-title').textContent = filtered ? '没有匹配的下载记录' : '还没有下载记录';
+      el('tasks-empty-description').textContent = filtered ? '调整筛选条件，或新建下载任务。' : '粘贴一个媒体链接，开始第一个下载。';
       renderBulkBar();
       renderPager();
       updateSelectAllState();
@@ -1236,7 +1424,8 @@
     if (el('next-page')) el('next-page').disabled = state.page >= maxPage;
     if (el('page-info')) {
       if (!state.total) {
-        el('page-info').textContent = '没有匹配的记录';
+        const filtered = state.filters.status !== 'all' || state.filters.query || state.filters.range !== 'all';
+        el('page-info').textContent = filtered ? '没有匹配的记录' : '尚无下载记录';
       } else {
         const start = (state.page - 1) * state.pageSize + 1;
         const end = Math.min(state.total, state.page * state.pageSize);
@@ -1285,20 +1474,23 @@
   }
 
   function updateOverview() {
-    const summary = state.summary || { total: 0, active: 0, completed: 0, failed: 0, output_bytes: 0 };
-    if (el('stat-active')) el('stat-active').textContent = String(summary.active || 0);
-    if (el('stat-completed')) el('stat-completed').textContent = String(summary.completed || 0);
-    if (el('stat-failed')) el('stat-failed').textContent = String(summary.failed || 0);
-    if (el('stat-output')) el('stat-output').textContent = formatBytes(summary.output_bytes || 0);
-    if (el('overview-records')) el('overview-records').textContent = String(summary.total || 0) + ' 条';
+    const summary = state.summary;
+    ['active', 'completed', 'failed'].forEach((key) => {
+      if (el('stat-' + key)) el('stat-' + key).textContent = summary ? String(summary[key] || 0) : '—';
+    });
+    if (el('stat-output')) el('stat-output').textContent = summary ? formatBytes(summary.output_bytes || 0) : '—';
+    if (el('overview-records')) el('overview-records').textContent = summary ? String(summary.total || 0) + ' 条' : '未读取';
+    if (el('stats-freshness')) el('stats-freshness').textContent = !summary
+      ? (state.jobsError ? '统计未读取，请重试' : '正在读取统计…')
+      : state.jobsError ? '上次统计 · ' + formatDate(state.lastJobsLoadedAt, true) + ' · 数据可能已过期' : '统计已更新';
     if (el('overview-workspace')) {
       el('overview-workspace').textContent = state.workspaceRoot || '未绑定';
       el('overview-workspace').title = state.workspaceRoot || '未绑定工作区';
     }
-    if (el('overview-dest')) el('overview-dest').textContent = el('dest-dir') ? el('dest-dir').value.trim() || 'media' : state.settings.defaultDest;
+    if (el('overview-dest')) el('overview-dest').textContent = defaultDestination();
     if (el('nav-active-count')) {
-      el('nav-active-count').hidden = !(summary.active > 0);
-      el('nav-active-count').textContent = String(summary.active || 0);
+      el('nav-active-count').hidden = !(summary && summary.active > 0);
+      el('nav-active-count').textContent = summary ? String(summary.active || 0) : '';
     }
   }
 
@@ -1340,6 +1532,7 @@
         loadActiveJobs(),
         loadRecentJobs(),
       ]);
+      await loadSite();
       toast('数据已刷新。', 'success');
     } finally {
       if (button) button.disabled = false;
@@ -1622,7 +1815,7 @@
         detailRow('覆盖同名', job.overwrite ? '是' : '否') +
         detailRow('播放列表', job.playlist ? '是，最多 ' + (job.max_items || '—') + ' 项' : '否') +
         detailRow('字幕', Array.isArray(job.subtitles) && job.subtitles.length ? job.subtitles.join('、') : '无') +
-        detailRow('大小上限', job.max_bytes ? formatBytes(job.max_bytes) : '默认') +
+        detailRow('单文件限制', job.max_bytes ? formatBytes(job.max_bytes) : '默认') +
         detailRow('已下载', formatBytes(job.downloaded_bytes || 0)) +
         detailRow('创建时间', formatDate(job.created_at, true)) +
         detailRow('开始时间', job.started_at ? formatDate(job.started_at, true) : '—') +
@@ -1761,7 +1954,7 @@
     }
     const ok = await askConfirm(
       '清理已结束记录',
-      '将删除 ' + matched + ' 条已完成、失败和已取消任务的记录与日志，但不会删除工作区内的媒体文件。该操作不可撤销。',
+      '将删除 ' + matched + ' 条已完成、失败和已取消任务的记录与日志，不会删除任务指定目录中的媒体文件。该操作不可撤销。',
       '清理 ' + matched + ' 条',
       'danger'
     );
@@ -1805,24 +1998,28 @@
       theme: el('setting-theme').value,
       density: el('setting-density').value,
     };
-    saveSettings();
+    const persisted = saveSettings();
     applySettings();
+    if (persisted && window.MediaDesktop) window.MediaDesktop.settingsSaved();
+    if (window.MediaDesktop) window.MediaDesktop.syncControls();
     stopPolling();
     state.page = 1;
     void loadJobs({ silent: true });
-    toast('设置已保存，并应用到当前视图。', 'success');
+    toast(persisted ? '设置已保存，并应用到当前视图。' : '本机存储不可用，设置仅在当前窗口生效；请勿关闭窗口。', persisted ? 'success' : 'warn');
   }
 
   async function resetSettings(button) {
     const ok = await askConfirm('恢复默认设置', '界面偏好与下载默认值将恢复为初始状态，不会影响任务记录。', '恢复默认', 'primary');
     if (!ok) return;
     state.settings = Object.assign({}, DEFAULT_SETTINGS);
-    saveSettings();
+    const persisted = saveSettings();
     applySettings();
+    if (persisted && window.MediaDesktop) window.MediaDesktop.settingsSaved();
+    if (window.MediaDesktop) window.MediaDesktop.syncControls();
     stopPolling();
     state.page = 1;
     await loadJobs({ silent: true });
-    toast('已恢复默认设置。', 'success');
+    toast(persisted ? '已恢复默认设置。' : '本机存储不可用，默认设置仅在当前窗口生效。', persisted ? 'success' : 'warn');
   }
 
   function debounce(fn, delay) {
@@ -1909,8 +2106,11 @@
   }
 
   function invalidateProbe(message) {
-    if (!state.media && !message) return;
+    state.resumeProbe = null;
+    renderSite();
     state.probeToken += 1;
+    state.pendingProbe = null;
+    setProbeBusy(false);
     state.media = null;
     state.mediaInput = '';
     if (el('info-card')) el('info-card').hidden = true;
@@ -2017,10 +2217,24 @@
   }
 
   function handleKeydown(event) {
+    if (event.isComposing) return;
     const modifier = event.ctrlKey || event.metaKey;
-    if (modifier && String(event.key).toLowerCase() === 'k') {
+    const key = String(event.key).toLowerCase();
+    const modalOpen = (el('confirm-layer') && !el('confirm-layer').hidden) || (el('drawer-layer') && !el('drawer-layer').hidden);
+    if ((modifier && ['k', 'f', 'r', 'n', ',', 's', 'p', 'o'].includes(key)) || key === 'f5' || key === 'f1') {
       event.preventDefault();
-      focusSearch();
+      if (modalOpen) return;
+      if (key === 'k' || key === 'f') focusSearch();
+      else if (key === 'r' || key === 'f5') void refreshAll(el('refresh-all'));
+      else if (key === 'n') navigate('download');
+      else if (key === ',') navigate('settings');
+      else if (key === 's') {
+        if (state.currentView === 'settings' && !event.shiftKey) saveSettingsFromForm();
+        else toast('设置页可用 Ctrl+S 保存；下载任务自动记录。', 'info');
+      } else if (key === 'f1') {
+        navigate('runtime');
+        toast('快捷键：Ctrl+N 新建，Ctrl+F 搜索，Ctrl+, 设置，F5 刷新。', 'info', 7000);
+      }
       return;
     }
     if (event.key === 'Escape') {
@@ -2040,10 +2254,18 @@
       trapFocus(qs('.dialog', el('confirm-layer')), event);
     } else if (el('drawer-layer') && !el('drawer-layer').hidden) {
       trapFocus(el('detail-drawer'), event);
+    } else if (el('sidebar') && el('sidebar').classList.contains('open')) {
+      trapFocus(el('sidebar'), event);
     }
   }
 
   function bindEvents() {
+    if (window.matchMedia) {
+      const compactNavigation = window.matchMedia('(max-width: 900px)');
+      const syncNavigation = () => closeSidebar();
+      compactNavigation.addEventListener('change', syncNavigation);
+      syncNavigation();
+    }
     qsa('.nav-item').forEach((button) => {
       button.addEventListener('click', () => navigate(button.getAttribute('data-view')));
     });
@@ -2053,6 +2275,10 @@
       const node = el(id);
       if (node) node.addEventListener(type, handler);
     };
+    on('site-connect', 'click', connectSite);
+    on('site-inline-cancel', 'click', disconnectSite);
+    on('site-settings-connect', 'click', connectSite);
+    on('site-disconnect', 'click', disconnectSite);
 
     on('sidebar-toggle', 'click', openSidebar);
     on('sidebar-scrim', 'click', closeSidebar);
@@ -2068,6 +2294,10 @@
 
     on('paste-url', 'click', pasteUrl);
     on('probe-button', 'click', probe);
+    on('cancel-probe', 'click', () => {
+      invalidateProbe('已停止等待。后台解析可能仍会运行至超时，返回结果将被忽略。');
+      el('url').focus();
+    });
     on('start-button', 'click', startDownload);
     on('reset-composer', 'click', resetComposer);
     on('url', 'keydown', (event) => {
@@ -2077,9 +2307,10 @@
       }
     });
     on('url', 'input', () => {
-      if (state.media && state.mediaInput && el('url').value.trim() !== state.mediaInput) {
+      if (state.pendingProbe || state.media) {
         invalidateProbe('链接已更改，请重新解析。');
-      } else if (!state.media) {
+      } else {
+        setProbeState('', '');
         setComposerStep(1);
       }
     });
@@ -2114,6 +2345,11 @@
       event.currentTarget.disabled = true;
       Promise.all([loadJobs({ silent: false }), loadActiveJobs(), loadRecentJobs()])
         .finally(() => { event.currentTarget.disabled = false; });
+    });
+    on('jobs-retry', 'click', async (event) => {
+      event.currentTarget.disabled = true;
+      try { await loadJobs({ silent: true }); }
+      finally { event.currentTarget.disabled = false; }
     });
     on('export-tasks', 'click', () => exportRecords(false));
     on('page-size', 'change', () => {
@@ -2165,6 +2401,9 @@
     on('settings-reset', 'click', (event) => resetSettings(event.currentTarget));
 
     document.addEventListener('keydown', handleKeydown);
+    document.addEventListener('contextmenu', (event) => event.preventDefault());
+    document.addEventListener('dragover', (event) => event.preventDefault());
+    document.addEventListener('drop', (event) => event.preventDefault());
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && state.jobsLoaded && !state.loadingJobs) void refreshLive();
     });
@@ -2174,9 +2413,11 @@
   async function boot() {
     applySettings();
     bindEvents();
+    if (window.MediaDesktop) window.MediaDesktop.init();
     setComposerStep(1);
     showComposerOptions(false);
     updateDownloadSummary();
+    updateOverview();
     updateSelectAllState();
     if (!window.__TAURI_INTERNALS__ || typeof window.__TAURI_INTERNALS__.invoke !== 'function') {
       toast('当前不在 HiMind Agent 的扩展视图窗口中，任务与运行时数据不可用。', 'warn', 8000);
@@ -2187,6 +2428,13 @@
       loadJobs({ silent: true }),
     ]);
     await Promise.all([loadActiveJobs(), loadRecentJobs()]);
+    await loadSite();
+    if (window.MediaDesktop) {
+      const restored = window.MediaDesktop.restoreDraft();
+      if (restored.settings) navigate('settings');
+      else if (restored.composer) navigate('download');
+      window.MediaDesktop.syncControls();
+    }
   }
 
   window.addEventListener('DOMContentLoaded', () => { void boot(); });

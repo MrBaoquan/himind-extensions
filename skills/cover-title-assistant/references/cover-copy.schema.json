@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "himind.cover-copy.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "selected_candidate", "signature", "cover_copy"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "selected_candidate": {"enum": ["A", "B", "C", "D", "E", "F"]},
+    "signature": {
+      "type": "object", "additionalProperties": false,
+      "required": ["cn", "en"],
+      "properties": {"cn": {"const": "皖美拾光"}, "en": {"const": "LIGHT, GATHERED IN ANHUI"}}
+    },
+    "cover_copy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["main", "sub", "main_lines", "sub_lines", "layout_hint"],
+      "properties": {
+        "main": {"type": "string", "minLength": 4, "maxLength": 30},
+        "sub": {"type": "string", "maxLength": 40},
+        "main_lines": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 2},
+        "sub_lines": {"type": "array", "items": {"type": "string"}, "minItems": 0, "maxItems": 1},
+        "layout_hint": {"enum": ["short", "normal", "long"]}
+      }
+    }
+  }
+}
