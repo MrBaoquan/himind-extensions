@@ -1,0 +1,70 @@
+{
+  "schema_version": "workflow_view.v1",
+  "title": "素材套图生产",
+  "sections": [
+    {
+      "id": "brief",
+      "title": "生成需求",
+      "fields": [
+        {
+          "id": "prompt",
+          "label": "要生成什么",
+          "type": "text",
+          "placeholder": "例如：展馆大厅的夜间主视觉，前景是入口通道",
+          "hint": "主体、场景、画面用途写清楚；风格交给风格包，不要在这里堆形容词。"
+        },
+        {
+          "id": "filename_prefix",
+          "label": "文件名前缀",
+          "type": "text",
+          "placeholder": "留空自动按时间命名",
+          "hint": "产物文件名会带上风格包与尺寸，方便脱离工具后辨认。"
+        }
+      ]
+    },
+    {
+      "id": "matrix",
+      "title": "矩阵范围",
+      "fields": [
+        {
+          "id": "styles",
+          "label": "风格包",
+          "type": "list",
+          "default": ["clean-product"],
+          "placeholder": "每行一个：clean-product / exhibit-keyvisual / icon-tile / night-city / ink-poster / brand-minimal",
+          "hint": "选中多个会各生成一组，便于横向比较；留空等于「不加风格包」。"
+        },
+        {
+          "id": "sizes",
+          "label": "尺寸",
+          "type": "list",
+          "default": ["1024x1024"],
+          "placeholder": "每行一个：1024x1024 / 1280x720 / 1920x1080 …",
+          "hint": "留空会用所选风格包的默认尺寸。"
+        },
+        {
+          "id": "variants",
+          "label": "每格张数",
+          "type": "number",
+          "default": 1,
+          "hint": "1-4；矩阵总量（风格 × 尺寸 × 张数）不能超过 36 张。"
+        }
+      ]
+    },
+    {
+      "id": "output",
+      "title": "产物目录",
+      "fields": [
+        {
+          "id": "output_dir",
+          "label": "产物目录",
+          "type": "text",
+          "picker": "directory",
+          "placeholder": "留空即工作区 .himind/media",
+          "hint": "填了会替换默认目录；生成血缘始终记录在媒体创作工具里。"
+        }
+      ]
+    }
+  ],
+  "actions": ["check", "produce", "review"]
+}

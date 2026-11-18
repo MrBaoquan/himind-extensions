@@ -9,6 +9,12 @@
     "github"
   ],
   "default_branch": "main",
+  "retired_skill_ids": [
+    "com.himind.skill.develop-himind-plugins",
+    "com.himind.skill.develop-himind-skills",
+    "com.himind.skill.develop-himind-workflows",
+    "com.himind.skill.develop-himind-conventions"
+  ],
   "extensions": [
     {
       "type": "plugin",
@@ -51,29 +57,9 @@
       "path": "plugins/work-log"
     },
     {
-      "type": "plugin",
-      "id": "com.himind.work-log-collector",
-      "path": "plugins/work-log-collector"
-    },
-    {
       "type": "skill",
-      "id": "com.himind.skill.develop-himind-plugins",
-      "path": "skills/develop-himind-plugins"
-    },
-    {
-      "type": "skill",
-      "id": "com.himind.skill.develop-himind-skills",
-      "path": "skills/develop-himind-skills"
-    },
-    {
-      "type": "skill",
-      "id": "com.himind.skill.develop-himind-workflows",
-      "path": "skills/develop-himind-workflows"
-    },
-    {
-      "type": "skill",
-      "id": "com.himind.skill.develop-himind-conventions",
-      "path": "skills/develop-himind-conventions"
+      "id": "com.himind.skill.extension-authoring",
+      "path": "skills/extension-authoring"
     },
     {
       "type": "skill",
@@ -104,6 +90,11 @@
       "type": "skill",
       "id": "com.himind.media-downloader-assistant",
       "path": "skills/media-downloader-assistant"
+    },
+    {
+      "type": "skill",
+      "id": "com.himind.skill.media-creation-assistant",
+      "path": "skills/media-creation-assistant"
     },
     {
       "type": "skill",
@@ -139,6 +130,11 @@
       "type": "workflow",
       "id": "com.himind.workflow.daily-work-log",
       "path": "workflows/daily-work-log"
+    },
+    {
+      "type": "workflow",
+      "id": "com.himind.workflow.media-kit-production",
+      "path": "workflows/media-kit-production"
     },
     {
       "type": "expert",
@@ -256,6 +252,11 @@
       "path": "plugins/media-ai"
     },
     {
+      "type": "plugin",
+      "id": "com.himind.media-studio",
+      "path": "plugins/media-studio"
+    },
+    {
       "type": "skill",
       "id": "com.mrbaoquan.skill.wechat-miniprogram-assistant",
       "path": "skills/wechat-miniprogram-assistant"
@@ -302,22 +303,21 @@
       "name": "扩展创作",
       "plugin_ids": [],
       "skill_ids": [
-        "com.himind.skill.develop-himind-plugins",
-        "com.himind.skill.develop-himind-skills",
-        "com.himind.skill.develop-himind-workflows",
-        "com.himind.skill.develop-himind-conventions"
+        "com.himind.skill.extension-authoring"
       ]
     },
     {
       "id": "com.himind.feature.work-log",
       "name": "工作日志",
       "plugin_ids": [
-        "com.himind.work-log",
-        "com.himind.work-log-collector"
+        "com.himind.work-log"
       ],
       "skill_ids": [
         "com.himind.skill.work-log"
       ]
     }
+  ],
+  "retired_plugin_ids": [
+    "com.himind.work-log-collector"
   ]
 }

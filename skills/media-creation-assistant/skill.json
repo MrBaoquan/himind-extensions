@@ -1,0 +1,86 @@
+{
+  "id": "com.himind.skill.media-creation-assistant",
+  "icon": "assets/icon.png",
+  "name": "媒体创作助手",
+  "author": "马宝全",
+  "categories": [
+    "visual-design",
+    "content-production"
+  ],
+  "version": "0.1.0",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
+  "scope": "organization",
+  "description": "用媒体创作工具把生成做成可复现的交付：选风格包、控制矩阵规模、先小样再放量、按生成血缘追溯与续改；当用户要求批量出图、统一素材风格或改某张图时使用。",
+  "release_notes": "首个版本：风格包选择、矩阵规模控制、小样验证、改图与故障排查。",
+  "min_agent_version": "0.3.47",
+  "supported_clients": [
+    "agent-skills"
+  ],
+  "capabilities": [
+    {
+      "id": "media.studio.runtime.status",
+      "required": true,
+      "min_version": "0.1.0",
+      "provider": "com.himind.media-studio"
+    },
+    {
+      "id": "media.studio.style.list",
+      "required": true,
+      "min_version": "0.1.0",
+      "provider": "com.himind.media-studio"
+    },
+    {
+      "id": "media.studio.style.save",
+      "required": false,
+      "min_version": "0.1.0",
+      "provider": "com.himind.media-studio"
+    },
+    {
+      "id": "media.studio.batch.start",
+      "required": true,
+      "min_version": "0.1.0",
+      "provider": "com.himind.media-studio"
+    },
+    {
+      "id": "media.studio.batch.status",
+      "required": true,
+      "min_version": "0.1.0",
+      "provider": "com.himind.media-studio"
+    },
+    {
+      "id": "media.studio.batch.cancel",
+      "required": false,
+      "min_version": "0.1.0",
+      "provider": "com.himind.media-studio"
+    },
+    {
+      "id": "media.studio.asset.lineage",
+      "required": false,
+      "min_version": "0.1.0",
+      "provider": "com.himind.media-studio"
+    },
+    {
+      "id": "media.studio.image.rework",
+      "required": false,
+      "min_version": "0.1.0",
+      "provider": "com.himind.media-studio"
+    }
+  ],
+  "plugin_dependencies": [
+    {
+      "plugin_id": "com.himind.media-studio",
+      "required": true,
+      "min_version": "0.1.0"
+    }
+  ],
+  "risk_summary": "批量生成会调用本机已配置的生图服务并产生费用：矩阵上限 36 张，先小样后放量；改图会先复制工作区外素材到工作区内；不接收任意 URL、不读取凭据、不在工作区外写入。",
+  "contents": [
+    "skill.json",
+    "SKILL.md",
+    "agents/openai.yaml",
+    "assets/icon.png"
+  ]
+}

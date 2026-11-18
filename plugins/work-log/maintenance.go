@@ -291,6 +291,14 @@ type digestSession struct {
 
 type digestFile struct {
 	Sessions []digestSession `json:"sessions"`
+	Complete bool            `json:"complete"`
+	From     string          `json:"from"`
+	To       string          `json:"to"`
+	Scope    struct {
+		Scope string `json:"scope"`
+	} `json:"scope"`
+	PrivacyFiltered bool             `json:"privacy_filtered"`
+	SourceStatuses  []materialSource `json:"source_statuses"`
 }
 
 type reconcileRef struct {
@@ -314,8 +322,8 @@ type reconcileBucket struct {
 
 const reconcileSampleCap = 500
 
-// entryReconcileCap 读取采集器产出的会话语料，与日志按 (source, session_id) 对账，
-// 列出「语料里有、日志里没有」的未入账会话与「日志里有、语料里没有」的过时条目，
+// entryReconcileCap 读取 Agent 会话素材，与日志按 (source, session_id, date) 对账，
+// 列出当前素材缺少的日志匹配，不完整素材中的缺失不代表原日志过时，
 // 供重扫前预览。纯只读，不写盘。
 func entryReconcileCap(in input) (any, error) {
 	root, err := logRoot(in.LogRoot)
@@ -353,7 +361,7 @@ func entryReconcileCap(in input) (any, error) {
 			continue
 		}
 		src := strings.TrimSpace(item.Source)
-		logIndex[sessionKey(src, sid)] = reconcileRef{
+		logIndex[sessionKey(src, sid)+"|"+date] = reconcileRef{
 			Date: date, Source: src, SessionID: sid,
 			Project: item.Project, Title: item.Title, Minutes: item.Minutes,
 			Locked: item.Locked,
@@ -361,6 +369,7 @@ func entryReconcileCap(in input) (any, error) {
 	}
 
 	materialIndex := map[string]reconcileRef{}
+	coverage := map[string]bool{}
 	materialByDate := map[string]int{}
 	found := true
 	files, readErr := os.ReadDir(dir)
@@ -379,6 +388,19 @@ func entryReconcileCap(in input) (any, error) {
 		if err := json.Unmarshal(body, &doc); err != nil {
 			continue
 		}
+		if doc.Complete && doc.Scope.Scope == "all" && !doc.PrivacyFiltered && validDate(doc.From) && validDate(doc.To) {
+			start, _ := time.Parse("2006-01-02", doc.From)
+			end, _ := time.Parse("2006-01-02", doc.To)
+			if !end.Before(start) && end.Sub(start) <= 31*24*time.Hour {
+				for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
+					for _, source := range doc.SourceStatuses {
+						if source.Availability == "available" {
+							coverage[legacyAgentSource(source.Source)+"|"+date.Format("2006-01-02")] = true
+						}
+					}
+				}
+			}
+		}
 		for _, s := range doc.Sessions {
 			sid := strings.TrimSpace(s.SessionID)
 			if sid == "" {
@@ -388,7 +410,7 @@ func entryReconcileCap(in input) (any, error) {
 			if !validDate(date) || date < from || date > to {
 				continue
 			}
-			key := sessionKey(strings.TrimSpace(s.Source), sid)
+			key := sessionKey(strings.TrimSpace(s.Source), sid) + "|" + date
 			if _, seen := materialIndex[key]; !seen {
 				materialByDate[date]++
 			}
@@ -406,13 +428,19 @@ func entryReconcileCap(in input) (any, error) {
 		}
 	}
 	stale := make([]reconcileRef, 0)
+	unverified := make([]reconcileRef, 0)
 	for key, ref := range logIndex {
 		if _, ok := materialIndex[key]; !ok {
-			stale = append(stale, ref)
+			if coverage[ref.Source+"|"+ref.Date] {
+				stale = append(stale, ref)
+			} else {
+				unverified = append(unverified, ref)
+			}
 		}
 	}
 	sortRefs(missing)
 	sortRefs(stale)
+	sortRefs(unverified)
 
 	byDate := map[string]reconcileBucket{}
 	for date, count := range materialByDate {
@@ -457,6 +485,8 @@ func entryReconcileCap(in input) (any, error) {
 		"matched":           matched,
 		"missing_count":     len(missing),
 		"stale_count":       len(stale),
+		"unverified_count":  len(unverified),
+		"unverified":        capRefs(unverified, reconcileSampleCap),
 		"missing":           capRefs(missing, reconcileSampleCap),
 		"stale":             capRefs(stale, reconcileSampleCap),
 		"by_date":           byDate,

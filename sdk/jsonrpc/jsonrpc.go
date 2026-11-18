@@ -8,6 +8,13 @@ import (
 	"io"
 )
 
+// MaxRequestBytes bounds one JSON-RPC request, excluding its trailing newline.
+// Match the Agent's default plugin response budget so an exported log can be
+// imported again after JSON string escaping expands its wire representation.
+const MaxRequestBytes = 16 * 1024 * 1024
+
+var ErrRequestTooLarge = errors.New("jsonrpc request exceeds 16 MiB limit")
+
 type Request struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      json.RawMessage `json:"id"`
@@ -47,9 +54,12 @@ func Serve(r io.Reader, w io.Writer, handler Handler) error {
 		return errors.New("jsonrpc handler is required")
 	}
 	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 4096), 1024*1024)
+	scanner.Buffer(make([]byte, 4096), MaxRequestBytes+1)
 	encoder := json.NewEncoder(w)
 	for scanner.Scan() {
+		if len(scanner.Bytes()) > MaxRequestBytes {
+			return ErrRequestTooLarge
+		}
 		var request Request
 		if err := json.Unmarshal(scanner.Bytes(), &request); err != nil {
 			if err := encoder.Encode(Response{JSONRPC: "2.0", Error: &Error{Code: -32700, Message: "parse error"}}); err != nil {
@@ -69,7 +79,11 @@ func Serve(r io.Reader, w io.Writer, handler Handler) error {
 			return err
 		}
 	}
-	return scanner.Err()
+	if err := scanner.Err(); errors.Is(err, bufio.ErrTooLong) {
+		return ErrRequestTooLarge
+	} else {
+		return err
+	}
 }
 
 func DecodeParams(request Request, target any) *Error {

@@ -2,9 +2,9 @@
 
 马宝全维护的 HiMind Agent 插件、Skill 与 Workflow 源码仓库。仓库统一版本控制和协作入口，每个扩展仍独立版本化、构建、测试和发布。
 
-扩展创作工具链已内置进 Agent：`com.himind.extension-development-tools` 作为内置插件随 Agent 发布，外部同 ID 插件已退役；插件开发助手、技能开发助手、工作流开发助手和扩展开发规范四个 Skill 仍由本仓发布。三类创作共用 Workspace、Candidate、Extension Lock、测试报告和提审生命周期，但保留各自的确定性校验与运行语义。
+本仓只维护一个 [扩展创作 Skill](skills/extension-authoring/SKILL.md)，包内按需读取插件、技能、工作流指南及共用规范。三类创作共用候选和提审流程，仍按类型校验和测试。执行工具 `com.himind.extension-development-tools` 随 Agent 内置发布，不作为外置依赖安装。
 
-稳定 ID、目录名、显示名称、用途说明、触发说明和更新说明都有长度上限，脚手架和校验超限即拒绝，阈值以 `tooling/metaguide` 为准。类型专属的字段清单和流程写在各自的开发助手里；跨类型的命名、分类、依赖和分发规则统一由 `skills/develop-himind-conventions`（扩展开发规范）承载，`extension.environment.preflight` 会把同一份规则和字段约束一起返回给创作方。
+仓库校验的字段长度以 `tooling/metaguide` 为准；命名、分类、依赖和分发规则见包内[共用规范](skills/extension-authoring/references/conventions.md)。`extension.environment.preflight` 检查所选类型的工具链就绪状态。原四个创作 Skill 已退役，`extensions.json` 的 `retired_skill_ids` 防止其历史 Release 被重建进公开目录。
 
 ## 内置插件与外部扩展
 
@@ -39,7 +39,7 @@ Agent 工作台绑定同一个仓库地址，并为每个工程保存自己的�
 ```text
 仓库：https://github.com/MrBaoquan/himind-extensions.git
 分支：main
-仓库内目录：skills/develop-himind-skills
+仓库内目录：skills/extension-authoring
 源码版本：提交审核时对应的 commit SHA
 ```
 
@@ -130,10 +130,7 @@ go run ./tools/cmd/himind-agent-workspace-sync -commit (git rev-parse HEAD)
     "name": "扩展创作",
     "plugin_ids": [],
     "skill_ids": [
-      "com.himind.skill.develop-himind-plugins",
-      "com.himind.skill.develop-himind-skills",
-      "com.himind.skill.develop-himind-workflows",
-      "com.himind.skill.develop-himind-conventions"
+      "com.himind.skill.extension-authoring"
     ]
   }
 ]
@@ -180,3 +177,5 @@ Release 创建后如果只需要修复目录，应在同一源提交上重跑同
 无论 Agent 是否对接 AI 工作台，都可以在扩展源面板一键添加 HiMind 扩展源，也可手动填写 `MrBaoquan/himind-extensions`、`main`、`.himind/catalog.json`。GitHub 目录项始终是用户可选、用户管理；组织必装、推荐、禁用和退出范围策略只由 Dashboard 控制面声明。目录中每个版本都必须提供完整签名元数据，且 key ID 必须已被本机信任，否则整个来源会显示为不可用而不会进入安装列表。
 
 按 Tag 直装（不走目录清单）时口径相同：发布清单里出现 `signature` 就必须验签通过，否则安装失败并回滚；没有签名时由 `HIMIND_REQUIRE_SIGNED_EXTENSIONS` 决定是否放行，默认与 Agent 更新一致——内嵌了生产公钥就要求签名。
+
+工作日志现已直接消费 Agent 会话服务，独立工作日志采集器退役。新候选为 work-log 0.19.1 / work-log skill 0.7.2 / daily-work-log 0.9.1；来源配置与工作区归属由 Agent 管理，日志插件只负责素材整理、日志和报表。迁移边界与验证见 [集成说明](docs/work-log-agent-session-integration.md)。退役插件历史制品不再纳入活动市场目录，历史工作流依赖锁仍保留。

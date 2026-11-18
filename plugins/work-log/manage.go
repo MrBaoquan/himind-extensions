@@ -13,7 +13,6 @@ import (
 // 本文件实现「登记管理增强」与「存储稳健性」相关能力：
 //   - work-log.entry.patch   单条条目的字段级局部更新（只改传入的键，不注入默认值）
 //   - work-log.project.rename       项目改名（保持稳定 ID，回绑历史条目）
-//   - work-log.project.autofill     从 AI 会话素材自动补全项目路径（可预览）
 //   - work-log.project.export / import  登记表导出与导入（备份 / 迁移 / 跨机复制）
 //   - work-log.archive.migrate          把历史文件补齐到当前 schema（一次性维护）
 // 以及对应的迁移函数 migrateProjectsFile / migrateDayFile。
@@ -372,83 +371,18 @@ func projectRenameCap(in input) (any, error) {
 	}, nil
 }
 
-// ---------- 会话记录自动填充路径 ----------
-
-// materialSession 是会话素材里与会话路径相关的最小字段集。
-type materialSession struct {
-	Project   string `json:"project"`
-	Directory string `json:"directory"`
-	RepoPath  string `json:"repo_path"`
-}
-
-type materialFile struct {
-	Sessions []materialSession `json:"sessions"`
-}
-
-// sessionMaterialDir 解析「AI 会话素材」目录：显式入参 > 采集器私有数据目录 material/。
+// sessionMaterialDir returns work-log's own material store.
 func sessionMaterialDir(value string) (string, error) {
-	if v := strings.TrimSpace(value); v != "" {
-		abs, err := filepath.Abs(v)
-		if err != nil {
-			return "", errors.New("material_root 无效")
-		}
-		return abs, nil
+	if value != "" {
+		return filepath.Abs(value)
 	}
-	base := strings.TrimSpace(os.Getenv("HIMIND_PLUGIN_DATA_ROOT"))
-	if base == "" {
-		if local := strings.TrimSpace(os.Getenv("LOCALAPPDATA")); local != "" {
-			base = filepath.Join(local, "HiMindAgent", "plugin-data")
-		} else {
-			base = filepath.Join(os.TempDir(), "HiMindAgent", "plugin-data")
-		}
-		return filepath.Join(base, "com.himind.work-log-collector", "material"), nil
+	if base := strings.TrimSpace(os.Getenv("HIMIND_PLUGIN_DATA_ROOT")); base != "" {
+		return filepath.Join(base, "material"), nil
 	}
-	// HIMIND_PLUGIN_DATA_ROOT 指向本插件的私有数据目录（…/plugin-data/com.himind.work-log），
-	// 采集器是其同级插件。素材目录在 plugin-data 下的同级目录里；若某些宿主把它设成了
-	// 共享的 plugin-data 根，则退回同名嵌套目录。两种布局都探测，取其存在者。
-	candidates := []string{
-		filepath.Join(filepath.Dir(base), "com.himind.work-log-collector", "material"),
-		filepath.Join(base, "com.himind.work-log-collector", "material"),
+	if local := strings.TrimSpace(os.Getenv("LOCALAPPDATA")); local != "" {
+		return filepath.Join(local, "HiMindAgent", "plugin-data", "com.himind.work-log", "material"), nil
 	}
-	for _, c := range candidates {
-		if info, err := os.Stat(c); err == nil && info.IsDir() {
-			return c, nil
-		}
-	}
-	return candidates[0], nil
-}
-
-// ephemeralProjectPath 判断会话工作目录是否是「临时/缓存/草稿」路径，不应作为项目主路径
-// 自动绑定：系统临时目录、Copilot 的工作树与聊天缓存、Codex 的任务草稿目录等。真正的
-// 项目仓库（哪怕是缓存克隆，如 .copilot/repos/<repo>）不在其列。
-func ephemeralProjectPath(p string) bool {
-	key := normalizePathKey(p)
-	if key == "" {
-		return false
-	}
-	for _, t := range []string{os.TempDir(), os.Getenv("TEMP"), os.Getenv("TMP")} {
-		tk := normalizePathKey(t)
-		if tk != "" && (key == tk || strings.HasPrefix(key, tk+"/")) {
-			return true
-		}
-	}
-	scratch := []string{
-		"appdata/local/temp/",
-		"copilot-worktrees/",
-		".copilot/chats/",
-		".copilot/workspaces/",
-		"documents/codex/",
-		// Claude Desktop 的会话目录：local agent mode 的 cwd 指向客户端沙箱，不是项目路径。
-		"appdata/local/claude-3p/",
-		"appdata/local/claude/",
-		"appdata/roaming/claude/",
-	}
-	for _, s := range scratch {
-		if strings.Contains(key, s) {
-			return true
-		}
-	}
-	return false
+	return filepath.Join(os.TempDir(), "HiMindAgent", "com.himind.work-log", "material"), nil
 }
 
 // worktreeMainRoot 若路径位于链接工作树里（`.git` 是文件，内容为
@@ -496,168 +430,6 @@ func hasRepoMarker(p string) bool {
 		return true
 	}
 	return false
-}
-
-// projectAutofillCap 从 AI 工具会话记录（采集器落盘的会话素材）里「搜一轮」，为还没有
-// 绑定路径的登记项目自动补上仓库路径：会话里出现过的「项目名 → 工作目录/仓库根」，
-// 按名称（含别名）或路径末级目录名匹配到登记项目，命中即写入（source=session）。
-// dry_run 时只预览；只补空，绝不覆盖已有路径。
-func projectAutofillCap(in input) (any, error) {
-	root, err := logRoot(in.LogRoot)
-	if err != nil {
-		return nil, err
-	}
-	dir, err := sessionMaterialDir(in.MaterialRoot)
-	if err != nil {
-		return nil, err
-	}
-	files, err := os.ReadDir(dir)
-	if err != nil {
-		return map[string]any{
-			"log_root":       root,
-			"material_dir":   dir,
-			"found_material": false,
-			"filled":         []any{},
-			"filled_count":   0,
-			"candidates":     []any{},
-			"message":        "未找到会话素材目录，请先运行一次采集：" + dir,
-		}, nil
-	}
-
-	// 汇总 归一项目名 → 候选路径：优先非临时路径、其次出现次数多者、再取更短的规范根。
-	// 链接工作树（如 Copilot copilot-worktrees）先解析到主仓库工作树，避免绑定 C 盘缓存。
-	type cand struct {
-		path  string
-		count int
-	}
-	best := map[string]cand{}
-	display := map[string]string{}
-	skippedEphemeral := map[string]string{}
-	scanned := 0
-	for _, f := range files {
-		if f.IsDir() || !strings.HasPrefix(f.Name(), "session-digest-") || !strings.HasSuffix(f.Name(), ".json") {
-			continue
-		}
-		body, err := os.ReadFile(filepath.Join(dir, f.Name()))
-		if err != nil {
-			continue
-		}
-		var mf materialFile
-		if json.Unmarshal(body, &mf) != nil {
-			continue
-		}
-		scanned++
-		for _, s := range mf.Sessions {
-			p := firstNonEmpty(s.RepoPath, s.Directory)
-			if normalizePathKey(p) == "" {
-				continue
-			}
-			if main := worktreeMainRoot(p); main != "" {
-				p = main
-			}
-			label := strings.TrimSpace(s.Project)
-			if label == "" {
-				label = filepath.Base(filepath.Clean(p))
-			}
-			key := normalizeProjectKey(label)
-			if key == "" {
-				continue
-			}
-			if _, ok := display[key]; !ok {
-				display[key] = label
-			}
-			if ephemeralProjectPath(p) {
-				skippedEphemeral[key] = p
-				continue
-			}
-			cur := best[key]
-			switch {
-			case cur.path == "" || cur.path == p:
-				cur = cand{path: p, count: cur.count + 1}
-			case preferCandidatePath(p, cur.path):
-				cur = cand{path: p, count: 1}
-			}
-			best[key] = cur
-		}
-	}
-
-	unlock := lockRoot(root)
-	defer unlock()
-	pf, err := readProjects(root)
-	if err != nil {
-		return nil, err
-	}
-	dryRun := in.DryRun != nil && *in.DryRun
-	now := time.Now().Format(time.RFC3339)
-	index := projectIndex(pf)
-	nameAt := map[string]int{}
-	for i := range pf.Projects {
-		nameAt[pf.Projects[i].Name] = i
-	}
-	filled := make([]map[string]any, 0)
-	matched := map[string]bool{}
-	for key, c := range best {
-		label := display[key]
-		canonical, ok := resolveProjectName(index, label)
-		if !ok {
-			canonical, ok = resolveProjectName(index, filepath.Base(filepath.Clean(c.path)))
-		}
-		if !ok {
-			continue
-		}
-		at, ok := nameAt[canonical]
-		if !ok || len(pf.Projects[at].Paths) > 0 {
-			continue // 只补空，不覆盖已有路径。
-		}
-		matched[key] = true
-		filled = append(filled, map[string]any{
-			"project_id": pf.Projects[at].ID,
-			"project":    pf.Projects[at].Name,
-			"path":       c.path,
-			"from":       label,
-		})
-		if !dryRun {
-			pf.Projects[at].Paths = mergePaths(pf.Projects[at].Paths, sanitizePaths([]pathSpec{{Path: c.path, Kind: "repo", Source: "session"}}))
-			pf.Projects[at].UpdatedAt = now
-		}
-	}
-
-	candidates := make([]map[string]any, 0, len(best))
-	for key, c := range best {
-		candidates = append(candidates, map[string]any{
-			"project": display[key],
-			"path":    c.path,
-			"count":   c.count,
-			"matched": matched[key],
-		})
-	}
-	sort.SliceStable(candidates, func(i, j int) bool {
-		return asInt(candidates[i]["count"]) > asInt(candidates[j]["count"])
-	})
-	ignored := make([]map[string]any, 0, len(skippedEphemeral))
-	for key, p := range skippedEphemeral {
-		if _, bonded := best[key]; bonded {
-			continue // 该项目另有可用路径，就不必再列忽略项。
-		}
-		ignored = append(ignored, map[string]any{"project": display[key], "path": p, "reason": "临时/缓存路径"})
-	}
-	if !dryRun && len(filled) > 0 {
-		if err := writeProjects(root, pf); err != nil {
-			return nil, err
-		}
-	}
-	return map[string]any{
-		"log_root":          root,
-		"material_dir":      dir,
-		"found_material":    scanned > 0,
-		"files":             scanned,
-		"dry_run":           dryRun,
-		"filled":            filled,
-		"filled_count":      len(filled),
-		"candidates":        candidates,
-		"ignored_ephemeral": ignored,
-		"ignored_count":     len(ignored),
-	}, nil
 }
 
 // preferCandidatePath 在同一个项目的两个候选路径间择优：优先更像仓库/工程根的，其次取
@@ -952,7 +724,7 @@ func filterDates(dates []string, from, to string) []string {
 
 // archiveDedupeCap 合并同一会话的重复条目。
 //
-// 采集器自 0.6.2 起按「活跃日」归集：同一条跨多日的长会话会在每一天各留一条记录，
+// Agent 会话服务按消息「活动日」归集：同一条跨多日的长会话会在每一天各留一条记录，
 // 这是**正常记录**，不应被合并。因此默认只合并「同一天、同一会话」的真正重复条目
 // （例如 entry_id 规则变化前后各写过一次）。显式传 cross_day=true 时，才退回旧的
 // 「跨天合并到最早日期」行为，用于清理历史误录。默认 dry_run 预览；dry_run=false 时

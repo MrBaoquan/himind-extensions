@@ -1,0 +1,4 @@
+interface:
+  display_name: "扩展创作"
+  short_description: "创建、修订和评审 HiMind 扩展"
+  default_prompt: "使用 $extension-authoring 将需求设计为合适的 HiMind 扩展，并验证候选结果。"

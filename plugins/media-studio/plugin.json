@@ -1,0 +1,442 @@
+{
+  "id": "com.himind.media-studio",
+  "icon": "assets/icon.png",
+  "name": "媒体创作工具",
+  "author": "马宝全",
+  "categories": [
+    "visual-design",
+    "content-production"
+  ],
+  "description": "把生图组织成可复现的交付：固化风格包、按矩阵批量出图、为每个产物留下生成血缘，并对已有素材按描述改图。",
+  "release_notes": "首个版本：风格包、矩阵批量生成、生成血缘与改图入口。",
+  "version": "0.1.0",
+  "entry": "bin/media-studio.exe",
+  "runtime": "process-jsonrpc-stdio",
+  "platforms": [
+    "windows-x64"
+  ],
+  "min_agent_version": "0.3.47",
+  "governance": "optional",
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
+  "capability_namespace": "media.studio",
+  "capability_dependencies": [
+    "media.image.generate",
+    "media.image.edit",
+    "media.provider.catalog"
+  ],
+  "capabilities": [
+    {
+      "id": "media.studio.runtime.status",
+      "description": "查看风格包、作业与生图服务的就绪状态",
+      "availability": "local",
+      "timeout_seconds": 60,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.studio.style.list",
+      "description": "列出可用的风格包（内置与自定义）",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "include_builtin": {
+            "type": "boolean"
+          },
+          "include_custom": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.studio.style.save",
+      "description": "新增或覆盖一个风格包",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "style": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "maxLength": 48
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "prompt_suffix": {
+                "type": "string",
+                "maxLength": 600
+              },
+              "avoid": {
+                "type": "string",
+                "maxLength": 300
+              },
+              "sizes": {
+                "type": "array",
+                "maxItems": 6,
+                "items": {
+                  "type": "string",
+                  "maxLength": 16
+                }
+              },
+              "params": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "prompt_suffix"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "style"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.studio.style.remove",
+      "description": "删除一个自定义风格包（内置包不可删除）",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 48
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.studio.batch.start",
+      "description": "按「描述 × 风格包 × 尺寸」启动矩阵批量生成并返回作业号",
+      "availability": "local",
+      "timeout_seconds": 1800,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "prompt": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "styles": {
+            "type": "array",
+            "maxItems": 12,
+            "items": {
+              "type": "string",
+              "maxLength": 48
+            }
+          },
+          "sizes": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "string",
+              "maxLength": 16
+            }
+          },
+          "variants": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "output_dir": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "filename_prefix": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "service": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "parameters": {
+            "type": "object"
+          },
+          "wait": {
+            "type": "boolean"
+          },
+          "wait_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1800
+          }
+        },
+        "required": [
+          "workspace_root",
+          "prompt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.studio.batch.status",
+      "description": "查询矩阵作业的进度与逐项结果",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "include_items": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.studio.batch.cancel",
+      "description": "取消尚未完成的矩阵作业",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.studio.batch.list",
+      "description": "列出最近的矩阵作业",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.studio.asset.lineage",
+      "description": "按媒体 ID、路径或摘要反查一个产物的生成记录",
+      "availability": "local",
+      "timeout_seconds": 30,
+      "risk_level": "read_only",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "media_id": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "sha256": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "include_chain": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "media.studio.image.rework",
+      "description": "对已有图片按描述与风格包改图，返回新产物与血缘",
+      "availability": "local",
+      "timeout_seconds": 300,
+      "risk_level": "local_write",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "workspace_root": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "input_images": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "items": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          },
+          "prompt": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "style_id": {
+            "type": "string",
+            "maxLength": 48
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "size": {
+            "type": "string",
+            "maxLength": 16
+          },
+          "output_dir": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "filename_prefix": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "service": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "parameters": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "input_images"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "permissions": [
+    "filesystem.workspace.read",
+    "filesystem.workspace.write"
+  ],
+  "contributes": {
+    "views": [
+      {
+        "id": "media-studio.workspace",
+        "title": "媒体创作工具 · 矩阵生成",
+        "short_title": "媒体创作",
+        "icon": "media",
+        "quick_access": true,
+        "order": 61,
+        "location": "plugin_navigation",
+        "entry": "ui/index.html"
+      }
+    ],
+    "commands": [
+      {
+        "id": "media.studio.runtime.status",
+        "title": "检查创作就绪状态"
+      },
+      {
+        "id": "media.studio.style.list",
+        "title": "查看风格包"
+      },
+      {
+        "id": "media.studio.style.save",
+        "title": "保存风格包"
+      },
+      {
+        "id": "media.studio.style.remove",
+        "title": "删除风格包"
+      },
+      {
+        "id": "media.studio.batch.start",
+        "title": "开始矩阵生成"
+      },
+      {
+        "id": "media.studio.batch.status",
+        "title": "查看生成进度"
+      },
+      {
+        "id": "media.studio.batch.cancel",
+        "title": "取消生成作业"
+      },
+      {
+        "id": "media.studio.batch.list",
+        "title": "查看生成作业"
+      },
+      {
+        "id": "media.studio.asset.lineage",
+        "title": "查看生成血缘"
+      },
+      {
+        "id": "media.studio.image.rework",
+        "title": "按描述改图"
+      }
+    ]
+  },
+  "plugin_dependencies": []
+}

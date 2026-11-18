@@ -2,47 +2,174 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "工作日志条目写入结果",
   "type": "object",
-  "required": ["date", "count"],
+  "required": [
+    "date",
+    "count"
+  ],
   "properties": {
-    "date": {"type": "string"},
-    "count": {"type": "integer"},
+    "date": {
+      "type": "string"
+    },
+    "count": {
+      "type": "integer"
+    },
     "entries": {
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
-          "entry_id": {"type": "string"},
-          "date": {"type": "string"},
-          "source": {"type": "string"},
-          "session_id": {"type": "string"},
-          "project": {"type": "string"},
-          "feature": {"type": "string"},
-          "exhibit": {"type": "string"},
-          "project_id": {"type": "string"},
-          "exhibit_id": {"type": "string"},
-          "repo_path": {"type": "string"},
-          "project_hint": {"type": "string"},
-          "category": {"type": "string"},
-          "started_at": {"type": "string"},
-          "ended_at": {"type": "string"},
-          "minutes": {"type": "integer"},
-          "minutes_source": {"type": "string", "enum": ["measured", "span", "estimated", "manual"]},
-          "title": {"type": "string"},
-          "summary": {"type": "string"},
-          "outcomes": {"type": "array", "items": {"type": "string"}},
-          "decisions": {"type": "array", "items": {"type": "string"}},
-          "learnings": {"type": "array", "items": {"type": "string"}},
-          "blockers": {"type": "array", "items": {"type": "string"}},
-          "next": {"type": "array", "items": {"type": "string"}},
-          "tags": {"type": "array", "items": {"type": "string"}},
-          "created_at": {"type": "string"},
-          "updated_at": {"type": "string"}
+          "entry_id": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "feature": {
+            "type": "string"
+          },
+          "exhibit": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "exhibit_id": {
+            "type": "string"
+          },
+          "repo_path": {
+            "type": "string"
+          },
+          "project_hint": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string"
+          },
+          "ended_at": {
+            "type": "string"
+          },
+          "minutes": {
+            "type": "integer"
+          },
+          "minutes_source": {
+            "type": "string",
+            "enum": [
+              "measured",
+              "span",
+              "estimated",
+              "manual"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "learnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "next": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "workspace_project_id": {
+            "type": "string",
+            "description": "Agent 工作区注册 ID，与业务 project_id 独立"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "minutes_method": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "object"
+            }
+          },
+          "evidence_truncated": {
+            "type": "boolean"
+          },
+          "activity_intervals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string"
+                },
+                "to": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "overlap_adjusted": {
+            "type": "boolean"
+          }
         }
       }
     },
     "artifacts": {
       "type": "array",
-      "items": {"type": "object"}
+      "items": {
+        "type": "object"
+      }
     }
   }
 }

@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "矩阵生成结果",
+  "type": "object",
+  "required": ["job_id", "state", "file_count", "output_dir"],
+  "properties": {
+    "job_id": { "type": "string" },
+    "state": {
+      "type": "string",
+      "enum": ["queued", "running", "succeeded", "partial", "failed", "canceled", "interrupted"]
+    },
+    "file_count": { "type": "integer", "minimum": 0 },
+    "completed": { "type": "integer", "minimum": 0 },
+    "failed": { "type": "integer", "minimum": 0 },
+    "output_dir": { "type": "string" },
+    "prompt": { "type": "string" },
+    "styles": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "sizes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "media_id": { "type": "string" },
+          "path": { "type": "string" },
+          "name": { "type": "string" },
+          "mime_type": { "type": "string" },
+          "sha256": { "type": "string" },
+          "width": { "type": "integer" },
+          "height": { "type": "integer" },
+          "size_bytes": { "type": "integer" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "message": { "type": "string" }
+  },
+  "additionalProperties": true
+}

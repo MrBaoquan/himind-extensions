@@ -1,6 +1,8 @@
+> 状态：已由 [彻底退役验收报告](work-log-collector-retirement-20261118.md) 取代。本文记录当时的保守迁移方案和历史事实，不再作为当前实施指引。
+
 # 工作日志插件迁移方案：废弃采集器，改用 Agent 侧工作区与会话能力
 
-- 状态：待评审（不含代码改动）
+- 状态：已被 2026-11-18 退役验收取代，仅留作历史背景。
 - 日期：2026-11-17
 - 涉及代码库：`F:\WebProjects\himind-extensions`
 - 涉及扩展：`com.himind.work-log`、`com.himind.work-log-collector`、`com.himind.workflow.daily-work-log`、`com.himind.skill.work-log`

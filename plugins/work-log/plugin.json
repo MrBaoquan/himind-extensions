@@ -3,18 +3,212 @@
   "icon": "assets/icon.png",
   "name": "工作日志工具",
   "author": "马宝全",
-  "categories": ["collaboration-delivery", "docs-knowledge"],
+  "categories": [
+    "collaboration-delivery",
+    "docs-knowledge"
+  ],
   "description": "以按日工作日志为核心，含当前工作台（项目状态、优先级、下一步、完成）、工作项、每日时间块计划与容量校验；按项目/功能/工时聚合报告，支持导出导入、备份恢复与重扫对账。",
-  "release_notes": "0.17.0：工时表复制只保留日期列，不再带项目列与合计列，方便贴进自有的工时模板；修复被裁切容器吃掉的键盘焦��环、口径切换等 20 个控件的焦点提示，以及 4 处偏低的文字对比度，收窄到 320px 时工具栏与翻页按钮不再被挤出视口。",
-  "version": "0.17.0",
+  "release_notes": "0.19.1：退役独立采集器并直接使用 Agent 会话与工作区服务；收紧素材命令标题，保留证据、隐私规则、去重和报表。",
+  "version": "0.19.1",
   "capability_namespace": "work-log",
-  "distribution_targets": ["workbench", "github"],
+  "distribution_targets": [
+    "workbench",
+    "github"
+  ],
   "entry": "bin/work-log.exe",
   "runtime": "process-jsonrpc-stdio",
-  "platforms": ["windows-x64"],
-  "min_agent_version": "0.3.0",
+  "platforms": [
+    "windows-x64"
+  ],
+  "min_agent_version": "0.3.92",
   "governance": "optional",
   "capabilities": [
+    {
+      "id": "work-log.material.collect",
+      "description": "从 Agent 读取会话活动，生成带工作区归属与证据的日志素材",
+      "availability": "local",
+      "risk_level": "read_only",
+      "timeout_seconds": 600,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {
+            "type": "string"
+          },
+          "material_root": {
+            "type": "string",
+            "description": "工作日志私有素材目录；旧素材可显式指定导入目录"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "lookback_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA 时区，例如 Asia/Shanghai"
+          },
+          "source": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "maxItems": 37,
+            "items": {
+              "type": "string"
+            }
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all",
+              "project",
+              "unassigned"
+            ]
+          },
+          "workspace_project_id": {
+            "type": "string"
+          },
+          "include_children": {
+            "type": "boolean"
+          },
+          "strict": {
+            "type": "boolean",
+            "description": "来源或消息不完整时停止，不生成素材"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "max_prompts": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "max_chars": {
+            "type": "integer",
+            "minimum": 200,
+            "maximum": 20000
+          },
+          "exclude_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "exclude_keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "work-log.material.sources",
+      "description": "查看 Agent 统一会话来源与可用性",
+      "availability": "local",
+      "risk_level": "read_only",
+      "timeout_seconds": 600,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "log_root": {
+            "type": "string"
+          },
+          "material_root": {
+            "type": "string",
+            "description": "工作日志私有素材目录；旧素材可显式指定导入目录"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "lookback_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA 时区，例如 Asia/Shanghai"
+          },
+          "source": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "maxItems": 37,
+            "items": {
+              "type": "string"
+            }
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all",
+              "project",
+              "unassigned"
+            ]
+          },
+          "workspace_project_id": {
+            "type": "string"
+          },
+          "include_children": {
+            "type": "boolean"
+          },
+          "strict": {
+            "type": "boolean",
+            "description": "来源或消息不完整时停止，不生成素材"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "max_prompts": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "max_chars": {
+            "type": "integer",
+            "minimum": 200,
+            "maximum": 20000
+          },
+          "exclude_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "exclude_keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     {
       "id": "work-log.entry.upsert",
       "description": "写入或合并某天的日志条目，按稳定 ID 幂等去重",
@@ -22,44 +216,201 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "date": {"type": "string"},
-          "overwrite": {"type": "boolean", "description": "命中同一 entry_id 时整条替换而非字段级合并，用于视图编辑"},
-          "resolve_projects": {"type": "boolean", "description": "按项目登记表归一项目名，并为未命中的项目自动建项目，默认 true"},
-          "register_projects": {"type": "boolean", "description": "已废弃字段，忽略；自动建项目统一由 resolve_projects 控制"},
-          "entries_step": {"type": "string"},
-          "base_step": {"type": "string", "description": "上游确定性素材步骤；与 entries_step（AI 总结）配合时，工时/起止时间等以素材为准"},
-          "workflow_context": {"type": "object", "additionalProperties": true},
+          "log_root": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "overwrite": {
+            "type": "boolean",
+            "description": "命中同一 entry_id 时整条替换而非字段级合并，用于视图编辑"
+          },
+          "resolve_projects": {
+            "type": "boolean",
+            "description": "按项目登记表归一项目名，并为未命中的项目自动建项目，默认 true"
+          },
+          "register_projects": {
+            "type": "boolean",
+            "description": "已废弃字段，忽略；自动建项目统一由 resolve_projects 控制"
+          },
+          "entries_step": {
+            "type": "string"
+          },
+          "base_step": {
+            "type": "string",
+            "description": "上游确定性素材步骤；与 entries_step（AI 总结）配合时，工时/起止时间等以素材为准"
+          },
+          "workflow_context": {
+            "type": "object",
+            "additionalProperties": true
+          },
           "entry": {
             "type": "object",
             "properties": {
-              "entry_id": {"type": "string"},
-              "date": {"type": "string"},
-              "source": {"type": "string"},
-              "session_id": {"type": "string"},
-              "project": {"type": "string"},
-              "feature": {"type": "string", "description": "功能/模块名，用于按项目下的功能归类与小计"},
-              "exhibit": {"type": "string", "description": "展项名（项目下的具体展项），可留空"},
-              "repo_path": {"type": "string", "description": "会话仓库根路径（稳定标识）；写入时据此归类，未命中则按项目名/目录名自动建项目并登记该路径"},
-              "project_hint": {"type": "string", "description": "未归类时保留的原始项目名建议，仅作参考"},
-              "category": {"type": "string", "enum": ["开发", "修复", "设计", "调研", "文档", "评审", "会议", "运维", "其他"], "description": "受控工作类型（中文枚举），未知值会被视为「其他」"},
-              "minutes": {"type": "integer", "minimum": 0, "maximum": 1440, "description": "工时（分钟）"},
-              "minutes_source": {"type": "string", "enum": ["measured", "span", "estimated", "manual"]},
-              "started_at": {"type": "string"},
-              "ended_at": {"type": "string"},
-              "title": {"type": "string"},
-              "summary": {"type": "string"},
-              "outcomes": {"type": "array", "items": {"type": "string"}},
-              "decisions": {"type": "array", "items": {"type": "string"}},
-              "learnings": {"type": "array", "items": {"type": "string"}},
-              "blockers": {"type": "array", "items": {"type": "string"}},
-              "next": {"type": "array", "items": {"type": "string"}},
-              "tags": {"type": "array", "items": {"type": "string"}},
+              "entry_id": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "session_id": {
+                "type": "string"
+              },
+              "workspace_project_id": {
+                "type": "string",
+                "description": "Agent 工作区注册 ID，与业务 project_id 独立"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "minutes_method": {
+                "type": "string"
+              },
+              "evidence": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "object"
+                }
+              },
+              "evidence_truncated": {
+                "type": "boolean"
+              },
+              "activity_intervals": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "from": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "from",
+                    "to"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "overlap_adjusted": {
+                "type": "boolean"
+              },
+              "project": {
+                "type": "string"
+              },
+              "feature": {
+                "type": "string",
+                "description": "功能/模块名，用于按项目下的功能归类与小计"
+              },
+              "exhibit": {
+                "type": "string",
+                "description": "展项名（项目下的具体展项），可留空"
+              },
+              "repo_path": {
+                "type": "string",
+                "description": "会话仓库根路径（稳定标识）；写入时据此归类，未命中则按项目名/目录名自动建项目并登记该路径"
+              },
+              "project_hint": {
+                "type": "string",
+                "description": "未归类时保留的原始项目名建议，仅作参考"
+              },
+              "category": {
+                "type": "string",
+                "enum": [
+                  "开发",
+                  "修复",
+                  "设计",
+                  "调研",
+                  "文档",
+                  "评审",
+                  "会议",
+                  "运维",
+                  "其他"
+                ],
+                "description": "受控工作类型（中文枚举），未知值会被视为「其他」"
+              },
+              "minutes": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1440,
+                "description": "工时（分钟）"
+              },
+              "minutes_source": {
+                "type": "string",
+                "enum": [
+                  "measured",
+                  "span",
+                  "estimated",
+                  "manual"
+                ]
+              },
+              "started_at": {
+                "type": "string"
+              },
+              "ended_at": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "outcomes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "decisions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "learnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "blockers": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "next": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "refs": {
                 "type": "array",
                 "items": {
                   "type": "object",
-                  "properties": {"type": {"type": "string"}, "value": {"type": "string"}},
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
                   "additionalProperties": false
                 }
               }
@@ -71,33 +422,169 @@
             "items": {
               "type": "object",
               "properties": {
-                "entry_id": {"type": "string"},
-                "date": {"type": "string"},
-                "source": {"type": "string"},
-                "session_id": {"type": "string"},
-                "project": {"type": "string"},
-                "feature": {"type": "string", "description": "功能/模块名，用于按项目下的功能归类与小计"},
-                "exhibit": {"type": "string", "description": "展项名（项目下的具体展项），可留空"},
-              "repo_path": {"type": "string", "description": "会话仓库根路径（稳定标识）；写入时据此归类，未命中则按项目名/目录名自动建项目并登记该路径"},
-              "project_hint": {"type": "string", "description": "未归类时保留的原始项目名建议，仅作参考"},
-                "category": {"type": "string", "enum": ["开发", "修复", "设计", "调研", "文档", "评审", "会议", "运维", "其他"], "description": "受控工作类型（中文枚举），未知值会被视为「其他」"},
-                "minutes": {"type": "integer", "minimum": 0, "maximum": 1440, "description": "工时（分钟）"},
-                "minutes_source": {"type": "string", "enum": ["measured", "span", "estimated", "manual"]},
-                "started_at": {"type": "string"},
-                "ended_at": {"type": "string"},
-                "title": {"type": "string"},
-                "summary": {"type": "string"},
-                "outcomes": {"type": "array", "items": {"type": "string"}},
-                "decisions": {"type": "array", "items": {"type": "string"}},
-                "learnings": {"type": "array", "items": {"type": "string"}},
-                "blockers": {"type": "array", "items": {"type": "string"}},
-                "next": {"type": "array", "items": {"type": "string"}},
-                "tags": {"type": "array", "items": {"type": "string"}},
+                "entry_id": {
+                  "type": "string"
+                },
+                "date": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "session_id": {
+                  "type": "string"
+                },
+                "workspace_project_id": {
+                  "type": "string",
+                  "description": "Agent 工作区注册 ID，与业务 project_id 独立"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "minutes_method": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "type": "array",
+                  "maxItems": 32,
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "evidence_truncated": {
+                  "type": "boolean"
+                },
+                "activity_intervals": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "from": {
+                        "type": "string"
+                      },
+                      "to": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "from",
+                      "to"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "overlap_adjusted": {
+                  "type": "boolean"
+                },
+                "project": {
+                  "type": "string"
+                },
+                "feature": {
+                  "type": "string",
+                  "description": "功能/模块名，用于按项目下的功能归类与小计"
+                },
+                "exhibit": {
+                  "type": "string",
+                  "description": "展项名（项目下的具体展项），可留空"
+                },
+                "repo_path": {
+                  "type": "string",
+                  "description": "会话仓库根路径（稳定标识）；写入时据此归类，未命中则按项目名/目录名自动建项目并登记该路径"
+                },
+                "project_hint": {
+                  "type": "string",
+                  "description": "未归类时保留的原始项目名建议，仅作参考"
+                },
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "开发",
+                    "修复",
+                    "设计",
+                    "调研",
+                    "文档",
+                    "评审",
+                    "会议",
+                    "运维",
+                    "其他"
+                  ],
+                  "description": "受控工作类型（中文枚举），未知值会被视为「其他」"
+                },
+                "minutes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1440,
+                  "description": "工时（分钟）"
+                },
+                "minutes_source": {
+                  "type": "string",
+                  "enum": [
+                    "measured",
+                    "span",
+                    "estimated",
+                    "manual"
+                  ]
+                },
+                "started_at": {
+                  "type": "string"
+                },
+                "ended_at": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "outcomes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "decisions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "learnings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "blockers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "next": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
                 "refs": {
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "properties": {"type": {"type": "string"}, "value": {"type": "string"}},
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
                     "additionalProperties": false
                   }
                 }
@@ -118,16 +605,39 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "date": {"type": "string"},
-          "from": {"type": "string"},
-          "to": {"type": "string"},
-          "project": {"type": "string"},
-          "category": {"type": "string"},
-          "source": {"type": "string"},
-          "tag": {"type": "string"},
-          "query": {"type": "string", "description": "自由文本检索：匹配标题/摘要/功能/项目/标签"},
-          "limit": {"type": "integer", "minimum": 1, "maximum": 5000}
+          "log_root": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string",
+            "description": "自由文本检索：匹配标题/摘要/功能/项目/标签"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -141,8 +651,12 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "date": {"type": "string"}
+          "log_root": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -156,12 +670,25 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "date": {"type": "string"},
-          "entry_id": {"type": "string"},
-          "entry_ids": {"type": "array", "items": {"type": "string"}}
+          "log_root": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "entry_id": {
+            "type": "string"
+          },
+          "entry_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         },
-        "required": ["date"],
+        "required": [
+          "date"
+        ],
         "additionalProperties": false
       },
       "risk_level": "local_write"
@@ -173,11 +700,23 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "date": {"type": "string"},
-          "from": {"type": "string"},
-          "to": {"type": "string"},
-          "limit": {"type": "integer", "minimum": 1, "maximum": 2000}
+          "log_root": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -191,12 +730,29 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "date": {"type": "string"},
-          "year": {"type": "integer"},
-          "month": {"type": "integer"},
-          "week_start": {"type": "string", "enum": ["monday", "sunday"]},
-          "project": {"type": "string", "description": "只统计命中该项目的条目"}
+          "log_root": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "year": {
+            "type": "integer"
+          },
+          "month": {
+            "type": "integer"
+          },
+          "week_start": {
+            "type": "string",
+            "enum": [
+              "monday",
+              "sunday"
+            ]
+          },
+          "project": {
+            "type": "string",
+            "description": "只统计命中该项目的条目"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -210,10 +766,25 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "status": {"type": "string", "enum": ["active", "archived"]},
-          "include_stats": {"type": "boolean"},
-          "recent_days": {"type": "integer", "minimum": 1, "maximum": 365, "description": "当前工作的最近活动窗口，默认 14 天"}
+          "log_root": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived"
+            ]
+          },
+          "include_stats": {
+            "type": "boolean"
+          },
+          "recent_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365,
+            "description": "当前工作的最近活动窗口，默认 14 天"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -227,8 +798,15 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "recent_days": {"type": "integer", "minimum": 1, "maximum": 365, "description": "当前工作的最近活动窗口，默认 14 天"}
+          "log_root": {
+            "type": "string"
+          },
+          "recent_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365,
+            "description": "当前工作的最近活动窗口，默认 14 天"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -242,11 +820,22 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "project_id": {"type": "string"},
-          "project_name": {"type": "string"},
-          "project": {"type": "string"},
-          "patch": {"type": "object", "additionalProperties": true}
+          "log_root": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "project_name": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "patch": {
+            "type": "object",
+            "additionalProperties": true
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -260,14 +849,30 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "project": {"type": "string"},
-          "status": {"type": "string"},
-          "priority": {"type": "string"},
-          "query": {"type": "string"},
-          "include_done": {"type": "boolean"},
-          "from": {"type": "string"},
-          "to": {"type": "string"}
+          "log_root": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "include_done": {
+            "type": "boolean"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -281,10 +886,17 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "work_item": {"type": "object", "additionalProperties": true}
+          "log_root": {
+            "type": "string"
+          },
+          "work_item": {
+            "type": "object",
+            "additionalProperties": true
+          }
         },
-        "required": ["work_item"],
+        "required": [
+          "work_item"
+        ],
         "additionalProperties": false
       },
       "risk_level": "local_write"
@@ -296,11 +908,21 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "work_item_id": {"type": "string"},
-          "patch": {"type": "object", "additionalProperties": true}
+          "log_root": {
+            "type": "string"
+          },
+          "work_item_id": {
+            "type": "string"
+          },
+          "patch": {
+            "type": "object",
+            "additionalProperties": true
+          }
         },
-        "required": ["work_item_id", "patch"],
+        "required": [
+          "work_item_id",
+          "patch"
+        ],
         "additionalProperties": false
       },
       "risk_level": "local_write"
@@ -312,9 +934,18 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "work_item_id": {"type": "string"},
-          "work_item_ids": {"type": "array", "items": {"type": "string"}}
+          "log_root": {
+            "type": "string"
+          },
+          "work_item_id": {
+            "type": "string"
+          },
+          "work_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -328,10 +959,16 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "date": {"type": "string"}
+          "log_root": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          }
         },
-        "required": ["date"],
+        "required": [
+          "date"
+        ],
         "additionalProperties": false
       },
       "risk_level": "read_only"
@@ -343,11 +980,20 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "date": {"type": "string"},
-          "plan": {"type": "object", "additionalProperties": true}
+          "log_root": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "plan": {
+            "type": "object",
+            "additionalProperties": true
+          }
         },
-        "required": ["plan"],
+        "required": [
+          "plan"
+        ],
         "additionalProperties": false
       },
       "risk_level": "local_write"
@@ -359,8 +1005,12 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "date": {"type": "string"}
+          "log_root": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -374,10 +1024,17 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "plan": {"type": "object", "additionalProperties": true}
+          "log_root": {
+            "type": "string"
+          },
+          "plan": {
+            "type": "object",
+            "additionalProperties": true
+          }
         },
-        "required": ["plan"],
+        "required": [
+          "plan"
+        ],
         "additionalProperties": false
       },
       "risk_level": "read_only"
@@ -389,10 +1046,16 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "date": {"type": "string"}
+          "log_root": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          }
         },
-        "required": ["date"],
+        "required": [
+          "date"
+        ],
         "additionalProperties": false
       },
       "risk_level": "read_only"
@@ -404,11 +1067,20 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "from": {"type": "string"},
-          "to": {"type": "string"}
+          "log_root": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
         },
-        "required": ["from", "to"],
+        "required": [
+          "from",
+          "to"
+        ],
         "additionalProperties": false
       },
       "risk_level": "read_only"
@@ -420,31 +1092,95 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "project_id": {"type": "string"},
-          "project_name": {"type": "string"},
-          "aliases": {"type": "array", "items": {"type": "string"}},
-          "description": {"type": "string"},
-          "status": {"type": "string", "enum": ["active", "archived"]},
-          "color": {"type": "string"},
-          "kind": {"type": "string", "description": "项目类型：交付项目 / 平台产品 / 通用沉淀"},
+          "log_root": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "project_name": {
+            "type": "string"
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived"
+            ]
+          },
+          "color": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "项目类型：交付项目 / 平台产品 / 通用沉淀"
+          },
           "paths": {
             "type": "array",
             "description": "整组替换项目的路径映射；空数组表示清空",
             "items": {
               "type": "object",
               "properties": {
-                "path": {"type": "string"},
-                "kind": {"type": "string"},
-                "label": {"type": "string"},
-                "source": {"type": "string"}
+                "path": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                }
               },
-              "required": ["path"],
+              "required": [
+                "path"
+              ],
               "additionalProperties": false
             }
           },
-          "add_paths": {"type": "array", "description": "追加路径映射", "items": {"type": "object", "additionalProperties": false, "properties": {"path": {"type": "string"}, "kind": {"type": "string"}, "label": {"type": "string"}, "source": {"type": "string"}}, "required": ["path"]}},
-          "remove_paths": {"type": "array", "description": "移除路径映射", "items": {"type": "string"}}
+          "add_paths": {
+            "type": "array",
+            "description": "追加路径映射",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ]
+            }
+          },
+          "remove_paths": {
+            "type": "array",
+            "description": "移除路径映射",
+            "items": {
+              "type": "string"
+            }
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -458,28 +1194,78 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "project_id": {"type": "string"},
-          "project_name": {"type": "string"},
-          "exhibit_id": {"type": "string"},
-          "exhibit_name": {"type": "string"},
+          "log_root": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "project_name": {
+            "type": "string"
+          },
+          "exhibit_id": {
+            "type": "string"
+          },
+          "exhibit_name": {
+            "type": "string"
+          },
           "paths": {
             "type": "array",
             "description": "整组替换；空数组表示清空",
             "items": {
               "type": "object",
               "properties": {
-                "path": {"type": "string"},
-                "kind": {"type": "string"},
-                "label": {"type": "string"},
-                "source": {"type": "string"}
+                "path": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                }
               },
-              "required": ["path"],
+              "required": [
+                "path"
+              ],
               "additionalProperties": false
             }
           },
-          "add_paths": {"type": "array", "description": "追加路径映射", "items": {"type": "object", "additionalProperties": false, "properties": {"path": {"type": "string"}, "kind": {"type": "string"}, "label": {"type": "string"}, "source": {"type": "string"}}, "required": ["path"]}},
-          "remove_paths": {"type": "array", "description": "移除路径映射", "items": {"type": "string"}}
+          "add_paths": {
+            "type": "array",
+            "description": "追加路径映射",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ]
+            }
+          },
+          "remove_paths": {
+            "type": "array",
+            "description": "移除路径映射",
+            "items": {
+              "type": "string"
+            }
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -493,9 +1279,15 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "path": {"type": "string"},
-          "repo_path": {"type": "string"}
+          "log_root": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "repo_path": {
+            "type": "string"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -509,15 +1301,33 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "repo_path": {"type": "string", "description": "要认领的仓库/目录路径"},
-          "project_id": {"type": "string"},
-          "project_name": {"type": "string"},
-          "exhibit_id": {"type": "string"},
-          "exhibit_name": {"type": "string"},
-          "create_target": {"type": "boolean", "description": "目标不存在时是否新建项目/展项，默认 true"}
+          "log_root": {
+            "type": "string"
+          },
+          "repo_path": {
+            "type": "string",
+            "description": "要认领的仓库/目录路径"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "project_name": {
+            "type": "string"
+          },
+          "exhibit_id": {
+            "type": "string"
+          },
+          "exhibit_name": {
+            "type": "string"
+          },
+          "create_target": {
+            "type": "boolean",
+            "description": "目标不存在时是否新建项目/展项，默认 true"
+          }
         },
-        "required": ["repo_path"],
+        "required": [
+          "repo_path"
+        ],
         "additionalProperties": false
       },
       "risk_level": "local_write"
@@ -529,12 +1339,29 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "from_project": {"type": "string", "description": "单个来源项目"},
-          "from_projects": {"type": "array", "items": {"type": "string"}, "description": "批量来源项目"},
-          "to_project": {"type": "string"},
-          "project_id": {"type": "string"},
-          "project_name": {"type": "string"}
+          "log_root": {
+            "type": "string"
+          },
+          "from_project": {
+            "type": "string",
+            "description": "单个来源项目"
+          },
+          "from_projects": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "批量来源项目"
+          },
+          "to_project": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "project_name": {
+            "type": "string"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -548,10 +1375,22 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "project_id": {"type": "string"},
-          "project_ids": {"type": "array", "items": {"type": "string"}, "description": "批量删除的项目 ID"},
-          "project_name": {"type": "string"}
+          "log_root": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "project_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "批量删除的项目 ID"
+          },
+          "project_name": {
+            "type": "string"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -565,28 +1404,23 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "project_id": {"type": "string"},
-          "project_name": {"type": "string"},
-          "new_name": {"type": "string", "description": "新的项目展示名"}
+          "log_root": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "project_name": {
+            "type": "string"
+          },
+          "new_name": {
+            "type": "string",
+            "description": "新的项目展示名"
+          }
         },
-        "required": ["new_name"],
-        "additionalProperties": false
-      },
-      "risk_level": "local_write"
-    },
-    {
-      "id": "work-log.project.autofill",
-      "description": "从本机 AI 会话记录搜一轮，自动补全项目路径",
-      "availability": "local",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "log_root": {"type": "string"},
-          "material_root": {"type": "string", "description": "会话素材目录，缺省用采集器私有数据目录"},
-          "dry_run": {"type": "boolean", "description": "只预览不写盘"}
-        },
-        "required": [],
+        "required": [
+          "new_name"
+        ],
         "additionalProperties": false
       },
       "risk_level": "local_write"
@@ -598,7 +1432,9 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"}
+          "log_root": {
+            "type": "string"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -612,11 +1448,24 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "projects_json": {"type": "string", "description": "work-log.project.export 产出的 JSON 文本"},
-          "mode": {"type": "string", "enum": ["merge", "replace"]}
+          "log_root": {
+            "type": "string"
+          },
+          "projects_json": {
+            "type": "string",
+            "description": "work-log.project.export 产出的 JSON 文本"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "merge",
+              "replace"
+            ]
+          }
         },
-        "required": ["projects_json"],
+        "required": [
+          "projects_json"
+        ],
         "additionalProperties": false
       },
       "risk_level": "local_write"
@@ -628,16 +1477,27 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "date": {"type": "string", "description": "条目所属日期 YYYY-MM-DD"},
-          "entry_id": {"type": "string"},
+          "log_root": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "description": "条目所属日期 YYYY-MM-DD"
+          },
+          "entry_id": {
+            "type": "string"
+          },
           "patch": {
             "type": "object",
             "description": "要修改的字段（project/feature/exhibit/category/title/summary/minutes/minutes_source/repo_path/tags）",
             "additionalProperties": true
           }
         },
-        "required": ["date", "entry_id", "patch"],
+        "required": [
+          "date",
+          "entry_id",
+          "patch"
+        ],
         "additionalProperties": false
       },
       "risk_level": "local_write"
@@ -649,8 +1509,12 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "dry_run": {"type": "boolean"}
+          "log_root": {
+            "type": "string"
+          },
+          "dry_run": {
+            "type": "boolean"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -664,11 +1528,23 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "dry_run": {"type": "boolean", "description": "默认 true 只预览；传 false 才改写（改写前自动备份受影响日文件）"},
-          "cross_day": {"type": "boolean", "description": "默认 false：只合并「同一天+同一会话」的真正重复条目；显式 true 才把同一会话的跨天记录合并到最早日期（会抹掉按活跃日归集的记录，慎用）"},
-          "from": {"type": "string"},
-          "to": {"type": "string"}
+          "log_root": {
+            "type": "string"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "默认 true 只预览；传 false 才改写（改写前自动备份受影响日文件）"
+          },
+          "cross_day": {
+            "type": "boolean",
+            "description": "默认 false：只合并「同一天+同一会话」的真正重复条目；显式 true 才把同一会话的跨天记录合并到最早日期（会抹掉按活跃日归集的记录，慎用）"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -682,10 +1558,18 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "from": {"type": "string"},
-          "to": {"type": "string"},
-          "date": {"type": "string"}
+          "log_root": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -699,12 +1583,28 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "entries_json": {"type": "string", "description": "导出的条目 JSON 文本"},
-          "mode": {"type": "string", "enum": ["merge", "replace"]},
-          "resolve_projects": {"type": "boolean", "description": "按项目登记表归一项目名，默认 true"}
+          "log_root": {
+            "type": "string"
+          },
+          "entries_json": {
+            "type": "string",
+            "description": "导出的条目 JSON 文本"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "merge",
+              "replace"
+            ]
+          },
+          "resolve_projects": {
+            "type": "boolean",
+            "description": "按项目登记表归一项目名，默认 true"
+          }
         },
-        "required": ["entries_json"],
+        "required": [
+          "entries_json"
+        ],
         "additionalProperties": false
       },
       "risk_level": "local_write"
@@ -716,13 +1616,29 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "date": {"type": "string"},
-          "entry_id": {"type": "string"},
-          "entry_ids": {"type": "array", "items": {"type": "string"}},
-          "locked": {"type": "boolean", "description": "true 锁定，false 解锁；默认 true"}
+          "log_root": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "entry_id": {
+            "type": "string"
+          },
+          "entry_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "locked": {
+            "type": "boolean",
+            "description": "true 锁定，false 解锁；默认 true"
+          }
         },
-        "required": ["date"],
+        "required": [
+          "date"
+        ],
         "additionalProperties": false
       },
       "risk_level": "local_write"
@@ -734,11 +1650,22 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "material_root": {"type": "string", "description": "采集语料目录；留空用默认插件数据目录"},
-          "date": {"type": "string"},
-          "from": {"type": "string"},
-          "to": {"type": "string"}
+          "log_root": {
+            "type": "string"
+          },
+          "material_root": {
+            "type": "string",
+            "description": "工作日志私有素材目录；旧素材可显式指定导入目录"
+          },
+          "date": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -752,7 +1679,9 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"}
+          "log_root": {
+            "type": "string"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -766,8 +1695,13 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "backup_path": {"type": "string", "description": "要恢复的备份 zip；留空则用最新一份"}
+          "log_root": {
+            "type": "string"
+          },
+          "backup_path": {
+            "type": "string",
+            "description": "要恢复的备份 zip；留空则用最新一份"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -781,9 +1715,15 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "project": {"type": "string"},
-          "project_name": {"type": "string"}
+          "log_root": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "project_name": {
+            "type": "string"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -797,17 +1737,39 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "project": {"type": "string"},
-          "project_name": {"type": "string"},
-          "from": {"type": "string"},
-          "to": {"type": "string"},
-          "date": {"type": "string"},
-          "current_project": {"type": "string"},
-          "source": {"type": "string"},
-          "category": {"type": "string"},
-          "tag": {"type": "string"},
-          "session_id": {"type": "string"}
+          "log_root": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "project_name": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "current_project": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -821,11 +1783,30 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "projects": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
-          "projects_step": {"type": "string"},
-          "exhibits": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
-          "exhibits_step": {"type": "string", "description": "上游展项列表步骤（含 source_path/release_path）"}
+          "log_root": {
+            "type": "string"
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "projects_step": {
+            "type": "string"
+          },
+          "exhibits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "exhibits_step": {
+            "type": "string",
+            "description": "上游展项列表步骤（含 source_path/release_path）"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -834,11 +1815,15 @@
     },
     {
       "id": "work-log.source.list",
-      "description": "读取通用可配置来源（<日志根>/config/sources.json）",
+      "description": "读取 Agent 统一管理的会话来源配置",
       "availability": "local",
       "input_schema": {
         "type": "object",
-        "properties": {"log_root": {"type": "string"}},
+        "properties": {
+          "log_root": {
+            "type": "string"
+          }
+        },
         "required": [],
         "additionalProperties": false
       },
@@ -846,14 +1831,28 @@
     },
     {
       "id": "work-log.source.save",
-      "description": "保存通用可配置来源规格，供采集器读取",
+      "description": "把客户端来源配置保存到 Agent，不再创建日志私有采集配置",
       "availability": "local",
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "mode": {"type": "string", "enum": ["merge", "replace"]},
-          "sources": {"type": "array", "items": {"type": "object", "additionalProperties": true}}
+          "log_root": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "merge",
+              "replace"
+            ]
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -866,7 +1865,11 @@
       "availability": "local",
       "input_schema": {
         "type": "object",
-        "properties": {"log_root": {"type": "string"}},
+        "properties": {
+          "log_root": {
+            "type": "string"
+          }
+        },
         "required": [],
         "additionalProperties": false
       },
@@ -879,7 +1882,9 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
+          "log_root": {
+            "type": "string"
+          },
           "fiscal_year_start_month": {
             "type": "integer",
             "minimum": 1,
@@ -887,7 +1892,9 @@
             "description": "起算月 1-12：1 为自然季度，2 则 Q1 是 2/3/4 月"
           }
         },
-        "required": ["fiscal_year_start_month"],
+        "required": [
+          "fiscal_year_start_month"
+        ],
         "additionalProperties": false
       },
       "risk_level": "local_write"
@@ -899,18 +1906,42 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "period": {"type": "string", "enum": ["daily", "weekly", "monthly", "quarterly", "yearly"]},
-          "date": {"type": "string"},
-          "narrative": {"type": "string"},
+          "log_root": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              "quarterly",
+              "yearly"
+            ]
+          },
+          "date": {
+            "type": "string"
+          },
+          "narrative": {
+            "type": "string"
+          },
           "narratives": {
             "type": "object",
-            "additionalProperties": {"type": "string"},
+            "additionalProperties": {
+              "type": "string"
+            },
             "description": "按项目或「项目/功能」的模型小结，键为项目名或 项目/功能"
           },
-          "title": {"type": "string"},
-          "narrative_step": {"type": "string"},
-          "workflow_context": {"type": "object", "additionalProperties": true}
+          "title": {
+            "type": "string"
+          },
+          "narrative_step": {
+            "type": "string"
+          },
+          "workflow_context": {
+            "type": "object",
+            "additionalProperties": true
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -924,9 +1955,22 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "period": {"type": "string", "enum": ["daily", "weekly", "monthly", "quarterly", "yearly"]},
-          "date": {"type": "string"}
+          "log_root": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              "quarterly",
+              "yearly"
+            ]
+          },
+          "date": {
+            "type": "string"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -940,20 +1984,49 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "date": {"type": "string", "description": "锚点日期，默认今天"},
+          "log_root": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "description": "锚点日期，默认今天"
+          },
           "periods": {
             "type": "array",
-            "items": {"type": "string", "enum": ["daily", "weekly", "monthly", "quarterly", "yearly"]},
+            "items": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly",
+                "quarterly",
+                "yearly"
+              ]
+            },
             "description": "要汇总的周期集合，默认 周报+月报"
           },
-          "completed_only": {"type": "boolean", "description": "只汇总已结束的自然周期（跨期补算），默认 true"},
-          "force": {"type": "boolean", "description": "覆盖已存在的归档记录，默认 false"},
-          "lookback": {"type": "integer", "minimum": 1, "maximum": 200, "description": "自动模式最多回溯的周期数，默认 24"},
-          "narrative": {"type": "string"},
+          "completed_only": {
+            "type": "boolean",
+            "description": "只汇总已结束的自然周期（跨期补算），默认 true"
+          },
+          "force": {
+            "type": "boolean",
+            "description": "覆盖已存在的归档记录，默认 false"
+          },
+          "lookback": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "自动模式最多回溯的周期数，默认 24"
+          },
+          "narrative": {
+            "type": "string"
+          },
           "narratives": {
             "type": "object",
-            "additionalProperties": {"type": "string"},
+            "additionalProperties": {
+              "type": "string"
+            },
             "description": "按项目或「项目/功能」的模型小结"
           }
         },
@@ -968,8 +2041,14 @@
       "availability": "local",
       "input_schema": {
         "type": "object",
-        "properties": {"url": {"type": "string"}},
-        "required": ["url"],
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
         "additionalProperties": false
       },
       "risk_level": "local_action"
@@ -981,8 +2060,13 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "log_root": {"type": "string"},
-          "path": {"type": "string", "description": "要定位的目录或文件；留空则打开日志根目录"}
+          "log_root": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "description": "要定位的目录或文件；留空则打开日志根目录"
+          }
         },
         "required": [],
         "additionalProperties": false
@@ -990,7 +2074,10 @@
       "risk_level": "local_action"
     }
   ],
-  "permissions": ["filesystem.workspace.read", "filesystem.workspace.write"],
+  "permissions": [
+    "filesystem.workspace.read",
+    "filesystem.workspace.write"
+  ],
   "contributes": {
     "views": [
       {
@@ -1005,30 +2092,113 @@
       }
     ],
     "commands": [
-      {"id": "work-log.entry.upsert", "title": "记录今日工作日志"},
-      {"id": "work-log.entry.delete", "title": "删除工作日志条目"},
-      {"id": "work-log.entry.dedupe", "title": "整理重复条目"},
-      {"id": "work-log.entry.lock", "title": "锁定/解锁日志条目"},
-      {"id": "work-log.entry.export", "title": "导出日志条目"},
-      {"id": "work-log.entry.import", "title": "导入日志条目"},
-      {"id": "work-log.entry.reconcile", "title": "重扫对账预览"},
-      {"id": "work-log.archive.backup", "title": "备份整个日志库"},
-      {"id": "work-log.archive.restore", "title": "从备份恢复日志库"},
-      {"id": "work-log.archive.calendar", "title": "按日历回看工作日志"},
-      {"id": "work-log.report.render", "title": "生成当日工作简报"},
-      {"id": "work-log.report.aggregate", "title": "汇总周报/月报"},
-      {"id": "work-log.preferences.save", "title": "设置季度起算月"},
-      {"id": "work-log.archive.list", "title": "浏览工作日志归档"},
-      {"id": "work-log.project.list", "title": "查看项目归类"},
-      {"id": "work-log.project.board", "title": "查看当前工作台"},
-      {"id": "work-log.project.work.update", "title": "更新项目工作状态"},
-      {"id": "work-log.item.upsert", "title": "新增工作项"},
-      {"id": "work-log.item.update", "title": "更新工作项"},
-      {"id": "work-log.plan.save", "title": "保存每日计划"},
-      {"id": "work-log.plan.auto", "title": "一键智能排期"},
-      {"id": "work-log.project.claim", "title": "把仓库路径归到项目"},
-      {"id": "work-log.project.autofill", "title": "自动补全项目路径"},
-      {"id": "work-log.link.reveal", "title": "打开日志目录"}
+      {
+        "id": "work-log.material.collect",
+        "title": "读取 Agent 会话素材"
+      },
+      {
+        "id": "work-log.material.sources",
+        "title": "查看 Agent 会话来源"
+      },
+      {
+        "id": "work-log.entry.upsert",
+        "title": "记录今日工作日志"
+      },
+      {
+        "id": "work-log.entry.delete",
+        "title": "删除工作日志条目"
+      },
+      {
+        "id": "work-log.entry.dedupe",
+        "title": "整理重复条目"
+      },
+      {
+        "id": "work-log.entry.lock",
+        "title": "锁定/解锁日志条目"
+      },
+      {
+        "id": "work-log.entry.export",
+        "title": "导出日志条目"
+      },
+      {
+        "id": "work-log.entry.import",
+        "title": "导入日志条目"
+      },
+      {
+        "id": "work-log.entry.reconcile",
+        "title": "重扫对账预览"
+      },
+      {
+        "id": "work-log.archive.backup",
+        "title": "备份整个日志库"
+      },
+      {
+        "id": "work-log.archive.restore",
+        "title": "从备份恢复日志库"
+      },
+      {
+        "id": "work-log.archive.calendar",
+        "title": "按日历回看工作日志"
+      },
+      {
+        "id": "work-log.report.render",
+        "title": "生成当日工作简报"
+      },
+      {
+        "id": "work-log.report.aggregate",
+        "title": "汇总周报/月报"
+      },
+      {
+        "id": "work-log.preferences.save",
+        "title": "设置季度起算月"
+      },
+      {
+        "id": "work-log.archive.list",
+        "title": "浏览工作日志归档"
+      },
+      {
+        "id": "work-log.project.list",
+        "title": "查看项目归类"
+      },
+      {
+        "id": "work-log.project.board",
+        "title": "查看当前工作台"
+      },
+      {
+        "id": "work-log.project.work.update",
+        "title": "更新项目工作状态"
+      },
+      {
+        "id": "work-log.item.upsert",
+        "title": "新增工作项"
+      },
+      {
+        "id": "work-log.item.update",
+        "title": "更新工作项"
+      },
+      {
+        "id": "work-log.plan.save",
+        "title": "保存每日计划"
+      },
+      {
+        "id": "work-log.plan.auto",
+        "title": "一键智能排期"
+      },
+      {
+        "id": "work-log.project.claim",
+        "title": "把仓库路径归到项目"
+      },
+      {
+        "id": "work-log.link.reveal",
+        "title": "打开日志目录"
+      }
     ]
-  }
+  },
+  "capability_dependencies": [
+    "workspace.session.sources",
+    "workspace.session.activity",
+    "workspace.session.list",
+    "workspace.session.source.get",
+    "workspace.session.source.configure"
+  ]
 }

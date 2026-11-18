@@ -32,10 +32,12 @@ type extensionEntry struct {
 }
 
 type extensionCatalog struct {
-	DistributionID string           `json:"distribution_id"`
-	Channel        string           `json:"channel"`
-	CatalogID      string           `json:"catalog_id"`
-	Extensions     []extensionEntry `json:"extensions"`
+	DistributionID   string           `json:"distribution_id"`
+	Channel          string           `json:"channel"`
+	CatalogID        string           `json:"catalog_id"`
+	Extensions       []extensionEntry `json:"extensions"`
+	RetiredSkillIDs  []string         `json:"retired_skill_ids"`
+	RetiredPluginIDs []string         `json:"retired_plugin_ids"`
 	// FeaturePacks 由各仓自己的清单声明：能力包是「本仓托管了这些扩展」的事实，
 	// 只有托管这些扩展的仓才能声明，否则消费侧会把同 id 的包读成跨来源冲突。
 	FeaturePacks []catalog.FeaturePack `json:"feature_packs"`
@@ -109,6 +111,20 @@ func sync(repository, catalogPath, extensionsPath, token, apiBase string, allowM
 	for _, extension := range config.Extensions {
 		byID[extension.ID] = append(byID[extension.ID], extension)
 	}
+	retired := make(map[string]bool, len(config.RetiredSkillIDs))
+	for _, id := range config.RetiredSkillIDs {
+		if _, active := byID[id]; active {
+			return summary{}, fmt.Errorf("Skill %s 不能同时声明为托管和退役", id)
+		}
+		retired[id] = true
+	}
+	retiredPlugins := map[string]bool{}
+	for _, id := range config.RetiredPluginIDs {
+		if _, active := byID[id]; active {
+			return summary{}, fmt.Errorf("Plugin %s 不能同时声明为托管和退役", id)
+		}
+		retiredPlugins[id] = true
+	}
 	published := map[string]bool{}
 	skippedTags := 0
 	// 同一扩展可能有多个规范版本，索引保留全部版本，由消费侧选择要用的那个。
@@ -116,6 +132,9 @@ func sync(repository, catalogPath, extensionsPath, token, apiBase string, allowM
 		kind, id, version, err := distribution.ParseReleaseTag(item.TagName)
 		if err != nil {
 			skippedTags++
+			continue
+		}
+		if kind == distribution.KindSkill && retired[id] || kind == distribution.KindPlugin && retiredPlugins[id] {
 			continue
 		}
 		if _, ok := byID[id]; !ok {

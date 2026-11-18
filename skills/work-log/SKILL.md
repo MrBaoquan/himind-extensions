@@ -23,13 +23,15 @@ description: 把当前 AI 会话整理成结构化工作日志并写入全局日
 
 ## 工作流
 
+用户要求补采本机历史会话时，先调用 `work-log.material.sources` 查看可用来源，再调用 `work-log.material.collect` 并显式限定日期/时区/来源/工作区。只整理返回素材，不读取客户端目录。`complete=false`、`truncated` 或 `warnings` 非空时，在汇报中说明缺口；要求完整补采时使用 `strict=true`，遇到不完整数据停止写入。默认只根据当前对话整理时不必扫描其它历史会话。
+
 ### 1. 确认日期与范围
 
 1. 用系统时间确认真实的当前日期，不要臆测；用户说“昨天”“本周”时换算成具体日期。
 2. 确认要整理的范围：默认只整理当前会话中已完成的工作。用户指定某个时间段或某次会话时以用户为准。
 3. 用户没有明确要求写入时，先把条目草稿展示出来，确认后再写入。
 
-**归档口径**：条目按「本机本地时区下的日期」归到 `date`；`started_at` / `ended_at` 用 RFC3339 记录真实时刻。跨零点的会话以其**起始时刻所属日期**归档，避免同一次工作被拆到两天。
+**归档口径**：条目按采集请求的时区与每条消息的真实时间归到自然日；跨零点的会话可能按活动消息拆成多条日记录，`source + session_id + date` 是幂等键。缺失时间不以文件修改时间推断。
 
 ### 2. 从会话中提取事实
 
@@ -53,7 +55,7 @@ description: 把当前 AI 会话整理成结构化工作日志并写入全局日
 - `source`：当前客户端标识（对齐 HiMind 标准客户端 ID），如 `codex`、`claude-code`、`claude-desktop`、`opencode`、`github-copilot`、`himind-ai`。
 - `session_id`：能拿到会话标识时填写，用于同日重复整理时幂等合并。
 - `started_at` / `ended_at`：只有明确时间才填，填 RFC3339 或能解析的时间。
-- `minutes` / `minutes_source`：这条工作的工时（分钟）与来源。能用会话时间戳估算就用 `measured`（按消息间隔算活跃时长）；只有起止时间用 `span`；只能按轮次估用 `estimated`；人工填写用 `manual`。不确定工时就留空，不要编造。
+- `minutes` / `minutes_source`：自动采集只提供相邻消息区间扣除长空闲与重叠后的活动时长估算，标记 `estimated`，不能称为实测投入；人工确认的分钟数才标 `manual`。没有时间证据时保持空值或零，不按轮次补造。
 - `summary`：一两句话说明成果与要点。
 - `outcomes` / `decisions` / `learnings` / `blockers` / `next`：字符串数组，没有就留空。
 - `tags`：可检索标签。
@@ -80,7 +82,7 @@ description: 把当前 AI 会话整理成结构化工作日志并写入全局日
         "title": "<一句话结果>",
         "summary": "<要点>",
         "minutes": 60,
-        "minutes_source": "measured",
+        "minutes_source": "estimated",
         "outcomes": ["<产出>"],
         "next": ["<后续>"]
       }
@@ -271,12 +273,13 @@ description: 把当前 AI 会话整理成结构化工作日志并写入全局日
 
 ## 采集来源
 
-自动采集走 `com.himind.work-log-collector`，来源分两类：
+自动补记调用 `work-log.material.collect`，日志插件通过受限 broker 读取 Agent 的 `workspace.session.sources/activity`。无需安装独立采集器；日志插件不直接读取客户端私有 JSONL 或 SQLite。
 
-- 原生解析：Codex、Claude Code、Claude Desktop、OpenCode、GitHub Copilot（含 VS Code 会话）。
-- 通用可配置来源：用声明式规格接入其他客户端，配置在 `<日志根>/config/sources.json`，可用 `work-log.source.list` / `work-log.source.save` 读取与保存（内置 Cursor、Gemini CLI、Cline、Continue、Windsurf、通义灵码、CodeBuddy CLI、Kiro、WorkBuddy 等预设）。
-
-需要新增来源时，先看是否已有预设匹配；没有再用 `work-log.source.save` 增加一条规格（路径 + 格式 + 字段映射），不要改代码。
+- 日期、时区和工作区范围由本次调用显式声明；可按来源筛选。`work-log.material.sources` 显示真实可用性，缺失来源不能当作没有工作。
+- 来源配置通过 `work-log.source.list/save` 委托给 Agent；原 `<日志根>/config/sources.json` 保留供显式迁移，不作为隐式回退。
+- 工作区归属来自 Agent 稳定 ID；未知目录保持未归属，不按标题或目录名自动登记。
+- 素材、人工工时、隐私过滤和报表由工作日志负责。自动工时是活动估算，证据和原生来源/会话/活动日身份不能被 AI 覆盖。
+- 对账读取工作日志自有素材目录；旧素材可显式指定导入位置，不完整素材不能用于断言历史日志应删除。
 
 ## 纯手工路径
 

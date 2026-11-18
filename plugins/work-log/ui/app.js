@@ -178,14 +178,16 @@
   const el = (id) => document.getElementById(id);
 
   const MINUTES_SOURCE_LABELS = {
-    measured: '实测',
-    span: '区间',
+    measured: '活动估算',
+    span: '区间估算',
     estimated: '估算',
     manual: '人工',
   };
 
   // SOURCE_LABELS 把条目来源（AI 客户端 ID）翻译成显示名，与 Go 侧 sourceClientLabel 对齐。
   const SOURCE_LABELS = {
+    dsh: 'HiMind AI',
+    acp: 'Agent ACP',
     codex: 'Codex',
     claude: 'Claude Code',
     'claude-code': 'Claude Code',
@@ -1377,7 +1379,7 @@
     }
     const flow = aggregateFlow(entries);
     const totalMinutes = flow.totalMinutes;
-    const measured = entries.filter((i) => i.minutes_source !== 'estimated').reduce((s, i) => s + (Number(i.minutes) || 0), 0);
+    const measured = entries.filter((i) => i.minutes_source === 'manual').reduce((s, i) => s + (Number(i.minutes) || 0), 0);
     const estimated = totalMinutes - measured;
     const activeDays = {};
     entries.forEach((item) => {
@@ -1392,7 +1394,7 @@
       statCard(String(Object.keys(activeDays).length), '活跃天数') +
       '</div>' +
       (totalMinutes > 0 && estimated > 0
-        ? '<p class="meta">其中实测 ' + escapeHTML(hoursShort(measured)) + 'h · 估算 ' + escapeHTML(hoursShort(estimated)) + 'h</p>'
+        ? '<p class="meta">其中人工 ' + escapeHTML(hoursShort(measured)) + 'h · 估算 ' + escapeHTML(hoursShort(estimated)) + 'h</p>'
         : '');
 
     const catBars = flow.categories.length
@@ -3579,7 +3581,6 @@
       ' 个' +
       (zeroCount ? ' · 无记录 ' + escapeHTML(zeroCount) + ' 个' : '') +
       '</span>' +
-      '<button class="btn tiny" type="button" data-action="autofill">自动填充路径</button>' +
       '<button class="btn tiny" type="button" data-action="clean-empty"' +
       (zeroCount ? '' : ' disabled') +
       '>清理无记录</button>' +
@@ -3976,28 +3977,6 @@
         if (input) input.focus();
       }
     });
-    panel.querySelector('[data-action="autofill"]')?.addEventListener('click', async (event) => {
-      const btn = event.currentTarget;
-      btn.disabled = true;
-      try {
-        const result = await bridgeInvoke('work-log.project.autofill', {});
-        const count = Number((result && result.filled_count) || 0);
-        if (!count) {
-          notify('没有可自动补全的路径：会话记录里没找到与登记项目匹配的目录', 'warn');
-        } else {
-          const sample = (result.filled || [])
-            .map((f) => text(f && f.project) + ' → ' + text(f && f.path))
-            .slice(0, 3)
-            .join('；');
-          notify('已自动补全 ' + count + ' 个项目路径：' + sample + (count > 3 ? ' 等' : ''));
-        }
-        await refreshProjects();
-      } catch (error) {
-        notify('自动填充失败：' + String((error && error.message) || error), 'error');
-        btn.disabled = false;
-      }
-    });
-
     const save = panel.querySelector('#p-save');
     if (save) {
       save.addEventListener('click', async () => {
@@ -4395,7 +4374,7 @@
     el('m-project').value = entry ? text(entry.project) : '';
     el('m-feature').value = entry ? text(entry.feature) : '';
     el('m-exhibit').value = entry ? text(entry.exhibit) : '';
-    el('m-hours').value = entry && Number(entry.minutes) > 0 ? String((Number(entry.minutes) / 60).toFixed(2).replace(/\.?0+$/, '')) : '';
+    el('m-hours').value = entry && (Number(entry.minutes) > 0 || entry.minutes_source === 'manual') ? String(((Number(entry.minutes) || 0) / 60).toFixed(2).replace(/\.?0+$/, '')) : '';
     el('m-category').value = (() => {
       const label = entry ? catLabel(entry.category) : '';
       return CATEGORY_OPTIONS.indexOf(label) >= 0 ? label : '开发';
@@ -4625,7 +4604,9 @@
   // 原样回传被 schema 拒绝（entry 声明了 additionalProperties:false）。
   const ENTRY_FIELDS = [
     'entry_id', 'date', 'source', 'session_id', 'project', 'feature', 'exhibit',
-    'project_id', 'exhibit_id', 'category',
+    'project_id', 'exhibit_id', 'category', 'repo_path', 'project_hint',
+    'workspace_project_id', 'provider', 'minutes_method', 'evidence', 'evidence_truncated',
+    'activity_intervals', 'overlap_adjusted',
     'minutes', 'minutes_source', 'started_at', 'ended_at', 'title', 'summary',
     'outcomes', 'decisions', 'learnings', 'blockers', 'next', 'tags', 'refs',
   ];
@@ -4658,8 +4639,16 @@
     entry.summary = text(el('m-summary').value);
     entry.outcomes = splitList(el('m-outcomes').value);
     entry.next = splitList(el('m-next').value);
-    const hours = Number(el('m-hours').value);
-    if (hours > 0) {
+    const hoursInput = el('m-hours').value.trim();
+    const hours = Number(hoursInput);
+    if (hoursInput !== '' && (!Number.isFinite(hours) || hours < 0)) {
+      notify('工时请输入大于或等于 0 的数字。', 'error');
+      return;
+    }
+    delete entry.minutes_method;
+    delete entry.activity_intervals;
+    delete entry.overlap_adjusted;
+    if (hoursInput !== '') {
       entry.minutes = Math.round(hours * 60);
       entry.minutes_source = 'manual';
     } else {

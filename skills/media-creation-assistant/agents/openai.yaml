@@ -1,0 +1,4 @@
+interface:
+  display_name: "媒体创作助手"
+  short_description: "选风格包、控制矩阵规模、先小样后放量并留存生成血缘"
+  default_prompt: "使用 $media-creation-assistant 处理这批素材需求：先读可用风格包并确认生成服务就绪，只写主体与用途，先跑一张小样确认方向，再按矩阵放量（总量不超过 36 张），最后用生成血缘说明每张图是怎么来的。"

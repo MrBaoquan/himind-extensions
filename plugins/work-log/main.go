@@ -86,7 +86,7 @@ type input struct {
 	// EntriesStep / NarrativeStep 指向上游步骤，用于从工作流取结构化结果。
 	EntriesStep   string `json:"entries_step"`
 	NarrativeStep string `json:"narrative_step"`
-	// BaseStep 指向上游的「确定性素材」步骤（采集器候选条目）。与 EntriesStep（通常是
+	// BaseStep 指向上游的「确定性素材」步骤（Agent 会话候选条目）。与 EntriesStep（通常是
 	// AI 总结结果）配合时，用工时/起止时间/来源/会话等确定性字段兜底，AI 只覆盖人类可读内容，
 	// 避免模型把工时时长、时间戳写歪。
 	BaseStep string `json:"base_step"`
@@ -138,11 +138,10 @@ type input struct {
 	// DryRun 供迁移维护能力预览改动而不写盘。
 	DryRun *bool `json:"dry_run"`
 	// CrossDay 供 work-log.entry.dedupe 选择是否跨天合并同一会话：默认 false 时只合并
-	// 「同一天、同一会话」的真正重复条目（采集器按活跃日归集后，同一长会话跨天出现是
+	// 「同一天、同一会话」的真正重复条目（Agent 按消息活动日归集后，同一长会话跨天出现是
 	// 正常记录，不该被合并）；显式 true 才启用旧的跨天合并（清理历史误录）。
 	CrossDay *bool `json:"cross_day"`
-	// MaterialRoot 供 work-log.project.autofill 指定「AI 会话素材」目录；缺省用采集器
-	// （com.himind.work-log-collector）私有数据目录下的 material/。
+	// MaterialRoot 指定工作日志私有素材目录；显式路径可读取旧素材。
 	MaterialRoot string `json:"material_root"`
 	// Patch 供 work-log.entry.patch 做字段级局部更新：只改显式传入的键，未传的键保持原值。
 	Patch map[string]any `json:"patch"`
@@ -173,21 +172,33 @@ type ref struct {
 	Value string `json:"value"`
 }
 
-// entry 是一条工作日志。字段设计目标是同时支撑"采集草稿"与"汇总报告"。
+type activityInterval struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+// entry 是一条工作日志，同时支持采集草稿与汇总报告。
 type entry struct {
-	EntryID   string `json:"entry_id"`
-	Date      string `json:"date"`
-	Source    string `json:"source"`
-	SessionID string `json:"session_id"`
-	Project   string `json:"project"`
-	Feature   string `json:"feature,omitempty"`
+	WorkspaceProjectID string             `json:"workspace_project_id,omitempty"` // Agent registry identity, distinct from business ProjectID.
+	Provider           string             `json:"provider,omitempty"`
+	MinutesMethod      string             `json:"minutes_method,omitempty"`
+	Evidence           []map[string]any   `json:"evidence,omitempty"`
+	EvidenceTruncated  bool               `json:"evidence_truncated,omitempty"`
+	ActivityIntervals  []activityInterval `json:"activity_intervals,omitempty"`
+	OverlapAdjusted    bool               `json:"overlap_adjusted,omitempty"`
+	EntryID            string             `json:"entry_id"`
+	Date               string             `json:"date"`
+	Source             string             `json:"source"`
+	SessionID          string             `json:"session_id"`
+	Project            string             `json:"project"`
+	Feature            string             `json:"feature,omitempty"`
 	// Exhibit 是「展项」维度（工作台项目下的展项）。项目为主、展项可选：
 	// 条目至少应落到项目；能从工作台或素材判定展项时再落到展项。
 	Exhibit string `json:"exhibit,omitempty"`
 	// ProjectID / ExhibitID 是命中工作台登记后的稳定 ID（未命中留空，供用户确认后再补）。
 	ProjectID string `json:"project_id,omitempty"`
 	ExhibitID string `json:"exhibit_id,omitempty"`
-	// RepoPath 是会话工作目录对应的仓库根（采集器写入的稳定路径事实）。
+	// RepoPath 是会话工作目录对应的仓库根（Agent 工作区注册表提供的路径事实）。
 	// 写入时按「路径 → 项目/展项」映射归类，未命中则留空并进入待认领。
 	RepoPath string `json:"repo_path,omitempty"`
 	// ProjectHint 是未归类时保留的原始项目名建议（AI/目录名/仓库自述），仅供待认领界面参考。
@@ -195,8 +206,8 @@ type entry struct {
 	Category    string `json:"category"`
 	StartedAt   string `json:"started_at"`
 	EndedAt     string `json:"ended_at"`
-	// Minutes 是该条目的工时（分钟）。MinutesSource 标明来源：measured（按消息间隔实测的活跃时长）
-	// / span（仅有起止时间的粗粒度区间）/ estimated（按轮次估算）/ manual（人工填写）。
+	// Minutes 是该条目的工时（分钟）。MinutesSource 标明来源：measured（历史枚举，按消息间隔估算的活跃时长）
+	// / span（仅有起止时间的粗粒度区间）/ estimated（自动估算，方法见 MinutesMethod）/ manual（人工填写）。
 	Minutes       int      `json:"minutes,omitempty"`
 	MinutesSource string   `json:"minutes_source,omitempty"`
 	Title         string   `json:"title"`
@@ -230,6 +241,9 @@ func main() {
 }
 
 func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
+	if request.Method == "work-log.material.collect" || request.Method == "work-log.material.sources" {
+		return materialCap(request)
+	}
 	var in input
 	if rpcError := jsonrpc.DecodeParams(request, &in); rpcError != nil {
 		return nil, rpcError
@@ -282,9 +296,6 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 		return rpcResult(result, err)
 	case "work-log.project.merge":
 		result, err := projectMergeCap(in)
-		return rpcResult(result, err)
-	case "work-log.project.autofill":
-		result, err := projectAutofillCap(in)
 		return rpcResult(result, err)
 	case "work-log.project.export":
 		result, err := projectExportCap(in)
@@ -699,6 +710,21 @@ func upsert(in input) (any, error) {
 // mergeEntry 用 incoming 覆盖 current，但不让 incoming 的空值冲掉已有内容。
 func mergeEntry(current, incoming entry) entry {
 	merged := incoming
+	if merged.WorkspaceProjectID == "" {
+		merged.WorkspaceProjectID = current.WorkspaceProjectID
+	}
+	if merged.Provider == "" {
+		merged.Provider = current.Provider
+	}
+	if merged.MinutesMethod == "" && incoming.MinutesSource != "manual" {
+		merged.MinutesMethod = current.MinutesMethod
+		merged.ActivityIntervals = current.ActivityIntervals
+		merged.OverlapAdjusted = current.OverlapAdjusted
+	}
+	if len(merged.Evidence) == 0 {
+		merged.Evidence = current.Evidence
+		merged.EvidenceTruncated = current.EvidenceTruncated
+	}
 	if merged.Project == "" {
 		merged.Project = current.Project
 	}
@@ -708,7 +734,7 @@ func mergeEntry(current, incoming entry) entry {
 	if merged.Category == "" {
 		merged.Category = current.Category
 	}
-	if merged.Minutes == 0 {
+	if merged.Minutes == 0 && incoming.MinutesMethod == "" && incoming.MinutesSource != "manual" {
 		merged.Minutes = current.Minutes
 	}
 	if merged.MinutesSource == "" {
@@ -1359,7 +1385,8 @@ func renderPeriodReport(root, period, anchor, title, narrative string, narrative
 		report["quarter_rule"] = fiscalQuarterRuleText(startMonth)
 	}
 	measuredMinutes, estimatedMinutes := splitMinutes(entries)
-	report["measured_minutes"] = measuredMinutes
+	report["measured_minutes"] = measuredMinutes // legacy alias: now manual minutes only
+	report["manual_minutes"] = measuredMinutes
 	report["estimated_minutes"] = estimatedMinutes
 	jsonPath := filepath.Join(dir, key+".json")
 	jsonBody, err := json.MarshalIndent(map[string]any{"report": report}, "", "  ")
@@ -2137,13 +2164,13 @@ func groupMinutes(items []entry) int {
 	return total
 }
 
-// splitMinutes 把工时拆成"实测/区间"与"估算"两类，便于报告透明标注。
+// splitMinutes retains the legacy API field name but only manual minutes are confirmed; all automatic minutes are estimates.
 func splitMinutes(items []entry) (measured, estimated int) {
 	for _, item := range items {
 		if item.Minutes <= 0 {
 			continue
 		}
-		if item.MinutesSource == "estimated" {
+		if item.MinutesSource != "manual" {
 			estimated += item.Minutes
 		} else {
 			measured += item.Minutes
@@ -2175,6 +2202,10 @@ func hoursText(m int) string {
 // sourceClientLabel 把来源标识（AI 客户端 ID）翻译成人读显示名。
 func sourceClientLabel(source string) string {
 	switch strings.ToLower(strings.TrimSpace(source)) {
+	case "dsh":
+		return "HiMind AI"
+	case "acp":
+		return "Agent ACP"
 	case "codex":
 		return "Codex"
 	case "claude":
@@ -2216,9 +2247,9 @@ func sourceClientLabel(source string) string {
 func minutesSourceLabel(source string) string {
 	switch source {
 	case "measured":
-		return "实测"
+		return "活动估算"
 	case "span":
-		return "区间"
+		return "区间估算"
 	case "estimated":
 		return "估算"
 	case "manual":
@@ -2245,7 +2276,7 @@ func overviewLines(entries []entry) string {
 	measured, estimated := splitMinutes(entries)
 	total := measured + estimated
 	if total > 0 {
-		builder.WriteString(fmt.Sprintf("- 记录工时：约 %s（实测 %s / 估算 %s）\n", hoursText(total), hoursText(measured), hoursText(estimated)))
+		builder.WriteString(fmt.Sprintf("- 记录工时：约 %s（人工 %s / 估算 %s）\n", hoursText(total), hoursText(measured), hoursText(estimated)))
 	}
 	return builder.String()
 }
@@ -2807,7 +2838,7 @@ func parseStamp(value string) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-// compareStamps 按真实时刻比较两个时间戳：采集器记录的时区并不统一（Codex、Copilot
+// compareStamps 按真实时刻比较两个时间戳：不同客户端的时区表示并不统一（Codex、Copilot
 // 写 UTC，OpenCode 写本地偏移），直接比字符串会把先后顺序排错，所以能解析时按时刻比。
 // 只要有一侧不是可解析的时间戳（空值、手工写的 HH:MM），就返回 ok=false 让调用方
 // 退回字符串比较，保持既有行为。

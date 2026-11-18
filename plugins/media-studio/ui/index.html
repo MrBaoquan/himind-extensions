@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>媒体创作</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-bar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">✳</span>
+        <div>
+          <h1>媒体创作</h1>
+          <p>风格包、矩阵生成与生成血缘</p>
+        </div>
+      </div>
+      <div class="app-actions">
+        <span id="ready-chip" class="chip" role="status">正在检查…</span>
+        <button type="button" id="refresh-state" class="icon-button" aria-label="刷新就绪状态" title="刷新就绪状态">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="composer" aria-labelledby="composer-title">
+        <h2 id="composer-title" class="section-title">生成设置</h2>
+
+        <label class="field">
+          <span class="field-label">要生成什么</span>
+          <textarea id="prompt" rows="4" maxlength="4000" placeholder="例如：展馆大厅的夜间主视觉，前景是入口通道"></textarea>
+        </label>
+
+        <div class="field">
+          <div class="field-head">
+            <span class="field-label" id="styles-label">风格包</span>
+            <button type="button" id="clear-styles" class="link-button">清除</button>
+          </div>
+          <div id="styles" class="chip-grid" role="group" aria-labelledby="styles-label"></div>
+          <p id="styles-hint" class="hint">选中多个风格包会各生成一组，便于横向比较。</p>
+        </div>
+
+        <div class="field">
+          <span class="field-label" id="sizes-label">尺寸</span>
+          <div id="sizes" class="chip-grid" role="group" aria-labelledby="sizes-label"></div>
+        </div>
+
+        <div class="field-grid">
+          <label class="field">
+            <span class="field-label">每格张数</span>
+            <select id="variants">
+              <option value="1">1 张</option>
+              <option value="2">2 张</option>
+              <option value="3">3 张</option>
+              <option value="4">4 张</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">文件名前缀</span>
+            <input id="filename-prefix" type="text" maxlength="120" placeholder="留空自动命名" />
+          </label>
+        </div>
+
+        <p id="matrix-preview" class="matrix-preview" role="status"></p>
+        <div id="composer-feedback" class="inline-feedback" role="status" hidden></div>
+
+        <div class="composer-actions">
+          <button type="button" id="start-batch" class="primary wide">开始矩阵生成</button>
+          <button type="button" id="open-style-form" class="ghost wide">保存为新风格包</button>
+        </div>
+      </section>
+
+      <section class="stage" aria-labelledby="stage-title">
+        <div class="stage-head">
+          <div>
+            <h2 id="stage-title" class="section-title">生成结果</h2>
+            <p id="stage-subtitle" class="hint">还没有作业。左侧选好风格包后开始生成。</p>
+          </div>
+          <div class="stage-actions">
+            <button type="button" id="cancel-job" class="ghost" hidden>取消作业</button>
+            <button type="button" id="reload" class="icon-button" aria-label="刷新作业" title="刷新作业">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div id="progress" class="progress" hidden>
+          <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-bar">
+            <span id="progress-fill"></span>
+          </div>
+          <p id="progress-text" class="hint"></p>
+        </div>
+
+        <div id="results" class="results" aria-live="polite"></div>
+
+        <section class="history" aria-labelledby="history-title">
+          <div class="field-head">
+            <h3 id="history-title">最近作业</h3>
+          </div>
+          <div id="history-list" class="history-list"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <aside id="lineage" class="detail-sheet" role="dialog" aria-modal="true" aria-labelledby="lineage-title" aria-hidden="true" hidden>
+    <div id="lineage-scrim" class="scrim" hidden></div>
+    <div class="detail-body">
+      <header class="detail-head">
+        <h2 id="lineage-title">生成血缘</h2>
+        <button type="button" id="close-lineage" class="icon-button" aria-label="关闭血缘" title="关闭">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
+      <div id="lineage-content" class="detail-content"></div>
+    </div>
+  </aside>
+
+  <div id="style-modal" class="modal-layer" aria-hidden="true" hidden>
+    <div class="modal-backdrop" data-close-style></div>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="style-modal-title">
+      <header class="modal-head">
+        <div>
+          <h2 id="style-modal-title">保存风格包</h2>
+          <p class="hint">风格包是提示词骨架，下次生成可直接复用。</p>
+        </div>
+        <button type="button" id="close-style" class="icon-button" aria-label="关闭风格包表单" title="关闭">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
+      <div class="modal-body">
+        <div class="field-grid">
+          <label class="field">
+            <span class="field-label">标识</span>
+            <input id="style-id" type="text" maxlength="48" placeholder="my-pack（小写字母、数字、连字符）" />
+          </label>
+          <label class="field">
+            <span class="field-label">显示名</span>
+            <input id="style-label" type="text" maxlength="40" placeholder="例如：夜展主视觉" />
+          </label>
+        </div>
+        <label class="field">
+          <span class="field-label">风格要求</span>
+          <textarea id="style-suffix" rows="3" maxlength="600" placeholder="例如：夜色、湿润地面反光、冷暖对比"></textarea>
+        </label>
+        <label class="field">
+          <span class="field-label">不要出现</span>
+          <input id="style-avoid" type="text" maxlength="300" placeholder="例如：文字、人群特写" />
+        </label>
+        <label class="field">
+          <span class="field-label">默认尺寸</span>
+          <input id="style-sizes" type="text" maxlength="120" placeholder="1024x1024, 1280x720" />
+        </label>
+        <div id="style-feedback" class="inline-feedback" role="status" hidden></div>
+      </div>
+      <footer class="modal-foot">
+        <button type="button" id="cancel-style" class="ghost">取消</button>
+        <button type="button" id="save-style" class="primary">保存风格包</button>
+      </footer>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

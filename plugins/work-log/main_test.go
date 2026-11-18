@@ -723,25 +723,6 @@ func TestEntryUpsertAutoCreatesProject(t *testing.T) {
 	}
 }
 
-func TestSourceConfigSaveAndList(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	saved := call(t, "work-log.source.save", `{"log_root":`+quote(root)+`,"sources":[{"id":"myclient","label":"我的客户端","root":"~/.myclient","glob":"**/*.jsonl","format":"jsonl"}]}`)
-	if saved["count"].(float64) != 1 {
-		t.Fatalf("保存来源数异常: %v", saved["count"])
-	}
-	list := call(t, "work-log.source.list", `{"log_root":`+quote(root)+`}`)
-	if !list["exists"].(bool) {
-		t.Fatal("来源配置应已存在")
-	}
-	if len(list["sources"].([]any)) != 1 {
-		t.Fatalf("来源配置读取异常: %v", list["sources"])
-	}
-	if _, err := os.Stat(sourcesConfigPath(root)); err != nil {
-		t.Fatalf("来源配置文件未落盘: %v", err)
-	}
-}
-
 func TestReportGroupsByProjectAndFeatureWithMinutes(t *testing.T) {
 	withDataRoot(t)
 	root := t.TempDir()
@@ -761,10 +742,10 @@ func TestReportGroupsByProjectAndFeatureWithMinutes(t *testing.T) {
 		"日历视图今天落地",
 		"完成月历",
 		"完成：月历可用",
-		"记录工时：约 2.0 小时（实测 1.5 小时 / 估算 0.5 小时）",
+		"记录工时：约 2.0 小时（人工 0.0 小时 / 估算 2.0 小时）",
 		"素材来源：Codex（2）",
 		"来源:Codex",
-		"（1 小时 30 分·实测·Codex）",
+		"（1 小时 30 分·活动估算·Codex）",
 	} {
 		if !contains(markdown, want) {
 			t.Fatalf("日报 Markdown 缺少 %q:\n%s", want, markdown)
@@ -858,7 +839,7 @@ func TestTimeSpanFormatsTimestamps(t *testing.T) {
 	}
 }
 
-// TestTimeSpanLocalizesUTCStamp 覆盖「采集器写入 UTC、界面按本地时钟展示」的口径：
+// TestTimeSpanLocalizesUTCStamp 覆盖「历史会话写入 UTC、界面按本地时钟展示」的口径：
 // Codex / Copilot 的会话时间戳是 UTC，报告里的时间必须是换算后的本地时刻，
 // 而不是直接把字符串里的时分截出来（否则会整体偏一个时区）。
 // 期望值按本机时区算，测试不依赖运行机器的时区。
@@ -875,7 +856,7 @@ func TestTimeSpanLocalizesUTCStamp(t *testing.T) {
 	}
 }
 
-// TestSortEntriesComparesInstantsAcrossTimezones 验证跨时区排序：采集器对 Codex 写 UTC、
+// TestSortEntriesComparesInstantsAcrossTimezones 验证跨时区排序：Codex 会话时间写入 UTC、
 // 对 OpenCode 写本地偏移，同一批条目里直接比字符串会把先后顺序排反。
 func TestSortEntriesComparesInstantsAcrossTimezones(t *testing.T) {
 	// 真实时刻：01:00Z（09:00 +08:00）晚于 00:00Z（08:00 +08:00），
@@ -1507,59 +1488,13 @@ func TestProjectRenameRebindsEntries(t *testing.T) {
 }
 
 // TestProjectAutofillFromSessionMaterial 验证从会话素材搜一轮自动补全项目路径，且 dry_run 不写盘。
-func TestProjectAutofillFromSessionMaterial(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"甲馆"}`)
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"乙馆","paths":[{"path":"F:/keep"}]}`)
-
-	material := t.TempDir()
-	digest := `{"sessions":[` +
-		`{"project":"甲馆","directory":"F:/work/jiaguan"},` +
-		`{"project":"甲馆","repo_path":"F:/work/jiaguan"},` +
-		`{"project":"乙馆","directory":"F:/work/yiguan"},` +
-		`{"project":"孤儿","directory":"F:/work/orphan"}` +
-		`]}`
-	if err := os.WriteFile(filepath.Join(material, "session-digest-2026-10-02_2026-10-02.json"), []byte(digest), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	// dry_run：只预览，不写盘。
-	preview := call(t, "work-log.project.autofill", `{"log_root":`+quote(root)+`,"material_root":`+quote(material)+`,"dry_run":true}`)
-	if preview["filled_count"].(float64) != 1 {
-		t.Fatalf("dry_run 应预览 1 个待补项目: %v", preview)
-	}
-	if len(findProjectByName(t, root, "甲馆")["paths"].([]any)) != 0 {
-		t.Fatal("dry_run 不应真正写入路径")
-	}
-
-	applied := call(t, "work-log.project.autofill", `{"log_root":`+quote(root)+`,"material_root":`+quote(material)+`}`)
-	if applied["filled_count"].(float64) != 1 {
-		t.Fatalf("应补 1 个项目路径: %v", applied)
-	}
-	paths := findProjectByName(t, root, "甲馆")["paths"].([]any)
-	if len(paths) != 1 || paths[0].(map[string]any)["path"] != "F:/work/jiaguan" {
-		t.Fatalf("路径未自动补全: %v", paths)
-	}
-	if paths[0].(map[string]any)["source"] != "session" {
-		t.Fatalf("自动补全来源应为 session: %v", paths[0])
-	}
-	// 已有路径的项目不被覆盖。
-	kept := findProjectByName(t, root, "乙馆")["paths"].([]any)
-	if len(kept) != 1 || kept[0].(map[string]any)["path"] != "F:/keep" {
-		t.Fatalf("已有路径不应被覆盖: %v", kept)
-	}
-}
-
-// TestSessionMaterialDirSiblingLayout 验证未显式给 material_root 时，能从采集器（同级插件）
-// 的私有数据目录找到素材：HIMIND_PLUGIN_DATA_ROOT 指向本插件目录，素材在同级目录。
-func TestSessionMaterialDirSiblingLayout(t *testing.T) {
+func TestSessionMaterialDirOwnedByWorkLog(t *testing.T) {
 	pluginData := t.TempDir()
 	own := filepath.Join(pluginData, "com.himind.work-log")
 	if err := os.MkdirAll(own, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	sibling := filepath.Join(pluginData, "com.himind.work-log-collector", "material")
+	sibling := filepath.Join(own, "material")
 	if err := os.MkdirAll(sibling, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -1570,65 +1505,7 @@ func TestSessionMaterialDirSiblingLayout(t *testing.T) {
 		t.Fatal(err)
 	}
 	if filepath.Clean(got) != filepath.Clean(sibling) {
-		t.Fatalf("应解析到同级采集器素材目录 %q，实际 %q", sibling, got)
-	}
-}
-
-// TestProjectAutofillViaSiblingMaterialDir 走真实环境变量路径（不给 material_root）时，
-// autofill 应能读到同级采集器素材并补全路径。
-func TestProjectAutofillViaSiblingMaterialDir(t *testing.T) {
-	pluginData := t.TempDir()
-	own := filepath.Join(pluginData, "com.himind.work-log")
-	if err := os.MkdirAll(own, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	material := filepath.Join(pluginData, "com.himind.work-log-collector", "material")
-	if err := os.MkdirAll(material, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", own)
-
-	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"甲馆"}`)
-	digest := `{"sessions":[{"project":"甲馆","directory":"F:/work/jiaguan"}]}`
-	if err := os.WriteFile(filepath.Join(material, "session-digest-2026-10-02_2026-10-02.json"), []byte(digest), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	applied := call(t, "work-log.project.autofill", `{"log_root":`+quote(root)+`}`)
-	if applied["found_material"] != true {
-		t.Fatalf("应找到同级采集器素材: %v", applied)
-	}
-	if applied["filled_count"].(float64) != 1 {
-		t.Fatalf("应补 1 个项目路径: %v", applied)
-	}
-}
-
-// TestEphemeralProjectPath 验证临时/缓存/草稿路径被识别，真实仓库不被误判。
-func TestEphemeralProjectPath(t *testing.T) {
-	ephemeral := []string{
-		filepath.Join(os.TempDir(), "himind-runtime-1", "workspace"),
-		`C:\Users\me\AppData\Local\Temp\himind-acp-real-deadbeef\workspace`,
-		`C:\Users\me\.copilot\repos\copilot-worktrees\AndX\mrbaoquan-wt`,
-		`C:\Users\me\.copilot\chats\2026-09-20\fuzzy-adventure`,
-		`C:\Users\me\Documents\Codex\2026-09-29\x-decrypted-3`,
-		`C:\Users\me\AppData\Local\Claude-3p\local-agent-mode-sessions\de34d5bb\00000000\5183affa\outputs`,
-		`C:\Users\me\AppData\Roaming\Claude\local-agent-mode-sessions\de34d5bb\00000000\c58e56b0\host-cwd`,
-	}
-	for _, p := range ephemeral {
-		if !ephemeralProjectPath(p) {
-			t.Fatalf("应判为临时/缓存路径: %q", p)
-		}
-	}
-	real := []string{
-		`F:\WebProjects\AndX`,
-		`O:\DevModules\IODevice`,
-		`C:\Users\me\.copilot\repos\HiMind-Agent`,
-	}
-	for _, p := range real {
-		if ephemeralProjectPath(p) {
-			t.Fatalf("真实项目路径不应判为临时: %q", p)
-		}
+		t.Fatalf("应解析到工作日志自有素材目录 %q，实际 %q", sibling, got)
 	}
 }
 
@@ -1657,55 +1534,6 @@ func TestWorktreeMainRoot(t *testing.T) {
 }
 
 // TestAutofillSkipsCacheKeepsReal 验证同一项目同时有缓存工作树与真实路径时，只绑真实路径。
-func TestAutofillSkipsCacheKeepsReal(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"甲馆"}`)
-	material := t.TempDir()
-	digest := `{"sessions":[` +
-		`{"project":"甲馆","directory":"C:/Users/me/.copilot/repos/copilot-worktrees/jiaguan/mrbaoquan-very-long-name"},` +
-		`{"project":"甲馆","directory":"F:/WebProjects/jiaguan"}` +
-		`]}`
-	if err := os.WriteFile(filepath.Join(material, "session-digest-2026-10-03_2026-10-03.json"), []byte(digest), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	applied := call(t, "work-log.project.autofill", `{"log_root":`+quote(root)+`,"material_root":`+quote(material)+`}`)
-	if applied["filled_count"].(float64) != 1 {
-		t.Fatalf("应补 1 个路径: %v", applied)
-	}
-	filled := applied["filled"].([]any)
-	if got := filled[0].(map[string]any)["path"]; got != "F:/WebProjects/jiaguan" {
-		t.Fatalf("应绑真实仓库路径而非缓存工作树，实际 %v", got)
-	}
-	paths := findProjectByName(t, root, "甲馆")["paths"].([]any)
-	if len(paths) != 1 || paths[0].(map[string]any)["path"] != "F:/WebProjects/jiaguan" {
-		t.Fatalf("登记表里也应只有真实路径: %v", paths)
-	}
-}
-
-// TestAutofillOnlyCacheLeavesUnbound 验证只有缓存路径的项目不被绑定，并出现在忽略清单里。
-func TestAutofillOnlyCacheLeavesUnbound(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"只有缓存"}`)
-	material := t.TempDir()
-	digest := `{"sessions":[{"project":"只有缓存","directory":"C:/Users/me/AppData/Local/Temp/himind-acp-real-1/workspace"}]}`
-	if err := os.WriteFile(filepath.Join(material, "session-digest-2026-10-04_2026-10-04.json"), []byte(digest), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	applied := call(t, "work-log.project.autofill", `{"log_root":`+quote(root)+`,"material_root":`+quote(material)+`}`)
-	if applied["filled_count"].(float64) != 0 {
-		t.Fatalf("只有缓存路径时不应绑定: %v", applied)
-	}
-	if applied["ignored_count"].(float64) < 1 {
-		t.Fatalf("应报告被忽略的缓存路径: %v", applied)
-	}
-	if len(findProjectByName(t, root, "只有缓存")["paths"].([]any)) != 0 {
-		t.Fatalf("不应写入任何路径")
-	}
-}
-
-// TestPreferCandidatePath 验证候选择优：仓库根优先于普通目录，否则取更短路径。
 func TestPreferCandidatePath(t *testing.T) {
 	home := t.TempDir()
 	repo := filepath.Join(home, "repo")
@@ -1795,7 +1623,7 @@ func writeDayFixture(t *testing.T, root, date string, entries []map[string]any) 
 	}
 }
 
-// TestDedupeKeepsCrossDayByDefault 验证默认语义：同一会话跨天出现是采集器按活跃日
+// TestDedupeKeepsCrossDayByDefault 验证默认语义：同一会话跨天出现是 Agent 按活动日
 // 归集出的正常记录，默认不该被合并。
 func TestDedupeKeepsCrossDayByDefault(t *testing.T) {
 	withDataRoot(t)

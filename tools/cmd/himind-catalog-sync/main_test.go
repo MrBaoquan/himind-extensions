@@ -86,8 +86,16 @@ func TestSyncLeavesFeaturePacksEmptyWhenManifestDeclaresNone(t *testing.T) {
 	}
 }
 
+func TestSyncIgnoresRetiredSkillReleases(t *testing.T) {
+	const retired = "com.himind.skill.old-authoring"
+	synced := runSync(t, nil, retired)
+	if len(synced.Skills) != 0 || len(synced.Workflows) != 1 {
+		t.Fatalf("unexpected catalog after skill retirement: %+v", synced)
+	}
+}
+
 // runSync 起一个假的 GitHub API，跑一次完整索引重建，返回落盘的索引。
-func runSync(t *testing.T, declared []catalogtool.FeaturePack) catalogtool.Catalog {
+func runSync(t *testing.T, declared []catalogtool.FeaturePack, retired ...string) catalogtool.Catalog {
 	t.Helper()
 	const (
 		repository = "MrBaoquan/demo-ext"
@@ -126,13 +134,21 @@ func runSync(t *testing.T, declared []catalogtool.FeaturePack) catalogtool.Catal
 		writer.Header().Set("Content-Type", "application/json")
 		switch {
 		case strings.HasSuffix(request.URL.Path, "/releases"):
-			_ = json.NewEncoder(writer).Encode([]map[string]interface{}{{
+			items := []map[string]interface{}{{
 				"tag_name": tag, "draft": false, "published_at": "2026-09-28T00:00:00Z",
 				"assets": []map[string]interface{}{
 					{"name": manifest, "size": len(releaseManifest), "url": "http://" + request.Host + "/assets/manifest"},
 					{"name": lock, "size": 2, "url": "http://" + request.Host + "/assets/lock"},
 				},
-			}})
+			}}
+			for _, id := range retired {
+				kind := "skill"
+				if strings.Contains(id, "collector") {
+					kind = "plugin"
+				}
+				items = append(items, map[string]interface{}{"tag_name": kind + "/" + id + "@1.0.0"})
+			}
+			_ = json.NewEncoder(writer).Encode(items)
 		case request.URL.Path == "/assets/manifest":
 			_, _ = writer.Write(releaseManifest)
 		case request.URL.Path == "/assets/lock":
@@ -164,6 +180,18 @@ func runSync(t *testing.T, declared []catalogtool.FeaturePack) catalogtool.Catal
 	if declared != nil {
 		config["feature_packs"] = declared
 	}
+	if len(retired) > 0 {
+		skills, plugins := []string{}, []string{}
+		for _, id := range retired {
+			if strings.Contains(id, "collector") {
+				plugins = append(plugins, id)
+			} else {
+				skills = append(skills, id)
+			}
+		}
+		config["retired_skill_ids"] = skills
+		config["retired_plugin_ids"] = plugins
+	}
 	data, err := json.Marshal(config)
 	if err != nil {
 		t.Fatalf("构造仓库清单失败: %v", err)
@@ -185,4 +213,11 @@ func runSync(t *testing.T, declared []catalogtool.FeaturePack) catalogtool.Catal
 		t.Fatalf("读取重建结果失败: %v", err)
 	}
 	return *synced
+}
+
+func TestSyncIgnoresRetiredCollectorReleases(t *testing.T) {
+	synced := runSync(t, nil, "com.himind.work-log-collector")
+	if len(synced.Plugins) != 0 || len(synced.Workflows) != 1 {
+		t.Fatalf("retired collector returned: %+v", synced)
+	}
 }
