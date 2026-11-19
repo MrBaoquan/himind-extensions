@@ -6,7 +6,7 @@
     <title>工作日志 · 当前工作</title>
     <!-- 资源带版本后缀：插件 UI 由 Agent 直接按路径提供，不带缓存头；版本号变化会让 WebView
          重新拉取 app.js/app.css，避免界面改版后仍显示旧脚本。改动前端资源时请同步提升。 -->
-    <link rel="stylesheet" href="app.css?v=0.19.1" />
+    <link rel="stylesheet" href="app.css?v=0.21.6" />
   </head>
   <body>
     <header class="topbar">
@@ -112,8 +112,7 @@
         <form id="manual-fields">
           <input type="hidden" id="m-entry-id" />
           <div class="manual-grid">
-            <label class="field"><span>项目</span><input id="m-project" type="text" list="project-options" placeholder="从项目列表选择或输入" /></label>
-            <datalist id="project-options"></datalist>
+            <label class="field"><span>项目</span><select id="m-project"><option value="">未归属</option></select></label>
             <label class="field"><span>功能</span><input id="m-feature" type="text" placeholder="如：日历视图" /></label>
             <label class="field"><span>工时（小时）</span><input id="m-hours" type="number" min="0" max="24" step="0.5" placeholder="如：3" /></label>
             <label class="field"><span>类型</span>
@@ -284,18 +283,13 @@
         <div class="detail-head">
           <div>
             <h1>项目</h1>
-            <p id="projects-subtitle">按项目回看推进记录；登记表用于归类与路径映射。</p>
+            <p id="projects-subtitle">按项目回看推进记录；项目身份与目录归属由 Agent 工作区统一管理。</p>
           </div>
-        </div>
-        <div class="seg" role="group" aria-label="项目视图" id="projects-mode">
-          <button type="button" class="seg-btn active" data-mode="progress" aria-pressed="true">推进记录</button>
-          <button type="button" class="seg-btn" data-mode="registry" aria-pressed="false">登记管理</button>
         </div>
         <div class="projects-layout" id="projects-progress">
           <aside class="proj-list-col" id="proj-list"></aside>
           <section class="proj-progress-col" id="proj-progress"></section>
         </div>
-        <div id="projects-panel" class="panel-body" hidden></div>
       </section>
     </div>
 
@@ -411,6 +405,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=0.19.1"></script>
+    <script src="app.js?v=0.21.6"></script>
   </body>
 </html>

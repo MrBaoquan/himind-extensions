@@ -64,7 +64,7 @@ func TestMaterialCollectUsesOnlyAgentHandlesCrossDayAndPrivacy(t *testing.T) {
 		}
 		return map[string]any{"schema_version": "session_history.v1", "activities": rows, "complete": true, "next_cursor": cursor, "sources": []any{}, "skipped": []any{}}, 200
 	})
-	value, err := materialCollect(materialInput{LogRoot: root, From: "2026-11-17", To: "2026-11-18", Timezone: "Asia/Shanghai", WorkspaceProjectID: "parent", IncludeChildren: true})
+	value, err := materialCollect(materialInput{LogRoot: root, From: "2026-11-17", To: "2026-11-18", Timezone: "Asia/Shanghai", ProjectID: "parent", IncludeChildren: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,21 +76,25 @@ func TestMaterialCollectUsesOnlyAgentHandlesCrossDayAndPrivacy(t *testing.T) {
 	total := 0
 	for _, row := range rows {
 		total += row["minutes"].(int)
-		if row["workspace_project_id"] != "registry-project" || row["source"] != "codex" {
+		want := map[string]int{"2026-11-17": 10, "2026-11-18": 5}[row["date"].(string)]
+		if row["minutes"].(int) != want {
+			t.Fatalf("cross-midnight interval assigned to wrong day: %v", row)
+		}
+		if row["project_id"] != "registry-project" || row["source"] != "codex" {
 			t.Fatal("lost stable native identity")
 		}
 	}
-	if total != 9 {
+	if total != 15 {
 		t.Fatalf("wrong estimates: %d", total)
 	}
 	dir, _ := sessionMaterialDir("")
 	if _, err := os.Stat(filepath.Join(dir, "session-digest-2026-11-17_2026-11-18.json")); err != nil {
 		t.Fatal("material not stored in work-log data")
 	}
-	if _, err := os.Stat(projectsPath(root)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, "projects.json")); !os.IsNotExist(err) {
 		t.Fatal("collection must not create business project registrations")
 	}
-	filtered, err := materialCollect(materialInput{LogRoot: root, From: "2026-11-17", To: "2026-11-18", Timezone: "Asia/Shanghai", WorkspaceProjectID: "parent", IncludeChildren: true, ExcludePaths: []string{"F:/real-project"}})
+	filtered, err := materialCollect(materialInput{LogRoot: root, From: "2026-11-17", To: "2026-11-18", Timezone: "Asia/Shanghai", ProjectID: "parent", IncludeChildren: true, ExcludePaths: []string{"F:/real-project"}})
 	if err != nil || filtered.(map[string]any)["total"] != 0 {
 		t.Fatal("privacy exclusion not applied")
 	}
@@ -153,6 +157,23 @@ func TestMaterialOverlapAndUnknownTimeRemainEstimates(t *testing.T) {
 	_ = context.Background()
 }
 
+func TestMaterialIntervalsPreserveSubsecondPrecision(t *testing.T) {
+	var rows []agentActivity
+	for i, stamp := range []string{"2026-11-19T10:00:00.900+08:00", "2026-11-19T10:01:00.100+08:00"} {
+		var row agentActivity
+		raw, _ := json.Marshal(materialActivity("codex", fmt.Sprint(i), "user", stamp, "work"))
+		if err := json.Unmarshal(raw, &row); err != nil {
+			t.Fatal(err)
+		}
+		rows = append(rows, row)
+	}
+	digests := agentDigests(rows, time.FixedZone("test", 8*3600))
+	allocateAgentMinutes(digests)
+	if len(digests) != 1 || digests[0].Minutes != 0 || len(digests[0].ActivityIntervals) != 1 {
+		t.Fatalf("subsecond interval rounded up or dropped: %+v", digests)
+	}
+}
+
 func TestReconcileRequiresCompleteUnfilteredCoverageAndKeepsActivityDays(t *testing.T) {
 	withDataRoot(t)
 	root, material := t.TempDir(), t.TempDir()
@@ -179,4 +200,51 @@ func TestReconcileRequiresCompleteUnfilteredCoverageAndKeepsActivityDays(t *test
 	doc["privacy_filtered"] = true
 	save()
 	check(0, 1)
+}
+
+func TestMaterialSourceTimeoutKeepsOtherSourcesAndRejectsStrict(t *testing.T) {
+	withDataRoot(t)
+	root := t.TempDir()
+	materialBroker(t, func(name string, in map[string]any) (any, int) {
+		if name == "workspace.session.sources" {
+			return map[string]any{"sources": []map[string]any{
+				{"source": "vscode", "availability": "available"},
+				{"source": "codex", "availability": "available"},
+			}}, 200
+		}
+		source := in["sources"].([]any)[0].(string)
+		if source == "vscode" {
+			time.Sleep(400 * time.Millisecond)
+		}
+		rows := []map[string]any{materialActivity(source, "user1", "user", "2026-11-18T10:00:00+08:00", "测试会话来源超时")}
+		return map[string]any{"schema_version": "session_history.v1", "activities": rows, "complete": true}, 200
+	})
+	in := materialInput{LogRoot: root, Date: "2026-11-18", Timezone: "Asia/Shanghai"}
+	value, err := materialCollectWithSourceTimeout(in, 150*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := value.(map[string]any)
+	warnings := result["warnings"].([]map[string]any)
+	rows := result["entries"].([]map[string]any)
+	if result["complete"] != false || len(rows) != 1 || rows[0]["source"] != "codex" || len(warnings) != 1 || warnings[0]["source"] != "vscode" || warnings[0]["reason"] != "activity_read_timeout" {
+		t.Fatalf("partial source coverage was not preserved: %v", warnings)
+	}
+	in.Strict = true
+	if _, err := materialCollectWithSourceTimeout(in, 150*time.Millisecond); err == nil {
+		t.Fatal("strict mode must reject the incomplete collection")
+	}
+	in.Strict = false
+	in.Sources = []string{"vscode"}
+	if _, err := materialCollectWithSourceTimeout(in, 150*time.Millisecond); err == nil {
+		t.Fatal("an empty collection with a timeout must not pass")
+	}
+}
+
+func TestTrimMaterialDigestHidesSyntheticCodexIDTitle(t *testing.T) {
+	digest := materialDigest{Source: "codex", SessionID: "01a1abcd-1234-5678", Title: "Codex 会话 01a1abcd", UserPrompts: []string{"untrusted task text"}}
+	trimMaterialDigest(&digest, 12, 800)
+	if digest.Title != "Codex 会话（标题待补）" {
+		t.Fatalf("synthetic session ID must not be shown as a human title: %q", digest.Title)
+	}
 }

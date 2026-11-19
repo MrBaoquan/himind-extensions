@@ -249,7 +249,7 @@ func mapBool(m map[string]any, key string) bool {
 }
 
 // collectProjectStats 扫描全部日志，按规范项目名汇总条目数与近期工时。
-func collectProjectStats(root string, index map[string]string) (projectStatsResult, error) {
+func collectProjectStats(root string, projects projectsFile) (projectStatsResult, error) {
 	result := projectStatsResult{
 		Stats:     map[string]*projectEntryStat{},
 		Unmatched: map[string]int{},
@@ -258,25 +258,24 @@ func collectProjectStats(root string, index map[string]string) (projectStatsResu
 	if err != nil {
 		return result, err
 	}
+	agentNames := map[string]string{}
+	for _, project := range projects.Projects {
+		agentNames[project.ID] = project.Name
+	}
 	now := time.Now()
 	today := now.Format("2006-01-02")
 	sevenAgo := now.AddDate(0, 0, -6).Format("2006-01-02")
 	thirtyAgo := now.AddDate(0, 0, -29).Format("2006-01-02")
 	for _, item := range entries {
-		raw := strings.TrimSpace(item.Project)
-		if raw == "" {
+		canonical := agentNames[strings.TrimSpace(item.ProjectID)]
+		if canonical == "" {
 			result.Pending = append(result.Pending, item)
 			continue
 		}
-		canonical, ok := resolveProjectName(index, raw)
-		if !ok {
-			result.Unmatched[raw]++
-			canonical = raw
-		}
-		stat := result.Stats[canonical]
+		stat := result.Stats[item.ProjectID]
 		if stat == nil {
 			stat = &projectEntryStat{days: map[string]struct{}{}}
-			result.Stats[canonical] = stat
+			result.Stats[item.ProjectID] = stat
 		}
 		stat.count++
 		stat.days[item.Date] = struct{}{}
@@ -710,15 +709,14 @@ func projectBoardItem(p project, work projectWork, stat *projectEntryStat, now t
 	}
 	return map[string]any{
 		"id":                  p.ID,
+		"parent_id":           p.ParentID,
 		"name":                p.Name,
 		"description":         p.Description,
 		"status":              p.Status,
 		"color":               p.Color,
 		"kind":                p.Kind,
 		"source":              p.Source,
-		"external_id":         p.ExternalID,
 		"paths":               pathsToMaps(p.Paths),
-		"exhibits":            exhibitsToMaps(p.Exhibits),
 		"created_at":          p.CreatedAt,
 		"updated_at":          p.UpdatedAt,
 		"work":                work,
@@ -767,45 +765,27 @@ func projectWorkUpdateCap(in input) (any, error) {
 	if len(in.Patch) == 0 {
 		return nil, errors.New("patch 不能为空：请至少提供一个要修改的字段")
 	}
-	unlock := lockRoot(root)
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 
 	pf, err := readProjects(root)
 	if err != nil {
 		return nil, err
 	}
-	index := -1
-	if id := strings.TrimSpace(in.ProjectID); id != "" {
-		for i := range pf.Projects {
-			if pf.Projects[i].ID == id {
-				index = i
-				break
-			}
-		}
-	}
-	if index < 0 {
-		name := strings.TrimSpace(in.ProjectName)
-		if name == "" {
-			name = strings.TrimSpace(in.Project)
-		}
-		if name != "" {
-			canonical, ok := resolveProjectName(projectIndex(pf), name)
-			if ok {
-				name = canonical
-			}
-			index = projectIndexByName(pf, name)
-		}
-	}
-	if index < 0 {
-		return nil, errors.New("未找到项目：请提供 project_id 或 project_name")
+	index, err := projectIndexForReference(pf, in.ProjectID, firstNonEmpty(in.ProjectName, in.Project))
+	if err != nil {
+		return nil, err
 	}
 
-	stats, err := collectProjectStats(root, projectIndex(pf))
+	stats, err := collectProjectStats(root, pf)
 	if err != nil {
 		return nil, err
 	}
 	p := &pf.Projects[index]
-	work := projectWorkFor(*p, stats.Stats[p.Name], time.Now(), recentDaysFor(in))
+	work := projectWorkFor(*p, stats.Stats[p.ID], time.Now(), recentDaysFor(in))
 	now := time.Now().Format(time.RFC3339)
 	stateProvided := false
 	progressProvided := false
@@ -904,7 +884,7 @@ func projectBoardCap(in input) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	stats, err := collectProjectStats(root, projectIndex(pf))
+	stats, err := collectProjectStats(root, pf)
 	if err != nil {
 		return nil, err
 	}
@@ -932,7 +912,7 @@ func projectBoardCap(in input) (any, error) {
 		if strings.EqualFold(p.Status, "archived") {
 			continue
 		}
-		stat := stats.Stats[p.Name]
+		stat := stats.Stats[p.ID]
 		work := projectWorkFor(p, stat, now, recentDays)
 		item := projectBoardItem(p, work, stat, now, recentDays)
 		projects = append(projects, item)

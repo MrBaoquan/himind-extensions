@@ -40,10 +40,8 @@
             "type": "string"
           },
           "project_id": {
-            "type": "string"
-          },
-          "exhibit_id": {
-            "type": "string"
+            "type": "string",
+            "description": "Agent 工作区注册 ID，与业务 project_id 独立"
           },
           "repo_path": {
             "type": "string"
@@ -120,10 +118,6 @@
           "updated_at": {
             "type": "string"
           },
-          "workspace_project_id": {
-            "type": "string",
-            "description": "Agent 工作区注册 ID，与业务 project_id 独立"
-          },
           "provider": {
             "type": "string"
           },
@@ -141,6 +135,25 @@
             "type": "boolean"
           },
           "activity_intervals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string"
+                },
+                "to": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "execution_intervals": {
             "type": "array",
             "items": {
               "type": "object",

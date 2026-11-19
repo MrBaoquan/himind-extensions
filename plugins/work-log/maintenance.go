@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -106,7 +107,10 @@ func entryImportCap(in input) (any, error) {
 	sort.Strings(dates)
 
 	replace := strings.EqualFold(strings.TrimSpace(in.Mode), "replace")
-	unlock := lockRoot(root)
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 
 	now := time.Now().Format(time.RFC3339)
@@ -120,18 +124,16 @@ func entryImportCap(in input) (any, error) {
 		for _, item := range byDate[date] {
 			incoming = append(incoming, normalizeEntry(item, date, now))
 		}
+		snapshot, err := loadAgentWorkspace(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		if err := resolveAgentEntries(context.Background(), incoming, snapshot); err != nil {
+			return nil, err
+		}
 		stats := mergeIntoDay(&day, incoming, replace)
 		day.Date = date
 		day.SchemaVersion = schemaVersion
-		resolve := in.ResolveProjects == nil || *in.ResolveProjects
-		if _, err := applyProjectRegistry(root, day.Entries, resolve); err != nil {
-			return nil, err
-		}
-		if resolve {
-			if pf, err := readProjects(root); err == nil {
-				enrichEntryLinks(pf, day.Entries)
-			}
-		}
 		if err := writeDay(root, day); err != nil {
 			return nil, err
 		}
@@ -233,7 +235,10 @@ func entryLockCap(in input) (any, error) {
 		return nil, errors.New("需要 entry_id 或 entry_ids")
 	}
 	locked := in.Locked != nil && *in.Locked
-	unlock := lockRoot(root)
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 	day, err := readDay(root, date)
 	if err != nil {
@@ -521,14 +526,17 @@ func capRefs(items []reconcileRef, limit int) []reconcileRef {
 // backupIncludeRoots 是备份纳入的目录（相对日志根）；单文件见 backupIncludeFiles。
 var backupIncludeRoots = []string{"logs", "reports", "config", "plans"}
 
-var backupIncludeFiles = []string{"projects.json", "work-items.json"}
+var backupIncludeFiles = []string{"work-items.json", "workspace-business.json"}
 
 func archiveBackupCap(in input) (any, error) {
 	root, err := logRoot(in.LogRoot)
 	if err != nil {
 		return nil, err
 	}
-	unlock := lockRoot(root)
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 	path, files, size, err := writeBackupArchive(root)
 	if err != nil {
@@ -566,32 +574,56 @@ func writeBackupArchive(root string) (string, int, int, error) {
 	files := 0
 	for _, rel := range backupIncludeFiles {
 		target := filepath.Join(root, rel)
-		if info, err := os.Stat(target); err != nil || info.IsDir() {
+		info, err := os.Stat(target)
+		if errors.Is(err, os.ErrNotExist) {
+			if rel == "workspace-business.json" {
+				w, createErr := zw.Create(rel)
+				if createErr != nil {
+					return "", 0, 0, createErr
+				}
+				if encodeErr := json.NewEncoder(w).Encode(workspaceBusiness{SchemaVersion: workspaceBusinessSchemaVersion, Projects: map[string]projectWork{}}); encodeErr != nil {
+					return "", 0, 0, encodeErr
+				}
+				files++
+			}
 			continue
 		}
+		if err != nil || info.IsDir() {
+			return "", 0, 0, fmt.Errorf("备份读取失败：%s", rel)
+		}
 		if err := addFileToZip(zw, root, target); err != nil {
-			continue
+			return "", 0, 0, fmt.Errorf("备份读取失败：%s：%w", rel, err)
 		}
 		files++
 	}
 	for _, rel := range backupIncludeRoots {
 		base := filepath.Join(root, rel)
-		if info, err := os.Stat(base); err != nil || !info.IsDir() {
+		info, err := os.Stat(base)
+		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
-		_ = filepath.WalkDir(base, func(path string, d fs.DirEntry, walkErr error) error {
-			if walkErr != nil || d.IsDir() {
+		if err != nil || !info.IsDir() {
+			return "", 0, 0, fmt.Errorf("备份目录读取失败：%s", rel)
+		}
+		if err := filepath.WalkDir(base, func(path string, d fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if d.IsDir() {
 				return nil
 			}
 			name := strings.ToLower(d.Name())
 			if strings.HasSuffix(name, ".bak") || strings.HasSuffix(name, ".tmp") {
 				return nil
 			}
-			if err := addFileToZip(zw, root, path); err == nil {
-				files++
+			if err := addFileToZip(zw, root, path); err != nil {
+				return err
 			}
+			files++
 			return nil
-		})
+		}); err != nil {
+			return "", 0, 0, fmt.Errorf("备份目录读取失败：%s：%w", rel, err)
+		}
 	}
 	if err := zw.Close(); err != nil {
 		return "", 0, 0, errors.New("备份打包失败")
@@ -653,19 +685,35 @@ func archiveRestoreCap(in input) (any, error) {
 		return nil, errors.New("找不到备份文件：" + abs)
 	}
 
-	unlock := lockRoot(root)
-	defer unlock()
-	// 恢复前先留一份当前状态的安全备份，避免误恢复无法回退。
-	safety, _, _, err := writeBackupArchive(root)
+	unlock, err := lockRoot(root)
 	if err != nil {
-		return nil, errors.New("恢复前自动备份失败：" + err.Error())
+		return nil, err
 	}
-
+	defer unlock()
 	reader, err := zip.OpenReader(abs)
 	if err != nil {
 		return nil, errors.New("备份不是合法的 zip 包")
 	}
 	defer reader.Close()
+	business, err := readWorkspaceBusiness(root)
+	if err != nil {
+		return nil, err
+	}
+	hasBusiness := false
+	for _, file := range reader.File {
+		if !file.FileInfo().IsDir() && strings.EqualFold(filepath.ToSlash(file.Name), "workspace-business.json") {
+			hasBusiness = true
+			break
+		}
+	}
+	if business != nil && !hasBusiness {
+		return nil, errors.New("备份不含工作状态文件，请选择完整备份")
+	}
+	// 恢复前先留一份当前状态的安全备份，避免误恢复无法回退。
+	safety, _, _, err := writeBackupArchive(root)
+	if err != nil {
+		return nil, errors.New("恢复前自动备份失败：" + err.Error())
+	}
 
 	restored := 0
 	for _, f := range reader.File {
@@ -708,7 +756,7 @@ func archiveRestoreCap(in input) (any, error) {
 
 func isRestorablePath(rel string) bool {
 	lower := strings.ToLower(rel)
-	if lower == "projects.json" || lower == "work-items.json" {
+	if lower == "work-items.json" || lower == "workspace-business.json" {
 		return true
 	}
 	for _, prefix := range []string{"logs/", "reports/", "config/", "plans/"} {

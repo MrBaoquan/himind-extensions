@@ -8,13 +8,19 @@ import (
 
 func TestAgentMaterialSurvivesAIEnrichmentRepeatBackfillLocksAndExport(t *testing.T) {
 	withDataRoot(t)
+	materialBroker(t, func(name string, _ map[string]any) (any, int) {
+		if name != "workspace.registry.project.list" {
+			t.Fatalf("unexpected capability %s", name)
+		}
+		return map[string]any{"revision": "r1", "projects": []map[string]any{{"id": "registry-child", "name": "设备配置"}}, "workspaces": []any{}}, 200
+	})
 	root := t.TempDir()
 	evidence := []map[string]any{{"session_id": "claude_code:native-1", "message_id": "m1", "snapshot_revision": "synthetic-revision", "content_sha256": "synthetic-hash"}}
-	base := entry{Source: "claude-code", SessionID: "native-1", Date: "2026-11-16", Project: "设备配置", WorkspaceProjectID: "registry-child", Provider: "agent", Minutes: 10, MinutesSource: "estimated", MinutesMethod: "message_intervals_v1", Evidence: evidence, Title: "素材", Refs: []ref{{Type: "session", Value: "himind-session:claude_code:native-1"}}}
+	base := entry{Source: "claude-code", SessionID: "native-1", Date: "2026-11-16", Project: "设备配置", ProjectID: "registry-child", Provider: "agent", Minutes: 10, MinutesSource: "estimated", MinutesMethod: "message_intervals_v1", Evidence: evidence, Title: "素材", Refs: []ref{{Type: "session", Value: "himind-session:claude_code:native-1"}}}
 	next := base
 	next.Date = "2026-11-17"
 	next.Minutes = 5
-	ai := entry{Source: "claude-code", SessionID: "native-1", Date: "2026-11-16", Title: "梳理设备配置", Summary: "完成合成配置工作", Minutes: 999, WorkspaceProjectID: "forged", Evidence: []map[string]any{{"forged": true}}}
+	ai := entry{Source: "claude-code", SessionID: "native-1", Date: "2026-11-16", Title: "梳理设备配置", Summary: "完成合成配置工作", Minutes: 999, ProjectID: "forged", Evidence: []map[string]any{{"forged": true}}}
 	aiNext := entry{Source: next.Source, SessionID: next.SessionID, Date: next.Date, Title: "继续设备配置", Summary: "补记第二天的合成配置活动"}
 	params := map[string]any{"log_root": root, "resolve_projects": false, "base_step": "collect", "entries_step": "ai", "workflow_context": map[string]any{"steps": map[string]any{"collect": map[string]any{"entries": []entry{base, next}}, "ai": map[string]any{"entries": []entry{ai, aiNext}}}}}
 	raw, _ := json.Marshal(params)
@@ -26,14 +32,14 @@ func TestAgentMaterialSurvivesAIEnrichmentRepeatBackfillLocksAndExport(t *testin
 		t.Fatalf("repeat duplicated entry: %v", rows)
 	}
 	got := rows[0].(map[string]any)
-	if got["minutes"] != float64(10) || got["workspace_project_id"] != "registry-child" || got["minutes_method"] != "message_intervals_v1" || got["summary"] != "完成合成配置工作" {
+	if got["minutes"] != float64(10) || got["project_id"] != "registry-child" || got["minutes_method"] != "message_intervals_v1" || got["summary"] != "完成合成配置工作" {
 		t.Fatalf("AI replaced deterministic facts: %v", got)
 	}
 	if len(got["evidence"].([]any)) != 1 || got["evidence"].([]any)[0].(map[string]any)["message_id"] != "m1" {
 		t.Fatal("lost evidence")
 	}
-	if got["project_id"] == "registry-child" {
-		t.Fatal("Agent registry ID used as business project ID")
+	if got["project_id"] != "registry-child" {
+		t.Fatal("log must reference Agent project ID")
 	}
 	id := got["entry_id"].(string)
 	if id != makeEntryID(base) {
@@ -60,7 +66,7 @@ func TestAgentMaterialSurvivesAIEnrichmentRepeatBackfillLocksAndExport(t *testin
 	target := t.TempDir()
 	call(t, "work-log.entry.import", `{"log_root":`+quote(target)+`,"entries_json":`+quote(text)+`}`)
 	imported := call(t, "work-log.entry.read", `{"log_root":`+quote(target)+`,"date":"2026-11-16"}`)
-	if imported["entries"].([]any)[0].(map[string]any)["workspace_project_id"] != "registry-child" {
+	if imported["entries"].([]any)[0].(map[string]any)["project_id"] != "registry-child" {
 		t.Fatal("import lost workspace identity")
 	}
 }

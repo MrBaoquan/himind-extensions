@@ -21,24 +21,24 @@ import (
 // Material is derived only from Agent-owned facts. This package never reads
 // client JSONL/SQLite files and has no legacy collection backend.
 type materialInput struct {
-	LogRoot            string   `json:"log_root"`
-	MaterialRoot       string   `json:"material_root"`
-	From               string   `json:"from"`
-	To                 string   `json:"to"`
-	Date               string   `json:"date"`
-	LookbackDays       int      `json:"lookback_days"`
-	Timezone           string   `json:"timezone"`
-	Source             string   `json:"source"`
-	Sources            []string `json:"sources"`
-	Scope              string   `json:"scope"`
-	WorkspaceProjectID string   `json:"workspace_project_id"`
-	IncludeChildren    bool     `json:"include_children"`
-	Limit              int      `json:"limit"`
-	MaxPrompts         int      `json:"max_prompts"`
-	MaxChars           int      `json:"max_chars"`
-	Strict             bool     `json:"strict"`
-	ExcludePaths       []string `json:"exclude_paths"`
-	ExcludeKeywords    []string `json:"exclude_keywords"`
+	LogRoot         string   `json:"log_root"`
+	MaterialRoot    string   `json:"material_root"`
+	From            string   `json:"from"`
+	To              string   `json:"to"`
+	Date            string   `json:"date"`
+	LookbackDays    int      `json:"lookback_days"`
+	Timezone        string   `json:"timezone"`
+	Source          string   `json:"source"`
+	Sources         []string `json:"sources"`
+	Scope           string   `json:"scope"`
+	ProjectID       string   `json:"project_id"`
+	IncludeChildren bool     `json:"include_children"`
+	Limit           int      `json:"limit"`
+	MaxPrompts      int      `json:"max_prompts"`
+	MaxChars        int      `json:"max_chars"`
+	Strict          bool     `json:"strict"`
+	ExcludePaths    []string `json:"exclude_paths"`
+	ExcludeKeywords []string `json:"exclude_keywords"`
 }
 
 type materialSource struct {
@@ -67,9 +67,9 @@ func materialScope(in materialInput) map[string]any {
 	if in.Scope != "" {
 		q["scope"] = in.Scope
 	}
-	if in.WorkspaceProjectID != "" {
+	if in.ProjectID != "" {
 		q["scope"] = "project"
-		q["project_id"] = in.WorkspaceProjectID
+		q["project_id"] = in.ProjectID
 		q["include_children"] = in.IncludeChildren
 	}
 	return q
@@ -112,6 +112,10 @@ func materialWindow(in materialInput) (time.Time, time.Time, string, string, err
 	return start, end.AddDate(0, 0, 1), from, to, nil
 }
 func materialCollect(in materialInput) (any, error) {
+	return materialCollectWithSourceTimeout(in, 90*time.Second)
+}
+
+func materialCollectWithSourceTimeout(in materialInput, sourceTimeout time.Duration) (any, error) {
 	if !capability.Available() {
 		return nil, errors.New("Agent 会话服务不可用；工作日志不再直接读取客户端存储")
 	}
@@ -171,7 +175,9 @@ func materialCollect(in materialInput) (any, error) {
 	warnings := []map[string]any{}
 	complete := true
 	calls := 1
-	for _, source := range statuses {
+	var timeoutSource string
+	for index := range statuses {
+		source := &statuses[index]
 		if source.Availability == "unavailable" || source.Availability == "error" {
 			complete = false
 			warnings = append(warnings, map[string]any{"source": source.Source, "reason": source.ErrorCode})
@@ -186,13 +192,28 @@ func materialCollect(in materialInput) (any, error) {
 		var rows []agentActivity
 		seen := map[string]bool{}
 		done := false
+		// Excessively slow adapters must leave time for other sources. Each
+		// page shares the same deadline for the current source.
+		sourceCtx, cancelSource := context.WithTimeout(ctx, sourceTimeout)
+		timedOut := false
 		for calls < 240 {
 			calls++
 			var page agentPage
-			if e := capability.Invoke(ctx, "workspace.session.activity", request, &page); e != nil {
-				return nil, fmt.Errorf("Agent 活动读取失败（%s），没有切换到私有存储回退：%w", source.Source, e)
+			if e := capability.Invoke(sourceCtx, "workspace.session.activity", request, &page); e != nil {
+				cancelSource()
+				if !errors.Is(e, context.DeadlineExceeded) {
+					return nil, fmt.Errorf("Agent 活动读取失败（%s）：%w", source.Source, e)
+				}
+				complete = false
+				timedOut = true
+				timeoutSource = source.Source
+				source.Availability = "partial"
+				source.ErrorCode = "activity_read_timeout"
+				warnings = append(warnings, map[string]any{"source": source.Source, "reason": source.ErrorCode})
+				break
 			}
 			if page.SchemaVersion != "session_history.v1" {
+				cancelSource()
 				return nil, errors.New("Agent 会话响应版本不受支持")
 			}
 			for _, r := range page.Activities {
@@ -203,6 +224,7 @@ func materialCollect(in materialInput) (any, error) {
 				}
 			}
 			if len(rows) > 20000 {
+				cancelSource()
 				return nil, errors.New("活动素材超出消息预算，请缩小日期或工作区范围")
 			}
 			if !page.Complete {
@@ -217,17 +239,22 @@ func materialCollect(in materialInput) (any, error) {
 				break
 			}
 			if request["cursor"] == page.NextCursor {
+				cancelSource()
 				return nil, errors.New("Agent 活动游标未推进")
 			}
 			request["cursor"] = page.NextCursor
 		}
-		if !done {
+		cancelSource()
+		if !done && !timedOut {
 			return nil, errors.New("活动分页超出调用预算，请缩小日期或工作区范围")
 		}
 		digests = append(digests, agentDigests(rows, start.Location())...)
 	}
 	if in.Strict && !complete {
 		return nil, errors.New("Agent 来源或消息不完整，严格模式未生成素材")
+	}
+	if timeoutSource != "" && len(digests) == 0 {
+		return nil, fmt.Errorf("Agent 活动读取超时（%s），没有可用会话素材", timeoutSource)
 	}
 	var privacy struct {
 		ExcludePaths    []string `json:"exclude_paths"`
@@ -243,6 +270,7 @@ func materialCollect(in materialInput) (any, error) {
 	privacy.ExcludePaths = append(privacy.ExcludePaths, in.ExcludePaths...)
 	privacy.ExcludeKeywords = append(privacy.ExcludeKeywords, in.ExcludeKeywords...)
 	filtered := make([]materialDigest, 0, len(digests))
+	summarySources := make(map[string]materialDigest, len(digests))
 	excluded := 0
 	for _, d := range digests {
 		blocked := false
@@ -263,10 +291,12 @@ func materialCollect(in materialInput) (any, error) {
 			excluded++
 			continue
 		}
-		if len(d.UserPrompts) == 0 && len(d.AssistantExcerpts) == 0 {
+		if len(d.UserPrompts) == 0 && len(d.AssistantExcerpts) == 0 &&
+			(len(d.ExecutionIntervals) == 0 || len(privacy.ExcludeKeywords) != 0) {
 			continue
 		}
 		d.RepoPath = d.Directory
+		summarySources[summaryDigestKey(d)] = summarySourceDigest(d)
 		trimMaterialDigest(&d, in.MaxPrompts, in.MaxChars)
 		filtered = append(filtered, d)
 	}
@@ -302,7 +332,27 @@ func materialCollect(in materialInput) (any, error) {
 		return nil, err
 	}
 	sum := sha256.Sum256(body)
-	result["artifacts"] = []map[string]any{{"artifact_id": "session-digest", "artifact_type": "session_digest", "name": "Agent 会话素材 " + from + " ~ " + to, "uri": fileURIPath(path), "sha256": hex.EncodeToString(sum[:])}}
+	summaryDigests := make([]materialDigest, 0, len(filtered))
+	for _, digest := range filtered {
+		source, ok := summarySources[summaryDigestKey(digest)]
+		if !ok {
+			return nil, errors.New("AI 汇总会话与日志素材无法对应")
+		}
+		summaryDigests = append(summaryDigests, source)
+	}
+	summary, err := summaryMaterial(summaryDigests)
+	if err != nil {
+		return nil, err
+	}
+	summarySHA := sha256.Sum256(summary)
+	summaryPath := filepath.Join(materialDir, fmt.Sprintf("session-summary-input-%x.json", summarySHA))
+	if err := writeFileAtomic(summaryPath, summary); err != nil {
+		return nil, err
+	}
+	result["artifacts"] = []map[string]any{
+		{"artifact_id": "session-digest", "artifact_type": "session_digest", "name": "Agent 会话素材 " + from + " ~ " + to, "uri": fileURIPath(path), "sha256": hex.EncodeToString(sum[:])},
+		{"artifact_id": "session-summary-input", "artifact_type": "session_summary_input", "name": "AI 汇总素材 " + from + " ~ " + to, "uri": fileURIPath(summaryPath), "sha256": fmt.Sprintf("%x", summarySHA)},
+	}
 	return result, nil
 }
 func agentSourceID(id string) string {
@@ -331,7 +381,8 @@ type agentActivity struct {
 		Content   string `json:"content"`
 		Timestamp string `json:"timestamp"`
 	} `json:"message"`
-	Evidence map[string]any `json:"evidence"`
+	Evidence  map[string]any   `json:"evidence"`
+	Execution activityInterval `json:"execution"`
 }
 type agentPage struct {
 	SchemaVersion string          `json:"schema_version"`
@@ -348,12 +399,13 @@ type agentPage struct {
 }
 
 type materialDigest struct {
-	WorkspaceProjectID string             `json:"workspace_project_id,omitempty"`
+	ProjectID          string             `json:"project_id,omitempty"`
 	Provider           string             `json:"provider,omitempty"`
 	MinutesMethod      string             `json:"minutes_method,omitempty"`
 	Evidence           []map[string]any   `json:"evidence,omitempty"`
 	EvidenceTruncated  bool               `json:"evidence_truncated,omitempty"`
 	ActivityIntervals  []activityInterval `json:"activity_intervals,omitempty"`
+	ExecutionIntervals []activityInterval `json:"execution_intervals,omitempty"`
 	OverlapAdjusted    bool               `json:"overlap_adjusted,omitempty"`
 	Source             string             `json:"source"`
 	SessionID          string             `json:"session_id"`
@@ -388,18 +440,46 @@ func legacyAgentSource(source string) string {
 	return source
 }
 
+func newMaterialDigest(session agentSession, date string) materialDigest {
+	return materialDigest{Source: legacyAgentSource(session.Source), SessionID: session.NativeID,
+		Date: date, Project: session.ProjectName, Directory: session.Directory, Title: session.Title,
+		ProjectID: session.ProjectID, Provider: "agent", MinutesSource: "estimated", MinutesMethod: "message_intervals_v2"}
+}
+
 func agentDigests(rows []agentActivity, location *time.Location) []materialDigest {
 	type bucket struct {
 		digest materialDigest
-		times  []time.Time
 	}
 	buckets := map[string]*bucket{}
+	sessionTimes := map[string][]time.Time{}
 	sort.SliceStable(rows, func(i, j int) bool {
 		a, _ := time.Parse(time.RFC3339, rows[i].Message.Timestamp)
 		b, _ := time.Parse(time.RFC3339, rows[j].Message.Timestamp)
 		return a.Before(b)
 	})
 	for _, row := range rows {
+		if row.Kind == "agent_execution" {
+			for _, span := range intervalSpans([]activityInterval{row.Execution}) {
+				for from := span.from.In(location); from.Before(span.to); {
+					midnight := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, location).AddDate(0, 0, 1)
+					until := span.to.In(location)
+					if midnight.Before(until) {
+						until = midnight
+					}
+					source := legacyAgentSource(row.Session.Source)
+					date := from.Format("2006-01-02")
+					key := source + "\x00" + row.Session.NativeID + "\x00" + date
+					b := buckets[key]
+					if b == nil {
+						b = &bucket{digest: newMaterialDigest(row.Session, date)}
+						buckets[key] = b
+					}
+					b.digest.ExecutionIntervals = append(b.digest.ExecutionIntervals, activityInterval{from.Format(time.RFC3339Nano), until.Format(time.RFC3339Nano)})
+					from = until
+				}
+			}
+			continue
+		}
 		if row.Kind != "dialogue" || (row.Message.Role != "user" && row.Message.Role != "assistant") {
 			continue
 		}
@@ -410,13 +490,18 @@ func agentDigests(rows []agentActivity, location *time.Location) []materialDiges
 		at = at.In(location)
 		source := legacyAgentSource(row.Session.Source)
 		date := at.Format("2006-01-02")
-		key := source + "|" + row.Session.NativeID + "|" + date
+		sessionKey := source + "\x00" + row.Session.NativeID
+		key := sessionKey + "\x00" + date
 		b := buckets[key]
 		if b == nil {
-			b = &bucket{digest: materialDigest{Source: source, SessionID: row.Session.NativeID, Date: date, Project: row.Session.ProjectName, Directory: row.Session.Directory, Title: row.Session.Title, WorkspaceProjectID: row.Session.ProjectID, Provider: "agent", MinutesSource: "estimated", MinutesMethod: "message_intervals_v1"}}
+			b = &bucket{digest: newMaterialDigest(row.Session, date)}
 			buckets[key] = b
 		}
-		b.times = append(b.times, at)
+		sessionTimes[sessionKey] = append(sessionTimes[sessionKey], at)
+		if b.digest.StartedAt == "" {
+			b.digest.StartedAt = at.Format(time.RFC3339)
+		}
+		b.digest.EndedAt = at.Format(time.RFC3339)
 		b.digest.Evidence = append(b.digest.Evidence, row.Evidence)
 		b.digest.Truncated = b.digest.Truncated || row.Truncated
 		if row.Message.Role == "user" {
@@ -424,6 +509,29 @@ func agentDigests(rows []agentActivity, location *time.Location) []materialDiges
 			b.digest.TurnCount++
 		} else {
 			b.digest.AssistantExcerpts = append(b.digest.AssistantExcerpts, row.Message.Content)
+		}
+	}
+	// Form adjacent-message intervals before splitting by local date. This keeps
+	// the part on each side of midnight instead of dropping the entire interval.
+	for sessionKey, times := range sessionTimes {
+		sort.Slice(times, func(i, j int) bool { return times[i].Before(times[j]) })
+		for i := 1; i < len(times); i++ {
+			from, end := times[i-1], times[i]
+			if !end.After(from) || end.Sub(from) > 20*time.Minute {
+				continue
+			}
+			for from.Before(end) {
+				date := from.Format("2006-01-02")
+				nextDay := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, location).AddDate(0, 0, 1)
+				until := end
+				if nextDay.Before(until) {
+					until = nextDay
+				}
+				if b := buckets[sessionKey+"\x00"+date]; b != nil {
+					b.digest.ActivityIntervals = append(b.digest.ActivityIntervals, activityInterval{from.Format(time.RFC3339Nano), until.Format(time.RFC3339Nano)})
+				}
+				from = until
+			}
 		}
 	}
 	keys := make([]string, 0, len(buckets))
@@ -434,15 +542,10 @@ func agentDigests(rows []agentActivity, location *time.Location) []materialDiges
 	var result []materialDigest
 	for _, key := range keys {
 		b := buckets[key]
-		sort.Slice(b.times, func(i, j int) bool { return b.times[i].Before(b.times[j]) })
-		b.digest.StartedAt = b.times[0].Format(time.RFC3339)
-		b.digest.EndedAt = b.times[len(b.times)-1].Format(time.RFC3339)
-		for i := 1; i < len(b.times); i++ {
-			a, z := b.times[i-1], b.times[i]
-			if !z.After(a) || z.Sub(a) > 20*time.Minute {
-				continue
-			}
-			b.digest.ActivityIntervals = append(b.digest.ActivityIntervals, activityInterval{a.Format(time.RFC3339), z.Format(time.RFC3339)})
+		b.digest.ExecutionIntervals = compactActivityIntervals(b.digest.ExecutionIntervals)
+		if b.digest.StartedAt == "" && len(b.digest.ExecutionIntervals) > 0 {
+			b.digest.StartedAt = b.digest.ExecutionIntervals[0].From
+			b.digest.EndedAt = b.digest.ExecutionIntervals[len(b.digest.ExecutionIntervals)-1].To
 		}
 		b.digest.Ref = fmt.Sprintf("himind-session:%s:%s", strings.ReplaceAll(b.digest.Source, "claude-code", "claude_code"), b.digest.SessionID)
 		result = append(result, b.digest)
@@ -450,61 +553,30 @@ func agentDigests(rows []agentActivity, location *time.Location) []materialDiges
 	return result
 }
 
-// Allocate each selected Agent interval once. Legacy estimates lack comparable interval
-// evidence and are deliberately not folded into this calculation.
-
+// Estimate each session independently; overlapping sessions represent parallel
+// activity. Aggregate coverage is computed separately from interval evidence.
 func allocateAgentMinutes(digests []materialDigest) {
-	type span struct{ from, to time.Time }
-	var occupied []span
-	indexes := make([]int, 0, len(digests))
 	for i := range digests {
-		if digests[i].Provider == "agent" {
-			indexes = append(indexes, i)
-		}
-	}
-	sort.Slice(indexes, func(i, j int) bool {
-		a, b := digests[indexes[i]], digests[indexes[j]]
-		return a.Source+"|"+a.SessionID+"|"+a.Date < b.Source+"|"+b.SessionID+"|"+b.Date
-	})
-	for _, i := range indexes {
 		d := &digests[i]
-		seconds := 0.0
-		d.OverlapAdjusted = false
-		for _, interval := range d.ActivityIntervals {
-			a, ea := time.Parse(time.RFC3339, interval.From)
-			z, ez := time.Parse(time.RFC3339, interval.To)
-			if ea != nil || ez != nil || !z.After(a) {
-				continue
-			}
-			remaining := []span{{a, z}}
-			for _, used := range occupied {
-				var next []span
-				for _, s := range remaining {
-					if !used.to.After(s.from) || !used.from.Before(s.to) {
-						next = append(next, s)
-						continue
-					}
-					d.OverlapAdjusted = true
-					if used.from.After(s.from) {
-						next = append(next, span{s.from, used.from})
-					}
-					if used.to.Before(s.to) {
-						next = append(next, span{used.to, s.to})
-					}
-				}
-				remaining = next
-			}
-			for _, s := range remaining {
-				seconds += s.to.Sub(s.from).Seconds()
-				occupied = append(occupied, s)
-			}
+		if d.Provider != "agent" {
+			continue
 		}
-		d.Minutes = min(480, max(0, int(seconds/60)))
+		d.OverlapAdjusted = false
+		d.Minutes = int(mergedActivityDuration(intervalSpans(d.ActivityIntervals)) / time.Minute)
 	}
 }
 
+func isCodexIDFallbackTitle(source, sessionID, title string) bool {
+	if source != "codex" || len(sessionID) < 8 {
+		return false
+	}
+	return strings.HasPrefix(strings.TrimSpace(title), "Codex 会话 "+sessionID[:8])
+}
+
 func trimMaterialDigest(d *materialDigest, maxPrompts, maxChars int) {
-	if strings.TrimSpace(d.Title) == "" {
+	if isCodexIDFallbackTitle(d.Source, d.SessionID, d.Title) {
+		d.Title = "Codex 会话（标题待补）"
+	} else if strings.TrimSpace(d.Title) == "" {
 		d.Title = materialTitle(d.UserPrompts)
 	}
 	if len(d.Evidence) > 32 {
@@ -550,6 +622,9 @@ func materialEntries(digests []materialDigest) []map[string]any {
 		if summary == "" {
 			summary = strings.TrimSpace(strings.Join(digest.UserPrompts, "\n"))
 		}
+		if summary == "" && len(digest.ExecutionIntervals) > 0 {
+			summary = "已采集 Agent 作业区间。"
+		}
 		feature := strings.TrimSpace(digest.Feature)
 		minutes := digest.Minutes
 		minutesSource := digest.MinutesSource
@@ -577,11 +652,14 @@ func materialEntries(digests []materialDigest) []map[string]any {
 		}
 		if digest.Provider == "agent" {
 			item["provider"] = digest.Provider
-			item["workspace_project_id"] = digest.WorkspaceProjectID
+			item["project_id"] = digest.ProjectID
 			item["minutes_method"] = digest.MinutesMethod
 			item["evidence"] = digest.Evidence
 			item["evidence_truncated"] = digest.EvidenceTruncated
 			item["activity_intervals"] = append([]activityInterval{}, digest.ActivityIntervals...)
+			if len(digest.ExecutionIntervals) > 0 {
+				item["execution_intervals"] = digest.ExecutionIntervals
+			}
 			item["overlap_adjusted"] = digest.OverlapAdjusted
 			item["refs"] = []map[string]string{{"type": "session", "value": digest.Ref}}
 		}

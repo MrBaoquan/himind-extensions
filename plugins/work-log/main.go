@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
@@ -61,7 +62,7 @@ type input struct {
 	// Query 是自由文本检索：在标题、摘要、功能、项目与标签里做不区分大小写的子串匹配。
 	Query string `json:"query"`
 	Limit int    `json:"limit"`
-	// SessionID 用于按会话重归类（work-log.project.assign）。
+	// SessionID identifies a source session.
 	SessionID string `json:"session_id"`
 	// Narrative / Title 供报告渲染使用：narrative 是 AI 提炼的主线叙述。
 	Narrative string `json:"narrative"`
@@ -90,47 +91,16 @@ type input struct {
 	// AI 总结结果）配合时，用工时/起止时间/来源/会话等确定性字段兜底，AI 只覆盖人类可读内容，
 	// 避免模型把工时时长、时间戳写歪。
 	BaseStep string `json:"base_step"`
-	// 项目登记：ProjectID/ProjectName 等用于项目管理能力；ResolveProjects 控制写入时
-	// 是否按登记表归一项目名并为未命中的项目自动建项目（默认开启）。RegisterProjects
-	// 已废弃：自动建项目由 ResolveProjects 统一控制（保留字段以兼容旧调用）。
-	ProjectID   string `json:"project_id"`
-	ProjectName string `json:"project_name"`
-	// NewName 供 work-log.project.rename：给项目改展示名（保持稳定 ID，并回绑历史条目）。
-	NewName     string   `json:"new_name"`
-	Aliases     []string `json:"aliases"`
-	Description string   `json:"description"`
-	Status      string   `json:"status"`
-	Priority    string   `json:"priority"`
-	Color       string   `json:"color"`
-	// Kind 是项目类型：交付项目（场馆/展馆，含展项）/ 平台产品（自研，1 项目=1 路径，无展项）/ 通用沉淀。
-	Kind             string `json:"kind"`
-	CurrentProject   string `json:"current_project"`
-	IncludeStats     *bool  `json:"include_stats"`
-	RecentDays       *int   `json:"recent_days"`
-	ResolveProjects  *bool  `json:"resolve_projects"`
-	RegisterProjects *bool  `json:"register_projects"`
-	// 路径映射：项目/展项可通过本机目录/仓库路径稳定识别（路径优先于名称）。
-	// Paths/AddPaths/RemovePaths 供 work-log.project.path.set 与 project.upsert 管理映射；
-	// RepoPath 是会话仓库根、ExhibitID/ExhibitName 是展项目标选择器。
-	Paths        []pathSpec `json:"paths"`
-	AddPaths     []pathSpec `json:"add_paths"`
-	RemovePaths  []string   `json:"remove_paths"`
-	RepoPath     string     `json:"repo_path"`
-	ExhibitID    string     `json:"exhibit_id"`
-	ExhibitName  string     `json:"exhibit_name"`
-	FromProject  string     `json:"from_project"`
-	ToProject    string     `json:"to_project"`
-	CreateTarget *bool      `json:"create_target"`
-	// Exhibits / ExhibitsStep 用于从工作台同步展项（含 source_path/release_path 路径）。
-	Exhibits     []map[string]any `json:"exhibits"`
-	ExhibitsStep string           `json:"exhibits_step"`
-	// ProjectIDs / FromProjects 供项目批量删除与多来源合并（登记管理的一次性清理）。
-	ProjectIDs   []string `json:"project_ids"`
-	FromProjects []string `json:"from_projects"`
-	// ProjectsJSON 供登记表导入（完整登记表 JSON 文本）；Mode=merge（默认）或 replace。
-	ProjectsJSON string `json:"projects_json"`
-	// EntriesJSON 供日志条目导出/导入（work-log.entry.export / entry.import）：导出产出的 JSON 文本。
-	EntriesJSON string `json:"entries_json"`
+	// ProjectID is the Agent project tree identity used for filtering and work state.
+	ProjectID       string `json:"project_id"`
+	ProjectName     string `json:"project_name"`
+	IncludeChildren bool   `json:"include_children"`
+	Status          string `json:"status"`
+	Priority        string `json:"priority"`
+	CurrentProject  string `json:"current_project"`
+	IncludeStats    *bool  `json:"include_stats"`
+	RecentDays      *int   `json:"recent_days"`
+	EntriesJSON     string `json:"entries_json"`
 	// BackupPath 供 work-log.archive.restore 指定要恢复的备份包；留空则用最新一份。
 	BackupPath string `json:"backup_path"`
 	// Locked 供 work-log.entry.lock 设置/取消条目手工锁定。
@@ -147,8 +117,6 @@ type input struct {
 	Patch map[string]any `json:"patch"`
 	// Projects / ProjectsStep 用于从工作台同步项目（含展项）到本地登记表：
 	// Projects 直接给数组，ProjectsStep 指向工作流里取工作台项目列表的上游步骤。
-	Projects     []map[string]any `json:"projects"`
-	ProjectsStep string           `json:"projects_step"`
 	// 来源配置（通用可配置来源）：sources 为声明式来源规格数组。
 	Sources  []map[string]any `json:"sources"`
 	SourceID string           `json:"source_id"`
@@ -179,12 +147,12 @@ type activityInterval struct {
 
 // entry 是一条工作日志，同时支持采集草稿与汇总报告。
 type entry struct {
-	WorkspaceProjectID string             `json:"workspace_project_id,omitempty"` // Agent registry identity, distinct from business ProjectID.
 	Provider           string             `json:"provider,omitempty"`
 	MinutesMethod      string             `json:"minutes_method,omitempty"`
 	Evidence           []map[string]any   `json:"evidence,omitempty"`
 	EvidenceTruncated  bool               `json:"evidence_truncated,omitempty"`
 	ActivityIntervals  []activityInterval `json:"activity_intervals,omitempty"`
+	ExecutionIntervals []activityInterval `json:"execution_intervals,omitempty"`
 	OverlapAdjusted    bool               `json:"overlap_adjusted,omitempty"`
 	EntryID            string             `json:"entry_id"`
 	Date               string             `json:"date"`
@@ -195,9 +163,8 @@ type entry struct {
 	// Exhibit 是「展项」维度（工作台项目下的展项）。项目为主、展项可选：
 	// 条目至少应落到项目；能从工作台或素材判定展项时再落到展项。
 	Exhibit string `json:"exhibit,omitempty"`
-	// ProjectID / ExhibitID 是命中工作台登记后的稳定 ID（未命中留空，供用户确认后再补）。
+	// ProjectID references Agent; Exhibit is a log classification only.
 	ProjectID string `json:"project_id,omitempty"`
-	ExhibitID string `json:"exhibit_id,omitempty"`
 	// RepoPath 是会话工作目录对应的仓库根（Agent 工作区注册表提供的路径事实）。
 	// 写入时按「路径 → 项目/展项」映射归类，未命中则留空并进入待认领。
 	RepoPath string `json:"repo_path,omitempty"`
@@ -240,7 +207,9 @@ func main() {
 	}
 }
 
-func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
+func handle(request jsonrpc.Request) (any, *jsonrpc.Error) { return handleCore(request) }
+
+func handleCore(request jsonrpc.Request) (any, *jsonrpc.Error) {
 	if request.Method == "work-log.material.collect" || request.Method == "work-log.material.sources" {
 		return materialCap(request)
 	}
@@ -270,39 +239,6 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 	case "work-log.project.list":
 		result, err := projectListCap(in)
 		return rpcResult(result, err)
-	case "work-log.project.upsert":
-		result, err := projectUpsertCap(in)
-		return rpcResult(result, err)
-	case "work-log.project.rename":
-		result, err := projectRenameCap(in)
-		return rpcResult(result, err)
-	case "work-log.project.delete":
-		result, err := projectDeleteCap(in)
-		return rpcResult(result, err)
-	case "work-log.project.resolve":
-		result, err := projectResolveCap(in)
-		return rpcResult(result, err)
-	case "work-log.project.assign":
-		result, err := projectAssignCap(in)
-		return rpcResult(result, err)
-	case "work-log.project.path.set":
-		result, err := projectPathSetCap(in)
-		return rpcResult(result, err)
-	case "work-log.project.path.map":
-		result, err := projectMapPathCap(in)
-		return rpcResult(result, err)
-	case "work-log.project.claim":
-		result, err := projectClaimCap(in)
-		return rpcResult(result, err)
-	case "work-log.project.merge":
-		result, err := projectMergeCap(in)
-		return rpcResult(result, err)
-	case "work-log.project.export":
-		result, err := projectExportCap(in)
-		return rpcResult(result, err)
-	case "work-log.project.import":
-		result, err := projectImportCap(in)
-		return rpcResult(result, err)
 	case "work-log.entry.patch":
 		result, err := entryPatchCap(in)
 		return rpcResult(result, err)
@@ -329,9 +265,6 @@ func handle(request jsonrpc.Request) (any, *jsonrpc.Error) {
 		return rpcResult(result, err)
 	case "work-log.archive.restore":
 		result, err := archiveRestoreCap(in)
-		return rpcResult(result, err)
-	case "work-log.project.sync":
-		result, err := projectSyncCap(in)
 		return rpcResult(result, err)
 	case "work-log.source.list":
 		result, err := sourceListCap(in)
@@ -571,8 +504,6 @@ func resolveNarrative(in input) string {
 	return strings.TrimSpace(text)
 }
 
-// ---------- 写入 ----------
-
 func upsert(in input) (any, error) {
 	root, err := logRoot(in.LogRoot)
 	if err != nil {
@@ -581,11 +512,6 @@ func upsert(in input) (any, error) {
 	date := normalizeDate(in.Date)
 	if !validDate(date) {
 		return nil, errors.New("date 必须是 YYYY-MM-DD 格式")
-	}
-	// 若提供了工作台项目（含展项），先并入登记表；后续条目归一与项目/展项落点会用到。
-	// 同步失败不阻断写入：登记表已有内容仍可继续按名称归一。
-	if len(in.Projects) > 0 || strings.TrimSpace(in.ProjectsStep) != "" {
-		_, _ = projectSyncCap(in)
 	}
 	incoming := append([]entry{}, resolveEntries(in)...)
 	if in.Entry != nil {
@@ -608,8 +534,27 @@ func upsert(in input) (any, error) {
 		}, nil
 	}
 
-	unlock := lockRoot(root)
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
+	{
+		snapshot, err := loadAgentWorkspace(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		if err := resolveAgentEntries(context.Background(), incoming, snapshot); err != nil {
+			return nil, err
+		}
+		current, err := loadAgentWorkspace(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		if current.Revision != snapshot.Revision {
+			return nil, errors.New("Agent 工作区登记已变化，请重新写入")
+		}
+	}
 
 	// 按条目自带的日期分组：一次运行可能同时补齐多个自然日（例如「昨天+今天」的滚动补采），
 	// 每条日志都落回它真正的活动日文件，而不是全部塞进运行当天。缺日期的条目回退到运行日。
@@ -628,7 +573,6 @@ func upsert(in input) (any, error) {
 	sort.Strings(dates)
 
 	now := time.Now().Format(time.RFC3339)
-	resolve := in.ResolveProjects == nil || *in.ResolveProjects
 	lockedSkipped := 0
 	total := 0
 	written := make([]entry, 0)
@@ -658,7 +602,19 @@ func upsert(in input) (any, error) {
 				// 合并语义：保留首次创建时间，逐字段以新值覆盖，空字段不冲掉旧值。
 				// overwrite=true 时改为整条替换，让编辑可以真正清空字段。
 				item.CreatedAt = day.Entries[existing].CreatedAt
+				if !in.Overwrite {
+					current := day.Entries[existing]
+					if current.ProjectID != "" {
+						item.Project, item.ProjectID = current.Project, current.ProjectID
+						item.Exhibit, item.ProjectHint = current.Exhibit, current.ProjectHint
+					}
+					if current.MinutesSource == "manual" && item.Provider == "agent" {
+						item.Minutes, item.MinutesSource = current.Minutes, current.MinutesSource
+						item.MinutesMethod, item.ActivityIntervals, item.OverlapAdjusted = "", nil, false
+					}
+				}
 				if in.Overwrite {
+					item.ExecutionIntervals = day.Entries[existing].ExecutionIntervals
 					day.Entries[existing] = item
 				} else {
 					day.Entries[existing] = mergeEntry(day.Entries[existing], item)
@@ -670,15 +626,6 @@ func upsert(in input) (any, error) {
 		sortEntries(day.Entries)
 		day.Date = dayDate
 		day.SchemaVersion = schemaVersion
-		if _, err := applyProjectRegistry(root, day.Entries, resolve); err != nil {
-			return nil, err
-		}
-		// 用登记表补上稳定的项目/展项 ID（工作台同步进来的项目也会在这里被命中）。
-		if resolve {
-			if pf, err := readProjects(root); err == nil {
-				enrichEntryLinks(pf, day.Entries)
-			}
-		}
 		if err := writeDay(root, day); err != nil {
 			return nil, err
 		}
@@ -710,8 +657,8 @@ func upsert(in input) (any, error) {
 // mergeEntry 用 incoming 覆盖 current，但不让 incoming 的空值冲掉已有内容。
 func mergeEntry(current, incoming entry) entry {
 	merged := incoming
-	if merged.WorkspaceProjectID == "" {
-		merged.WorkspaceProjectID = current.WorkspaceProjectID
+	if merged.ProjectID == "" {
+		merged.ProjectID = current.ProjectID
 	}
 	if merged.Provider == "" {
 		merged.Provider = current.Provider
@@ -721,6 +668,8 @@ func mergeEntry(current, incoming entry) entry {
 		merged.ActivityIntervals = current.ActivityIntervals
 		merged.OverlapAdjusted = current.OverlapAdjusted
 	}
+	// A historical rescan without execution evidence cannot erase prior observations.
+	merged.ExecutionIntervals = compactActivityIntervals(append(append([]activityInterval(nil), current.ExecutionIntervals...), incoming.ExecutionIntervals...))
 	if len(merged.Evidence) == 0 {
 		merged.Evidence = current.Evidence
 		merged.EvidenceTruncated = current.EvidenceTruncated
@@ -834,8 +783,6 @@ func shortHash(basis string) string {
 	return hex.EncodeToString(sum[:])[:12]
 }
 
-// ---------- 查询 ----------
-
 func listEntries(in input) (any, error) {
 	root, err := logRoot(in.LogRoot)
 	if err != nil {
@@ -849,23 +796,45 @@ func listEntries(in input) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	view := all
+	var scope map[string]bool
+	if strings.TrimSpace(in.Project) != "" || strings.TrimSpace(in.ProjectID) != "" || in.IncludeChildren {
+		projects, err := agentProjectView(root)
+		if err != nil {
+			return nil, err
+		}
+		scope, err = agentProjectScope(projects, in.ProjectID, in.IncludeChildren)
+		if err != nil {
+			return nil, err
+		}
+		if projects != nil {
+			view = projectEntriesForView(all, *projects)
+		}
+	}
 	filtered := make([]entry, 0, len(all))
-	for _, item := range all {
-		if !matches(item, in) {
+	for i, item := range all {
+		if scope != nil && !scope[firstNonEmpty(view[i].ProjectID, view[i].ProjectID)] {
+			continue
+		}
+		if !matches(view[i], in) {
 			continue
 		}
 		filtered = append(filtered, item)
 	}
+	matchedTotal := len(filtered)
+	activity := calculateActivityMetrics(filtered)
 	limit := in.Limit
 	if limit > 0 && len(filtered) > limit {
 		filtered = filtered[:limit]
 	}
 	return map[string]any{
-		"log_root": root,
-		"from":     from,
-		"to":       to,
-		"total":    len(filtered),
-		"entries":  filtered,
+		"log_root":         root,
+		"from":             from,
+		"to":               to,
+		"total":            len(filtered),
+		"matched_total":    matchedTotal,
+		"activity_metrics": activity,
+		"entries":          filtered,
 	}, nil
 }
 
@@ -883,9 +852,10 @@ func readEntries(in input) (any, error) {
 		return nil, err
 	}
 	return map[string]any{
-		"log_root": root,
-		"date":     date,
-		"entries":  nonNilEntries(day.Entries),
+		"log_root":         root,
+		"date":             date,
+		"entries":          nonNilEntries(day.Entries),
+		"activity_metrics": calculateActivityMetrics(day.Entries),
 	}, nil
 }
 
@@ -915,7 +885,10 @@ func deleteEntry(in input) (any, error) {
 		return nil, errors.New("需要 entry_id 或 entry_ids")
 	}
 
-	unlock := lockRoot(root)
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 
 	day, err := readDay(root, date)
@@ -964,7 +937,7 @@ func deleteEntry(in input) (any, error) {
 }
 
 func matches(item entry, in input) bool {
-	if p := strings.TrimSpace(in.Project); p != "" && !strings.Contains(strings.ToLower(item.Project), strings.ToLower(p)) {
+	if p := strings.TrimSpace(in.Project); p != "" && !strings.EqualFold(item.ProjectID, p) && !strings.EqualFold(item.ProjectID, p) && !strings.Contains(strings.ToLower(item.Project), strings.ToLower(p)) {
 		return false
 	}
 	if c := strings.TrimSpace(in.Category); c != "" && !strings.EqualFold(item.Category, c) {
@@ -1008,15 +981,20 @@ func entryMatchText(item entry, query string) bool {
 }
 
 type daySummary struct {
-	Date         string   `json:"date"`
-	EntryCount   int      `json:"entry_count"`
-	TotalMinutes int      `json:"total_minutes,omitempty"`
-	Projects     []string `json:"projects"`
-	Categories   []string `json:"categories"`
+	Projects     []string        `json:"projects"`
+	Date         string          `json:"date"`
+	EntryCount   int             `json:"entry_count"`
+	TotalMinutes int             `json:"total_minutes,omitempty"`
+	Activity     activityMetrics `json:"activity_metrics"`
+	Categories   []string        `json:"categories"`
 }
 
 func archiveList(in input) (any, error) {
 	root, err := logRoot(in.LogRoot)
+	if err != nil {
+		return nil, err
+	}
+	projects, err := agentProjectView(root)
 	if err != nil {
 		return nil, err
 	}
@@ -1056,6 +1034,9 @@ func archiveList(in input) (any, error) {
 		if err != nil {
 			return nil, err
 		}
+		if projects != nil {
+			day.Entries = projectEntriesForView(day.Entries, *projects)
+		}
 		summaries = append(summaries, summarizeDay(date, day.Entries))
 	}
 	sort.SliceStable(summaries, func(left, right int) bool { return summaries[left].Date > summaries[right].Date })
@@ -1090,6 +1071,7 @@ func summarizeDay(date string, entries []entry) daySummary {
 		Date:         date,
 		EntryCount:   len(entries),
 		TotalMinutes: groupMinutes(entries),
+		Activity:     calculateActivityMetrics(entries),
 		Projects:     sortedKeys(projects),
 		Categories:   sortedKeys(categories),
 	}
@@ -1097,43 +1079,31 @@ func summarizeDay(date string, entries []entry) daySummary {
 
 // summarizeDayFiltered 只在命中项目过滤时统计当天的条目，用于「按项目看日历」。
 func summarizeDayFiltered(date string, entries []entry, project string) daySummary {
+	return summarizeDay(date, filterProjectEntries(entries, project))
+}
+
+func filterProjectEntries(entries []entry, project string) []entry {
 	keyword := strings.ToLower(strings.TrimSpace(project))
-	projects := map[string]struct{}{}
-	categories := map[string]struct{}{}
-	count := 0
-	minutes := 0
+	filtered := make([]entry, 0, len(entries))
 	for _, item := range entries {
-		if !strings.Contains(strings.ToLower(item.Project), keyword) {
-			continue
-		}
-		count++
-		minutes += entryMinutes(item)
-		if item.Project != "" {
-			projects[item.Project] = struct{}{}
-		}
-		if item.Category != "" {
-			categories[item.Category] = struct{}{}
+		if strings.Contains(strings.ToLower(item.Project), keyword) || strings.EqualFold(item.ProjectID, keyword) || strings.EqualFold(item.ProjectID, keyword) {
+			filtered = append(filtered, item)
 		}
 	}
-	return daySummary{
-		Date:         date,
-		EntryCount:   count,
-		TotalMinutes: minutes,
-		Projects:     sortedKeys(projects),
-		Categories:   sortedKeys(categories),
-	}
+	return filtered
 }
 
 // calendarCell 是月历里的一天：既承载当天的计数，也承载宿主渲染所需的星期信息。
 type calendarCell struct {
-	Date         string   `json:"date"`
-	Day          int      `json:"day"`
-	InMonth      bool     `json:"in_month"`
-	IsToday      bool     `json:"is_today"`
-	EntryCount   int      `json:"entry_count"`
-	TotalMinutes int      `json:"total_minutes,omitempty"`
-	Projects     []string `json:"projects"`
-	Categories   []string `json:"categories"`
+	Projects     []string        `json:"projects"`
+	Date         string          `json:"date"`
+	Day          int             `json:"day"`
+	InMonth      bool            `json:"in_month"`
+	IsToday      bool            `json:"is_today"`
+	EntryCount   int             `json:"entry_count"`
+	TotalMinutes int             `json:"total_minutes,omitempty"`
+	Activity     activityMetrics `json:"activity_metrics"`
+	Categories   []string        `json:"categories"`
 }
 
 // archiveCalendar 按月构建可日历查看的日志统计。
@@ -1143,6 +1113,14 @@ type calendarCell struct {
 // 计数，避免格子里出现「有日志却空白」的错觉。
 func archiveCalendar(in input) (any, error) {
 	root, err := logRoot(in.LogRoot)
+	if err != nil {
+		return nil, err
+	}
+	projects, err := agentProjectView(root)
+	if err != nil {
+		return nil, err
+	}
+	scope, err := agentProjectScope(projects, in.ProjectID, in.IncludeChildren)
 	if err != nil {
 		return nil, err
 	}
@@ -1183,12 +1161,17 @@ func archiveCalendar(in input) (any, error) {
 	activeDays := 0
 	totalEntries := 0
 	totalMinutes := 0
+	var monthEntries []entry
 	for cursor := first.AddDate(0, 0, -lead); !cursor.After(last.AddDate(0, 0, trail)); cursor = cursor.AddDate(0, 0, 1) {
 		date := cursor.Format("2006-01-02")
 		day, err := readDay(root, date)
 		if err != nil {
 			return nil, err
 		}
+		if projects != nil {
+			day.Entries = projectEntriesForView(day.Entries, *projects)
+		}
+		day.Entries = filterAgentScope(day.Entries, scope)
 		summary := summarizeDay(date, day.Entries)
 		if project := strings.TrimSpace(in.Project); project != "" {
 			summary = summarizeDayFiltered(date, day.Entries, project)
@@ -1201,10 +1184,16 @@ func archiveCalendar(in input) (any, error) {
 			IsToday:      date == today,
 			EntryCount:   summary.EntryCount,
 			TotalMinutes: summary.TotalMinutes,
+			Activity:     summary.Activity,
 			Projects:     summary.Projects,
 			Categories:   summary.Categories,
 		}
 		if inMonth {
+			if project := strings.TrimSpace(in.Project); project != "" {
+				monthEntries = append(monthEntries, filterProjectEntries(day.Entries, project)...)
+			} else {
+				monthEntries = append(monthEntries, day.Entries...)
+			}
 			days = append(days, cell)
 			if summary.EntryCount > 0 {
 				activeDays++
@@ -1223,19 +1212,20 @@ func archiveCalendar(in input) (any, error) {
 		weekStartName = "sunday"
 	}
 	return map[string]any{
-		"log_root":      root,
-		"year":          year,
-		"month":         month,
-		"month_key":     fmt.Sprintf("%04d-%02d", year, month),
-		"week_start":    weekStartName,
-		"first_weekday": firstISO,
-		"days_in_month": daysInMonth,
-		"today":         today,
-		"active_days":   activeDays,
-		"total_entries": totalEntries,
-		"total_minutes": totalMinutes,
-		"days":          days,
-		"weeks":         weeks,
+		"log_root":         root,
+		"year":             year,
+		"month":            month,
+		"month_key":        fmt.Sprintf("%04d-%02d", year, month),
+		"week_start":       weekStartName,
+		"first_weekday":    firstISO,
+		"days_in_month":    daysInMonth,
+		"today":            today,
+		"active_days":      activeDays,
+		"total_entries":    totalEntries,
+		"total_minutes":    totalMinutes,
+		"activity_metrics": calculateActivityMetrics(monthEntries),
+		"days":             days,
+		"weeks":            weeks,
 	}, nil
 }
 
@@ -1304,8 +1294,6 @@ func listReports(root string) ([]reportRecord, error) {
 	return records, nil
 }
 
-// ---------- 报告 ----------
-
 // reportTarget 解析报告目标：周期（默认 daily）与锚点日期（默认今天）。
 func reportTarget(in input) (string, string, error) {
 	period := strings.ToLower(strings.TrimSpace(in.Period))
@@ -1325,6 +1313,24 @@ func reportTarget(in input) (string, string, error) {
 // renderPeriodReport 渲染并落盘一个报告周期。本期没有任何条目时返回 rendered=false，
 // 不落空文件（避免无工作日堆积空白报告）；成功时返回值里带 md/html/json 路径。
 func renderPeriodReport(root, period, anchor, title, narrative string, narratives map[string]string) (map[string]any, error) {
+	return renderPeriodReportScoped(root, period, anchor, title, narrative, narratives, "", false)
+}
+
+func scopedReportKey(key, projectID string, includeChildren bool) string {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return key
+	}
+	digest := sha256.Sum256([]byte(projectID))
+	mode := "self"
+	if includeChildren {
+		mode = "tree"
+	}
+	return key + "--project-" + hex.EncodeToString(digest[:8]) + "-" + mode
+}
+
+func renderPeriodReportScoped(root, period, anchor, title, narrative string, narratives map[string]string, projectID string, includeChildren bool) (map[string]any, error) {
+	projectID = strings.TrimSpace(projectID)
 	startMonth := fiscalStartMonth(root)
 	start, end, key, err := periodRange(period, anchor, startMonth)
 	if err != nil {
@@ -1334,6 +1340,20 @@ func renderPeriodReport(root, period, anchor, title, narrative string, narrative
 	if err != nil {
 		return nil, err
 	}
+	projects, err := agentProjectView(root)
+	if err != nil {
+		return nil, err
+	}
+	if projects != nil {
+		entries = projectEntriesForView(entries, *projects)
+	}
+	scope, err := agentProjectScope(projects, projectID, includeChildren)
+	if err != nil {
+		return nil, err
+	}
+	entries = filterAgentScope(entries, scope)
+	periodKey := key
+	key = scopedReportKey(key, projectID, includeChildren)
 	if len(entries) == 0 {
 		// 本期没有任何日志条目：不落空报告，避免在无工作日在 reports 目录
 		// 里堆积「本期没有记录」的空白文件；工作流链路据此正常收尾。
@@ -1348,12 +1368,20 @@ func renderPeriodReport(root, period, anchor, title, narrative string, narrative
 		}, nil
 	}
 	if strings.TrimSpace(title) == "" {
-		title = periodLabel(period) + " · " + key
+		title = periodLabel(period) + " · " + periodKey
+		if scope != nil {
+			for _, project := range projects.Projects {
+				if project.ID == projectID {
+					title += " · " + project.Name
+					break
+				}
+			}
+		}
 	} else {
 		title = strings.TrimSpace(title)
 	}
-	markdown := renderMarkdown(title, period, key, start, end, entries, narrative, narratives, startMonth)
-	htmlBody := renderHTML(title, period, key, start, end, entries, narrative, narratives, startMonth)
+	markdown := renderMarkdown(title, period, periodKey, start, end, entries, narrative, narratives, startMonth)
+	htmlBody := renderHTML(title, period, periodKey, start, end, entries, narrative, narratives, startMonth)
 
 	dir := filepath.Join(root, "reports", period)
 	mdPath := filepath.Join(dir, key+".md")
@@ -1365,18 +1393,22 @@ func renderPeriodReport(root, period, anchor, title, narrative string, narrative
 		return nil, errors.New("报告 HTML 写入失败")
 	}
 	report := map[string]any{
-		"period":         period,
-		"key":            key,
-		"title":          title,
-		"date_from":      start,
-		"date_to":        end,
-		"entry_count":    len(entries),
-		"total_minutes":  groupMinutes(entries),
-		"narrative_used": narrative != "" || len(narratives) > 0,
-		"md_path":        mdPath,
-		"html_path":      htmlPath,
-		"markdown":       markdown,
-		"rendered":       true,
+		"period":           period,
+		"key":              key,
+		"period_key":       periodKey,
+		"project_id":       projectID,
+		"include_children": includeChildren,
+		"title":            title,
+		"date_from":        start,
+		"date_to":          end,
+		"entry_count":      len(entries),
+		"total_minutes":    groupMinutes(entries),
+		"narrative_used":   narrative != "" || len(narratives) > 0,
+		"md_path":          mdPath,
+		"html_path":        htmlPath,
+		"markdown":         markdown,
+		"rendered":         true,
+		"activity_metrics": calculateActivityMetrics(entries),
 	}
 	// 季度 / 年度报告带上起算月与划分规则：同一份归档被别人打开时能看出
 	// 「Q1 是 2-4 月」这个口径，不然只看到 2026-02-01 ~ 2026-04-30 会以为算错了。
@@ -1405,11 +1437,16 @@ func renderReport(in input) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 	period, anchor, err := reportTarget(in)
 	if err != nil {
 		return nil, err
 	}
-	report, err := renderPeriodReport(root, period, anchor, strings.TrimSpace(in.Title), resolveNarrative(in), in.Narratives)
+	report, err := renderPeriodReportScoped(root, period, anchor, strings.TrimSpace(in.Title), resolveNarrative(in), in.Narratives, in.ProjectID, in.IncludeChildren)
 	if err != nil {
 		return nil, err
 	}
@@ -1433,8 +1470,6 @@ func renderReport(in input) (any, error) {
 		}},
 	}, nil
 }
-
-// ---------- 周期汇总 ----------
 
 // defaultAggregatePeriods 是自动汇总的默认周期集合：周报 + 月报。
 var defaultAggregatePeriods = []string{"weekly", "monthly"}
@@ -1554,13 +1589,14 @@ func aggregatePeriod(root, period, anchor string, force bool, narrative string, 
 	}
 	return map[string]any{
 		"period": period, "key": key, "date_from": start, "date_to": end,
-		"status":        "rendered",
-		"title":         report["title"],
-		"entry_count":   report["entry_count"],
-		"total_minutes": report["total_minutes"],
-		"md_path":       report["md_path"],
-		"html_path":     report["html_path"],
-		"json_path":     report["json_path"],
+		"status":           "rendered",
+		"title":            report["title"],
+		"entry_count":      report["entry_count"],
+		"total_minutes":    report["total_minutes"],
+		"activity_metrics": report["activity_metrics"],
+		"md_path":          report["md_path"],
+		"html_path":        report["html_path"],
+		"json_path":        report["json_path"],
 	}, nil
 }
 
@@ -1635,6 +1671,11 @@ func aggregateReports(in input) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 	anchor := normalizeDate(in.Date)
 	if !validDate(anchor) {
 		return nil, errors.New("date 必须是 YYYY-MM-DD 格式")
@@ -1708,7 +1749,7 @@ func aggregateReports(in input) (any, error) {
 // 变成 2025-Q4），旧归档仍躺在原键下。若直接按新键找不到就报「没有报告」，用户会
 // 以为归档被删了。这里读归档 JSON 里的 date_from / date_to 判断覆盖关系，避免
 // 用当前口径反推旧键（旧键可能是在别的起算月下生成的）。
-func findArchivedReport(root, period, anchor string) (string, string, string, bool) {
+func findArchivedReport(root, period, anchor, projectID string, includeChildren bool) (string, string, string, bool) {
 	dir := filepath.Join(root, "reports", period)
 	names, err := readDirNames(dir)
 	if err != nil {
@@ -1724,11 +1765,16 @@ func findArchivedReport(root, period, anchor string) (string, string, string, bo
 		}
 		var artifact struct {
 			Report struct {
-				DateFrom string `json:"date_from"`
-				DateTo   string `json:"date_to"`
+				DateFrom        string `json:"date_from"`
+				DateTo          string `json:"date_to"`
+				ProjectID       string `json:"project_id"`
+				IncludeChildren bool   `json:"include_children"`
 			} `json:"report"`
 		}
 		if json.Unmarshal(body, &artifact) != nil {
+			continue
+		}
+		if artifact.Report.ProjectID != projectID || artifact.Report.IncludeChildren != includeChildren {
 			continue
 		}
 		from, to := artifact.Report.DateFrom, artifact.Report.DateTo
@@ -1741,6 +1787,7 @@ func findArchivedReport(root, period, anchor string) (string, string, string, bo
 }
 
 func readReport(in input) (any, error) {
+	in.ProjectID = strings.TrimSpace(in.ProjectID)
 	root, err := logRoot(in.LogRoot)
 	if err != nil {
 		return nil, err
@@ -1760,12 +1807,16 @@ func readReport(in input) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	if in.IncludeChildren && strings.TrimSpace(in.ProjectID) == "" {
+		return nil, errors.New("包含子项目时必须指定 Agent 项目 ID")
+	}
+	key = scopedReportKey(key, in.ProjectID, in.IncludeChildren)
 	mdPath := filepath.Join(root, "reports", period, key+".md")
 	archivedFallback := false
 	if _, statErr := os.Stat(mdPath); errors.Is(statErr, os.ErrNotExist) {
 		// 改过起算月后，同一个日期会算到新的键，旧归档还留在原键下。
 		// 直接报「没有报告」会让人以为归档丢了，所以按覆盖区间回找一份。
-		if found, from, to, ok := findArchivedReport(root, period, anchor); ok {
+		if found, from, to, ok := findArchivedReport(root, period, anchor, in.ProjectID, in.IncludeChildren); ok {
 			key, start, end = found, from, to
 			mdPath = filepath.Join(root, "reports", period, key+".md")
 			archivedFallback = true
@@ -1800,8 +1851,6 @@ func readReport(in input) (any, error) {
 	}
 	return result, nil
 }
-
-// ---------- 存储 ----------
 
 func logRoot(value string) (string, error) {
 	trimmed := strings.TrimSpace(value)
@@ -1985,8 +2034,6 @@ func collectEntries(root, from, to string) ([]entry, error) {
 	return collected, nil
 }
 
-// ---------- 周期与日期 ----------
-
 // resolveRange 归一 entry.list 的查询区间。
 //
 // 语义：显式 date 视为单日锚点，只在其缺失的一侧补位；from/to 任一缺失则该侧取
@@ -2100,8 +2147,6 @@ func periodLabel(period string) string {
 	}
 }
 
-// ---------- 渲染 ----------
-
 func renderMarkdown(title, period, key, from, to string, entries []entry, narrative string, narratives map[string]string, fiscalStartMonth int) string {
 	var builder strings.Builder
 	builder.WriteString("# " + title + "\n\n")
@@ -2145,8 +2190,6 @@ func renderMarkdown(title, period, key, from, to string, entries []entry, narrat
 	}
 	return builder.String()
 }
-
-// ---- 工时 ----
 
 // entryMinutes 取条目工时（分钟），无有效值返回 0。
 func entryMinutes(item entry) int {
@@ -2269,10 +2312,22 @@ func overviewLines(entries []entry) string {
 		sources[sourceClientLabel(item.Source)]++
 	}
 	var builder strings.Builder
+	activity := calculateActivityMetrics(entries)
+	if activity.ExecutionSessions > 0 {
+		builder.WriteString(fmt.Sprintf("- Agent 累计作业：%s（已观测，%d 个会话日，并行会话分别计入）\n", hoursText(activity.ExecutionMinutes), activity.ExecutionSessions))
+		builder.WriteString(fmt.Sprintf("- 作业覆盖：%s（重叠时间合并）\n", hoursText(activity.ExecutionCoverageMinutes)))
+	}
 	builder.WriteString(fmt.Sprintf("- 记录条目：%d 条\n", len(entries)))
 	builder.WriteString("- 涉及项目：" + countText(projects) + "\n")
 	builder.WriteString("- 工作类型：" + countText(categories) + "\n")
 	builder.WriteString("- 素材来源：" + countText(sources) + "\n")
+	if activity.CoverageMinutes > 0 || activity.SessionMinutes > 0 {
+		builder.WriteString(fmt.Sprintf("- 活动覆盖：约 %s（消息区间估算，重叠时间合并）\n", hoursText(activity.CoverageMinutes)))
+		builder.WriteString(fmt.Sprintf("- 会话累计活动：约 %s（消息区间估算，并行会话分别计入）\n", hoursText(activity.SessionMinutes)))
+	}
+	if activity.UnknownSessions > 0 {
+		builder.WriteString(fmt.Sprintf("- 无可估算活动区间：%d 项\n", activity.UnknownSessions))
+	}
 	measured, estimated := splitMinutes(entries)
 	total := measured + estimated
 	if total > 0 {
@@ -2308,6 +2363,8 @@ func timelineLines(entries []entry) string {
 		}
 		if item.Minutes > 0 {
 			builder.WriteString("  - 工时：" + minutesText(item.Minutes) + "（" + minutesSourceLabel(item.MinutesSource) + "）\n")
+		} else if item.Provider == "agent" && len(intervalSpans(item.ActivityIntervals)) == 0 && item.MinutesSource != "manual" {
+			builder.WriteString("  - 活动时长：无法估算\n")
 		}
 		appendBullet(&builder, "交付", item.Outcomes)
 		appendBullet(&builder, "决策", item.Decisions)
@@ -2648,8 +2705,6 @@ func countText(counts map[string]int) string {
 	return strings.Join(parts, "、")
 }
 
-// ---------- 打开链接 ----------
-
 func openLink(in input) (any, error) {
 	target := strings.TrimSpace(in.URL)
 	if target == "" {
@@ -2712,8 +2767,6 @@ func revealPath(in input) (any, error) {
 	_ = command.Process.Release()
 	return map[string]any{"opened": true, "path": target}, nil
 }
-
-// ---------- 工具函数 ----------
 
 // 日志条目的受控类型（category）。这里是唯一的规范值集合：UI 选择、AI 结果 schema、
 // 报告显示与旧数据归一都以它为准，写入 schema 也用同一枚举。

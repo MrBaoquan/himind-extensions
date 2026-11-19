@@ -2,8 +2,6 @@ package main
 
 import (
 	"archive/zip"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -35,6 +33,7 @@ func boardProject(t *testing.T, board map[string]any, name string) map[string]an
 
 func TestProjectBoardAndWorkUpdate(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "当前工作台")
 	root := t.TempDir()
 	// 用相对今天的日期：工作台按最近活动窗口派生状态，写死日期会随时间推移被判为搁置。
 	today := time.Now().Format("2006-01-02")
@@ -75,8 +74,8 @@ func TestProjectBoardAndWorkUpdate(t *testing.T) {
 
 func TestWorkItemsCRUD(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "项目 A")
 	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"项目 A"}`)
 
 	created := call(t, "work-log.item.upsert", `{"log_root":`+quote(root)+`,"work_item":{"project":"项目 A","title":"实现登录","estimate_minutes":90,"remaining_minutes":90,"priority":"P1","due_date":"2026-10-24"}}`)
 	item := created["item"].(map[string]any)
@@ -107,8 +106,8 @@ func TestWorkItemsCRUD(t *testing.T) {
 
 func TestPlanSaveGetAndValidate(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "项目 A")
 	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"项目 A"}`)
 	created := call(t, "work-log.item.upsert", `{"log_root":`+quote(root)+`,"work_item":{"project":"项目 A","title":"实现登录","estimate_minutes":90}}`)
 	itemID := created["item"].(map[string]any)["id"].(string)
 
@@ -158,8 +157,8 @@ func TestPlanSaveGetAndValidate(t *testing.T) {
 
 func TestBackupIncludesWorkItemsAndPlans(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "备份项目")
 	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"备份项目"}`)
 	call(t, "work-log.item.upsert", `{"log_root":`+quote(root)+`,"work_item":{"project":"备份项目","title":"备份工作项","estimate_minutes":30}}`)
 	call(t, "work-log.plan.save", `{"log_root":`+quote(root)+`,"plan":{"date":"2026-10-19","blocks":[{"kind":"focus","title":"备份计划","start":"09:00","end":"09:30"}]}}`)
 	backup := call(t, "work-log.archive.backup", `{"log_root":`+quote(root)+`}`)
@@ -173,36 +172,16 @@ func TestBackupIncludesWorkItemsAndPlans(t *testing.T) {
 	for _, file := range reader.File {
 		names[file.Name] = true
 	}
-	for _, want := range []string{"work-items.json", "plans/2026-10-19.json", "projects.json"} {
+	for _, want := range []string{"work-items.json", "plans/2026-10-19.json", "workspace-business.json"} {
 		if !names[want] {
 			t.Fatalf("备份缺少 %s，实际文件: %v", want, names)
 		}
 	}
 }
 
-func TestLegacyProjectsWithoutWork(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	legacy := `{"schema_version":"work-log-projects.v1","projects":[{"id":"pj-legacy","name":"旧项目","aliases":[],"status":"active"}]}`
-	if err := os.WriteFile(filepath.Join(root, "projects.json"), []byte(legacy), 0o644); err != nil {
-		t.Fatalf("写入旧登记表失败: %v", err)
-	}
-	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":`+quote(time.Now().Format("2006-01-02"))+`,"entries":[{"project":"旧项目","category":"开发","title":"旧日志","minutes":30}]}`)
-	board := call(t, "work-log.project.board", `{"log_root":`+quote(root)+`}`)
-	project := boardProject(t, board, "旧项目")
-	if project["state"] != workStateInProgress {
-		t.Fatalf("旧项目有日志时应派生 in_progress，实际 %v", project["state"])
-	}
-	if project["priority"] != priorityP2 {
-		t.Fatalf("旧项目默认优先级应为 P2，实际 %v", project["priority"])
-	}
-	if steps, ok := project["next_steps"].([]any); !ok || len(steps) != 0 {
-		t.Fatalf("旧项目下一步应为空数组，实际 %v", project["next_steps"])
-	}
-}
-
 func TestProjectBoardRecentWindowAndInference(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "当前项目", "旧项目")
 	root := t.TempDir()
 	recentDate := time.Now().Format("2006-01-02")
 	oldDate := time.Now().AddDate(0, 0, -30).Format("2006-01-02")
@@ -250,8 +229,8 @@ func TestProjectBoardRecentWindowAndInference(t *testing.T) {
 
 func TestProjectBoardPlannedProjects(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "待开始项目")
 	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"待开始项目","status":"active"}`)
 	call(t, "work-log.project.work.update", `{"log_root":`+quote(root)+`,"project_name":"待开始项目","patch":{"next_steps":[{"text":"启动需求调研"}]}}`)
 	board := call(t, "work-log.project.board", `{"log_root":`+quote(root)+`}`)
 	planned, _ := board["planned"].([]any)
@@ -274,9 +253,9 @@ func TestProjectBoardPlannedProjects(t *testing.T) {
 
 func TestPlanReviewFinalizesPastDay(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "复盘项目")
 	root := t.TempDir()
 	date := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"复盘项目"}`)
 	created := call(t, "work-log.item.upsert", `{"log_root":`+quote(root)+`,"work_item":{"project":"复盘项目","title":"实现复盘功能","estimate_minutes":90}}`)
 	itemID := created["item"].(map[string]any)["id"].(string)
 	call(t, "work-log.plan.save", `{"log_root":`+quote(root)+`,"plan":{"date":`+quote(date)+`,"blocks":[{"kind":"focus","work_item_id":`+quote(itemID)+`,"title":"实现复盘功能","start":"09:00","end":"10:30"}]}}`)
@@ -305,8 +284,8 @@ func TestPlanReviewFinalizesPastDay(t *testing.T) {
 
 func TestAutoPlanSchedulesWorkItems(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "自动排期项目")
 	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"自动排期项目"}`)
 	call(t, "work-log.item.upsert", `{"log_root":`+quote(root)+`,"work_item":{"project":"自动排期项目","title":"先做P0","priority":"P0","estimate_minutes":90,"remaining_minutes":90}}`)
 	call(t, "work-log.item.upsert", `{"log_root":`+quote(root)+`,"work_item":{"project":"自动排期项目","title":"再做P1","priority":"P1","estimate_minutes":60,"remaining_minutes":60}}`)
 	date := time.Now().Format("2006-01-02")
@@ -336,10 +315,10 @@ func TestAutoPlanSchedulesWorkItems(t *testing.T) {
 
 func TestAutoPlanRealisticDay(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "排期验证")
 	root := t.TempDir()
 	today := time.Now().Format("2006-01-02")
 	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"排期验证"}`)
 	call(t, "work-log.item.upsert", `{"log_root":`+quote(root)+`,"work_item":{"project":"排期验证","title":"P0 修复登录","priority":"P0","estimate_minutes":90,"remaining_minutes":90}}`)
 	call(t, "work-log.item.upsert", `{"log_root":`+quote(root)+`,"work_item":{"project":"排期验证","title":"P1 准备验收","priority":"P1","estimate_minutes":60,"remaining_minutes":60}}`)
 	call(t, "work-log.item.upsert", `{"log_root":`+quote(root)+`,"work_item":{"project":"排期验证","title":"P2 整理文档","priority":"P2","estimate_minutes":45,"remaining_minutes":45}}`)
@@ -413,6 +392,7 @@ func TestAutoPlanRealisticDay(t *testing.T) {
 
 func TestAutoPlanUsesCurrentProjectsWithoutWorkItems(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "当前项目")
 	root := t.TempDir()
 	today := time.Now().Format("2006-01-02")
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":`+quote(today)+`,"entries":[{"project":"当前项目","category":"开发","title":"推进登录接口","minutes":60}]}`)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -9,15 +10,6 @@ import (
 	"strings"
 	"time"
 )
-
-// 本文件实现「登记管理增强」与「存储稳健性」相关能力：
-//   - work-log.entry.patch   单条条目的字段级局部更新（只改传入的键，不注入默认值）
-//   - work-log.project.rename       项目改名（保持稳定 ID，回绑历史条目）
-//   - work-log.project.export / import  登记表导出与导入（备份 / 迁移 / 跨机复制）
-//   - work-log.archive.migrate          把历史文件补齐到当前 schema（一次性维护）
-// 以及对应的迁移函数 migrateProjectsFile / migrateDayFile。
-
-// ---------- 条目局部更新 ----------
 
 // entryPatchCap 对单条条目做字段级更新：只有 patch 里出现的键会被改写，
 // 其余字段（含 source/category 默认值）保持不变，便于在视图里就地修正功能/项目。
@@ -37,7 +29,10 @@ func entryPatchCap(in input) (any, error) {
 	if len(in.Patch) == 0 {
 		return nil, errors.New("patch 不能为空：请至少提供一个要修改的字段")
 	}
-	unlock := lockRoot(root)
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 	day, err := readDay(root, date)
 	if err != nil {
@@ -54,17 +49,29 @@ func entryPatchCap(in input) (any, error) {
 		return nil, errors.New("未找到该条目：" + id)
 	}
 	item := day.Entries[at]
-	relink := false
+	projectChanged := false
+	projectProvided := false
+	requestedID := ""
+	idProvided := false
+	manualMinutes := false
+	sourceProvided := false
 	for key, raw := range in.Patch {
 		switch strings.ToLower(strings.TrimSpace(key)) {
 		case "project":
 			item.Project = asText(raw)
-			relink = true
+			projectChanged = true
+			projectProvided = true
+		case "project_id":
+			value := asText(raw)
+			if idProvided && requestedID != value {
+				return nil, errors.New("项目 ID 与工作区项目 ID 不一致")
+			}
+			requestedID, idProvided = value, true
+			projectChanged = true
 		case "feature":
 			item.Feature = asText(raw)
 		case "exhibit":
 			item.Exhibit = asText(raw)
-			relink = true
 		case "category":
 			item.Category = asText(raw)
 		case "title":
@@ -73,8 +80,10 @@ func entryPatchCap(in input) (any, error) {
 			item.Summary = asText(raw)
 		case "minutes":
 			item.Minutes = asInt(raw)
+			manualMinutes = true
 		case "minutes_source":
 			item.MinutesSource = asText(raw)
+			sourceProvided = true
 		case "repo_path":
 			item.RepoPath = asText(raw)
 		case "tags":
@@ -87,15 +96,36 @@ func entryPatchCap(in input) (any, error) {
 	if item.Title == "" {
 		return nil, errors.New("标题不能为空")
 	}
+	if manualMinutes && (!sourceProvided || item.MinutesSource == "manual") {
+		item.MinutesSource, item.MinutesMethod, item.ActivityIntervals, item.OverlapAdjusted = "manual", "", nil, false
+	}
+	if projectChanged {
+		if (idProvided && requestedID == "") || (!idProvided && strings.TrimSpace(item.Project) == "") {
+			item.Project, item.ProjectID, item.ProjectHint = "", "", ""
+		} else {
+			snapshot, err := loadAgentWorkspace(context.Background())
+			if err != nil {
+				return nil, err
+			}
+			project, err := findAgentProject(snapshot, requestedID, item.Project)
+			if err != nil {
+				return nil, err
+			}
+			if projectProvided && requestedID != "" && strings.TrimSpace(item.Project) != "" && !strings.EqualFold(project.Name, strings.TrimSpace(item.Project)) && !aliasMatches(project.Aliases, item.Project) {
+				return nil, errors.New("项目名称与 Agent 工作区项目 ID 不一致")
+			}
+			current, err := loadAgentWorkspace(context.Background())
+			if err != nil {
+				return nil, err
+			}
+			if current.Revision != snapshot.Revision {
+				return nil, errors.New("Agent 工作区登记已变化，请重新修改")
+			}
+			item.Project, item.ProjectID, item.ProjectHint = project.Name, project.ID, ""
+		}
+	}
 	item.UpdatedAt = time.Now().Format(time.RFC3339)
 	day.Entries[at] = item
-	if relink {
-		if err := rebindEntryProject(root, &day.Entries[at]); err != nil {
-			return nil, err
-		}
-	} else if pf, err := readProjects(root); err == nil {
-		enrichEntryLinks(pf, day.Entries[at:at+1])
-	}
 	if err := writeDay(root, day); err != nil {
 		return nil, err
 	}
@@ -103,163 +133,6 @@ func entryPatchCap(in input) (any, error) {
 		"log_root": root,
 		"date":     date,
 		"entry":    day.Entries[at],
-	}, nil
-}
-
-// rebindEntryProject 显式设置项目名后重新绑定项目/展项 ID：命中登记表就归一，
-// 没命中就把用户显式输入的名字登记为新项目（这是人工确认的动作，不是"猜"）。
-func rebindEntryProject(root string, item *entry) error {
-	name := strings.TrimSpace(item.Project)
-	if name == "" {
-		item.ProjectID = ""
-		item.ExhibitID = ""
-		return nil
-	}
-	pf, err := readProjects(root)
-	if err != nil {
-		return err
-	}
-	index := projectIndex(pf)
-	if canonical, ok := resolveProjectName(index, name); ok {
-		item.Project = canonical
-	} else if registerProject(&pf, index, name) {
-		if err := writeProjects(root, pf); err != nil {
-			return err
-		}
-		if pf, err = readProjects(root); err != nil {
-			return err
-		}
-	}
-	for _, p := range pf.Projects {
-		if !strings.EqualFold(p.Name, item.Project) {
-			continue
-		}
-		item.ProjectID = p.ID
-		ex := strings.TrimSpace(item.Exhibit)
-		if ex == "" {
-			item.ExhibitID = ""
-			return nil
-		}
-		for _, e := range p.Exhibits {
-			if strings.EqualFold(e.Name, ex) || aliasMatches(e.Aliases, ex) {
-				item.Exhibit = e.Name
-				item.ExhibitID = e.ID
-				return nil
-			}
-		}
-		item.ExhibitID = ""
-		return nil
-	}
-	item.ProjectID = ""
-	return nil
-}
-
-// ---------- 登记表导出 / 导入 ----------
-
-// projectExportCap 导出完整登记表（含别名、路径、展项），供备份或跨机迁移。
-func projectExportCap(in input) (any, error) {
-	root, err := logRoot(in.LogRoot)
-	if err != nil {
-		return nil, err
-	}
-	pf, err := readProjects(root)
-	if err != nil {
-		return nil, err
-	}
-	pf.SchemaVersion = projectsSchemaVersion
-	payload, err := json.MarshalIndent(pf, "", "  ")
-	if err != nil {
-		return nil, errors.New("登记表序列化失败")
-	}
-	return map[string]any{
-		"log_root":       root,
-		"schema_version": projectsSchemaVersion,
-		"count":          len(pf.Projects),
-		"projects":       pf.Projects,
-		"json":           string(payload),
-	}, nil
-}
-
-// projectImportCap 导入登记表：merge（默认，按名称/外部 ID 合并并补齐路径/别名/展项）
-// 或 replace（整体替换）。导入来源是 work-log.project.export 产出的 JSON 文本。
-func projectImportCap(in input) (any, error) {
-	root, err := logRoot(in.LogRoot)
-	if err != nil {
-		return nil, err
-	}
-	raw := strings.TrimSpace(in.ProjectsJSON)
-	if raw == "" {
-		return nil, errors.New("需要 projects_json（登记表 JSON 文本）")
-	}
-	var incoming projectsFile
-	if err := json.Unmarshal([]byte(raw), &incoming); err != nil {
-		// 也接受直接给一个项目数组。
-		var list []project
-		if err2 := json.Unmarshal([]byte(raw), &list); err2 != nil {
-			return nil, errors.New("导入内容不是合法的登记表 JSON")
-		}
-		incoming.Projects = list
-	}
-	unlock := lockRoot(root)
-	defer unlock()
-	pf, err := readProjects(root)
-	if err != nil {
-		return nil, err
-	}
-	mode := strings.ToLower(strings.TrimSpace(in.Mode))
-	if mode == "replace" {
-		pf.Projects = nonNilProjects(incoming.Projects)
-		if err := migrateProjectsFile(&pf); err != nil {
-			return nil, err
-		}
-		if err := writeProjects(root, pf); err != nil {
-			return nil, err
-		}
-		return map[string]any{"log_root": root, "mode": "replace", "imported": len(pf.Projects)}, nil
-	}
-	now := time.Now().Format(time.RFC3339)
-	created, updated := 0, 0
-	for _, src := range incoming.Projects {
-		name := strings.TrimSpace(src.Name)
-		if name == "" {
-			continue
-		}
-		at := matchProjectIndex(pf, name, src.ExternalID)
-		if at < 0 {
-			src.CreatedAt = firstNonEmpty(src.CreatedAt, now)
-			src.UpdatedAt = now
-			pf.Projects = append(pf.Projects, src)
-			created++
-			continue
-		}
-		p := pf.Projects[at]
-		p.Aliases = mergeAliases(p.Aliases, src.Aliases)
-		p.Paths = mergePaths(p.Paths, src.Paths)
-		p.Exhibits = mergeExhibits(p.Exhibits, src.Exhibits)
-		if p.ExternalID == "" {
-			p.ExternalID = src.ExternalID
-		}
-		if p.Source == "" {
-			p.Source = src.Source
-		}
-		if p.Description == "" {
-			p.Description = src.Description
-		}
-		p.UpdatedAt = now
-		pf.Projects[at] = p
-		updated++
-	}
-	if err := migrateProjectsFile(&pf); err != nil {
-		return nil, err
-	}
-	if err := writeProjects(root, pf); err != nil {
-		return nil, err
-	}
-	return map[string]any{
-		"log_root": root,
-		"mode":     "merge",
-		"created":  created,
-		"updated":  updated,
 	}, nil
 }
 
@@ -272,103 +145,6 @@ func nonNilProjects(items []project) []project {
 		out = append(out, p)
 	}
 	return out
-}
-
-// ---------- 项目改名 ----------
-
-// projectRenameCap 修改项目的展示名：保持稳定 ID 不变，并把历史条目里按旧名/旧别名
-// 归类的条目回绑到新名，避免改名后老条目变成未归类。新名若已被其它项目（含别名）
-// 占用则报错，提示改用「并入」而不是静默覆盖。
-func projectRenameCap(in input) (any, error) {
-	root, err := logRoot(in.LogRoot)
-	if err != nil {
-		return nil, err
-	}
-	newName := strings.TrimSpace(in.NewName)
-	if newName == "" {
-		return nil, errors.New("需要 new_name（新的项目名）")
-	}
-	unlock := lockRoot(root)
-	defer unlock()
-	pf, err := readProjects(root)
-	if err != nil {
-		return nil, err
-	}
-	at := findProjectIndex(pf, in.ProjectID, firstNonEmpty(in.ProjectName, in.Project))
-	if at < 0 {
-		return nil, errors.New("未找到目标项目：请提供有效的 project_id 或 project_name")
-	}
-	oldName := pf.Projects[at].Name
-	if normalizeProjectKey(oldName) == normalizeProjectKey(newName) {
-		return map[string]any{
-			"log_root": root,
-			"renamed":  false,
-			"reason":   "名称未变化",
-			"project":  pf.Projects[at],
-		}, nil
-	}
-	if canonical, ok := resolveProjectName(projectIndex(pf), newName); ok && !strings.EqualFold(canonical, oldName) {
-		return nil, errors.New("名称已被「" + canonical + "」占用，请改用「并入」合并到该项目")
-	}
-	now := time.Now().Format(time.RFC3339)
-	oldAliases := append([]string{}, pf.Projects[at].Aliases...)
-	pf.Projects[at].Name = newName
-	pf.Projects[at].UpdatedAt = now
-	targetID := pf.Projects[at].ID
-	if err := writeProjects(root, pf); err != nil {
-		return nil, err
-	}
-
-	// 回绑历史条目：按 ID / 旧名 / 旧别名命中即改写到新名。
-	oldKey := normalizeProjectKey(oldName)
-	aliasKeys := map[string]bool{}
-	for _, a := range oldAliases {
-		if k := normalizeProjectKey(a); k != "" {
-			aliasKeys[k] = true
-		}
-	}
-	updated := 0
-	touched := make([]string, 0)
-	dates, err := listDates(root)
-	if err != nil {
-		return nil, err
-	}
-	for _, date := range dates {
-		day, err := readDay(root, date)
-		if err != nil {
-			return nil, err
-		}
-		changed := false
-		for i := range day.Entries {
-			item := &day.Entries[i]
-			match := (targetID != "" && item.ProjectID == targetID) ||
-				normalizeProjectKey(item.Project) == oldKey ||
-				aliasKeys[normalizeProjectKey(item.Project)]
-			if !match {
-				continue
-			}
-			item.Project = newName
-			item.ProjectID = targetID
-			item.UpdatedAt = now
-			updated++
-			changed = true
-		}
-		if changed {
-			if err := writeDay(root, day); err != nil {
-				return nil, err
-			}
-			touched = append(touched, date)
-		}
-	}
-	return map[string]any{
-		"log_root": root,
-		"renamed":  true,
-		"from":     oldName,
-		"to":       newName,
-		"project":  pf.Projects[at],
-		"updated":  updated,
-		"dates":    touched,
-	}, nil
 }
 
 // sessionMaterialDir returns work-log's own material store.
@@ -444,51 +220,6 @@ func preferCandidatePath(cand, cur string) bool {
 	return len(cand) < len(cur)
 }
 
-// ---------- schema 迁移 ----------
-
-// migrateProjectsFile 把登记表补齐到当前 schema：戳版本、补 ID、补状态。
-// 项目 ID 由名称确定性推导，因此读时迁移是幂等的、可安全地只改内存。
-func migrateProjectsFile(pf *projectsFile) error {
-	pf.SchemaVersion = projectsSchemaVersion
-	if pf.Projects == nil {
-		pf.Projects = []project{}
-	}
-	for i := range pf.Projects {
-		p := &pf.Projects[i]
-		if strings.TrimSpace(p.Name) == "" {
-			continue
-		}
-		if strings.TrimSpace(p.ID) == "" {
-			p.ID = makeProjectID(p.Name)
-		}
-		if strings.TrimSpace(p.Status) == "" {
-			p.Status = "active"
-		}
-		if p.Aliases == nil {
-			p.Aliases = []string{}
-		}
-		if p.Work.NextSteps == nil {
-			p.Work.NextSteps = []nextStep{}
-		}
-		if p.Work.Blockers == nil {
-			p.Work.Blockers = []string{}
-		}
-		for j := range p.Work.NextSteps {
-			step := &p.Work.NextSteps[j]
-			if strings.TrimSpace(step.Text) != "" && strings.TrimSpace(step.ID) == "" {
-				step.ID = nextStepID(p.ID, step.Text)
-			}
-		}
-		for j := range p.Exhibits {
-			ex := &p.Exhibits[j]
-			if strings.TrimSpace(ex.Name) != "" && strings.TrimSpace(ex.ID) == "" {
-				ex.ID = "ex-" + shortHash(normalizeProjectKey(ex.Name))
-			}
-		}
-	}
-	return nil
-}
-
 // migrateDayFile 把某天的日志补齐到当前 schema。只做确定性、幂等的修正
 // （版本戳、条目日期），不生成新身份，避免破坏去重键。
 func migrateDayFile(day *dayFile) {
@@ -511,28 +242,13 @@ func archiveMigrateCap(in input) (any, error) {
 		return nil, err
 	}
 	dryRun := in.DryRun != nil && *in.DryRun
-	unlock := lockRoot(root)
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 
-	// 直接读原始文件，避免与读时迁移混淆（读时迁移不落盘，会掩盖真实改动）。
 	projectsChanged := false
-	if body, err := os.ReadFile(projectsPath(root)); err == nil && len(body) > 0 {
-		var raw projectsFile
-		if err := json.Unmarshal(body, &raw); err != nil {
-			return nil, errors.New("项目登记不是合法 JSON")
-		}
-		before, _ := json.Marshal(raw)
-		if err := migrateProjectsFile(&raw); err != nil {
-			return nil, err
-		}
-		after, _ := json.Marshal(raw)
-		projectsChanged = string(before) != string(after)
-		if projectsChanged && !dryRun {
-			if err := writeProjects(root, raw); err != nil {
-				return nil, err
-			}
-		}
-	}
 
 	dates, err := listDates(root)
 	if err != nil {
@@ -570,8 +286,6 @@ func archiveMigrateCap(in input) (any, error) {
 		"days_changed":     daysChanged,
 	}, nil
 }
-
-// ---------- 重复条目整理 ----------
 
 // entrySessionKey 归一化会话身份键：同一来源的同一会话视为同一条目，与日期无关。
 func entrySessionKey(e entry) string {
@@ -666,9 +380,6 @@ func mergeDuplicates(primary entry, others []entry) entry {
 		if strings.TrimSpace(merged.ProjectID) == "" {
 			merged.ProjectID = other.ProjectID
 		}
-		if strings.TrimSpace(merged.ExhibitID) == "" {
-			merged.ExhibitID = other.ExhibitID
-		}
 		if strings.TrimSpace(merged.RepoPath) == "" {
 			merged.RepoPath = other.RepoPath
 		}
@@ -736,7 +447,10 @@ func archiveDedupeCap(in input) (any, error) {
 	}
 	dryRun := in.DryRun == nil || *in.DryRun
 	crossDay := in.CrossDay != nil && *in.CrossDay
-	unlock := lockRoot(root)
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 
 	dates, err := listDates(root)
@@ -899,8 +613,6 @@ func yearOfDate(date string) string {
 	}
 	return date
 }
-
-// ---------- 小工具 ----------
 
 func asText(value any) string {
 	switch v := value.(type) {

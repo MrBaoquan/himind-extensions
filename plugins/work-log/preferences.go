@@ -213,7 +213,10 @@ func preferencesSaveCap(in input) (any, error) {
 	if month < 1 || month > 12 {
 		return nil, errors.New("fiscal_year_start_month 必须是 1-12 的整数")
 	}
-	unlock := lockRoot(root)
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 	prefs, err := readPreferences(root)
 	if err != nil {

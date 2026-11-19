@@ -161,48 +161,18 @@ func makeWorkItemID(item workItem) string {
 }
 
 // resolveWorkItemProject 把工作项归到登记表里的项目；项目不存在时自动登记。
-func resolveWorkItemProject(root string, pf *projectsFile, item *workItem) error {
-	index := projectIndex(*pf)
-	at := -1
-	if id := strings.TrimSpace(item.ProjectID); id != "" {
-		for i := range pf.Projects {
-			if pf.Projects[i].ID == id {
-				at = i
-				break
-			}
-		}
-		if at < 0 {
-			return errors.New("未找到工作项所属项目 ID：" + id)
-		}
+func resolveWorkItemProject(pf *projectsFile, item *workItem) error {
+	at, err := projectIndexForReference(*pf, item.ProjectID, item.Project)
+	if err != nil {
+		return err
 	}
-	if at < 0 {
-		name := strings.TrimSpace(item.Project)
-		if name == "" {
-			return errors.New("工作项需要 project 或 project_id")
-		}
-		if canonical, ok := resolveProjectName(index, name); ok {
-			name = canonical
-		}
-		at = projectIndexByName(*pf, name)
-		if at < 0 {
-			if registerProject(pf, index, name) {
-				if err := writeProjects(root, *pf); err != nil {
-					return err
-				}
-			}
-			at = projectIndexByName(*pf, name)
-		}
-		if at < 0 {
-			return errors.New("无法登记工作项所属项目：" + name)
-		}
-	}
-	item.ProjectID = pf.Projects[at].ID
-	item.Project = pf.Projects[at].Name
+	item.ProjectID, item.Project = pf.Projects[at].ID, pf.Projects[at].Name
 	return nil
+
 }
 
 func normalizeWorkItem(root string, pf *projectsFile, item workItem, now string) (workItem, error) {
-	if err := resolveWorkItemProject(root, pf, &item); err != nil {
+	if err := resolveWorkItemProject(pf, &item); err != nil {
 		return item, err
 	}
 	item.Title = strings.TrimSpace(item.Title)
@@ -365,7 +335,10 @@ func workItemUpsertCap(in input) (any, error) {
 	if in.WorkItem == nil {
 		return nil, errors.New("需要 work_item")
 	}
-	unlock := lockRoot(root)
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 	pf, err := readProjects(root)
 	if err != nil {
@@ -417,7 +390,10 @@ func workItemUpdateCap(in input) (any, error) {
 	if len(in.Patch) == 0 {
 		return nil, errors.New("patch 不能为空：请至少提供一个要修改的字段")
 	}
-	unlock := lockRoot(root)
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 	pf, err := readProjects(root)
 	if err != nil {
@@ -513,7 +489,10 @@ func workItemDeleteCap(in input) (any, error) {
 	if len(wanted) == 0 {
 		return nil, errors.New("需要 work_item_id 或 work_item_ids")
 	}
-	unlock := lockRoot(root)
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 	file, err := readWorkItems(root)
 	if err != nil {

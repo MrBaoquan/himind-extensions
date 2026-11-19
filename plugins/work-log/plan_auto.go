@@ -227,7 +227,10 @@ func autoPlanCap(in input) (any, error) {
 	if date != today {
 		return nil, errors.New("一键智能排期只支持当天（" + today + "）；历史或未来日期请手动调整计划")
 	}
-	unlock := lockRoot(root)
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 
 	existing, err := readPlan(root, date)

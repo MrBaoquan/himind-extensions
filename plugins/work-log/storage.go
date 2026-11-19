@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,20 +11,32 @@ import (
 
 // 本文件提供写入可靠性的公共设施：原子落盘与「按日志根串行化」。
 //
-// 背景：日志库的所有写入者都是本插件进程（采集器只读，工作流也经由本插件的
-// 能力写入）。因此「读-改-写」的竞态主要发生在同一进程内的并发 RPC 之间。
-// 按日志根加互斥锁把对同一天的读改写串行化，并用「临时文件 + 原子替换」落盘，
-// 确保进程在写入中途崩溃时不会留下半截 JSON，也不会让并发写入互相覆盖。
+// Each capability invocation may run in a different plugin process. A per-root
+// mutex and OS file lock serialize cooperating writers; atomic replacement
+// protects each individual file. Multi-file operations still need a journal.
 
 var rootLocks sync.Map // 归一化后的日志根 -> *sync.Mutex
 
-// lockRoot 返回一个解锁函数；调用方用 defer unlock() 释放。
-func lockRoot(root string) func() {
+// lockRoot serializes writers within and across plugin processes. Failure to
+// acquire the OS lock must stop the write rather than silently weaken it.
+func lockRoot(root string) (func(), error) {
+	return lockRootInternal(root)
+}
+
+func lockRootInternal(root string) (func(), error) {
 	key := strings.ToLower(filepath.Clean(root))
 	value, _ := rootLocks.LoadOrStore(key, &sync.Mutex{})
 	mutex := value.(*sync.Mutex)
 	mutex.Lock()
-	return mutex.Unlock
+	unlockFile, err := lockRootFile(root)
+	if err != nil {
+		mutex.Unlock()
+		return nil, fmt.Errorf("日志库写锁不可用：%w", err)
+	}
+	return func() {
+		unlockFile()
+		mutex.Unlock()
+	}, nil
 }
 
 // writeFileAtomic 先把内容写进同目录的临时文件并 fsync，再原子替换目标文件。

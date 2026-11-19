@@ -5,7 +5,7 @@
  *   日历回看：按天看当天脉络（项目 · 功能 · 工时）与明细。
  *   报告：按周期（日/周/月/季度/年）回看，核心仍是项目 → 功能 → 工时。
  *   工时表：按月生成「项目 × 日期」矩阵，可切换到 8 小时对齐口径。
- *   项目：按项目回看推进记录，并管理项目登记表与路径映射。
+ *   项目：读取 Agent 项目树并回看推进记录。
  *
  * 视图只消费本插件 Manifest 已声明的能力：月历统计、条目录入/读取/删除、区间查询、
  * 报告渲染/读取、项目登记、打开链接/目录。它不直接读文件系统，也不依赖宿主页面。
@@ -135,25 +135,12 @@
     // 只含日期列，项目名另存 rowNames 供提示文案使用。
     matrixTable: null,
     // 项目
-    projectsMode: 'progress',
     activeProject: '',
     projectEntries: null,
     projectLoading: false,
     projectExhibit: '',
     projectExhibitsExpanded: false,
     projectGroupBy: 'time',
-    // 登记管理（本地 UI 状态）
-    registryQuery: '',
-    registryFilter: 'all',
-    registrySort: 'count',
-    registrySelected: {},
-    registryIOOpen: false,
-    registryIOText: '',
-    registryNewOpen: false,
-    registryEditingName: '',
-    registryPage: 1,
-    registryPageSize: 12,
-    registryExpanded: {},
     // 当前工作台
     board: null,
     boardLoading: false,
@@ -344,6 +331,10 @@
   }
 
   // hoursShort 把分钟渲染成紧凑小时数：整数不带小数点（3），否则一位小数（3.5）。
+  function agentHoursLabel(minutes) {
+    return Number(minutes) > 0 ? minutesLabel(minutes) : '不足 1 分钟';
+  }
+
   function hoursShort(minutes) {
     const value = Number(minutes) || 0;
     if (value <= 0) return '';
@@ -672,7 +663,7 @@
               (cell.entry_count > 0 ? '，' + cell.entry_count + ' 条' : '，无记录') +
               (projects ? '，' + projects : '');
             const titleAttr =
-              text(cell.date) + (projects ? ' · ' + projects : '') + (hours ? ' · 约 ' + hours : '');
+              text(cell.date) + (projects ? ' · ' + projects : '') + (hours ? ' · 记录工时约 ' + hours : '');
             const marker =
               cell.entry_count > 0 ? '<span class="cal-count">' + escapeHTML(cell.entry_count) + '</span>' : '';
             return (
@@ -701,10 +692,25 @@
       });
     });
     const pills = [
+      calendar.activity_metrics && calendar.activity_metrics.execution_sessions
+        ? '<span class="pill">Agent 累计作业 ' + escapeHTML(agentHoursLabel(calendar.activity_metrics.execution_minutes)) + '（已观测）</span>'
+        : '',
       '<span class="pill">' + escapeHTML(calendar.active_days || 0) + ' 天有记录</span>',
       '<span class="pill">' + escapeHTML(calendar.total_entries || 0) + ' 条日志</span>',
-      calendar.total_minutes
-        ? '<span class="pill">约 ' + escapeHTML(hoursLabel(calendar.total_minutes)) + '</span>'
+      calendar.activity_metrics && calendar.activity_metrics.coverage_minutes
+        ? '<span class="pill">活动覆盖约 ' + escapeHTML(hoursLabel(calendar.activity_metrics.coverage_minutes)) + '</span>'
+        : '',
+      calendar.activity_metrics && calendar.activity_metrics.session_minutes
+        ? '<span class="pill">会话累计约 ' + escapeHTML(hoursLabel(calendar.activity_metrics.session_minutes)) + '</span>'
+        : '',
+      calendar.activity_metrics && calendar.activity_metrics.manual_minutes
+        ? '<span class="pill">人工工时 ' + escapeHTML(hoursLabel(calendar.activity_metrics.manual_minutes)) + '</span>'
+        : '',
+      calendar.activity_metrics && calendar.activity_metrics.unknown_sessions
+        ? '<span class="pill">' + escapeHTML(calendar.activity_metrics.unknown_sessions) + ' 项无法估算</span>'
+        : '',
+      !calendar.activity_metrics && calendar.total_minutes
+        ? '<span class="pill">记录工时约 ' + escapeHTML(hoursLabel(calendar.total_minutes)) + '</span>'
         : '',
     ].filter(Boolean);
     if (projects.length) {
@@ -730,7 +736,12 @@
       : '这一天还没有记录。';
     const badges = ['<span class="badge">' + escapeHTML(state.entries.length) + ' 条</span>'];
     if (projectNames.length) badges.push('<span class="badge new">' + escapeHTML(projectNames.length) + ' 个项目</span>');
-    if (flow.totalMinutes > 0) badges.push('<span class="badge">约 ' + escapeHTML(hoursLabel(flow.totalMinutes)) + '</span>');
+    const metrics = state.dayActivityMetrics;
+    if (metrics && metrics.execution_sessions) {
+      badges.unshift('<span class="badge new">Agent 累计作业 ' + escapeHTML(agentHoursLabel(metrics.execution_minutes)) + '（已观测）</span>');
+    } else if (flow.totalMinutes > 0) {
+      badges.push('<span class="badge">记录时长 ' + escapeHTML(hoursLabel(flow.totalMinutes)) + '</span>');
+    }
     el('detail-badges').innerHTML = badges.join('');
   }
 
@@ -1113,9 +1124,7 @@
     try {
       await loadProjects();
       if (state.view === 'projects') {
-        if (state.projectsMode === 'registry') {
-          renderProjectsPanel();
-        } else if (state.activeProject) {
+        if (state.activeProject) {
           await selectProject(state.activeProject);
         }
         return;
@@ -2167,7 +2176,7 @@
       '"></span><div class="wb-row-main"><div class="wb-row-title">' +
       (running ? '<span class="wb-spinner" role="status" aria-label="正在推进" title="正在推进"></span>' : '') +
       '<button class="link-btn wb-row-name" type="button" data-wb-open="' +
-      escapeHTML(item.name) +
+      escapeHTML(item.id) +
       '" title="打开项目详情">' +
       escapeHTML(item.name) +
       '</button><span class="stage-pill stage-' +
@@ -2262,7 +2271,7 @@
             });
             return (
               '<button class="link-btn" type="button" data-wb-open="' +
-              escapeHTML(row.name) +
+              escapeHTML(row.project_id) +
               '">' +
               escapeHTML(row.name) +
               ' · ' +
@@ -3016,17 +3025,6 @@
     await savePlan();
   }  // ---------- 项目 ----------
 
-  function renderProjectsMode() {
-    const node = el('projects-mode');
-    if (!node) return;
-    node.querySelectorAll('.seg-btn').forEach((button) => {
-      const on = button.getAttribute('data-mode') === state.projectsMode;
-      button.classList.toggle('active', on);
-      button.setAttribute('aria-pressed', on ? 'true' : 'false');
-    });
-    el('projects-progress').hidden = state.projectsMode !== 'progress';
-    el('projects-panel').hidden = state.projectsMode !== 'registry';
-  }
 
   function renderProjectList() {
     const node = el('proj-list');
@@ -3034,20 +3032,20 @@
     const query = text(state.query).toLowerCase();
     const list = (state.projects || []).filter((item) => !query || text(item.name).toLowerCase().indexOf(query) >= 0);
     if (!list.length) {
-      node.innerHTML = '<p class="meta pad">还没有项目。写入日志时会按项目名或仓库目录自动建项目。</p>';
+      node.innerHTML = '<p class="meta pad">' + escapeHTML(state.projectsData.error || '还没有项目，请在 Agent 工作区中创建项目并绑定目录。') + '</p>';
       return;
     }
     node.innerHTML = list
       .map((item) => {
-        const active = text(item.name) === state.activeProject;
-        const range = text(item.first_date) ? escapeHTML(item.last_date) + ' 止' : '暂无记录';
+        const active = text(item.id) === state.activeProject;
+        const range = text(item.last_date) ? escapeHTML(item.last_date) + ' 止' : '暂无记录';
         return (
           '<button type="button" class="proj-item' +
           (active ? ' active' : '') +
           '" data-name="' +
-          escapeHTML(item.name) +
+          escapeHTML(item.id) +
           '"><span class="pi-name">' +
-          escapeHTML(item.name) +
+          escapeHTML(projectLabel(item)) +
           '</span><span class="pi-meta">' +
           escapeHTML(item.entry_count || 0) +
           ' 条 · ' +
@@ -3078,7 +3076,7 @@
     state.projectLoading = true;
     node.innerHTML = skeleton();
     try {
-      const data = await bridgeInvoke('work-log.entry.list', { project: name, limit: 5000 });
+      const data = await bridgeInvoke('work-log.entry.list', { project_id: name, limit: 5000 });
       state.projectEntries = (data && data.entries) || [];
     } catch (error) {
       state.projectEntries = [];
@@ -3176,7 +3174,7 @@
       return;
     }
 
-    const proj = (state.projects || []).find((p) => text(p.name) === state.activeProject) || null;
+    const proj = (state.projects || []).find((p) => text(p.id) === state.activeProject) || null;
     const kind = proj ? text(proj.kind) : '';
     const exhibits = proj && Array.isArray(proj.exhibits) ? proj.exhibits : [];
     const exhibitIDByName = {};
@@ -3269,7 +3267,7 @@
 
     const head =
       '<div class="pp-head"><h2>' +
-      escapeHTML(state.activeProject) +
+      escapeHTML((proj && proj.name) || state.activeProject) +
       '</h2>' +
       '<div class="pp-stats">' +
       (kind ? '<span class="badge kind kind-' + kindClass + '">' + escapeHTML(kind) + '</span>' : '') +
@@ -3457,777 +3455,10 @@
     });
   }
 
-  // pathTags 渲染一组路径映射为可移除的标签。
-  function pathTags(paths, projectId, exhibitName) {
-    const items = Array.isArray(paths) ? paths : [];
-    if (!items.length) return '<span class="path-empty">未绑定</span>';
-    return items
-      .map((p) => {
-        const kind = text(p && p.kind);
-        const value = text(p && p.path);
-        return (
-          '<span class="path-tag" title="' + escapeHTML(value) + '">' +
-          (kind ? '<em>' + escapeHTML(kind) + '</em>' : '') +
-          '<span class="path-text">' + escapeHTML(value) + '</span>' +
-          '<button class="path-remove" type="button" data-action="rm-path" data-id="' + escapeHTML(projectId) +
-          '" data-exhibit="' + escapeHTML(text(exhibitName)) + '" data-path="' + escapeHTML(value) +
-          '" aria-label="移除路径">×</button>' +
-          '</span>'
-        );
-      })
-      .join('');
-  }
-
-  function renderProjectsPanel() {
-    const panel = el('projects-panel');
-    if (!panel) return;
-    const data = state.projectsData || {};
-    const projects = data.projects || [];
-    const unmatched = data.unmatched || [];
-
-    const form = state.registryNewOpen
-      ? '<div class="proj-form">' +
-        '<label class="field"><span>项目名</span><input id="p-name" type="text" placeholder="如：深圳科技馆" /></label>' +
-        '<label class="field"><span>仓库 / 目录路径（可选）</span><input id="p-paths" type="text" placeholder="如：F:/work/szkjg" /></label>' +
-        '<button id="p-save" class="btn primary" type="button">创建项目</button>' +
-        '<button id="p-cancel" class="btn" type="button">取消</button>' +
-        '</div>'
-      : '';
-
-    const filters = [
-      { key: 'all', label: '全部' },
-      { key: 'used', label: '有记录' },
-      { key: 'empty', label: '无记录' },
-      { key: 'nopath', label: '未绑路径' },
-      { key: 'workbench', label: '看板' },
-      { key: 'archived', label: '已归档' },
-    ];
-    const sorts = [
-      { key: 'count', label: '条目多→少' },
-      { key: 'name', label: '名称' },
-      { key: 'recent', label: '最近更新' },
-      { key: 'paths', label: '路径多→少' },
-    ];
-    const q = text(state.registryQuery).toLowerCase();
-
-    function projectMatches(item) {
-      const status = text(item.status, 'active');
-      switch (state.registryFilter) {
-        case 'used':
-          return Number(item.entry_count || 0) > 0;
-        case 'empty':
-          return Number(item.entry_count || 0) === 0;
-        case 'nopath':
-          return !(item.paths || []).length && !(item.exhibits || []).some((ex) => ((ex && ex.paths) || []).length);
-        case 'workbench':
-          return text(item.source) === 'workbench';
-        case 'archived':
-          return status === 'archived';
-        default:
-          return status !== 'archived';
-      }
-    }
-    function matchesQuery(item) {
-      if (!q) return true;
-      const hay = [
-        item.name,
-        (item.paths || []).map((p) => text(p && p.path)).join(' '),
-        item.external_id,
-      ]
-        .join(' ')
-        .toLowerCase();
-      return hay.indexOf(q) >= 0;
-    }
-
-    const visible = projects.filter((item) => matchesQuery(item) && projectMatches(item));
-    const sortKey = state.registrySort;
-    visible.sort((a, b) => {
-      if (sortKey === 'name') return String(a.name).localeCompare(String(b.name), 'zh-Hans-CN');
-      if (sortKey === 'recent') return String(b.last_date || '').localeCompare(String(a.last_date || ''));
-      if (sortKey === 'paths') {
-        return (b.paths || []).length + (b.exhibits || []).length - ((a.paths || []).length + (a.exhibits || []).length);
-      }
-      return Number(b.entry_count || 0) - Number(a.entry_count || 0);
-    });
-
-    const chips = filters
-      .map((f) => {
-        const on = state.registryFilter === f.key ? ' active' : '';
-        return '<button class="chip' + on + '" type="button" data-filter="' + f.key + '">' + escapeHTML(f.label) + '</button>';
-      })
-      .join('');
-    const sortOptions = sorts
-      .map((s) => '<option value="' + s.key + '"' + (state.registrySort === s.key ? ' selected' : '') + '>' + escapeHTML(s.label) + '</option>')
-      .join('');
-    const selectedIds = Object.keys(state.registrySelected).filter((k) => state.registrySelected[k]);
-    const zeroCount = projects.filter((item) => Number(item.entry_count || 0) === 0).length;
-    const toolbar =
-      '<div class="proj-tools">' +
-      '<input id="p-search" class="proj-search" type="search" placeholder="搜索项目名 / 路径" value="' +
-      escapeHTML(state.registryQuery) +
-      '" />' +
-      '<div class="proj-chips">' +
-      chips +
-      '</div>' +
-      '<label class="proj-sort"><span>排序</span><select id="p-sort">' +
-      sortOptions +
-      '</select></label>' +
-      '</div>' +
-      '<div class="proj-bulk">' +
-      '<span class="meta">共 ' +
-      escapeHTML(projects.length) +
-      ' 个 · 当前 ' +
-      escapeHTML(visible.length) +
-      ' 个' +
-      (zeroCount ? ' · 无记录 ' + escapeHTML(zeroCount) + ' 个' : '') +
-      '</span>' +
-      '<button class="btn tiny" type="button" data-action="clean-empty"' +
-      (zeroCount ? '' : ' disabled') +
-      '>清理无记录</button>' +
-      '<button class="btn tiny" type="button" data-action="io-toggle">导出 / 导入</button>' +
-      '<button class="btn tiny primary" type="button" data-action="new-toggle">' +
-      (state.registryNewOpen ? '收起新建' : '+ 新建项目') +
-      '</button>' +
-      '</div>' +
-      (selectedIds.length
-        ? '<div class="proj-selbar"><span>已选 ' +
-          escapeHTML(selectedIds.length) +
-          ' 个</span>' +
-          '<button class="btn tiny" type="button" data-action="bulk-archive">批量归档</button>' +
-          '<button class="btn tiny" type="button" data-action="bulk-restore">恢复</button>' +
-          '<button class="btn tiny danger" type="button" data-action="bulk-delete">批量删除</button>' +
-          '<button class="btn tiny" type="button" data-action="clear-sel">取消选择</button></div>'
-        : '') +
-      (state.registryIOOpen
-        ? '<div class="proj-io"><textarea id="p-io-text" placeholder="导出的登记表 JSON 会出现在这里；也可粘贴 JSON 后点「合并导入 / 替换导入」">' +
-          escapeHTML(state.registryIOText) +
-          '</textarea>' +
-          '<div class="proj-io-actions"><button class="btn tiny" type="button" data-action="io-export">导出到此框</button>' +
-          '<button class="btn tiny" type="button" data-action="io-copy">复制</button>' +
-          '<button class="btn tiny" type="button" data-action="io-merge">合并导入</button>' +
-          '<button class="btn tiny danger" type="button" data-action="io-replace">替换导入</button></div></div>'
-        : '');
-
-    const targets = projects
-      .filter((item) => text(item.status, 'active') !== 'archived')
-      .map((item) => '<option value="' + escapeHTML(item.id) + '">' + escapeHTML(item.name) + '</option>')
-      .join('');
-
-    // —— 分页 ——
-    const pageSize = Number(state.registryPageSize) || 12;
-    const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
-    const page = Math.max(1, Math.min(Number(state.registryPage) || 1, totalPages));
-    state.registryPage = page;
-    const pageItems = visible.slice((page - 1) * pageSize, page * pageSize);
-
-    function pathSummary(item) {
-      const paths = item.paths || [];
-      if (!paths.length) return '<span class="reg-muted">—</span>';
-      const first = text(paths[0] && paths[0].path);
-      const extra = paths.length > 1 ? '<span class="reg-plus">+' + (paths.length - 1) + '</span>' : '';
-      return '<span class="reg-path" title="' + escapeHTML(first) + '">' + escapeHTML(first) + '</span>' + extra;
-    }
-
-    const rows = pageItems
-      .map((item) => {
-        const exhibits = item.exhibits || [];
-        const archived = text(item.status, 'active') === 'archived';
-        const src = text(item.source) === 'workbench' ? '<span class="badge new">看板</span>' : '';
-        const statusBadge = archived ? '<span class="badge arch">已归档</span>' : '';
-        const projectKind = text(item.kind);
-        const kindBadge = projectKind
-          ? '<span class="badge kind kind-' +
-            (projectKind === '交付项目' ? 'delivery' : projectKind === '平台产品' ? 'platform' : projectKind === '通用沉淀' ? 'tooling' : 'other') +
-            '">' +
-            escapeHTML(projectKind) +
-            '</span>'
-          : '';
-        const hasPath = (item.paths || []).length > 0;
-        const pathHint = hasPath ? '' : '<span class="badge warn">未绑路径</span>';
-        const checked = state.registrySelected[item.id] ? ' checked' : '';
-        const expanded = !!state.registryExpanded[item.id];
-        const editing = state.registryEditingName === item.id;
-        const nameNode = editing
-          ? '<input id="p-rename" class="proj-name-input" type="text" data-id="' +
-            escapeHTML(item.id) +
-            '" value="' +
-            escapeHTML(item.name) +
-            '" aria-label="项目名" />'
-          : '<button class="proj-name" type="button" data-action="rename" data-id="' +
-            escapeHTML(item.id) +
-            '" title="点击修改项目名">' +
-            escapeHTML(item.name) +
-            '</button>';
-        const attrs =
-          ' data-id="' + escapeHTML(item.id) + '" data-name="' + escapeHTML(item.name) +
-          '" data-status="' + (archived ? 'archived' : 'active') + '"';
-
-        const mainRow =
-          '<tr class="proj-row' + (archived ? ' archived' : '') + '"' + attrs + '>' +
-          '<td class="reg-pick"><input type="checkbox" class="proj-check" data-id="' + escapeHTML(item.id) + '"' + checked + ' /></td>' +
-          '<td class="reg-name"><div class="reg-name-row">' + nameNode + kindBadge + src + statusBadge + pathHint + '</div></td>' +
-          '<td class="reg-num">' + escapeHTML(item.entry_count || 0) + '</td>' +
-          '<td class="reg-num">' + escapeHTML(item.active_days || 0) + '</td>' +
-          '<td class="reg-cell">' + pathSummary(item) + '</td>' +
-          '<td class="reg-num">' + escapeHTML(exhibits.length || 0) + '</td>' +
-          '<td class="reg-date">' + escapeHTML(text(item.last_date) || '—') + '</td>' +
-          '<td class="reg-exp"><button class="reg-toggle" type="button" data-action="toggle-row" data-id="' +
-          escapeHTML(item.id) + '" aria-expanded="' + (expanded ? 'true' : 'false') + '" title="展开/收起">' +
-          (expanded ? '▾' : '▸') + '</button></td>' +
-          '</tr>';
-
-        if (!expanded) return mainRow;
-
-        const range = text(item.first_date)
-          ? escapeHTML(item.first_date) + ' ~ ' + escapeHTML(text(item.last_date))
-          : '暂无记录';
-        const exhibitRows = exhibits
-          .map((ex) => {
-            const exName = text(ex && ex.name);
-            return (
-              '<div class="proj-exhibit">' +
-              '<span class="ex-name">' + escapeHTML(exName) + '</span>' +
-              '<span class="ex-paths">' + pathTags(ex && ex.paths, item.id, exName) + '</span>' +
-              '<span class="ex-add">' +
-              '<input class="proj-ex-path-input" type="text" placeholder="展项目录路径" data-id="' + escapeHTML(item.id) +
-              '" data-exhibit="' + escapeHTML(exName) + '" />' +
-              '<button class="btn tiny" type="button" data-action="add-ex-path">加</button>' +
-              '</span></div>'
-            );
-          })
-          .join('');
-
-        const detailRow =
-          '<tr class="proj-row reg-detail' + (archived ? ' archived' : '') + '"' + attrs + '>' +
-          '<td colspan="8"><div class="reg-detail-inner">' +
-          '<div class="reg-detail-row"><span class="paths-label">路径</span>' +
-          pathTags(item.paths, item.id, '') +
-          '<span class="path-add">' +
-          '<input class="proj-path-input" type="text" placeholder="加目录路径" data-id="' + escapeHTML(item.id) + '" />' +
-          '<button class="btn tiny" type="button" data-action="add-path">加路径</button>' +
-          '</span></div>' +
-          '<div class="reg-detail-row"><span class="paths-label">展项</span>' +
-          (exhibits.length
-            ? '<div class="reg-exhibits">' + exhibitRows + '</div>'
-            : '<span class="reg-muted">暂无展项（写入日志时带「展项」会自动登记）</span>') +
-          '</div>' +
-          '<div class="reg-detail-row reg-detail-actions">' +
-          '<span class="proj-meta">' + escapeHTML(item.entry_count || 0) + ' 条 · ' + escapeHTML(item.active_days || 0) + ' 天 · ' + range + '</span>' +
-          '<span class="reg-spacer"></span>' +
-          '<select class="proj-merge-target"><option value="">并入到…</option>' + (targets || '') + '</select>' +
-          '<button class="btn tiny" type="button" data-action="merge">并入</button>' +
-          '<button class="btn tiny" type="button" data-action="archive">' + (archived ? '恢复' : '归档') + '</button>' +
-          '<button class="btn tiny danger" type="button" data-action="delete">删除</button>' +
-          '</div></div></td></tr>';
-
-        return mainRow + detailRow;
-      })
-      .join('');
-
-    // —— 分页控件 ——
-    const pageNums = [];
-    for (let n = 1; n <= totalPages; n++) {
-      if (n === 1 || n === totalPages || Math.abs(n - page) <= 2) {
-        if (pageNums.length && n - pageNums[pageNums.length - 1] > 1) pageNums.push('…');
-        pageNums.push(n);
-      }
-    }
-    const pagerBtns = pageNums
-      .map((n) =>
-        typeof n === 'number'
-          ? '<button class="reg-page' + (n === page ? ' active' : '') + '" type="button" data-page="' + n + '">' + n + '</button>'
-          : '<span class="reg-page-gap">…</span>',
-      )
-      .join('');
-    const pageSizeOpts = [12, 24, 48, 0]
-      .map((n) => '<option value="' + n + '"' + (pageSize === n ? ' selected' : '') + '>' + (n ? n : '全部') + '</option>')
-      .join('');
-
-    const list = visible.length
-      ? '<div class="reg-table-wrap"><table class="reg-table"><thead><tr>' +
-        '<th class="reg-pick"></th><th>项目</th><th class="reg-num">条目</th><th class="reg-num">天数</th><th>路径</th><th class="reg-num">展项</th><th class="reg-date">最近</th><th class="reg-exp"></th>' +
-        '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
-        '<div class="reg-pager"><span class="meta">共 ' + escapeHTML(visible.length) + ' 个 · 第 ' + escapeHTML(page) + ' / ' + escapeHTML(totalPages) + ' 页</span>' +
-        '<div class="reg-pager-btns"><button class="reg-page" type="button" data-page="' + (page - 1) + '"' + (page <= 1 ? ' disabled' : '') + '>‹</button>' +
-        pagerBtns +
-        '<button class="reg-page" type="button" data-page="' + (page + 1) + '"' + (page >= totalPages ? ' disabled' : '') + '>›</button></div>' +
-        '<label class="reg-pagesize">每页 <select id="p-pagesize">' + pageSizeOpts + '</select> 个</label></div>'
-      : projects.length
-        ? emptyBlock('当前筛选没有项目', ['换个筛选条件，或点「全部」查看所有登记项目。'])
-        : emptyBlock('还没有项目', ['写入日志时会按项目名或仓库目录自动建项目；也可以在上方手动添加。']);
-
-    const unmatchedBlock = unmatched.length
-      ? '<div class="proj-unmatched"><h3>未归类（登记表里没有）</h3><ul>' +
-        unmatched
-          .map((item) => '<li>' + escapeHTML(item.name) + ' · ' + escapeHTML(item.entry_count) + ' 条</li>')
-          .join('') +
-        '</ul><p class="meta">在上方登记同名项目，或用行内「并入」把历史条目归并到规范项目。</p></div>'
-      : '';
-
-    panel.innerHTML = toolbar + form + '<div class="proj-list">' + list + '</div>' + unmatchedBlock;
-    bindProjectsPanel(panel);
-  }
-
-  async function refreshProjects() {
-    await loadProjects();
-    renderProjectsPanel();
-    renderProjectList();
-  }
-
-  function bindProjectsPanel(panel) {
-    const rerender = (focusId) => {
-      renderProjectsPanel();
-      if (focusId) {
-        const node = el(focusId);
-        if (node) {
-          node.focus();
-          if (node.setSelectionRange && typeof node.value === 'string') {
-            const end = node.value.length;
-            node.setSelectionRange(end, end);
-          }
-        }
-      }
-    };
-
-    const searchInput = panel.querySelector('#p-search');
-    if (searchInput) {
-      searchInput.addEventListener('input', () => {
-        state.registryQuery = searchInput.value || '';
-        state.registryPage = 1;
-        rerender('p-search');
-      });
-    }
-    panel.querySelectorAll('[data-filter]').forEach((chip) => {
-      chip.addEventListener('click', () => {
-        state.registryFilter = chip.getAttribute('data-filter') || 'all';
-        state.registryPage = 1;
-        renderProjectsPanel();
-      });
-    });
-    const sortSelect = panel.querySelector('#p-sort');
-    if (sortSelect) {
-      sortSelect.addEventListener('change', () => {
-        state.registrySort = sortSelect.value || 'count';
-        state.registryPage = 1;
-        renderProjectsPanel();
-      });
-    }
-    panel.querySelectorAll('.proj-check').forEach((box) => {
-      box.addEventListener('change', () => {
-        state.registrySelected[box.getAttribute('data-id')] = box.checked;
-        if (!box.checked) delete state.registrySelected[box.getAttribute('data-id')];
-        renderProjectsPanel();
-      });
-    });
-    panel.querySelector('[data-action="clear-sel"]')?.addEventListener('click', () => {
-      state.registrySelected = {};
-      renderProjectsPanel();
-    });
-    panel.querySelector('[data-action="bulk-archive"]')?.addEventListener('click', async () => {
-      await bulkSetStatus(panel, 'archived');
-    });
-    panel.querySelector('[data-action="bulk-restore"]')?.addEventListener('click', async () => {
-      await bulkSetStatus(panel, 'active');
-    });
-    panel.querySelector('[data-action="bulk-delete"]')?.addEventListener('click', async (event) => {
-      const btn = event.currentTarget;
-      if (btn.getAttribute('data-armed') !== '1') {
-        btn.setAttribute('data-armed', '1');
-        btn.textContent = '确认删除';
-        return;
-      }
-      const ids = selectedProjectIds();
-      if (!ids.length) return;
-      try {
-        const result = await bridgeInvoke('work-log.project.delete', { project_ids: ids });
-        notify('已删除 ' + text((result && result.count) || ids.length) + ' 个项目登记');
-        state.registrySelected = {};
-        await refreshProjects();
-      } catch (error) {
-        notify('批量删除失败：' + String((error && error.message) || error), 'error');
-      }
-    });
-    panel.querySelector('[data-action="clean-empty"]')?.addEventListener('click', async (event) => {
-      const btn = event.currentTarget;
-      const empties = (state.projectsData && state.projectsData.projects ? state.projectsData.projects : []).filter(
-        (item) => Number(item.entry_count || 0) === 0,
-      );
-      if (!empties.length) return;
-      if (btn.getAttribute('data-armed') !== '1') {
-        btn.setAttribute('data-armed', '1');
-        btn.textContent = '确认清理 ' + empties.length + ' 个';
-        setTimeout(() => {
-          btn.setAttribute('data-armed', '0');
-          btn.textContent = '清理无记录';
-        }, 3000);
-        return;
-      }
-      try {
-        const result = await bridgeInvoke('work-log.project.delete', { project_ids: empties.map((item) => item.id) });
-        notify('已清理 ' + text((result && result.count) || empties.length) + ' 个无记录项目');
-        state.registrySelected = {};
-        await refreshProjects();
-      } catch (error) {
-        notify('清理失败：' + String((error && error.message) || error), 'error');
-      }
-    });
-
-    // 导出 / 导入。
-    panel.querySelector('[data-action="io-toggle"]')?.addEventListener('click', () => {
-      const box = panel.querySelector('#p-io-text');
-      if (box) state.registryIOText = box.value || '';
-      state.registryIOOpen = !state.registryIOOpen;
-      renderProjectsPanel();
-    });
-    panel.querySelector('[data-action="io-export"]')?.addEventListener('click', async () => {
-      try {
-        const result = await bridgeInvoke('work-log.project.export', {});
-        state.registryIOText = text(result && result.json);
-        state.registryIOOpen = true;
-        renderProjectsPanel();
-        notify('已导出 ' + text((result && result.count) || 0) + ' 个项目到文本框，可复制保存');
-      } catch (error) {
-        notify('导出失败：' + String((error && error.message) || error), 'error');
-      }
-    });
-    panel.querySelector('[data-action="io-copy"]')?.addEventListener('click', async () => {
-      const box = panel.querySelector('#p-io-text');
-      const value = (box && box.value) || state.registryIOText;
-      if (!value) {
-        notify('文本框为空，请先点「导出到此框」', 'warn');
-        return;
-      }
-      state.registryIOText = value;
-      try {
-        await navigator.clipboard.writeText(value);
-        notify('已复制到剪贴板');
-      } catch (error) {
-        if (box) {
-          box.focus();
-          box.select();
-        }
-        notify('请按 Ctrl+C 复制（浏览器未授权剪贴板）', 'warn');
-      }
-    });
-    panel.querySelector('[data-action="io-merge"]')?.addEventListener('click', () => importRegistry(panel, 'merge'));
-    panel.querySelector('[data-action="io-replace"]')?.addEventListener('click', async (event) => {
-      const btn = event.currentTarget;
-      if (btn.getAttribute('data-armed') !== '1') {
-        btn.setAttribute('data-armed', '1');
-        btn.textContent = '确认替换';
-        setTimeout(() => {
-          btn.setAttribute('data-armed', '0');
-          btn.textContent = '替换导入';
-        }, 3000);
-        return;
-      }
-      await importRegistry(panel, 'replace');
-    });
-
-    function selectedProjectIds() {
-      return Object.keys(state.registrySelected).filter((k) => state.registrySelected[k]);
-    }
-
-    async function bulkSetStatus(currentPanel, status) {
-      const ids = selectedProjectIds();
-      if (!ids.length) return;
-      const byId = {};
-      (state.projectsData && state.projectsData.projects ? state.projectsData.projects : []).forEach((item) => {
-        byId[item.id] = item;
-      });
-      try {
-        for (const id of ids) {
-          const item = byId[id];
-          if (!item) continue;
-          await bridgeInvoke('work-log.project.upsert', { project_id: id, project_name: item.name, status });
-        }
-        notify((status === 'archived' ? '已归档 ' : '已恢复 ') + ids.length + ' 个项目');
-        state.registrySelected = {};
-        await refreshProjects();
-      } catch (error) {
-        notify('批量操作失败：' + String((error && error.message) || error), 'error');
-      }
-    }
-
-    async function importRegistry(currentPanel, mode) {
-      const box = currentPanel.querySelector('#p-io-text');
-      const value = (box && box.value) || state.registryIOText;
-      if (!text(value)) {
-        notify('请先在文本框里粘贴登记表 JSON', 'warn');
-        return;
-      }
-      try {
-        const result = await bridgeInvoke('work-log.project.import', { projects_json: value, mode });
-        if (mode === 'replace') {
-          notify('已替换导入 ' + text((result && result.imported) || 0) + ' 个项目');
-        } else {
-          notify('已合并导入：新增 ' + text((result && result.created) || 0) + ' · 更新 ' + text((result && result.updated) || 0));
-        }
-        await refreshProjects();
-      } catch (error) {
-        notify('导入失败：' + String((error && error.message) || error), 'error');
-      }
-    }
-
-    panel.querySelector('[data-action="new-toggle"]')?.addEventListener('click', () => {
-      state.registryNewOpen = !state.registryNewOpen;
-      renderProjectsPanel();
-      if (state.registryNewOpen) {
-        const input = el('p-name');
-        if (input) input.focus();
-      }
-    });
-    const save = panel.querySelector('#p-save');
-    if (save) {
-      save.addEventListener('click', async () => {
-        const name = text(el('p-name').value);
-        if (!name) {
-          notify('请先填写项目名。', 'warn');
-          el('p-name').focus();
-          return;
-        }
-        const paths = splitList(el('p-paths').value).map((p) => ({ path: p, kind: 'repo' }));
-        try {
-          const payload = { project_name: name };
-          if (paths.length) payload.paths = paths;
-          await bridgeInvoke('work-log.project.upsert', payload);
-          notify('已创建项目：' + name);
-          state.registryNewOpen = false;
-          await refreshProjects();
-        } catch (error) {
-          notify('创建项目失败：' + String((error && error.message) || error), 'error');
-        }
-      });
-    }
-    panel.querySelector('#p-cancel')?.addEventListener('click', () => {
-      state.registryNewOpen = false;
-      renderProjectsPanel();
-    });
-
-    // 名称就地编辑：点击名称 → 输入框，回车 / 失焦保存，Esc 取消。
-    panel.querySelectorAll('[data-action="rename"]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        state.registryEditingName = btn.getAttribute('data-id') || '';
-        renderProjectsPanel();
-        const input = el('p-rename');
-        if (input) {
-          input.focus();
-          if (input.select) input.select();
-        }
-      });
-    });
-    const renameInput = panel.querySelector('.proj-name-input');
-    if (renameInput) {
-      const editId = renameInput.getAttribute('data-id') || '';
-      const source = (state.projectsData && state.projectsData.projects ? state.projectsData.projects : []).find(
-        (item) => item.id === editId,
-      );
-      const oldName = text(source && source.name);
-      let finished = false;
-      const finish = async (commitRename) => {
-        if (finished) return;
-        finished = true;
-        const value = text(renameInput.value);
-        state.registryEditingName = '';
-        if (!commitRename || !value || value === oldName) {
-          renderProjectsPanel();
-          return;
-        }
-        try {
-          const result = await bridgeInvoke('work-log.project.rename', { project_id: editId, new_name: value });
-          const rebound = Number((result && result.updated) || 0);
-          notify('已改名为「' + value + '」' + (rebound ? '，回绑 ' + rebound + ' 条记录' : ''));
-          await refreshProjects();
-        } catch (error) {
-          notify('改名失败：' + String((error && error.message) || error), 'error');
-          await refreshProjects();
-        }
-      };
-      renameInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
-          event.preventDefault();
-          finish(true);
-        } else if (event.key === 'Escape') {
-          event.preventDefault();
-          finish(false);
-        }
-      });
-      renameInput.addEventListener('blur', () => finish(true));
-    }
-
-    panel.querySelectorAll('.proj-row').forEach((row) => {
-      const id = row.getAttribute('data-id');
-      const name = row.getAttribute('data-name');
-
-      const addPathBtn = row.querySelector('[data-action="add-path"]');
-      if (addPathBtn) {
-        addPathBtn.addEventListener('click', async () => {
-          const input = row.querySelector('.proj-path-input');
-          const path = text(input ? input.value : '');
-          if (!path) {
-            notify('请先填写目录路径。', 'warn');
-            return;
-          }
-          try {
-            await bridgeInvoke('work-log.project.path.set', {
-              project_id: id,
-              add_paths: [{ path: path, kind: 'repo' }],
-            });
-            notify('已为「' + name + '」添加路径');
-            await refreshProjects();
-          } catch (error) {
-            notify('添加路径失败：' + String((error && error.message) || error), 'error');
-          }
-        });
-      }
-
-      row.querySelectorAll('[data-action="add-ex-path"]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const input = btn.parentElement.querySelector('.proj-ex-path-input');
-          const path = text(input ? input.value : '');
-          const exhibit = input ? text(input.getAttribute('data-exhibit')) : '';
-          if (!path) {
-            notify('请先填写展项目录路径。', 'warn');
-            return;
-          }
-          try {
-            await bridgeInvoke('work-log.project.path.set', {
-              project_id: id,
-              exhibit_name: exhibit,
-              add_paths: [{ path: path, kind: 'repo' }],
-            });
-            notify('已为展项「' + exhibit + '」添加路径');
-            await refreshProjects();
-          } catch (error) {
-            notify('添加展项路径失败：' + String((error && error.message) || error), 'error');
-          }
-        });
-      });
-
-      const delBtn = row.querySelector('[data-action="delete"]');
-      if (delBtn) {
-        delBtn.addEventListener('click', async () => {
-          if (delBtn.getAttribute('data-armed') !== '1') {
-            delBtn.setAttribute('data-armed', '1');
-            delBtn.textContent = '确认删除';
-            setTimeout(() => {
-              delBtn.setAttribute('data-armed', '0');
-              delBtn.textContent = '删除';
-            }, 3000);
-            return;
-          }
-          try {
-            await bridgeInvoke('work-log.project.delete', { project_id: id });
-            notify('已删除项目登记：' + name + '（既有条目不受影响）');
-            await refreshProjects();
-          } catch (error) {
-            notify('删除失败：' + String((error && error.message) || error), 'error');
-          }
-        });
-      }
-
-      const archiveBtn = row.querySelector('[data-action="archive"]');
-      if (archiveBtn) {
-        archiveBtn.addEventListener('click', async () => {
-          const nextStatus = text(row.getAttribute('data-status')) === 'archived' ? 'active' : 'archived';
-          try {
-            await bridgeInvoke('work-log.project.upsert', { project_id: id, project_name: name, status: nextStatus });
-            notify((nextStatus === 'archived' ? '已归档：' : '已恢复：') + name);
-            await refreshProjects();
-          } catch (error) {
-            notify('操作失败：' + String((error && error.message) || error), 'error');
-          }
-        });
-      }
-
-      const mergeBtn = row.querySelector('[data-action="merge"]');
-      if (mergeBtn) {
-        mergeBtn.addEventListener('click', async () => {
-          const select = row.querySelector('.proj-merge-target');
-          const targetId = text(select ? select.value : '');
-          if (!targetId) {
-            notify('请先选择要并入的目标项目。', 'warn');
-            return;
-          }
-          const targetName = text(select.options[select.selectedIndex].textContent);
-          if (mergeBtn.getAttribute('data-armed') !== '1') {
-            mergeBtn.setAttribute('data-armed', '1');
-            mergeBtn.textContent = '确认并入';
-            setTimeout(() => {
-              mergeBtn.setAttribute('data-armed', '0');
-              mergeBtn.textContent = '并入';
-            }, 3000);
-            return;
-          }
-          try {
-            const result = await bridgeInvoke('work-log.project.merge', {
-              from_project: name,
-              to_project: targetName,
-              project_id: targetId,
-            });
-            notify('已把「' + name + '」并入「' + targetName + '」：改写 ' + text((result && result.updated) || 0) + ' 条');
-            await refreshProjects();
-          } catch (error) {
-            notify('合并失败：' + String((error && error.message) || error), 'error');
-          }
-        });
-      }
-    });
-
-    // 展开 / 收起行明细。
-    panel.querySelectorAll('[data-action="toggle-row"]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-id') || '';
-        if (state.registryExpanded[id]) delete state.registryExpanded[id];
-        else state.registryExpanded[id] = true;
-        renderProjectsPanel();
-      });
-    });
-
-    // 分页：页码按钮 + 每页条数。
-    panel.querySelectorAll('[data-page]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const n = Number(btn.getAttribute('data-page'));
-        if (!n || n < 1) return;
-        state.registryPage = n;
-        renderProjectsPanel();
-      });
-    });
-    const pageSizeSel = panel.querySelector('#p-pagesize');
-    if (pageSizeSel) {
-      pageSizeSel.addEventListener('change', () => {
-        state.registryPageSize = Number(pageSizeSel.value) || 12;
-        state.registryPage = 1;
-        renderProjectsPanel();
-      });
-    }
-
-    // 移除路径：项目级与展项级共用。
-    panel.querySelectorAll('[data-action="rm-path"]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const id = btn.getAttribute('data-id');
-        const exhibit = text(btn.getAttribute('data-exhibit'));
-        const path = btn.getAttribute('data-path');
-        try {
-          const payload = { project_id: id, remove_paths: [path] };
-          if (exhibit) payload.exhibit_name = exhibit;
-          await bridgeInvoke('work-log.project.path.set', payload);
-          notify('已移除路径');
-          await refreshProjects();
-        } catch (error) {
-          notify('移除路径失败：' + String((error && error.message) || error), 'error');
-        }
-      });
-    });
-  }
-
   function renderProjectsView() {
-    renderProjectsMode();
     renderProjectList();
-    if (state.projectsMode === 'registry') {
-      renderProjectsPanel();
-    } else if (!state.activeProject && state.projects.length) {
-      selectProject(text(state.projects[0].name));
+    if (!state.activeProject && state.projects.length) {
+      selectProject(text(state.projects[0].id));
     } else if (state.activeProject) {
       renderProjectProgress();
     }
@@ -4237,7 +3468,7 @@
 
   async function loadCalendar(year, month) {
     const payload = { year: year, month: month };
-    if (state.projectFilter) payload.project = state.projectFilter;
+    if (state.projectFilter) payload.project_id = state.projectFilter;
     const data = await bridgeInvoke('work-log.archive.calendar', payload);
     state.calendar = data;
     state.year = data.year;
@@ -4260,21 +3491,24 @@
     populateProjectOptions();
   }
 
-  function populateProjectOptions() {
-    const names = state.projects.map((item) => text(item.name)).filter(Boolean);
+  function projectLabel(item) {
+    const parent = state.projects.find((p) => text(p.id) === text(item.parent_id));
+    return parent ? text(parent.name) + ' / ' + text(item.name) : text(item.name);
+  }
 
+  function populateProjectOptions() {
+    const options = state.projects.map((item) => '<option value="' + escapeHTML(item.id) + '">' + escapeHTML(projectLabel(item)) + '</option>').join('');
     const select = el('cal-project');
     if (select) {
-      select.innerHTML =
-        '<option value="">全部项目</option>' +
-        names.map((name) => '<option value="' + escapeHTML(name) + '">' + escapeHTML(name) + '</option>').join('');
-      select.value = names.indexOf(state.projectFilter) >= 0 ? state.projectFilter : '';
-      if (select.value !== state.projectFilter) state.projectFilter = select.value;
+      select.innerHTML = '<option value="">全部项目</option>' + options;
+      select.value = state.projectFilter;
+      if (select.value !== state.projectFilter) state.projectFilter = '';
     }
-
-    const datalist = el('project-options');
-    if (datalist) {
-      datalist.innerHTML = names.map((name) => '<option value="' + escapeHTML(name) + '"></option>').join('');
+    const manual = el('m-project');
+    if (manual) {
+      const selected = manual.value;
+      manual.innerHTML = '<option value="">未归属</option>' + options;
+      manual.value = selected;
     }
 
     const exhibits = [];
@@ -4303,11 +3537,15 @@
     state.selected = date || '';
     state.searchResults = null;
     state.entries = [];
+    state.dayActivityMetrics = null;
     renderCalendar();
     if (state.selected) {
       try {
-        const data = await bridgeInvoke('work-log.entry.read', { date: state.selected });
+        const data = state.projectFilter
+          ? await bridgeInvoke('work-log.entry.list', { date: state.selected, project_id: state.projectFilter, limit: 5000 })
+          : await bridgeInvoke('work-log.entry.read', { date: state.selected });
         state.entries = (data && data.entries) || [];
+        state.dayActivityMetrics = data && data.activity_metrics;
       } catch (error) {
         state.entries = [];
         notify('读取日志失败：' + String((error && error.message) || error), 'error');
@@ -4371,7 +3609,7 @@
     el('m-entry-id').value = entry ? text(entry.entry_id) : '';
     el('m-date').value = (entry && text(entry.date)) || state.selected || today();
     el('m-title').value = entry ? text(entry.title) : '';
-    el('m-project').value = entry ? text(entry.project) : '';
+    el('m-project').value = entry ? text(entry.project_id) : '';
     el('m-feature').value = entry ? text(entry.feature) : '';
     el('m-exhibit').value = entry ? text(entry.exhibit) : '';
     el('m-hours').value = entry && (Number(entry.minutes) > 0 || entry.minutes_source === 'manual') ? String(((Number(entry.minutes) || 0) / 60).toFixed(2).replace(/\.?0+$/, '')) : '';
@@ -4604,8 +3842,8 @@
   // 原样回传被 schema 拒绝（entry 声明了 additionalProperties:false）。
   const ENTRY_FIELDS = [
     'entry_id', 'date', 'source', 'session_id', 'project', 'feature', 'exhibit',
-    'project_id', 'exhibit_id', 'category', 'repo_path', 'project_hint',
-    'workspace_project_id', 'provider', 'minutes_method', 'evidence', 'evidence_truncated',
+    'project_id', 'category', 'repo_path', 'project_hint',
+    'provider', 'minutes_method', 'evidence', 'evidence_truncated',
     'activity_intervals', 'overlap_adjusted',
     'minutes', 'minutes_source', 'started_at', 'ended_at', 'title', 'summary',
     'outcomes', 'decisions', 'learnings', 'blockers', 'next', 'tags', 'refs',
@@ -4630,10 +3868,13 @@
     const editing = state.editingEntry;
     const entry = editing ? pickEntryFields(editing) : { source: 'manual' };
     entry.title = title;
-    entry.project = text(el('m-project').value);
+    entry.project_id = text(el('m-project').value);
+    const project = state.projects.find((item) => text(item.id) === entry.project_id);
+    entry.project = project ? text(project.name) : '';
+    entry.project_hint = '';
+    if (!entry.project_id) entry.repo_path = '';
     entry.feature = text(el('m-feature').value);
     entry.exhibit = text(el('m-exhibit').value);
-    delete entry.project_id;
     delete entry.exhibit_id;
     entry.category = text(el('m-category').value, '其他');
     entry.summary = text(el('m-summary').value);
@@ -4705,6 +3946,7 @@
         from: range.from,
         to: range.to,
         query: query,
+        project_id: state.projectFilter || undefined,
         limit: 500,
       });
       state.searchResults = { entries: (data && data.entries) || [], from: range.from, to: range.to };
@@ -4868,7 +4110,7 @@
       else if (state.view === 'matrix') renderMatrix();
       else if (state.view === 'projects') {
         renderProjectList();
-        if (state.projectsMode === 'progress') renderProjectProgress();
+        renderProjectProgress();
       }
     });
     search.addEventListener('keydown', (event) => {
@@ -5001,12 +4243,6 @@
     });
 
     // 项目
-    el('projects-mode').addEventListener('click', (event) => {
-      const button = event.target.closest('.seg-btn');
-      if (!button) return;
-      state.projectsMode = button.getAttribute('data-mode');
-      renderProjectsView();
-    });
 
     // 工作台只在页面可见时每 60 秒静默刷新一次；spinner 本身由 CSS 持续动画驱动。
     startBoardAutoRefresh();
@@ -5037,6 +4273,10 @@
       await loadCalendar(parts[0], parts[1]);
       await selectDate(pickDefaultDate(state.calendar));
       await loadBoard();
+      if (state.view === 'projects') {
+        renderProjectList();
+        if (state.activeProject) await selectProject(state.activeProject);
+      }
       if (state.view === 'plan') await loadPlan(state.planDate);
       if (state.view === 'report') loadReport();
       if (state.view === 'matrix') loadMatrix(state.matrixYear || parts[0], state.matrixMonth || parts[1]);

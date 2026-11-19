@@ -107,7 +107,7 @@
           "truncated": {
             "type": "boolean"
           },
-          "workspace_project_id": {
+          "project_id": {
             "type": "string",
             "description": "Agent 工作区注册 ID，与业务 project_id 独立"
           },
@@ -128,6 +128,25 @@
             "type": "boolean"
           },
           "activity_intervals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string"
+                },
+                "to": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "execution_intervals": {
             "type": "array",
             "items": {
               "type": "object",

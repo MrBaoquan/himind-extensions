@@ -7,9 +7,9 @@
     "collaboration-delivery",
     "docs-knowledge"
   ],
-  "description": "以按日工作日志为核心，含当前工作台（项目状态、优先级、下一步、完成）、工作项、每日时间块计划与容量校验；按项目/功能/工时聚合报告，支持导出导入、备份恢复与重扫对账。",
-  "release_notes": "0.19.1：退役独立采集器并直接使用 Agent 会话与工作区服务；收紧素材命令标题，保留证据、隐私规则、去重和报表。",
-  "version": "0.19.1",
+  "description": "使用 Agent 项目树和会话活动整理工作日志，查看活动投入、成果、工作状态与每日计划。",
+  "release_notes": "无标题 Codex 会话显示为待补标题，不再暴露会话 ID 占位。",
+  "version": "0.21.6",
   "capability_namespace": "work-log",
   "distribution_targets": [
     "workbench",
@@ -75,7 +75,7 @@
               "unassigned"
             ]
           },
-          "workspace_project_id": {
+          "project_id": {
             "type": "string"
           },
           "include_children": {
@@ -168,7 +168,7 @@
               "unassigned"
             ]
           },
-          "workspace_project_id": {
+          "project_id": {
             "type": "string"
           },
           "include_children": {
@@ -226,14 +226,6 @@
             "type": "boolean",
             "description": "命中同一 entry_id 时整条替换而非字段级合并，用于视图编辑"
           },
-          "resolve_projects": {
-            "type": "boolean",
-            "description": "按项目登记表归一项目名，并为未命中的项目自动建项目，默认 true"
-          },
-          "register_projects": {
-            "type": "boolean",
-            "description": "已废弃字段，忽略；自动建项目统一由 resolve_projects 控制"
-          },
           "entries_step": {
             "type": "string"
           },
@@ -260,9 +252,9 @@
               "session_id": {
                 "type": "string"
               },
-              "workspace_project_id": {
+              "project_id": {
                 "type": "string",
-                "description": "Agent 工作区注册 ID，与业务 project_id 独立"
+                "description": "Agent 项目树的稳定 ID"
               },
               "provider": {
                 "type": "string"
@@ -299,6 +291,25 @@
                   "additionalProperties": false
                 }
               },
+              "execution_intervals": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "from": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "from",
+                    "to"
+                  ],
+                  "additionalProperties": false
+                }
+              },
               "overlap_adjusted": {
                 "type": "boolean"
               },
@@ -315,7 +326,7 @@
               },
               "repo_path": {
                 "type": "string",
-                "description": "会话仓库根路径（稳定标识）；写入时据此归类，未命中则按项目名/目录名自动建项目并登记该路径"
+                "description": "会话仓库根路径，由 Agent 解析归属，未命中时保持未归属"
               },
               "project_hint": {
                 "type": "string",
@@ -434,9 +445,9 @@
                 "session_id": {
                   "type": "string"
                 },
-                "workspace_project_id": {
+                "project_id": {
                   "type": "string",
-                  "description": "Agent 工作区注册 ID，与业务 project_id 独立"
+                  "description": "Agent 项目树的稳定 ID"
                 },
                 "provider": {
                   "type": "string"
@@ -473,6 +484,25 @@
                     "additionalProperties": false
                   }
                 },
+                "execution_intervals": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "from": {
+                        "type": "string"
+                      },
+                      "to": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "from",
+                      "to"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
                 "overlap_adjusted": {
                   "type": "boolean"
                 },
@@ -489,7 +519,7 @@
                 },
                 "repo_path": {
                   "type": "string",
-                  "description": "会话仓库根路径（稳定标识）；写入时据此归类，未命中则按项目名/目录名自动建项目并登记该路径"
+                  "description": "会话仓库根路径，由 Agent 解析归属，未命中时保持未归属"
                 },
                 "project_hint": {
                   "type": "string",
@@ -619,6 +649,14 @@
           },
           "project": {
             "type": "string"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "Agent 项目 ID"
+          },
+          "include_children": {
+            "type": "boolean",
+            "description": "包含该项目的所有子项目"
           },
           "category": {
             "type": "string"
@@ -752,6 +790,14 @@
           "project": {
             "type": "string",
             "description": "只统计命中该项目的条目"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "Agent 项目 ID"
+          },
+          "include_children": {
+            "type": "boolean",
+            "description": "包含该项目的所有子项目"
           }
         },
         "required": [],
@@ -761,7 +807,7 @@
     },
     {
       "id": "work-log.project.list",
-      "description": "列出项目登记表与条目统计，含路径映射与未归类项目名",
+      "description": "读取 Agent 项目树，附加日志统计和工作状态",
       "availability": "local",
       "input_schema": {
         "type": "object",
@@ -1086,391 +1132,6 @@
       "risk_level": "read_only"
     },
     {
-      "id": "work-log.project.upsert",
-      "description": "新增或更新项目登记（名称、别名、描述、状态、颜色、路径映射）",
-      "availability": "local",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "log_root": {
-            "type": "string"
-          },
-          "project_id": {
-            "type": "string"
-          },
-          "project_name": {
-            "type": "string"
-          },
-          "aliases": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "description": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "active",
-              "archived"
-            ]
-          },
-          "color": {
-            "type": "string"
-          },
-          "kind": {
-            "type": "string",
-            "description": "项目类型：交付项目 / 平台产品 / 通用沉淀"
-          },
-          "paths": {
-            "type": "array",
-            "description": "整组替换项目的路径映射；空数组表示清空",
-            "items": {
-              "type": "object",
-              "properties": {
-                "path": {
-                  "type": "string"
-                },
-                "kind": {
-                  "type": "string"
-                },
-                "label": {
-                  "type": "string"
-                },
-                "source": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "path"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "add_paths": {
-            "type": "array",
-            "description": "追加路径映射",
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "path": {
-                  "type": "string"
-                },
-                "kind": {
-                  "type": "string"
-                },
-                "label": {
-                  "type": "string"
-                },
-                "source": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "path"
-              ]
-            }
-          },
-          "remove_paths": {
-            "type": "array",
-            "description": "移除路径映射",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [],
-        "additionalProperties": false
-      },
-      "risk_level": "local_write"
-    },
-    {
-      "id": "work-log.project.path.set",
-      "description": "管理项目或展项的路径映射（路径是稳定标识）",
-      "availability": "local",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "log_root": {
-            "type": "string"
-          },
-          "project_id": {
-            "type": "string"
-          },
-          "project_name": {
-            "type": "string"
-          },
-          "exhibit_id": {
-            "type": "string"
-          },
-          "exhibit_name": {
-            "type": "string"
-          },
-          "paths": {
-            "type": "array",
-            "description": "整组替换；空数组表示清空",
-            "items": {
-              "type": "object",
-              "properties": {
-                "path": {
-                  "type": "string"
-                },
-                "kind": {
-                  "type": "string"
-                },
-                "label": {
-                  "type": "string"
-                },
-                "source": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "path"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "add_paths": {
-            "type": "array",
-            "description": "追加路径映射",
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "path": {
-                  "type": "string"
-                },
-                "kind": {
-                  "type": "string"
-                },
-                "label": {
-                  "type": "string"
-                },
-                "source": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "path"
-              ]
-            }
-          },
-          "remove_paths": {
-            "type": "array",
-            "description": "移除路径映射",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [],
-        "additionalProperties": false
-      },
-      "risk_level": "local_write"
-    },
-    {
-      "id": "work-log.project.path.map",
-      "description": "预览一个路径会命中哪个项目/展项（只读）",
-      "availability": "local",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "log_root": {
-            "type": "string"
-          },
-          "path": {
-            "type": "string"
-          },
-          "repo_path": {
-            "type": "string"
-          }
-        },
-        "required": [],
-        "additionalProperties": false
-      },
-      "risk_level": "read_only"
-    },
-    {
-      "id": "work-log.project.claim",
-      "description": "把一个仓库路径归到项目/展项，并回填历史条目",
-      "availability": "local",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "log_root": {
-            "type": "string"
-          },
-          "repo_path": {
-            "type": "string",
-            "description": "要认领的仓库/目录路径"
-          },
-          "project_id": {
-            "type": "string"
-          },
-          "project_name": {
-            "type": "string"
-          },
-          "exhibit_id": {
-            "type": "string"
-          },
-          "exhibit_name": {
-            "type": "string"
-          },
-          "create_target": {
-            "type": "boolean",
-            "description": "目标不存在时是否新建项目/展项，默认 true"
-          }
-        },
-        "required": [
-          "repo_path"
-        ],
-        "additionalProperties": false
-      },
-      "risk_level": "local_write"
-    },
-    {
-      "id": "work-log.project.merge",
-      "description": "合并来源项目到目标项目（搬移条目并保留别名/路径/展项）",
-      "availability": "local",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "log_root": {
-            "type": "string"
-          },
-          "from_project": {
-            "type": "string",
-            "description": "单个来源项目"
-          },
-          "from_projects": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "批量来源项目"
-          },
-          "to_project": {
-            "type": "string"
-          },
-          "project_id": {
-            "type": "string"
-          },
-          "project_name": {
-            "type": "string"
-          }
-        },
-        "required": [],
-        "additionalProperties": false
-      },
-      "risk_level": "local_write"
-    },
-    {
-      "id": "work-log.project.delete",
-      "description": "按 ID 或名称删除项目登记，支持批量",
-      "availability": "local",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "log_root": {
-            "type": "string"
-          },
-          "project_id": {
-            "type": "string"
-          },
-          "project_ids": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "批量删除的项目 ID"
-          },
-          "project_name": {
-            "type": "string"
-          }
-        },
-        "required": [],
-        "additionalProperties": false
-      },
-      "risk_level": "local_write"
-    },
-    {
-      "id": "work-log.project.rename",
-      "description": "修改项目展示名，并回绑历史条目到新名",
-      "availability": "local",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "log_root": {
-            "type": "string"
-          },
-          "project_id": {
-            "type": "string"
-          },
-          "project_name": {
-            "type": "string"
-          },
-          "new_name": {
-            "type": "string",
-            "description": "新的项目展示名"
-          }
-        },
-        "required": [
-          "new_name"
-        ],
-        "additionalProperties": false
-      },
-      "risk_level": "local_write"
-    },
-    {
-      "id": "work-log.project.export",
-      "description": "导出完整项目登记表（含别名/路径/展项）为 JSON",
-      "availability": "local",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "log_root": {
-            "type": "string"
-          }
-        },
-        "required": [],
-        "additionalProperties": false
-      },
-      "risk_level": "read_only"
-    },
-    {
-      "id": "work-log.project.import",
-      "description": "导入项目登记表：merge 合并（默认）或 replace 替换",
-      "availability": "local",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "log_root": {
-            "type": "string"
-          },
-          "projects_json": {
-            "type": "string",
-            "description": "work-log.project.export 产出的 JSON 文本"
-          },
-          "mode": {
-            "type": "string",
-            "enum": [
-              "merge",
-              "replace"
-            ]
-          }
-        },
-        "required": [
-          "projects_json"
-        ],
-        "additionalProperties": false
-      },
-      "risk_level": "local_write"
-    },
-    {
       "id": "work-log.entry.patch",
       "description": "对单条日志做字段级局部更新（只改传入的键）",
       "availability": "local",
@@ -1504,7 +1165,7 @@
     },
     {
       "id": "work-log.archive.migrate",
-      "description": "把登记表与日文件补齐到当前 schema（可 dry_run）",
+      "description": "补齐日志日文件格式，可预览改动",
       "availability": "local",
       "input_schema": {
         "type": "object",
@@ -1596,10 +1257,6 @@
               "merge",
               "replace"
             ]
-          },
-          "resolve_projects": {
-            "type": "boolean",
-            "description": "按项目登记表归一项目名，默认 true"
           }
         },
         "required": [
@@ -1701,111 +1358,6 @@
           "backup_path": {
             "type": "string",
             "description": "要恢复的备份 zip；留空则用最新一份"
-          }
-        },
-        "required": [],
-        "additionalProperties": false
-      },
-      "risk_level": "local_write"
-    },
-    {
-      "id": "work-log.project.resolve",
-      "description": "把一个原始项目名按登记表归一为规范项目名",
-      "availability": "local",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "log_root": {
-            "type": "string"
-          },
-          "project": {
-            "type": "string"
-          },
-          "project_name": {
-            "type": "string"
-          }
-        },
-        "required": [],
-        "additionalProperties": false
-      },
-      "risk_level": "read_only"
-    },
-    {
-      "id": "work-log.project.assign",
-      "description": "把一批已有条目重新归到目标项目，用于清理历史归类",
-      "availability": "local",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "log_root": {
-            "type": "string"
-          },
-          "project": {
-            "type": "string"
-          },
-          "project_name": {
-            "type": "string"
-          },
-          "from": {
-            "type": "string"
-          },
-          "to": {
-            "type": "string"
-          },
-          "date": {
-            "type": "string"
-          },
-          "current_project": {
-            "type": "string"
-          },
-          "source": {
-            "type": "string"
-          },
-          "category": {
-            "type": "string"
-          },
-          "tag": {
-            "type": "string"
-          },
-          "session_id": {
-            "type": "string"
-          }
-        },
-        "required": [],
-        "additionalProperties": false
-      },
-      "risk_level": "local_write"
-    },
-    {
-      "id": "work-log.project.sync",
-      "description": "仅增补本地已有关联的项目/展项元数据（工作台只作权威来源，不批量导入）",
-      "availability": "local",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "log_root": {
-            "type": "string"
-          },
-          "projects": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": true
-            }
-          },
-          "projects_step": {
-            "type": "string"
-          },
-          "exhibits": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": true
-            }
-          },
-          "exhibits_step": {
-            "type": "string",
-            "description": "上游展项列表步骤（含 source_path/release_path）"
           }
         },
         "required": [],
@@ -1922,6 +1474,14 @@
           "date": {
             "type": "string"
           },
+          "project_id": {
+            "type": "string",
+            "description": "可选的 Agent 项目 ID"
+          },
+          "include_children": {
+            "type": "boolean",
+            "description": "包含该项目的所有子项目"
+          },
           "narrative": {
             "type": "string"
           },
@@ -1970,6 +1530,14 @@
           },
           "date": {
             "type": "string"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "可选的 Agent 项目 ID"
+          },
+          "include_children": {
+            "type": "boolean",
+            "description": "包含该项目的所有子项目"
           }
         },
         "required": [],
@@ -2185,10 +1753,6 @@
         "title": "一键智能排期"
       },
       {
-        "id": "work-log.project.claim",
-        "title": "把仓库路径归到项目"
-      },
-      {
         "id": "work-log.link.reveal",
         "title": "打开日志目录"
       }
@@ -2199,6 +1763,8 @@
     "workspace.session.activity",
     "workspace.session.list",
     "workspace.session.source.get",
-    "workspace.session.source.configure"
+    "workspace.session.source.configure",
+    "workspace.registry.project.list",
+    "workspace.registry.context.get"
   ]
 }

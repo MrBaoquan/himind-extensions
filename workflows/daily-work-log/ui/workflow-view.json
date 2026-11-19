@@ -19,7 +19,15 @@
           "type": "select",
           "required": false,
           "default": "all",
-          "options": ["all", "codex", "claude-code", "claude-desktop", "opencode", "github-copilot", "vscode"]
+          "options": [
+            "all",
+            "codex",
+            "claude-code",
+            "claude-desktop",
+            "opencode",
+            "github-copilot",
+            "vscode"
+          ]
         }
       ]
     },
@@ -40,7 +48,13 @@
           "type": "select",
           "required": false,
           "default": "daily",
-          "options": ["daily", "weekly", "monthly", "quarterly", "yearly"]
+          "options": [
+            "daily",
+            "weekly",
+            "monthly",
+            "quarterly",
+            "yearly"
+          ]
         }
       ]
     }

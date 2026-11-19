@@ -7,14 +7,14 @@
     "collaboration-delivery",
     "docs-knowledge"
   ],
-  "version": "0.7.2",
+  "version": "0.9.2",
   "distribution_targets": [
     "workbench",
     "github"
   ],
   "scope": "organization",
   "description": "把 AI 会话整理成结构化工作日志，并维护当前工作台、工作项与每日计划：项目状态、优先级、下一步、预计耗时与时间块。",
-  "release_notes": "0.7.2：对齐工作日志 0.19.1 Agent 采集契约及自然日活动估算口径。",
+  "release_notes": "仅消费 Agent 项目树和会话活动，统一项目引用及并行投入统计。",
   "min_agent_version": "0.3.92",
   "supported_clients": [
     "himind-ai",
@@ -26,13 +26,13 @@
     {
       "id": "work-log.material.collect",
       "required": false,
-      "min_version": "0.19.1",
+      "min_version": "0.20.0",
       "provider": "com.himind.work-log"
     },
     {
       "id": "work-log.material.sources",
       "required": false,
-      "min_version": "0.19.1",
+      "min_version": "0.20.0",
       "provider": "com.himind.work-log"
     },
     {
@@ -72,18 +72,6 @@
       "provider": "com.himind.work-log"
     },
     {
-      "id": "work-log.project.upsert",
-      "required": false,
-      "min_version": "0.2.0",
-      "provider": "com.himind.work-log"
-    },
-    {
-      "id": "work-log.project.resolve",
-      "required": false,
-      "min_version": "0.2.0",
-      "provider": "com.himind.work-log"
-    },
-    {
       "id": "work-log.source.list",
       "required": false,
       "min_version": "0.2.0",
@@ -91,12 +79,6 @@
     },
     {
       "id": "work-log.entry.read",
-      "required": false,
-      "min_version": "0.1.0",
-      "provider": "com.himind.work-log"
-    },
-    {
-      "id": "work-log.project.assign",
       "required": false,
       "min_version": "0.1.0",
       "provider": "com.himind.work-log"
@@ -178,13 +160,19 @@
       "required": false,
       "min_version": "0.16.0",
       "provider": "com.himind.work-log"
+    },
+    {
+      "id": "work-log.entry.patch",
+      "required": false,
+      "min_version": "0.21.1",
+      "provider": "com.himind.work-log"
     }
   ],
   "plugin_dependencies": [
     {
       "plugin_id": "com.himind.work-log",
       "required": true,
-      "min_version": "0.19.0"
+      "min_version": "0.21.2"
     }
   ],
   "risk_summary": "read_only_by_default; writing_logs_requires_user_confirmation",

@@ -35,10 +35,12 @@ func call(t *testing.T, method string, params string) map[string]any {
 func withDataRoot(t *testing.T) {
 	t.Helper()
 	t.Setenv("HIMIND_PLUGIN_DATA_ROOT", t.TempDir())
+	withAgentProjects(t)
 }
 
 func TestUpsertReadAndMerge(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "HiMind 扩展", "项目看板")
 	root := t.TempDir()
 	params := `{"log_root":` + quote(root) + `,"date":"2026-10-09","entries":[
 		{"source":"codex","session_id":"s1","project":"项目看板","category":"development","started_at":"09:30","ended_at":"11:00","title":"实现日志存储","summary":"完成 upsert/list/render"},
@@ -86,6 +88,7 @@ func TestUpsertReadAndMerge(t *testing.T) {
 
 func TestListFiltersByProject(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "HiMind 扩展", "看板", "项目看板")
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-08","entries":[{"project":"项目看板","title":"A"}]}`)
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[{"project":"HiMind 扩展","title":"B"}]}`)
@@ -104,6 +107,7 @@ func TestListFiltersByProject(t *testing.T) {
 // 否则新增的「项目推进记录」会漏掉全部历史条目。
 func TestListByProjectWithoutRangeSpansHistory(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "别的项目", "项目看板")
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2025-01-02","entries":[{"project":"项目看板","title":"旧"}]}`)
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-08","entries":[{"project":"项目看板","title":"新"}]}`)
@@ -126,6 +130,7 @@ func TestListByProjectWithoutRangeSpansHistory(t *testing.T) {
 
 func TestArchiveListAndReport(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "项目看板")
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[
 		{"project":"项目看板","category":"development","started_at":"09:30","title":"实现存储","outcomes":["go test 通过"],"next":["补前端"]}
@@ -188,6 +193,7 @@ func artifactFile(t *testing.T, artifact map[string]any) map[string]any {
 // 工作流会对 exitpoint 的 Artifact 做 JSON schema 校验：uri 必须指向内容合规的 JSON 文件。
 func TestReportArtifactIsSchemaJSON(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "项目看板")
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[{"project":"项目看板","title":"实现存储"}]}`)
 	rendered := call(t, "work-log.report.render", `{"log_root":`+quote(root)+`,"period":"daily","date":"2026-10-09"}`)
@@ -213,6 +219,7 @@ func TestReportArtifactIsSchemaJSON(t *testing.T) {
 
 func TestEntryArtifactMatchesSchema(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "项目看板")
 	root := t.TempDir()
 	upserted := call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[{"project":"项目看板","title":"A"}]}`)
 	arts := upserted["artifacts"].([]any)
@@ -233,6 +240,7 @@ func TestEntryArtifactMatchesSchema(t *testing.T) {
 
 func TestArchiveCalendar(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "HiMind 扩展", "项目看板")
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[
 		{"project":"项目看板","category":"development","title":"A"},
@@ -293,6 +301,7 @@ func TestArchiveCalendar(t *testing.T) {
 
 func TestUpsertFromWorkflowStep(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "demo")
 	root := t.TempDir()
 	// 模拟工作流注入的上下文：上游结构化步骤的输出里有 entries 与 narrative。
 	context := `"workflow_context":{"steps":{"WL-STRUCTURE":{"entries":[` +
@@ -431,6 +440,7 @@ func countReportFiles(t *testing.T, dir string) int {
 
 func TestAggregateCatchUpIsIdempotent(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "P")
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-05","entries":[{"project":"P","title":"甲"}]}`)
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-08","entries":[{"project":"P","title":"乙"}]}`)
@@ -467,6 +477,7 @@ func TestAggregateCatchUpIsIdempotent(t *testing.T) {
 
 func TestAggregateManualForceOverwritesSingleRecord(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "P")
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-14","entries":[{"project":"P","title":"甲"}]}`)
 
@@ -491,6 +502,7 @@ func TestAggregateManualForceOverwritesSingleRecord(t *testing.T) {
 
 func TestAggregateDefaultPeriodsWeeklyAndMonthly(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "P")
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-09-10","entries":[{"project":"P","title":"甲"}]}`)
 	result := call(t, "work-log.report.aggregate", `{"log_root":`+quote(root)+`,"date":"2026-11-05"}`)
@@ -505,6 +517,7 @@ func TestAggregateDefaultPeriodsWeeklyAndMonthly(t *testing.T) {
 
 func TestPreferencesDefaultToCalendarQuarters(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t)
 	root := t.TempDir()
 	got := call(t, "work-log.preferences.get", `{"log_root":`+quote(root)+`}`)
 	if got["fiscal_year_start_month"].(float64) != 1 {
@@ -517,6 +530,7 @@ func TestPreferencesDefaultToCalendarQuarters(t *testing.T) {
 
 func TestPreferencesSaveRejectsOutOfRange(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t)
 	root := t.TempDir()
 	for _, value := range []string{"0", "13", "-1"} {
 		_, rpcError := handle(jsonrpc.Request{
@@ -539,6 +553,7 @@ func TestPreferencesSaveRejectsOutOfRange(t *testing.T) {
 // 设置起算月后，季度报告与年度报告都要按公司口径切分，且归档键带财年起始年。
 func TestFiscalStartMonthDrivesQuarterAndYearReports(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "P")
 	root := t.TempDir()
 	saved := call(t, "work-log.preferences.save", `{"log_root":`+quote(root)+`,"fiscal_year_start_month":2}`)
 	if saved["fiscal_year_start_month"].(float64) != 2 {
@@ -577,6 +592,7 @@ func TestFiscalStartMonthDrivesQuarterAndYearReports(t *testing.T) {
 // 偏好跟着日志库走：换日志根就换口径，避免把公司口径带到别的库里。
 func TestPreferencesAreScopedToLogRoot(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t)
 	first := t.TempDir()
 	second := t.TempDir()
 	call(t, "work-log.preferences.save", `{"log_root":`+quote(first)+`,"fiscal_year_start_month":4}`)
@@ -612,6 +628,7 @@ func TestFiscalQuarterRuleTextHandlesCrossYear(t *testing.T) {
 // 改过起算月后，旧归档的键会变；读取应按覆盖区间回找到原归档，而不是报「没有报告」。
 func TestReportReadFallsBackToArchiveFromOtherFiscalRule(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "P")
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-01-30","entries":[{"project":"P","title":"年初收尾"}]}`)
 
@@ -640,6 +657,7 @@ func TestReportReadFallsBackToArchiveFromOtherFiscalRule(t *testing.T) {
 
 func TestUpsertRejectsBadDate(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t)
 	root := t.TempDir()
 	_, rpcError := handle(jsonrpc.Request{
 		Method: "work-log.entry.upsert",
@@ -659,72 +677,9 @@ func TestOpenLinkValidation(t *testing.T) {
 	}
 }
 
-func TestProjectRegistryNormalizesAndAggregates(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"项目看板","aliases":["project-kanban"]}`)
-	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[
-		{"source":"codex","session_id":"s1","project":"project-kanban","title":"甲"},
-		{"source":"codex","session_id":"s2","project":"项目看板","title":"乙"}
-	]}`)
-	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-09"}`)
-	for _, raw := range read["entries"].([]any) {
-		if item := raw.(map[string]any); item["project"] != "项目看板" {
-			t.Fatalf("别名应归一为规范项目名，实际 %v", item["project"])
-		}
-	}
-	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
-	projects := list["projects"].([]any)
-	if len(projects) != 1 {
-		t.Fatalf("期望 1 个项目，实际 %d", len(projects))
-	}
-	if got := projects[0].(map[string]any)["entry_count"].(float64); got != 2 {
-		t.Fatalf("项目条目数应为 2，实际 %v", got)
-	}
-}
-
-func TestProjectAssignReclassifies(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"新项目"}`)
-	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-07","entries":[{"source":"manual","project":"旧项目","title":"X"}]}`)
-	assigned := call(t, "work-log.project.assign", `{"log_root":`+quote(root)+`,"from":"2026-10-01","to":"2026-10-31","current_project":"旧项目","project":"新项目"}`)
-	if assigned["updated"].(float64) != 1 {
-		t.Fatalf("应重归类 1 条，实际 %v", assigned["updated"])
-	}
-	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-07"}`)
-	if item := read["entries"].([]any)[0].(map[string]any); item["project"] != "新项目" {
-		t.Fatalf("重归类后项目应为新项目，实际 %v", item["project"])
-	}
-}
-
-func TestEntryUpsertAutoCreatesProject(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-06","entries":[{"source":"codex","session_id":"z1","project":"第三方仓库","title":"Z"}]}`)
-	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
-	projects := list["projects"].([]any)
-	if len(projects) != 1 {
-		t.Fatalf("未命中项目名应直接建项目，实际 %v", projects)
-	}
-	if name := projects[0].(map[string]any)["name"]; name != "第三方仓库" {
-		t.Fatalf("自动建项目名应为第三方仓库，实际 %v", name)
-	}
-	if _, err := os.Stat(projectsPath(root)); err != nil {
-		t.Fatal("自动建项目应落盘项目登记文件")
-	}
-	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-06"}`)
-	item := read["entries"].([]any)[0].(map[string]any)
-	if item["project"] != "第三方仓库" {
-		t.Fatalf("条目应归到自动建的项目，实际 %v", item["project"])
-	}
-	if id, _ := item["project_id"].(string); id == "" {
-		t.Fatalf("自动建项目应带稳定 project_id，实际 %v", item)
-	}
-}
-
 func TestReportGroupsByProjectAndFeatureWithMinutes(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "项目看板")
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[
 		{"source":"codex","session_id":"s1","project":"项目看板","feature":"日历视图","category":"development","title":"实现月历","summary":"完成月历栅格","minutes":90,"minutes_source":"measured","outcomes":["月历可用"]},
@@ -761,6 +716,7 @@ func TestReportGroupsByProjectAndFeatureWithMinutes(t *testing.T) {
 
 func TestMergePreservesFeatureAndMinutes(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "P")
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[
 		{"source":"codex","session_id":"m1","project":"P","feature":"F","minutes":45,"minutes_source":"measured","title":"T"}
@@ -783,6 +739,7 @@ func TestMergePreservesFeatureAndMinutes(t *testing.T) {
 
 func TestCalendarTotalsMinutes(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "项目看板")
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[
 		{"project":"项目看板","title":"A","minutes":60,"minutes_source":"measured"},
@@ -886,6 +843,7 @@ func TestSortEntriesKeepsManualOrderSemantics(t *testing.T) {
 
 func TestDeleteEntryRemovesOneAndTrimsDay(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t)
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[
 		{"source":"manual","title":"保留"},
@@ -914,6 +872,7 @@ func TestDeleteEntryRemovesOneAndTrimsDay(t *testing.T) {
 
 func TestDeleteLastEntryRemovesDayFile(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t)
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[{"source":"manual","title":"唯一"}]}`)
 	path := filepath.Join(root, "logs", "2026", "2026-10-09.json")
@@ -937,6 +896,7 @@ func TestDeleteLastEntryRemovesDayFile(t *testing.T) {
 
 func TestDeleteRequiresTarget(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t)
 	root := t.TempDir()
 	if _, rpcError := handle(jsonrpc.Request{Method: "work-log.entry.delete", Params: []byte(`{"log_root":` + quote(root) + `,"date":"2026-10-09"}`)}); rpcError == nil {
 		t.Fatal("缺少 entry_id 时应被拒绝")
@@ -945,6 +905,7 @@ func TestDeleteRequiresTarget(t *testing.T) {
 
 func TestUpsertOverwriteClearsFields(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t)
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[{"source":"manual","title":"编辑前","decisions":["旧决策"],"outcomes":["旧交付"]}]}`)
 	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-09"}`)
@@ -968,6 +929,7 @@ func TestUpsertOverwriteClearsFields(t *testing.T) {
 // （该历史开关已移除，防止连带抹掉手工条目）。
 func TestUpsertModeReplaceDoesNotWipeDay(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t)
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[{"source":"manual","title":"手工补录"}]}`)
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","mode":"replace","entries":[{"source":"codex","session_id":"x1","title":"采集条目"}]}`)
@@ -980,6 +942,7 @@ func TestUpsertModeReplaceDoesNotWipeDay(t *testing.T) {
 
 func TestConcurrentUpsertsDoNotLoseEntries(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t)
 	root := t.TempDir()
 	const n = 20
 	var wg sync.WaitGroup
@@ -1002,6 +965,7 @@ func TestConcurrentUpsertsDoNotLoseEntries(t *testing.T) {
 
 func TestUpsertMergesAISummaryOntoDeterministicBase(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "项目看板")
 	root := t.TempDir()
 	// AI 总结步骤只提供人类可读字段，且故意带上错误工时；base 步骤提供确定性字段。
 	params := `{"log_root":` + quote(root) + `,"date":"2026-10-09",
@@ -1041,6 +1005,7 @@ func TestUpsertMergesAISummaryOntoDeterministicBase(t *testing.T) {
 
 func TestUpsertWritesEntriesToTheirOwnDates(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t)
 	root := t.TempDir()
 	// 运行日 2026-10-11，但条目自带活动日：应各回各自日期，而不是全塞进运行日。
 	params := `{"log_root":` + quote(root) + `,"date":"2026-10-11","entries":[
@@ -1066,6 +1031,7 @@ func TestUpsertWritesEntriesToTheirOwnDates(t *testing.T) {
 
 func TestUpsertRoutesCrossDaySessionByDate(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "项目看板")
 	root := t.TempDir()
 	// 同一次会话跨天：base 与 AI 都带 date，应按「来源+会话+日期」各并各自活动日，不串日。
 	params := `{"log_root":` + quote(root) + `,"date":"2026-10-11",
@@ -1127,152 +1093,16 @@ func quote(value string) string {
 
 // TestWriteAutoCreatesProjectForUnknownPath 验证：路径命中按映射归类；未命中的采集条目
 // 直接建项目（用条目自带项目名 / 目录名）并登记路径映射，不再有「待认领」环节。
-func TestWriteAutoCreatesProjectForUnknownPath(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"深圳科技馆","paths":[{"path":"F:/work/szkjg","kind":"repo"}]}`)
-	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[
-		{"source":"codex","session_id":"a1","repo_path":"F:/work/szkjg/sub/dir","project":"随手起的名字","title":"命中"},
-		{"source":"codex","session_id":"a2","repo_path":"F:/work/unknown-repo","project":"unknown-repo","title":"未命中"}
-	]}`)
-	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-09"}`)
-	got := map[string]map[string]any{}
-	for _, raw := range read["entries"].([]any) {
-		item := raw.(map[string]any)
-		got[item["session_id"].(string)] = item
-	}
-	if got["a1"]["project"] != "深圳科技馆" {
-		t.Fatalf("路径命中应归一为深圳科技馆，实际 %v", got["a1"]["project"])
-	}
-	if got["a2"]["project"] != "unknown-repo" {
-		t.Fatalf("未命中路径应直接建项目 unknown-repo，实际 %v", got["a2"]["project"])
-	}
-	if pid, _ := got["a2"]["project_id"].(string); pid == "" {
-		t.Fatalf("自动建项目应带稳定 project_id，实际 %v", got["a2"])
-	}
-	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
-	if len(list["projects"].([]any)) != 2 {
-		t.Fatalf("未命中应自动建项目，实际 %d 个", len(list["projects"].([]any)))
-	}
-	if len(list["pending_paths"].([]any)) != 0 {
-		t.Fatalf("不再有待认领路径，实际 %v", list["pending_paths"])
-	}
-	// 新会话命中同一路径应直接归到刚建的项目（路径映射已登记）。
-	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-10","entries":[{"source":"codex","session_id":"a3","repo_path":"F:/work/unknown-repo/src","title":"再来"}]}`)
-	read2 := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-10"}`)
-	if read2["entries"].([]any)[0].(map[string]any)["project"] != "unknown-repo" {
-		t.Fatalf("同类会话应自动归类，实际 %v", read2["entries"].([]any)[0])
-	}
-}
 
 // TestAutoCreateUsesHintThenBasename 验证未命中建项目的命名兜底：project_hint 优先，其次目录名。
-func TestAutoCreateUsesHintThenBasename(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-07","entries":[
-		{"source":"codex","session_id":"h1","repo_path":"F:/work/MyRepo","project_hint":"自定义项目名","title":"带建议"},
-		{"source":"codex","session_id":"h2","repo_path":"F:/work/AnotherRepo","title":"无建议"}
-	]}`)
-	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-07"}`)
-	got := map[string]map[string]any{}
-	for _, raw := range read["entries"].([]any) {
-		item := raw.(map[string]any)
-		got[item["session_id"].(string)] = item
-	}
-	if got["h1"]["project"] != "自定义项目名" {
-		t.Fatalf("应优先用 project_hint 建项目，实际 %v", got["h1"]["project"])
-	}
-	if got["h2"]["project"] != "AnotherRepo" {
-		t.Fatalf("无建议应退回目录名建项目，实际 %v", got["h2"]["project"])
-	}
-	names := map[string]bool{}
-	for _, raw := range call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)["projects"].([]any) {
-		if name, _ := raw.(map[string]any)["name"].(string); name != "" {
-			names[name] = true
-		}
-	}
-	if !names["自定义项目名"] || !names["AnotherRepo"] {
-		t.Fatalf("应登记两个新项目，实际 %v", names)
-	}
-}
 
 // TestExhibitPathOutranksProjectPath 验证更具体的展项路径优先于项目路径。
-func TestExhibitPathOutranksProjectPath(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"某馆","paths":[{"path":"F:/work/hall"}]}`)
-	call(t, "work-log.project.claim", `{"log_root":`+quote(root)+`,"repo_path":"F:/work/hall/ex1","project_name":"某馆","exhibit_name":"一号展项"}`)
-	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-08","entries":[{"source":"codex","session_id":"b1","repo_path":"F:/work/hall/ex1/src","title":"展项"}]}`)
-	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-08"}`)
-	item := read["entries"].([]any)[0].(map[string]any)
-	if item["project"] != "某馆" || item["exhibit"] != "一号展项" {
-		t.Fatalf("应命中展项，实际 project=%v exhibit=%v", item["project"], item["exhibit"])
-	}
-}
 
 // TestClaimBackfillsEntriesByPath 验证：显式把仓库路径归到项目时，会回填历史条目。
-func TestClaimBackfillsEntriesByPath(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"新馆"}`)
-	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-05","entries":[{"source":"codex","session_id":"c1","repo_path":"F:/work/mystery","project":"mystery","title":"T"}]}`)
-	// 新行为：写入即自动建项目 mystery（不再是留空待认领）。
-	before := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-05"}`)
-	if before["entries"].([]any)[0].(map[string]any)["project"] != "mystery" {
-		t.Fatal("写入应直接建项目 mystery")
-	}
-	claimed := call(t, "work-log.project.claim", `{"log_root":`+quote(root)+`,"repo_path":"F:/work/mystery","project_name":"新馆"}`)
-	if claimed["updated"].(float64) != 1 {
-		t.Fatalf("应回填 1 条，实际 %v", claimed["updated"])
-	}
-	after := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-05"}`)
-	if after["entries"].([]any)[0].(map[string]any)["project"] != "新馆" {
-		t.Fatal("归到新馆后应显示新馆")
-	}
-	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
-	if len(list["pending_paths"].([]any)) != 0 {
-		t.Fatalf("不应再有待认领，实际 %v", list["pending_paths"])
-	}
-}
 
 // TestProjectMergeMovesEntriesAndPaths 验证合并会搬移条目并保留路径映射。
-func TestProjectMergeMovesEntriesAndPaths(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"目标馆","paths":[{"path":"F:/work/target"}]}`)
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"旧名","aliases":["legacy"]}`)
-	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-04","entries":[{"source":"manual","project":"旧名","title":"m"}]}`)
-	merged := call(t, "work-log.project.merge", `{"log_root":`+quote(root)+`,"from_project":"旧名","to_project":"目标馆"}`)
-	if merged["merged"] != true {
-		t.Fatalf("合并失败: %v", merged)
-	}
-	if merged["updated"].(float64) != 1 {
-		t.Fatalf("应改写 1 条，实际 %v", merged["updated"])
-	}
-	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
-	if len(list["projects"].([]any)) != 1 {
-		t.Fatalf("合并后应剩 1 个项目，实际 %d", len(list["projects"].([]any)))
-	}
-	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-04"}`)
-	if read["entries"].([]any)[0].(map[string]any)["project"] != "目标馆" {
-		t.Fatal("条目应归到目标馆")
-	}
-}
 
 // TestProjectMapPathPreview 验证只读路径预览能力。
-func TestProjectMapPathPreview(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"甲项目"}`)
-	call(t, "work-log.project.path.set", `{"log_root":`+quote(root)+`,"project_name":"甲项目","paths":[{"path":"F:/work/jia","kind":"repo"}]}`)
-	mapped := call(t, "work-log.project.path.map", `{"log_root":`+quote(root)+`,"path":"F:/work/jia/app"}`)
-	if mapped["matched"] != true || mapped["project"] != "甲项目" || mapped["match_type"] != "project_path" {
-		t.Fatalf("路径预览异常: %v", mapped)
-	}
-	if none := call(t, "work-log.project.path.map", `{"log_root":`+quote(root)+`,"path":"F:/elsewhere"}`); none["matched"] != false {
-		t.Fatalf("不应命中: %v", none)
-	}
-}
 
 // firstEntryID 读取某天第一条条目的 entry_id。
 func firstEntryID(t *testing.T, root, date string) string {
@@ -1301,6 +1131,7 @@ func findProjectByName(t *testing.T, root, name string) map[string]any {
 // TestEntryPatchPreservesUnspecifiedFields 验证局部更新只改传入的键，不注入默认值。
 func TestEntryPatchPreservesUnspecifiedFields(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "乙", "甲")
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-06","entries":[{"source":"codex","session_id":"p1","project":"甲","category":"开发","title":"原始标题","summary":"原始摘要","minutes":30}]}`)
 	id := firstEntryID(t, root, "2026-10-06")
@@ -1332,160 +1163,14 @@ func TestEntryPatchPreservesUnspecifiedFields(t *testing.T) {
 }
 
 // TestProjectDeleteBatch 验证批量删除登记项目。
-func TestProjectDeleteBatch(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"甲"}`)
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"乙"}`)
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"丙"}`)
-	pjA := findProjectByName(t, root, "甲")["id"].(string)
-	pjB := findProjectByName(t, root, "乙")["id"].(string)
-	deleted := call(t, "work-log.project.delete", `{"log_root":`+quote(root)+`,"project_ids":[`+quote(pjA)+`,`+quote(pjB)+`]}`)
-	if deleted["count"].(float64) != 2 {
-		t.Fatalf("应删除 2 个，实际 %v", deleted["count"])
-	}
-	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
-	if len(list["projects"].([]any)) != 1 || findProjectByName(t, root, "丙") == nil {
-		t.Fatalf("应只剩「丙」，实际 %v", list["projects"])
-	}
-}
 
 // TestProjectMergeMultiSource 验证一次合并多个来源项目。
-func TestProjectMergeMultiSource(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"目标馆","paths":[{"path":"F:/tgt"}]}`)
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"甲","paths":[{"path":"F:/jia"}]}`)
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"乙"}`)
-	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-03","entries":[{"source":"manual","project":"甲","title":"a"},{"source":"manual","project":"乙","title":"b"}]}`)
-	merged := call(t, "work-log.project.merge", `{"log_root":`+quote(root)+`,"from_projects":["甲","乙"],"to_project":"目标馆"}`)
-	if merged["merged"] != true || merged["updated"].(float64) != 2 {
-		t.Fatalf("多来源合并异常: %v", merged)
-	}
-	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
-	if len(list["projects"].([]any)) != 1 {
-		t.Fatalf("应只剩目标项目，实际 %d", len(list["projects"].([]any)))
-	}
-	target := findProjectByName(t, root, "目标馆")
-	paths := target["paths"].([]any)
-	if len(paths) != 2 {
-		t.Fatalf("来源路径应并入目标，实际 %v", paths)
-	}
-	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-03"}`)
-	for _, raw := range read["entries"].([]any) {
-		if raw.(map[string]any)["project"] != "目标馆" {
-			t.Fatalf("条目应全部归到目标馆: %v", raw)
-		}
-	}
-}
 
 // TestProjectExportImport 验证登记表导出后可在另一日志根导入（含路径与别名）。
-func TestProjectExportImport(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"甲","aliases":["jia"],"paths":[{"path":"F:/jia","kind":"repo"}]}`)
-	exported := call(t, "work-log.project.export", `{"log_root":`+quote(root)+`}`)
-	body := exported["json"].(string)
-	if body == "" || exported["count"].(float64) != 1 {
-		t.Fatalf("导出异常: %v", exported)
-	}
-	root2 := t.TempDir()
-	params, _ := json.Marshal(map[string]any{"log_root": root2, "projects_json": body})
-	imported := call(t, "work-log.project.import", string(params))
-	if imported["created"].(float64) != 1 {
-		t.Fatalf("导入应新建 1 个，实际 %v", imported)
-	}
-	target := findProjectByName(t, root2, "甲")
-	if target == nil {
-		t.Fatal("导入后应存在「甲」")
-	}
-	paths := target["paths"].([]any)
-	if len(paths) != 1 || paths[0].(map[string]any)["path"] != "F:/jia" {
-		t.Fatalf("路径未随导入保留: %v", paths)
-	}
-}
 
 // TestArchiveMigrateStampsSchema 验证迁移把历史文件补齐到当前 schema，并留备份。
-func TestArchiveMigrateStampsSchema(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	dir := filepath.Join(root, "logs", "2026")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	// 旧格式：没有 schema_version，条目缺 date。
-	legacyDay := `{"date":"2026-10-01","entries":[{"source":"manual","title":"旧条目"}]}`
-	if err := os.WriteFile(filepath.Join(dir, "2026-10-01.json"), []byte(legacyDay), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	legacyProjects := `{"projects":[{"name":"旧项目","aliases":[],"status":"active"}]}`
-	if err := os.WriteFile(filepath.Join(root, "projects.json"), []byte(legacyProjects), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	res := call(t, "work-log.archive.migrate", `{"log_root":`+quote(root)+`}`)
-	if res["projects_changed"] != true || res["days_changed"].(float64) != 1 {
-		t.Fatalf("迁移应报告改动: %v", res)
-	}
-	dayBody, _ := os.ReadFile(filepath.Join(dir, "2026-10-01.json"))
-	var day map[string]any
-	if err := json.Unmarshal(dayBody, &day); err != nil {
-		t.Fatal(err)
-	}
-	if day["schema_version"] != schemaVersion {
-		t.Fatalf("日文件 schema 未补齐: %v", day["schema_version"])
-	}
-	item := day["entries"].([]any)[0].(map[string]any)
-	if item["date"] != "2026-10-01" {
-		t.Fatalf("条目 date 未补齐: %v", item["date"])
-	}
-	projBody, _ := os.ReadFile(filepath.Join(root, "projects.json"))
-	var pf map[string]any
-	if err := json.Unmarshal(projBody, &pf); err != nil {
-		t.Fatal(err)
-	}
-	if pf["projects"].([]any)[0].(map[string]any)["id"] == "" {
-		t.Fatal("项目 ID 未补齐")
-	}
-	if _, err := os.Stat(filepath.Join(dir, "2026-10-01.json.bak")); err != nil {
-		t.Fatalf("写前应生成 .bak 备份: %v", err)
-	}
-}
 
 // TestProjectRenameRebindsEntries 验证项目改名：保持稳定 ID，并把历史条目回绑到新名。
-func TestProjectRenameRebindsEntries(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"甲"}`)
-	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-02","entries":[{"source":"manual","project":"甲","title":"a"},{"source":"manual","project":"甲","title":"b"}]}`)
-	before := findProjectByName(t, root, "甲")
-	id := before["id"].(string)
-
-	renamed := call(t, "work-log.project.rename", `{"log_root":`+quote(root)+`,"project_id":`+quote(id)+`,"new_name":"甲馆"}`)
-	if renamed["renamed"] != true || renamed["updated"].(float64) != 2 {
-		t.Fatalf("改名应回绑 2 条: %v", renamed)
-	}
-	if findProjectByName(t, root, "甲") != nil {
-		t.Fatal("旧名不应再存在")
-	}
-	after := findProjectByName(t, root, "甲馆")
-	if after == nil || after["id"].(string) != id {
-		t.Fatalf("改名应保持稳定 ID，实际 %v", after)
-	}
-	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-02"}`)
-	for _, raw := range read["entries"].([]any) {
-		item := raw.(map[string]any)
-		if item["project"] != "甲馆" || item["project_id"] != id {
-			t.Fatalf("条目未回绑到新名: %v", item)
-		}
-	}
-
-	// 新名被其它项目占用时应报错，而不是静默覆盖。
-	call(t, "work-log.project.upsert", `{"log_root":`+quote(root)+`,"project_name":"乙"}`)
-	_, rpcError := handle(jsonrpc.Request{Method: "work-log.project.rename", Params: []byte(`{"log_root":` + quote(root) + `,"project_id":` + quote(id) + `,"new_name":"乙"}`)})
-	if rpcError == nil {
-		t.Fatal("名称冲突时应报错")
-	}
-}
 
 // TestProjectAutofillFromSessionMaterial 验证从会话素材搜一轮自动补全项目路径，且 dry_run 不写盘。
 func TestSessionMaterialDirOwnedByWorkLog(t *testing.T) {
@@ -1551,60 +1236,6 @@ func TestPreferCandidatePath(t *testing.T) {
 
 // TestProjectSyncEnrichesOnlyLocalAssociations 验证：工作台同步只增补本地已有关联的项目/展项，
 // 不对整个工作台目录做批量导入；本地未实际用到的项目/展项一律跳过。
-func TestProjectSyncEnrichesOnlyLocalAssociations(t *testing.T) {
-	withDataRoot(t)
-	root := t.TempDir()
-
-	// 先建立本地项目（写入会按项目名/路径自动建项目，这里用导入显式带上展项）。
-	seed := `{"projects":[{"name":"邯郸馆","exhibits":[{"name":"诗海词趣","id":"exh_local"}]}]}`
-	call(t, "work-log.project.import", `{"log_root":`+quote(root)+`,"projects_json":`+quote(seed)+`}`)
-	// 本地只实际用到一个项目，且条目带了一个展项。
-	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-09","entries":[
-		{"source":"codex","session_id":"a1","project":"邯郸馆","exhibit":"诗海词趣","title":"做展项"}
-	]}`)
-	list := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
-	projects := list["projects"].([]any)
-	if len(projects) != 1 {
-		t.Fatalf("本地应只有 1 个项目，实际 %d", len(projects))
-	}
-	if ex := projects[0].(map[string]any)["exhibits"].([]any); len(ex) != 1 {
-		t.Fatalf("已登记的展项应保留，实际 %d 个", len(ex))
-	}
-
-	// 工作台带来 2 个项目、3 个展项，其中只有一个项目/展项是本地真正用过的。
-	syncParams := `{"log_root":` + quote(root) + `,"projects":[
-		{"project_name":"邯郸馆","id":"prj_handan"},
-		{"project_name":"从未用过的馆","id":"prj_unused"}
-	],"exhibits":[
-		{"exhibit_name":"诗海词趣","pid":"exh_1","project_id":"prj_handan"},
-		{"exhibit_name":"没用过的展项","pid":"exh_2","project_id":"prj_handan"},
-		{"exhibit_name":"另一个馆的展项","pid":"exh_3","project_id":"prj_unused"}
-	]}`
-	res := call(t, "work-log.project.sync", syncParams)
-	if res["created"].(float64) != 0 {
-		t.Fatalf("同步不应新建项目，实际 created=%v", res["created"])
-	}
-	if res["skipped"].(float64) == 0 {
-		t.Fatalf("同步应跳过无本地关联项，实际 skipped=%v", res["skipped"])
-	}
-
-	after := call(t, "work-log.project.list", `{"log_root":`+quote(root)+`}`)
-	aps := after["projects"].([]any)
-	if len(aps) != 1 {
-		t.Fatalf("同步后本地仍应只有 1 个项目，实际 %d", len(aps))
-	}
-	p := aps[0].(map[string]any)
-	if p["external_id"] != "prj_handan" {
-		t.Fatalf("已有关联项目应补上 external_id，实际 %v", p["external_id"])
-	}
-	ex := p["exhibits"].([]any)
-	if len(ex) != 1 {
-		t.Fatalf("未使用的展项不应被引入，实际 %d 个", len(ex))
-	}
-	if ex[0].(map[string]any)["external_id"] != "exh_1" {
-		t.Fatalf("已有关联展项应补上 external_id，实际 %v", ex[0].(map[string]any)["external_id"])
-	}
-}
 
 // writeDayFixture 直接写一个日文件，解耦去重测试与写入幂等行为。
 func writeDayFixture(t *testing.T, root, date string, entries []map[string]any) {
@@ -1627,6 +1258,7 @@ func writeDayFixture(t *testing.T, root, date string, entries []map[string]any) 
 // 归集出的正常记录，默认不该被合并。
 func TestDedupeKeepsCrossDayByDefault(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t)
 	root := t.TempDir()
 	writeDayFixture(t, root, "2026-06-18", []map[string]any{{
 		"entry_id": "wl-a", "date": "2026-06-18", "source": "codex", "session_id": "s1",
@@ -1664,6 +1296,7 @@ func TestDedupeKeepsCrossDayByDefault(t *testing.T) {
 // TestDedupeMergesSameDayDuplicates 验证默认语义仍会合并「同一天+同一会话」的真正重复条目。
 func TestDedupeMergesSameDayDuplicates(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t)
 	root := t.TempDir()
 	writeDayFixture(t, root, "2026-06-18", []map[string]any{
 		{
@@ -1707,6 +1340,7 @@ func TestDedupeMergesSameDayDuplicates(t *testing.T) {
 // TestDedupeCrossDayOptIn 验证显式 cross_day=true 才退回旧的跨天合并行为（合并到最早日期）。
 func TestDedupeCrossDayOptIn(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t)
 	root := t.TempDir()
 	writeDayFixture(t, root, "2026-06-18", []map[string]any{{
 		"entry_id": "wl-a", "date": "2026-06-18", "source": "codex", "session_id": "s1",
@@ -1750,6 +1384,7 @@ func TestDedupeCrossDayOptIn(t *testing.T) {
 // TestEntryLockPreventsOverwrite 验证手工锁定条目不会被自动写入改写，只有显式 overwrite 才能覆盖。
 func TestEntryLockPreventsOverwrite(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "P")
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-05","entries":[{"source":"codex","session_id":"lk1","project":"P","title":"原始","summary":"原始摘要"}]}`)
 	read := call(t, "work-log.entry.read", `{"log_root":`+quote(root)+`,"date":"2026-10-05"}`)
@@ -1776,6 +1411,7 @@ func TestEntryLockPreventsOverwrite(t *testing.T) {
 // TestEntryExportImportRoundTrip 验证导出/导入可往返迁移，且重复导入幂等。
 func TestEntryExportImportRoundTrip(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "项目看板")
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-04","entries":[{"source":"codex","session_id":"e1","project":"项目看板","title":"甲","minutes":30,"minutes_source":"measured"}]}`)
 	exported := call(t, "work-log.entry.export", `{"log_root":`+quote(root)+`}`)
@@ -1802,6 +1438,7 @@ func TestEntryExportImportRoundTrip(t *testing.T) {
 // TestArchiveBackupAndRestore 验证整库备份后可从备份包一键恢复。
 func TestArchiveBackupAndRestore(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "P")
 	root := t.TempDir()
 	call(t, "work-log.entry.upsert", `{"log_root":`+quote(root)+`,"date":"2026-10-03","entries":[{"source":"codex","session_id":"b1","project":"P","title":"备份前"}]}`)
 	bk := call(t, "work-log.archive.backup", `{"log_root":`+quote(root)+`}`)
@@ -1831,6 +1468,7 @@ func TestArchiveBackupAndRestore(t *testing.T) {
 // TestEntryReconcileDetectsMissing 验证重扫对账能发现「有语料但未入账」的会话。
 func TestEntryReconcileDetectsMissing(t *testing.T) {
 	withDataRoot(t)
+	withAgentProjects(t, "项目看板")
 	root := t.TempDir()
 	material := t.TempDir()
 	materialDoc := `{"sessions":[

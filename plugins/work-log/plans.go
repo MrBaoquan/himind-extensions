@@ -396,7 +396,10 @@ func planSaveCap(in input) (any, error) {
 	if strings.TrimSpace(plan.Date) == "" {
 		plan.Date = strings.TrimSpace(in.Date)
 	}
-	unlock := lockRoot(root)
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 	if existing, err := readPlan(root, normalizeDate(plan.Date)); err == nil && existing.Revision > plan.Revision {
 		plan.Revision = existing.Revision
